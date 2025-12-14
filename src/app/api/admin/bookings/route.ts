@@ -18,7 +18,7 @@ export interface BookingWithDetails {
   numberOfChildren: number;
   costCategory: '>150 children' | '<150 children';
   bookingDate: string;
-  status: 'confirmed' | 'pending' | 'cancelled';
+  status: 'confirmed' | 'pending' | 'cancelled' | 'hold' | 'no_region';
   startTime?: string;
   endTime?: string;
   eventName?: string;
