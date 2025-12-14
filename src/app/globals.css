@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm Sage Color Palette */
+    --background: 40 50% 96.5%; /* #F9F6EE - Warm cream background */
+    --foreground: 170 15% 25%; /* Dark sage for text */
+    --card: 0 0% 100%; /* Keep cards white for contrast */
+    --card-foreground: 170 15% 25%; /* Dark sage text on cards */
+    --popover: 0 0% 100%;
+    --popover-foreground: 170 15% 25%;
+    --primary: 170 14% 66%; /* #94B8B3 - Primary sage */
+    --primary-foreground: 0 0% 100%; /* White text on primary */
+    --secondary: 30 35% 85%; /* #E8D5C7 - Warm accent cream */
+    --secondary-foreground: 170 15% 30%;
+    --muted: 40 30% 94%; /* Light cream for muted backgrounds */
+    --muted-foreground: 170 10% 45%;
+    --accent: 170 20% 75%; /* Light sage accent */
+    --accent-foreground: 170 25% 25%;
+    --destructive: 0 84.2% 60.2%; /* Keep red for errors */
+    --destructive-foreground: 210 40% 98%;
+    --border: 40 20% 90%; /* Subtle cream border */
+    --input: 40 20% 92%; /* Light cream input background */
+    --ring: 170 14% 66%; /* Sage focus ring */
+    --radius: 0.5rem;
+  }
+
+  /* Remove dark mode for now as requested */
+  .dark {
+    /* Dark mode disabled per client request */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans text-lg;
+    letter-spacing: 0.25px;
+  }
+
+  /* MiniMusiker Typography */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-bold text-minimusik-heading;
+  }
+
+  h1 {
+    @apply text-5xl md:text-6xl tracking-tight;
+  }
+
+  h2 {
+    @apply text-4xl md:text-5xl tracking-tight;
+  }
+
+  h3 {
+    @apply text-3xl md:text-4xl;
+  }
+
+  h4 {
+    @apply text-2xl md:text-3xl;
+  }
+
+  h5 {
+    @apply text-xl md:text-2xl;
+  }
+
+  h6 {
+    @apply text-lg md:text-xl;
+  }
+
+  /* Button styles */
+  .btn-primary {
+    @apply font-button font-bold uppercase text-lg tracking-wide;
+  }
+}
+
+/* Custom utility classes */
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out;
+  }
+
+  .animate-slide-in {
+    animation: slide-in 0.3s ease-out;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus styles */
+*:focus-visible {
+  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-md;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/30;
+}

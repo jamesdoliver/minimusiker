@@ -1,0 +1,21 @@
+{
+  "name": "MiniMusiker - School Music Event Platform",
+  "short_name": "MiniMusiker",
+  "description": "Manage school music events from notification to delivery",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7D9B8E",
+  "icons": [
+    {
+      "src": "/images/minimusiker_logo.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/images/minimusiker_logo.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
