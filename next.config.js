@@ -2,6 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  eslint: {
+    // Disable ESLint during production builds - linting runs locally during development
+    ignoreDuringBuilds: true,
+  },
   images: {
     remotePatterns: [
       {
