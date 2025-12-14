@@ -64,7 +64,7 @@ export function validatePhoneNumber(phone: string): {
   }
 
   // Allow various phone formats
-  const phonePattern = /^[\d\s\-\+\(\)]{8,20}$/;
+  const phonePattern = /^[\d\s\-+()]{8,20}$/;
   if (!phonePattern.test(trimmed)) {
     return { valid: false, error: 'Invalid phone number format' };
   }
