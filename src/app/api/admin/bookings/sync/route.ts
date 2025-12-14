@@ -95,8 +95,8 @@ export async function POST() {
         const startParsed = parseDateTime(booking.start_date);
         const endParsed = parseDateTime(booking.end_date);
 
-        // Determine status from is_confirm field (comes as string "1" or "0")
-        const isConfirmed = booking.is_confirm === '1' || booking.is_confirm === 1 || booking.is_confirmed === true;
+        // Determine status from is_confirmed field
+        const isConfirmed = booking.is_confirmed === true;
 
         // Create record in Airtable
         // Note: Region field is a single-select with predefined options - we skip it
