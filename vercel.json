@@ -8,26 +8,6 @@
   "env": {
     "NODE_ENV": "production"
   },
-  "build": {
-    "env": {
-      "NEXT_PUBLIC_APP_URL": "@next_public_app_url",
-      "AIRTABLE_API_KEY": "@airtable_api_key",
-      "AIRTABLE_BASE_ID": "@airtable_base_id",
-      "R2_ENDPOINT": "@r2_endpoint",
-      "R2_ACCESS_KEY_ID": "@r2_access_key_id",
-      "R2_SECRET_ACCESS_KEY": "@r2_secret_access_key",
-      "R2_BUCKET_NAME": "@r2_bucket_name",
-      "SHOPIFY_STORE_DOMAIN": "@shopify_store_domain",
-      "SHOPIFY_STOREFRONT_ACCESS_TOKEN": "@shopify_storefront_access_token",
-      "SHOPIFY_ADMIN_ACCESS_TOKEN": "@shopify_admin_access_token",
-      "SHOPIFY_WEBHOOK_SECRET": "@shopify_webhook_secret",
-      "SENDGRID_API_KEY": "@sendgrid_api_key",
-      "SENDGRID_FROM_EMAIL": "@sendgrid_from_email",
-      "SENDGRID_FROM_NAME": "@sendgrid_from_name",
-      "JWT_SECRET": "@jwt_secret",
-      "ADMIN_PASSWORD_HASH": "@admin_password_hash"
-    }
-  },
   "functions": {
     "src/app/api/admin/dashboard-stats/route.ts": {
       "maxDuration": 30
