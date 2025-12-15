@@ -33,14 +33,14 @@ export default function CheckoutButton({
     try {
       // Prepare line items for Shopify
       const lineItems = selectedProducts.map((selection) => {
-        const product = products.find((p) => p.product_id === selection.productId);
+        const product = products.find((p) => p.id === selection.productId);
         if (!product) throw new Error('Product not found');
 
         return {
-          productId: product.shopify_product_id,
+          productId: product.id,
           variantId: selection.size
-            ? product.shopify_variant_ids?.find((v) => v.includes(selection.size!))
-            : product.shopify_variant_ids?.[0],
+            ? product.variants?.find((v) => v.selectedOptions?.some(opt => opt.value === selection.size))?.id
+            : product.variants?.[0]?.id,
           quantity: selection.quantity,
         };
       });
