@@ -54,7 +54,7 @@ export function verifyParentSession(request: NextRequest): ParentSession | null 
  */
 export function createParentSessionToken(
   session: ParentSession,
-  expiresIn: string | number = '7d'
+  expiresIn: number = 604800  // 7 days in seconds
 ): string {
   return jwt.sign(session, PARENT_JWT_SECRET, { expiresIn });
 }
