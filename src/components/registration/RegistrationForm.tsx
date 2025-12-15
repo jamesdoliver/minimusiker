@@ -7,11 +7,11 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { RegistrationData, ChildRegistrationData } from '@/lib/types/registration';
 import {
   validateParentName,
-  validateEmail,
   validatePhoneNumber,
   validateChildName,
   checkDuplicateChildren,
 } from '@/lib/validators/registrationValidators';
+import { validateEmail } from '@/lib/utils/validators';
 
 interface RegistrationFormProps {
   eventId: string;
