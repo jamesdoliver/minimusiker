@@ -54,7 +54,7 @@ export function verifyEngineerSession(request: NextRequest): EngineerSession | n
  */
 export function createEngineerSessionToken(
   session: EngineerSession,
-  expiresIn: string | number = ENGINEER_SESSION_EXPIRY_SECONDS
+  expiresIn: number = ENGINEER_SESSION_EXPIRY_SECONDS
 ): string {
   return jwt.sign(session, ENGINEER_JWT_SECRET, { expiresIn });
 }
