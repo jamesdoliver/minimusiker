@@ -30,10 +30,14 @@ export function verifyParentSession(request: NextRequest): ParentSession | null 
       parentId: decoded.parentId,
       email: decoded.email,
       firstName: decoded.firstName,
-      lastName: decoded.lastName,
-      eventId: decoded.eventId,
+      bookingId: decoded.bookingId,
+      schoolName: decoded.schoolName,
       schoolId: decoded.schoolId,
-      studentIds: decoded.studentIds,
+      eventType: decoded.eventType,
+      eventId: decoded.eventId,
+      childName: decoded.childName,
+      bookingDate: decoded.bookingDate,
+      children: decoded.children || [],
       loginTimestamp: decoded.loginTimestamp,
     };
   } catch (error) {
