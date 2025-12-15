@@ -45,6 +45,14 @@ export async function GET(request: NextRequest) {
           eventType: decoded.eventType,
           childName: decoded.childName,
           loginTimestamp: decoded.loginTimestamp,
+          children: decoded.children || [{
+            childName: decoded.childName,
+            bookingId: decoded.bookingId,
+            class: '',
+            eventId: '',
+            schoolName: decoded.schoolName,
+            eventType: decoded.eventType,
+          }],
         },
       });
     } catch (jwtError: any) {
