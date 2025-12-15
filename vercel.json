@@ -52,23 +52,5 @@
       "source": "/robots.txt",
       "destination": "/api/robots"
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/send-t8-notifications",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/send-t4-notifications",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/send-t2-notifications",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/send-follow-ups",
-      "schedule": "0 10 * * *"
-    }
   ]
 }
