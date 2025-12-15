@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ApiResponse } from '@/types';
+import { ApiResponse } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {

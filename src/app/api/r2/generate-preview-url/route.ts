@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ApiResponse } from '@/types';
+import { ApiResponse } from '@/lib/types';
 import { getR2Service } from '@/lib/services/r2Service';
 
 export async function GET(request: NextRequest) {

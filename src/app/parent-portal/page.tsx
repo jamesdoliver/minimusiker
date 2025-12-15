@@ -9,7 +9,7 @@ import ProductSelector from '@/components/parent-portal/ProductSelector';
 import { CartProvider } from '@/lib/contexts/CartContext';
 import { FeaturedProducts, CartSummary, CartDrawer } from '@/components/shop';
 import { useProducts } from '@/lib/hooks/useProducts';
-import { ParentSession, ParentPortalData } from '@/types';
+import { ParentSession, ParentPortalData } from '@/lib/types';
 
 // Inner component that uses hooks
 function ParentPortalContent() {

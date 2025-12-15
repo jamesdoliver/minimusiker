@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { ApiResponse, AuthTokenPayload } from '@/types';
+import { ApiResponse, AuthTokenPayload } from '@/lib/types';
 
 // In production, store these in a database
 const ADMIN_USERS = [
