@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Product, ParentSessionChild } from '@/types/airtable';
-import CheckoutButton from '@/components/landing/CheckoutButton';
 
 interface BundleOfferProps {
   eventId: string;
