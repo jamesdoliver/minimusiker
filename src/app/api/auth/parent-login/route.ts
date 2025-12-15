@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
         school: {
           id: schoolId,
           name: parentJourney.school_name,
-          teacher: parentJourney.teacher_name,
+          teacher: parentJourney.main_teacher,
           class: parentJourney.class,
         },
         event: {
