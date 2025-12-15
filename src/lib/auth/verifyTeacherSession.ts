@@ -47,7 +47,7 @@ export function verifyTeacherSession(request: NextRequest): TeacherSession | nul
  */
 export function createTeacherSessionToken(
   session: TeacherSession,
-  expiresIn: string | number = TEACHER_SESSION_EXPIRY_SECONDS
+  expiresIn: number = TEACHER_SESSION_EXPIRY_SECONDS
 ): string {
   return jwt.sign(session, TEACHER_JWT_SECRET, { expiresIn });
 }

@@ -46,7 +46,7 @@ export function verifyStaffSession(request: NextRequest): StaffSession | null {
  */
 export function createStaffSessionToken(
   session: StaffSession,
-  expiresIn: string | number = '24h'
+  expiresIn: number = 86400  // 24 hours in seconds
 ): string {
   return jwt.sign(session, STAFF_JWT_SECRET, { expiresIn });
 }
