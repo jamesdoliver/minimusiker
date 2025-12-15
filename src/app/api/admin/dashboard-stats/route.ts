@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import airtableService from '@/lib/services/airtableService';
-import { ApiResponse, DashboardStats } from '@/types';
+import { ApiResponse, DashboardStats } from '@/lib/types';
 
 // Middleware to verify admin authentication
 async function verifyAdmin(request: NextRequest) {
