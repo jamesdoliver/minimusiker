@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { airtableService } from '@/lib/services/airtableService';
+import airtableService from '@/lib/services/airtableService';
 import HeroSection from '@/components/landing/HeroSection';
 import StudentCard from '@/components/landing/StudentCard';
 import PreviewPlayer from '@/components/landing/PreviewPlayer';

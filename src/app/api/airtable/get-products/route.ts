@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { airtableService } from '@/lib/services/airtableService';
-import { ApiResponse, Product } from '@/types';
+import airtableService from '@/lib/services/airtableService';
+import { ApiResponse, Product } from '@/lib/types';
 
 export async function GET(request: NextRequest) {
   try {
