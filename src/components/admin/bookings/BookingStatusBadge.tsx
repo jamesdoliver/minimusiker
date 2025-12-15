@@ -1,6 +1,6 @@
 'use client';
 
-type BookingStatus = 'confirmed' | 'hold' | 'no_region';
+type BookingStatus = 'confirmed' | 'hold' | 'no_region' | 'pending' | 'cancelled';
 
 interface BookingStatusBadgeProps {
   status: BookingStatus;
@@ -18,6 +18,14 @@ const statusConfig: Record<BookingStatus, { label: string; className: string }> 
   no_region: {
     label: 'NO REGION',
     className: 'bg-red-100 text-red-800 border-red-200',
+  },
+  pending: {
+    label: 'Pending',
+    className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    className: 'bg-gray-100 text-gray-600 border-gray-200',
   },
 };
 
