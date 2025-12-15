@@ -104,7 +104,7 @@ export async function POST() {
         await airtable.table(SCHOOL_BOOKINGS_TABLE_ID).create({
           [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id]: booking.id,
           [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_hash]: booking.hash || booking.code || '',
-          [SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name]: mappedData.contactPerson || booking.client || booking.text || '',
+          [SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name]: mappedData.contactPerson || booking.client_name || '',
           [SCHOOL_BOOKINGS_FIELD_IDS.school_contact_email]: mappedData.contactEmail || booking.client_email || '',
           [SCHOOL_BOOKINGS_FIELD_IDS.school_phone]: mappedData.phone || booking.client_phone || '',
           [SCHOOL_BOOKINGS_FIELD_IDS.school_address]: mappedData.address || '',
