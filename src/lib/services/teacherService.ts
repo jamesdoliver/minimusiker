@@ -537,7 +537,7 @@ class TeacherService {
     }
   ): Promise<AudioFile> {
     try {
-      const updateData: Record<string, unknown> = {};
+      const updateData: Record<string, string | number | boolean | undefined> = {};
       if (data.r2Key !== undefined) updateData.r2_key = data.r2Key;
       if (data.filename !== undefined) updateData.filename = data.filename;
       if (data.uploadedBy !== undefined) updateData.uploaded_by = data.uploadedBy;
