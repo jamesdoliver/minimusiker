@@ -120,7 +120,7 @@ function ParentPortalContent() {
   const selectedChild = children[selectedChildIndex] || null;
 
   const schoolName = selectedChild?.schoolName || session?.schoolName || portalData?.parentJourney?.school_name || 'Springfield Elementary School';
-  const schoolColor = portalData?.school?.branding_color || '#94B8B3';
+  const schoolColor = '#94B8B3'; // Default sage color
   const eventType = selectedChild?.eventType || session?.eventType || portalData?.parentJourney?.event_type || 'Spring Concert';
   const eventDate = selectedChild?.bookingDate || session?.bookingDate || portalData?.parentJourney?.booking_date || '2024-12-15';
   const classId = selectedChild?.classId || portalData?.parentJourney?.class_id;
@@ -281,39 +281,12 @@ function ParentPortalContent() {
               )}
             </div>
 
-            {/* Student Information */}
-            {session.studentIds && session.studentIds.length > 0 && (
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">
-                  Your Children
-                </h3>
-                <div className="space-y-3">
-                  {portalData?.students?.map((student, index) => (
-                    <div key={student.id || index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                      <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-white font-bold">
-                        {student.first_name[0]}{student.last_name[0]}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {student.first_name} {student.last_name}
-                        </p>
-                        {student.grade && (
-                          <p className="text-sm text-gray-600">Grade {student.grade}</p>
-                        )}
-                      </div>
-                    </div>
-                  )) || (
-                    <p className="text-gray-600">Student information loading...</p>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Right Column - Product Selector */}
           <div>
             <ProductSelector
-              eventId={portalData?.event?.event_id || session.eventId || 'demo'}
+              eventId={session.eventId || 'demo'}
               parentId={session.parentId}
               schoolName={schoolName}
               children={children}
