@@ -40,12 +40,12 @@ export default function AdminLayout({
         setIsAuthenticated(true);
       } else {
         setIsAuthenticated(false);
-        router.push('/admin/login');
+        router.push('/admin-login');
       }
     } catch (error) {
       console.error('Auth check failed:', error);
       setIsAuthenticated(false);
-      router.push('/admin/login');
+      router.push('/admin-login');
     } finally {
       setIsLoading(false);
     }
