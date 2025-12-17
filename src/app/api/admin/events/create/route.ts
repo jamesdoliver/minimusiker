@@ -3,6 +3,7 @@ import airtableService from '@/lib/services/airtableService';
 import { generateClassId } from '@/lib/utils/eventIdentifiers';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { validateEventCreation, sanitizeString } from '@/lib/utils/validators';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
 interface ClassInput {
   className: string;
@@ -26,6 +27,15 @@ interface CreatedClass {
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     // Parse request body
     const body: CreateEventRequest = await request.json();
 
@@ -200,6 +210,15 @@ export async function POST(request: NextRequest) {
 // GET endpoint to retrieve event details (optional)
 export async function GET(request: NextRequest) {
   try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const bookingId = searchParams.get('bookingId');
 

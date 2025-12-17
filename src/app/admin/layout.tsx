@@ -26,10 +26,7 @@ export default function AdminLayout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    // Skip authentication check for development
-    // TODO: Re-enable auth check in production
-    setIsAuthenticated(true);
-    setIsLoading(false);
+    checkAuth();
   }, []);
 
   const checkAuth = async () => {

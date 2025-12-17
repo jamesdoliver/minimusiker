@@ -1,20 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import airtableService from '@/lib/services/airtableService';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
 /**
  * POST /api/admin/events/[eventId]/assign-staff
  * Assign a staff member to all records with the given booking_id
  * Request body: { staffId: string | null }
  * Pass null to unassign staff
- *
- * Note: No auth required as this follows the admin API pattern
- * (admin auth to be implemented across all admin routes later)
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: { eventId: string } }
 ) {
   try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { staffId } = await request.json();
     const eventId = decodeURIComponent(params.eventId);
 

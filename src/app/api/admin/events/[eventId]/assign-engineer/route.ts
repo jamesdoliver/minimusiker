@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import airtableService from '@/lib/services/airtableService';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
 /**
  * POST /api/admin/events/[eventId]/assign-engineer
@@ -13,9 +14,14 @@ export async function POST(
   { params }: { params: { eventId: string } }
 ) {
   try {
-    // Note: In production, add admin authentication check here
-    // const session = verifyAdminSession(request);
-    // if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     const eventId = decodeURIComponent(params.eventId);
     const { engineerId } = await request.json();
@@ -93,6 +99,15 @@ export async function GET(
   { params }: { params: { eventId: string } }
 ) {
   try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const eventId = decodeURIComponent(params.eventId);
 
     // Get event detail which includes assigned engineer info

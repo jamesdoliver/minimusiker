@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateMockInventory, StockItem } from '@/lib/types/stock';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
 // In-memory storage for development (will be replaced with Airtable)
 let inventoryCache: StockItem[] | null = null;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     // Use cached data or generate new mock data
     if (!inventoryCache) {
       inventoryCache = generateMockInventory();
@@ -26,6 +36,15 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { id, costOverride } = body;
 

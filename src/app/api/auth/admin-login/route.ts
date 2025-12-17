@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { ApiResponse, AuthTokenPayload } from '@/lib/types';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
 // In production, store these in a database
 const ADMIN_USERS = [
@@ -12,6 +13,32 @@ const ADMIN_USERS = [
     role: 'admin' as const,
   },
 ];
+
+/**
+ * GET /api/auth/admin-login
+ * Verify admin session - returns user info if authenticated
+ */
+export async function GET(request: NextRequest) {
+  const session = verifyAdminSession(request);
+
+  if (!session) {
+    return NextResponse.json<ApiResponse>(
+      { success: false, error: 'Not authenticated' },
+      { status: 401 }
+    );
+  }
+
+  return NextResponse.json<ApiResponse>({
+    success: true,
+    data: {
+      user: {
+        id: session.userId,
+        email: session.email,
+        role: session.role,
+      },
+    },
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import jwt from 'jsonwebtoken';
 import airtableService from '@/lib/services/airtableService';
 import { SchoolBooking } from '@/lib/types/airtable';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
 // Extended booking data for display
 export interface BookingWithDetails {
@@ -22,23 +21,6 @@ export interface BookingWithDetails {
   startTime?: string;
   endTime?: string;
   eventName?: string;
-}
-
-// Middleware to verify admin authentication
-async function verifyAdmin() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('admin_token')?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as Record<string, unknown>;
-    return decoded;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -72,17 +54,13 @@ function transformToBookingWithDetails(booking: SchoolBooking): BookingWithDetai
  */
 export async function GET(request: NextRequest) {
   try {
-    // Skip authentication check for development
-    const isDev = process.env.NODE_ENV === 'development';
-
-    if (!isDev) {
-      const admin = await verifyAdmin();
-      if (!admin) {
-        return NextResponse.json(
-          { success: false, error: 'Unauthorized' },
-          { status: 401 }
-        );
-      }
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
     // Parse query params

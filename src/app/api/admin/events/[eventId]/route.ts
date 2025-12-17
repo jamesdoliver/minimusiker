@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import airtableService from '@/lib/services/airtableService';
 import { SchoolEventDetail } from '@/lib/types/airtable';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { eventId: string } }
 ) {
   try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const eventId = decodeURIComponent(params.eventId);
 
     // First try to get event detail from parent_journey_table (has class data)

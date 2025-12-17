@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { simplybookService } from '@/lib/services/simplybookService';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import {
   SCHOOL_BOOKINGS_TABLE_ID,
   SCHOOL_BOOKINGS_FIELD_IDS,
@@ -16,8 +17,16 @@ const airtable = new Airtable({ apiKey: airtableApiKey }).base(airtableBaseId);
  * One-time sync of future bookings from SimplyBook to Airtable
  * Fetches all bookings from today onwards and creates Airtable records
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
     // Get today's date in YYYY-MM-DD format
     const today = new Date().toISOString().split('T')[0];
 
@@ -167,7 +176,16 @@ export async function POST() {
  * GET /api/admin/bookings/sync
  * Returns info about the sync endpoint
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Verify admin authentication
+  const admin = verifyAdminSession(request);
+  if (!admin) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+
   return NextResponse.json({
     endpoint: '/api/admin/bookings/sync',
     method: 'POST',
