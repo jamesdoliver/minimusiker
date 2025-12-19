@@ -62,7 +62,7 @@ const nextConfig = {
           },
         ],
         permanent: false,
-        destination: '/admin/login',
+        destination: '/admin-login',
       },
     ];
   },
