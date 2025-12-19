@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { ApiResponse, AuthTokenPayload } from '@/lib/types';
-import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
+import { ApiResponse } from '@/lib/types';
+import { verifyAdminSession, AdminSession } from '@/lib/auth/verifyAdminSession';
+import airtableService from '@/lib/services/airtableService';
 
-// In production, store these in a database
-const ADMIN_USERS = [
-  {
-    id: 'admin_1',
-    email: 'admin@minimusiker.com',
-    passwordHash: process.env.ADMIN_PASSWORD_HASH || '',
-    role: 'admin' as const,
-  },
-];
+const ADMIN_SESSION_COOKIE = 'admin_token';
+const ADMIN_SESSION_EXPIRY = 60 * 60 * 8; // 8 hours in seconds
 
 /**
  * GET /api/auth/admin-login
@@ -40,6 +33,13 @@ export async function GET(request: NextRequest) {
   });
 }
 
+/**
+ * POST /api/auth/admin-login
+ * Admin login via Airtable Personen table
+ * - Email: E-Mail field from Personen table
+ * - Password: ID field (autonumber) from Personen table
+ * - Additional check: User must have Admin role
+ */
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
@@ -51,56 +51,66 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find admin user
-    const adminUser = ADMIN_USERS.find((user) => user.email === email);
+    // Find staff member by email in Personen table
+    const staff = await airtableService.getStaffByEmail(email);
 
-    if (!adminUser) {
+    if (!staff) {
       return NextResponse.json<ApiResponse>(
-        { success: false, error: 'Invalid credentials' },
+        { success: false, error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, adminUser.passwordHash);
-
-    if (!isValidPassword) {
+    // Verify password matches the numeric ID field
+    const expectedPassword = staff.numericId?.toString();
+    if (!expectedPassword || password !== expectedPassword) {
       return NextResponse.json<ApiResponse>(
-        { success: false, error: 'Invalid credentials' },
+        { success: false, error: 'Invalid email or password' },
         { status: 401 }
       );
     }
 
-    // Create JWT token
-    const tokenPayload: Omit<AuthTokenPayload, 'exp' | 'iat'> = {
-      userId: adminUser.id,
-      email: adminUser.email,
-      role: adminUser.role,
+    // Check if user has Admin role
+    const hasAdminRole = await airtableService.hasAdminRole(staff.id);
+    if (!hasAdminRole) {
+      return NextResponse.json<ApiResponse>(
+        { success: false, error: 'Access denied. Admin role required.' },
+        { status: 403 }
+      );
+    }
+
+    // Create session with Personen record ID
+    const session: AdminSession = {
+      userId: staff.id,
+      email: staff.email,
+      role: 'admin',
+      loginTimestamp: Date.now(),
     };
 
-    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET!, {
-      expiresIn: '8h',
+    // Generate JWT token
+    const token = jwt.sign(session, process.env.JWT_SECRET!, {
+      expiresIn: ADMIN_SESSION_EXPIRY,
     });
 
     // Create response with cookie
     const response = NextResponse.json<ApiResponse>({
       success: true,
       data: {
-        token,
         user: {
-          id: adminUser.id,
-          email: adminUser.email,
-          role: adminUser.role,
+          id: staff.id,
+          email: staff.email,
+          name: staff.name,
+          role: 'admin',
         },
       },
     });
 
     // Set HTTP-only cookie
-    response.cookies.set('admin_token', token, {
+    response.cookies.set(ADMIN_SESSION_COOKIE, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 8, // 8 hours
+      maxAge: ADMIN_SESSION_EXPIRY,
       path: '/',
     });
 
@@ -114,14 +124,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   // Logout endpoint
   const response = NextResponse.json<ApiResponse>({
     success: true,
     message: 'Logged out successfully',
   });
 
-  response.cookies.delete('admin_token');
+  response.cookies.delete(ADMIN_SESSION_COOKIE);
 
   return response;
 }

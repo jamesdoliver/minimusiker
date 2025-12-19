@@ -90,26 +90,27 @@ export default function AdminLogin() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
-                placeholder="admin@minimusiker.com"
+                placeholder="your.email@minimusiker.de"
               />
             </div>
 
-            {/* Password field */}
+            {/* ID field (numeric ID from Airtable) */}
             <div>
               <label
                 htmlFor="password"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Password
+                ID
               </label>
               <input
                 id="password"
-                type="password"
+                type="text"
+                inputMode="numeric"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500"
-                placeholder="Enter your password"
+                placeholder="Enter your numeric ID"
               />
             </div>
 

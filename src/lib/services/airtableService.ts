@@ -1385,6 +1385,27 @@ class AirtableService {
   }
 
   /**
+   * Check if a staff member has the Admin role
+   */
+  async hasAdminRole(staffId: string): Promise<boolean> {
+    try {
+      const record = await this.base(PERSONEN_TABLE_ID).find(staffId);
+      // Airtable returns fields by display name, not field ID
+      const roles = record.fields['Rollen'] as string[] | undefined;
+
+      if (!roles || !Array.isArray(roles)) {
+        return false;
+      }
+
+      // Check if Admin role is in the linked roles
+      return roles.includes(ROLLEN_IDS.admin);
+    } catch (error) {
+      console.error('Error checking admin role:', error);
+      return false;
+    }
+  }
+
+  /**
    * Get a staff member by email and verify they have Engineer role
    */
   async getEngineerByEmail(email: string): Promise<TeamStaffMember | null> {
