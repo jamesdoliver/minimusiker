@@ -54,11 +54,10 @@ const nextConfig = {
     return [
       {
         source: '/admin',
-        has: [
+        missing: [
           {
             type: 'cookie',
             key: 'admin_token',
-            value: undefined,
           },
         ],
         permanent: false,
