@@ -69,6 +69,12 @@ function TeacherLoginContent() {
         throw new Error(data.error || 'Failed to send magic link');
       }
 
+      // Admin bypass - redirect immediately (session already created)
+      if (data.adminBypass) {
+        router.push('/teacher');
+        return;
+      }
+
       setSuccess(
         'Ein Login-Link wurde an Ihre E-Mail-Adresse gesendet. Bitte überprüfen Sie Ihr Postfach.'
       );

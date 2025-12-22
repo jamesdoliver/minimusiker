@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { createTeacherSessionToken } from '@/lib/auth/verifyTeacherSession';
+import { TeacherSession, TEACHER_SESSION_COOKIE, TEACHER_SESSION_EXPIRY_SECONDS } from '@/lib/types/teacher';
 import sgMail from '@sendgrid/mail';
+
+// Admin bypass email - creates session directly without magic link
+const ADMIN_BYPASS_EMAIL = 'admin@minimusiker.de';
 
 // Initialize SendGrid
 if (process.env.SENDGRID_API_KEY) {
@@ -40,6 +45,36 @@ export async function POST(request: NextRequest) {
         success: true,
         message: 'If an account exists with this email, a magic link will be sent.',
       });
+    }
+
+    // Admin bypass - create session directly without magic link email
+    if (normalizedEmail === ADMIN_BYPASS_EMAIL) {
+      console.log('Admin bypass login for teacher portal');
+
+      const session: TeacherSession = {
+        teacherId: teacher.id,
+        email: teacher.email,
+        name: teacher.name,
+        schoolName: teacher.schoolName,
+        loginTimestamp: Date.now(),
+      };
+
+      const jwtToken = createTeacherSessionToken(session);
+
+      const response = NextResponse.json({
+        success: true,
+        adminBypass: true,
+      });
+
+      response.cookies.set(TEACHER_SESSION_COOKIE, jwtToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: TEACHER_SESSION_EXPIRY_SECONDS,
+        path: '/',
+      });
+
+      return response;
     }
 
     // Generate magic link token
