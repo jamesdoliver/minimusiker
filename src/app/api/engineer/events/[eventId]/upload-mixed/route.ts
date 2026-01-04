@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { getEmailService } from '@/lib/services/emailService';
 import airtableService from '@/lib/services/airtableService';
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 /**
  * POST /api/engineer/events/[eventId]/upload-mixed
@@ -192,25 +195,32 @@ export async function PUT(
     const classInfo = eventDetail?.classes.find((c) => c.classId === classId);
     const className = classInfo?.className || classId;
 
-    // Send notifications (if final audio is uploaded)
-    // Note: Preview notifications could also be added here
-    if (type === 'final' && eventDetail) {
+    // Send notifications when audio is uploaded
+    if (eventDetail) {
       try {
         // Get parent emails for this class
         const parentEmails = await airtableService.getParentEmailsByClassId(classId);
 
-        // TODO: Send email notifications
-        // For now, just log that we would send notifications
-        console.log(
-          `Would send notification to ${parentEmails.length} parents for ${className} final audio`
-        );
+        if (parentEmails.length > 0) {
+          const emailService = getEmailService();
+          const result = await emailService.sendRecordingReadyNotification(
+            parentEmails.map((email) => ({ email })),
+            {
+              schoolName: eventDetail.schoolName,
+              className,
+              eventDate: eventDetail.eventDate,
+              portalUrl: `${APP_URL}/parent-portal`,
+            }
+          );
 
-        // Note: Email service integration will be added in a separate step
-        // await emailService.sendRecordingReadyEmail(parentEmails, {
-        //   schoolName: eventDetail.schoolName,
-        //   eventDate: eventDetail.eventDate,
-        //   className,
-        // }, 'final', portalUrl);
+          if (result.success) {
+            console.log(
+              `Recording ready notification sent to ${parentEmails.length} parents for ${className}`
+            );
+          } else {
+            console.error('Failed to send recording notification:', result.error);
+          }
+        }
       } catch (notifyError) {
         // Log but don't fail the upload confirmation
         console.error('Error sending notifications:', notifyError);

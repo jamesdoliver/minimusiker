@@ -5,6 +5,7 @@ import {
   SCHOOL_BOOKINGS_TABLE_ID,
   SCHOOL_BOOKINGS_FIELD_IDS,
 } from '@/lib/types/airtable';
+import { getEmailService } from '@/lib/services/emailService';
 import Airtable from 'airtable';
 
 // Initialize Airtable
@@ -104,6 +105,41 @@ export async function POST(request: Request) {
     });
 
     console.log('Created SchoolBooking record:', record.id);
+
+    // Send email notification to assigned staff
+    if (staffId) {
+      try {
+        // Fetch staff email from Airtable
+        const staffRecord = await airtable.table('Staff').find(staffId);
+        const staffEmail = staffRecord.get('Email') as string;
+        const staffName = staffRecord.get('Name') as string;
+
+        if (staffEmail) {
+          const emailService = getEmailService();
+          const result = await emailService.sendNewBookingAlert(
+            staffEmail,
+            staffName || 'Team Member',
+            {
+              schoolName: mappedData.schoolName,
+              contactName: mappedData.contactPerson,
+              contactEmail: mappedData.contactEmail,
+              bookingDate: booking.start_date,
+              estimatedChildren: mappedData.numberOfChildren,
+              region: mappedData.region,
+            }
+          );
+
+          if (result.success) {
+            console.log(`Booking alert sent to staff ${staffEmail}`);
+          } else {
+            console.error('Failed to send booking alert:', result.error);
+          }
+        }
+      } catch (emailError) {
+        // Log but don't fail the webhook
+        console.error('Error sending booking alert:', emailError);
+      }
+    }
 
     return NextResponse.json({
       status: 'created',
