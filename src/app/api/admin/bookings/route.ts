@@ -30,7 +30,7 @@ function transformToBookingWithDetails(booking: SchoolBooking): BookingWithDetai
   return {
     id: booking.id,
     code: booking.simplybookId,
-    schoolName: booking.schoolContactName || 'Unknown School',
+    schoolName: booking.schoolName || booking.schoolContactName || 'Unknown School',
     contactPerson: booking.schoolContactName || '',
     contactEmail: booking.schoolContactEmail || '',
     phone: booking.schoolPhone,

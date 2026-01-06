@@ -20,6 +20,19 @@ import {
   EINRICHTUNGEN_TABLE_ID,
   EINRICHTUNGEN_FIELD_IDS,
   Einrichtung,
+  // New normalized table types and IDs
+  Event,
+  Class,
+  Parent,
+  Registration,
+  EVENTS_TABLE_ID,
+  EVENTS_FIELD_IDS,
+  CLASSES_TABLE_ID,
+  CLASSES_FIELD_IDS,
+  PARENTS_TABLE_ID,
+  PARENTS_FIELD_IDS,
+  REGISTRATIONS_TABLE_ID,
+  REGISTRATIONS_FIELD_IDS,
 } from '@/lib/types/airtable';
 
 // Single table name in Airtable
@@ -29,6 +42,12 @@ class AirtableService {
   private base: Airtable.Base;
   private static instance: AirtableService;
 
+  // Normalized tables (initialized when feature flag is enabled)
+  private eventsTable: Table<FieldSet> | null = null;
+  private classesTable: Table<FieldSet> | null = null;
+  private parentsTable: Table<FieldSet> | null = null;
+  private registrationsTable: Table<FieldSet> | null = null;
+
   private constructor() {
     // Configure with Personal Access Token (PAT)
     // The apiKey parameter accepts both old API keys and new PATs
@@ -36,6 +55,9 @@ class AirtableService {
       apiKey: process.env.AIRTABLE_API_KEY!, // This is actually the PAT
     });
     this.base = Airtable.base(process.env.AIRTABLE_BASE_ID!);
+
+    // Tables will be lazy-initialized on first use to avoid race condition
+    // with environment variable loading
   }
 
   public static getInstance(): AirtableService {
@@ -43,6 +65,156 @@ class AirtableService {
       AirtableService.instance = new AirtableService();
     }
     return AirtableService.instance;
+  }
+
+  /**
+   * Check if normalized tables should be used (feature flag)
+   */
+  private useNormalizedTables(): boolean {
+    return process.env.USE_NORMALIZED_TABLES === 'true';
+  }
+
+  /**
+   * Ensure normalized tables are initialized (lazy initialization)
+   * Called at the start of every method that needs normalized tables
+   * to avoid race condition with environment variable loading
+   */
+  private ensureNormalizedTablesInitialized(): void {
+    if (this.useNormalizedTables() && !this.eventsTable) {
+      this.eventsTable = this.base(EVENTS_TABLE_ID);
+      this.classesTable = this.base(CLASSES_TABLE_ID);
+      this.parentsTable = this.base(PARENTS_TABLE_ID);
+      this.registrationsTable = this.base(REGISTRATIONS_TABLE_ID);
+    }
+  }
+
+  /**
+   * Helper: Query parent by email from Parents table
+   */
+  private async queryParentByEmail(email: string): Promise<Parent | null> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.parentsTable) return null;
+
+    try {
+      const records = await this.parentsTable.select({
+        filterByFormula: `LOWER({${PARENTS_FIELD_IDS.parent_email}}) = LOWER('${email.replace(/'/g, "\\'")}')`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (records.length === 0) return null;
+
+      const record = records[0];
+      return {
+        id: record.id,
+        parents_id: record.fields[PARENTS_FIELD_IDS.parents_id] as string,
+        parent_id: record.fields[PARENTS_FIELD_IDS.parent_id] as string,
+        parent_email: record.fields[PARENTS_FIELD_IDS.parent_email] as string,
+        parent_first_name: record.fields[PARENTS_FIELD_IDS.parent_first_name] as string,
+        parent_telephone: record.fields[PARENTS_FIELD_IDS.parent_telephone] as string,
+        email_campaigns: record.fields[PARENTS_FIELD_IDS.email_campaigns] as 'yes' | 'no',
+        created_at: record.fields[PARENTS_FIELD_IDS.created_at] as string,
+      };
+    } catch (error) {
+      console.error('Error querying parent by email:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Helper: Query registrations by parent record ID
+   */
+  private async queryRegistrationsByParent(parentRecordId: string): Promise<Registration[]> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.registrationsTable) return [];
+
+    try {
+      // Note: Airtable formulas don't work reliably on linked record fields
+      // (ARRAYJOIN, SEARCH, FIND all fail). So we fetch all and filter in JavaScript.
+      const records = await this.registrationsTable.select({
+        returnFieldsByFieldId: true
+      }).all();
+
+      // Filter in JavaScript by checking if parent_id array includes the parentRecordId
+      const filteredRecords = records.filter(record => {
+        const parentIds = record.fields[REGISTRATIONS_FIELD_IDS.parent_id] as string[] | undefined;
+        return parentIds && parentIds.includes(parentRecordId);
+      });
+
+      return filteredRecords.map(record => ({
+        id: record.id,
+        Id: record.fields[REGISTRATIONS_FIELD_IDS.Id] as number,
+        event_id: record.fields[REGISTRATIONS_FIELD_IDS.event_id] as string[],
+        parent_id: record.fields[REGISTRATIONS_FIELD_IDS.parent_id] as string[],
+        class_id: record.fields[REGISTRATIONS_FIELD_IDS.class_id] as string[],
+        registered_child: record.fields[REGISTRATIONS_FIELD_IDS.registered_child] as string,
+        child_id: record.fields[REGISTRATIONS_FIELD_IDS.child_id] as string,
+        registered_complete: record.fields[REGISTRATIONS_FIELD_IDS.registered_complete] as boolean,
+        order_number: record.fields[REGISTRATIONS_FIELD_IDS.order_number] as string,
+        legacy_record: record.fields[REGISTRATIONS_FIELD_IDS.legacy_record] as string,
+        registration_date: record.fields[REGISTRATIONS_FIELD_IDS.registration_date] as string,
+        registration_status: record.fields[REGISTRATIONS_FIELD_IDS.registration_status] as string,
+      }));
+    } catch (error) {
+      console.error('Error querying registrations by parent:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Helper: Query event by record ID
+   */
+  private async queryEventById(eventRecordId: string): Promise<Event | null> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.eventsTable) return null;
+
+    try {
+      const record = await this.eventsTable.find(eventRecordId);
+      return {
+        id: record.id,
+        event_id: record.fields[EVENTS_FIELD_IDS.event_id] as string,
+        school_name: record.fields[EVENTS_FIELD_IDS.school_name] as string,
+        event_date: record.fields[EVENTS_FIELD_IDS.event_date] as string,
+        event_type: record.fields[EVENTS_FIELD_IDS.event_type] as 'concert' | 'recital' | 'competition' | 'showcase',
+        assigned_staff: record.fields[EVENTS_FIELD_IDS.assigned_staff] as string[],
+        assigned_engineer: record.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[],
+        created_at: record.fields[EVENTS_FIELD_IDS.created_at] as string,
+        legacy_booking_id: record.fields[EVENTS_FIELD_IDS.legacy_booking_id] as string,
+        simplybook_booking: record.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[],
+      };
+    } catch (error) {
+      console.error('Error querying event by ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Helper: Query class by record ID
+   */
+  private async queryClassById(classRecordId: string): Promise<Class | null> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.classesTable) return null;
+
+    try {
+      const record = await this.classesTable.find(classRecordId);
+      return {
+        id: record.id,
+        class_id: record.fields[CLASSES_FIELD_IDS.class_id] as string,
+        event_id: record.fields[CLASSES_FIELD_IDS.event_id] as string[],
+        class_name: record.fields[CLASSES_FIELD_IDS.class_name] as string,
+        main_teacher: record.fields[CLASSES_FIELD_IDS.main_teacher] as string,
+        other_teachers: record.fields[CLASSES_FIELD_IDS.other_teachers] as string,
+        total_children: record.fields[CLASSES_FIELD_IDS.total_children] as number,
+        created_at: record.fields[CLASSES_FIELD_IDS.created_at] as string,
+        legacy_booking_id: record.fields[CLASSES_FIELD_IDS.legacy_booking_id] as string,
+      };
+    } catch (error) {
+      console.error('Error querying class by ID:', error);
+      return null;
+    }
   }
 
   // Helper method to transform Airtable record to typed object
@@ -107,74 +279,260 @@ class AirtableService {
 
   // Create a new record
   async create(data: Partial<ParentJourney>): Promise<ParentJourney & { id: string }> {
-    try {
-      // Map the data to field names (not IDs) for creation
-      const recordData: any = {};
-      if (data.booking_id !== undefined) recordData.booking_id = data.booking_id;
-      if (data.class_id !== undefined) recordData.class_id = data.class_id;
-      if (data.school_name !== undefined) recordData.school_name = data.school_name;
-      if (data.main_teacher !== undefined) recordData.main_teacher = data.main_teacher;
-      if (data.other_teachers !== undefined) recordData.other_teachers = data.other_teachers;
-      if (data.class !== undefined) recordData.class = data.class;
-      if (data.registered_child !== undefined) recordData.registered_child = data.registered_child;
-      if (data.parent_first_name !== undefined) recordData.parent_first_name = data.parent_first_name;
-      if (data.parent_email !== undefined) recordData.parent_email = data.parent_email;
-      if (data.parent_telephone !== undefined) recordData.parent_telephone = data.parent_telephone;
-      if (data.email_campaigns !== undefined) recordData.email_campaigns = data.email_campaigns;
-      if (data.order_number !== undefined) recordData.order_number = data.order_number;
-      if (data.event_type !== undefined) recordData.event_type = data.event_type;
-      if (data.parent_id !== undefined) recordData.parent_id = data.parent_id;
-      if (data.booking_date !== undefined) recordData.booking_date = data.booking_date;
-      if (data.child_id !== undefined) recordData.child_id = data.child_id;
-      if (data.registered_complete !== undefined) recordData.registered_complete = data.registered_complete;
-      if (data.total_children !== undefined) recordData.total_children = data.total_children;
+    if (this.useNormalizedTables()) {
+      // NEW: Create in normalized tables (Parents + Registrations)
+      try {
+        if (!data.parent_email || !data.booking_id || !data.class_id) {
+          throw new Error('parent_email, booking_id, and class_id are required for registration');
+        }
 
-      const record = await this.base(TABLE_NAME).create(recordData);
-      return this.transformRecord(record);
-    } catch (error) {
-      console.error(`Error creating record in ${TABLE_NAME}:`, error);
-      throw new Error(`Failed to create record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // Step 1: Find or create Parent record
+        let parentRecord = await this.queryParentByEmail(data.parent_email);
+        let parentRecordId: string;
+
+        if (!parentRecord) {
+          // Create new parent
+          const parentFields: any = {
+            [PARENTS_FIELD_IDS.parent_email]: data.parent_email,
+          };
+          if (data.parent_id) parentFields[PARENTS_FIELD_IDS.parent_id] = data.parent_id;
+          if (data.parent_first_name) parentFields[PARENTS_FIELD_IDS.parent_first_name] = data.parent_first_name;
+          if (data.parent_telephone) parentFields[PARENTS_FIELD_IDS.parent_telephone] = data.parent_telephone;
+          if (data.email_campaigns) parentFields[PARENTS_FIELD_IDS.email_campaigns] = data.email_campaigns;
+
+          const newParentRecords = await this.parentsTable!.create([parentFields]);
+          parentRecordId = newParentRecords[0].id;
+        } else {
+          parentRecordId = parentRecord.id;
+        }
+
+        // Step 2: Find Event record by event_id (booking_id)
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.booking_id}'`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (eventRecords.length === 0) {
+          throw new Error(`Event not found for booking_id: ${data.booking_id}`);
+        }
+        const eventRecordId = eventRecords[0].id;
+
+        // Step 3: Find Class record by class_id
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.class_id}'`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (classRecords.length === 0) {
+          throw new Error(`Class not found for class_id: ${data.class_id}`);
+        }
+        const classRecordId = classRecords[0].id;
+
+        // Step 4: Create Registration record
+        const registrationFields: any = {
+          [REGISTRATIONS_FIELD_IDS.parent_id]: [parentRecordId],
+          [REGISTRATIONS_FIELD_IDS.event_id]: [eventRecordId],
+          [REGISTRATIONS_FIELD_IDS.class_id]: [classRecordId],
+        };
+        if (data.registered_child) registrationFields[REGISTRATIONS_FIELD_IDS.registered_child] = data.registered_child;
+        if (data.child_id) registrationFields[REGISTRATIONS_FIELD_IDS.child_id] = data.child_id;
+        if (data.order_number) registrationFields[REGISTRATIONS_FIELD_IDS.order_number] = data.order_number;
+        if (data.registered_complete !== undefined) registrationFields[REGISTRATIONS_FIELD_IDS.registered_complete] = data.registered_complete;
+
+        const registrationRecords = await this.registrationsTable!.create([registrationFields]);
+        const registrationRecord = registrationRecords[0];
+
+        // Step 5: Transform to ParentJourney format for backward compatibility
+        const eventFields = eventRecords[0].fields as Record<string, any>;
+        const classFields = classRecords[0].fields as Record<string, any>;
+
+        return {
+          id: registrationRecord.id,
+          booking_id: data.booking_id,
+          class_id: data.class_id,
+          school_name: eventFields[EVENTS_FIELD_IDS.school_name] || '',
+          main_teacher: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+          other_teachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+          class: classFields[CLASSES_FIELD_IDS.class_name] || '',
+          registered_child: data.registered_child || '',
+          parent_first_name: data.parent_first_name || '',
+          parent_email: data.parent_email,
+          parent_telephone: data.parent_telephone || '',
+          email_campaigns: data.email_campaigns,
+          order_number: data.order_number || '',
+          school_recording: [],
+          event_type: eventFields[EVENTS_FIELD_IDS.event_type] || '',
+          parent_id: data.parent_id || '',
+          booking_date: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+          child_id: data.child_id || '',
+          registered_complete: data.registered_complete || false,
+          total_children: classFields[CLASSES_FIELD_IDS.total_children] || 0,
+          assigned_staff: eventFields[EVENTS_FIELD_IDS.assigned_staff] || [],
+        };
+      } catch (error) {
+        console.error('Error creating registration in normalized tables:', error);
+        throw new Error(`Failed to create registration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // LEGACY: Create in parent_journey_table
+      try {
+        // Map the data to field names (not IDs) for creation
+        const recordData: any = {};
+        if (data.booking_id !== undefined) recordData.booking_id = data.booking_id;
+        if (data.class_id !== undefined) recordData.class_id = data.class_id;
+        if (data.school_name !== undefined) recordData.school_name = data.school_name;
+        if (data.main_teacher !== undefined) recordData.main_teacher = data.main_teacher;
+        if (data.other_teachers !== undefined) recordData.other_teachers = data.other_teachers;
+        if (data.class !== undefined) recordData.class = data.class;
+        if (data.registered_child !== undefined) recordData.registered_child = data.registered_child;
+        if (data.parent_first_name !== undefined) recordData.parent_first_name = data.parent_first_name;
+        if (data.parent_email !== undefined) recordData.parent_email = data.parent_email;
+        if (data.parent_telephone !== undefined) recordData.parent_telephone = data.parent_telephone;
+        if (data.email_campaigns !== undefined) recordData.email_campaigns = data.email_campaigns;
+        if (data.order_number !== undefined) recordData.order_number = data.order_number;
+        if (data.event_type !== undefined) recordData.event_type = data.event_type;
+        if (data.parent_id !== undefined) recordData.parent_id = data.parent_id;
+        if (data.booking_date !== undefined) recordData.booking_date = data.booking_date;
+        if (data.child_id !== undefined) recordData.child_id = data.child_id;
+        if (data.registered_complete !== undefined) recordData.registered_complete = data.registered_complete;
+        if (data.total_children !== undefined) recordData.total_children = data.total_children;
+
+        const record = await this.base(TABLE_NAME).create(recordData);
+        return this.transformRecord(record);
+      } catch (error) {
+        console.error(`Error creating record in ${TABLE_NAME}:`, error);
+        throw new Error(`Failed to create record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
   // Update an existing record
   async update(id: string, data: Partial<ParentJourney>): Promise<ParentJourney & { id: string }> {
-    try {
-      const recordData: any = {};
-      if (data.booking_id !== undefined) recordData.booking_id = data.booking_id;
-      if (data.class_id !== undefined) recordData.class_id = data.class_id;
-      if (data.school_name !== undefined) recordData.school_name = data.school_name;
-      if (data.main_teacher !== undefined) recordData.main_teacher = data.main_teacher;
-      if (data.other_teachers !== undefined) recordData.other_teachers = data.other_teachers;
-      if (data.class !== undefined) recordData.class = data.class;
-      if (data.registered_child !== undefined) recordData.registered_child = data.registered_child;
-      if (data.parent_first_name !== undefined) recordData.parent_first_name = data.parent_first_name;
-      if (data.parent_email !== undefined) recordData.parent_email = data.parent_email;
-      if (data.parent_telephone !== undefined) recordData.parent_telephone = data.parent_telephone;
-      if (data.email_campaigns !== undefined) recordData.email_campaigns = data.email_campaigns;
-      if (data.order_number !== undefined) recordData.order_number = data.order_number;
-      if (data.event_type !== undefined) recordData.event_type = data.event_type;
-      if (data.parent_id !== undefined) recordData.parent_id = data.parent_id;
-      if (data.booking_date !== undefined) recordData.booking_date = data.booking_date;
-      if (data.child_id !== undefined) recordData.child_id = data.child_id;
-      if (data.registered_complete !== undefined) recordData.registered_complete = data.registered_complete;
-      if (data.total_children !== undefined) recordData.total_children = data.total_children;
+    if (this.useNormalizedTables()) {
+      // NEW: Update in normalized tables (Registration + optionally Parent)
+      try {
+        // Get the existing registration record
+        const registrationRecord = await this.registrationsTable!.find(id);
+        const regFields = registrationRecord.fields as Record<string, any>;
 
-      const record = await this.base(TABLE_NAME).update(id, recordData);
-      return this.transformRecord(record);
-    } catch (error) {
-      console.error(`Error updating record in ${TABLE_NAME}:`, error);
-      throw new Error(`Failed to update record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // Step 1: Update Registration record fields (child-specific data)
+        const registrationUpdates: any = {};
+        if (data.registered_child !== undefined) registrationUpdates[REGISTRATIONS_FIELD_IDS.registered_child] = data.registered_child;
+        if (data.child_id !== undefined) registrationUpdates[REGISTRATIONS_FIELD_IDS.child_id] = data.child_id;
+        if (data.order_number !== undefined) registrationUpdates[REGISTRATIONS_FIELD_IDS.order_number] = data.order_number;
+        if (data.registered_complete !== undefined) registrationUpdates[REGISTRATIONS_FIELD_IDS.registered_complete] = data.registered_complete;
+
+        if (Object.keys(registrationUpdates).length > 0) {
+          await this.registrationsTable!.update(id, registrationUpdates);
+        }
+
+        // Step 2: Update Parent record if parent fields changed
+        const parentRecordId = regFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+        if (parentRecordId) {
+          const parentUpdates: any = {};
+          if (data.parent_first_name !== undefined) parentUpdates[PARENTS_FIELD_IDS.parent_first_name] = data.parent_first_name;
+          if (data.parent_email !== undefined) parentUpdates[PARENTS_FIELD_IDS.parent_email] = data.parent_email;
+          if (data.parent_telephone !== undefined) parentUpdates[PARENTS_FIELD_IDS.parent_telephone] = data.parent_telephone;
+          if (data.email_campaigns !== undefined) parentUpdates[PARENTS_FIELD_IDS.email_campaigns] = data.email_campaigns;
+
+          if (Object.keys(parentUpdates).length > 0) {
+            await this.parentsTable!.update(parentRecordId, parentUpdates);
+          }
+        }
+
+        // Step 3: Fetch updated data and transform to ParentJourney format
+        const updatedRegistration = await this.registrationsTable!.find(id);
+        const updatedRegFields = updatedRegistration.fields as Record<string, any>;
+
+        const eventRecordId = updatedRegFields[REGISTRATIONS_FIELD_IDS.event_id]?.[0];
+        const classRecordId = updatedRegFields[REGISTRATIONS_FIELD_IDS.class_id]?.[0];
+        const updatedParentRecordId = updatedRegFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+
+        const event = eventRecordId ? await this.eventsTable!.find(eventRecordId) : null;
+        const classInfo = classRecordId ? await this.classesTable!.find(classRecordId) : null;
+        const parent = updatedParentRecordId ? await this.parentsTable!.find(updatedParentRecordId) : null;
+
+        const eventFields = event?.fields as Record<string, any> || {};
+        const classFields = classInfo?.fields as Record<string, any> || {};
+        const parentFields = parent?.fields as Record<string, any> || {};
+
+        return {
+          id: id,
+          booking_id: eventFields[EVENTS_FIELD_IDS.event_id] || '',
+          class_id: classFields[CLASSES_FIELD_IDS.class_id] || '',
+          school_name: eventFields[EVENTS_FIELD_IDS.school_name] || '',
+          main_teacher: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+          other_teachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+          class: classFields[CLASSES_FIELD_IDS.class_name] || '',
+          registered_child: updatedRegFields[REGISTRATIONS_FIELD_IDS.registered_child] || '',
+          parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+          parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+          parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+          email_campaigns: parentFields[PARENTS_FIELD_IDS.email_campaigns] || '',
+          order_number: updatedRegFields[REGISTRATIONS_FIELD_IDS.order_number] || '',
+          school_recording: [],
+          event_type: eventFields[EVENTS_FIELD_IDS.event_type] || '',
+          parent_id: parentFields[PARENTS_FIELD_IDS.parent_id] || '',
+          booking_date: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+          child_id: updatedRegFields[REGISTRATIONS_FIELD_IDS.child_id] || '',
+          registered_complete: updatedRegFields[REGISTRATIONS_FIELD_IDS.registered_complete] || false,
+          total_children: classFields[CLASSES_FIELD_IDS.total_children] || 0,
+          assigned_staff: eventFields[EVENTS_FIELD_IDS.assigned_staff] || [],
+        };
+      } catch (error) {
+        console.error('Error updating registration in normalized tables:', error);
+        throw new Error(`Failed to update registration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // LEGACY: Update in parent_journey_table
+      try {
+        const recordData: any = {};
+        if (data.booking_id !== undefined) recordData.booking_id = data.booking_id;
+        if (data.class_id !== undefined) recordData.class_id = data.class_id;
+        if (data.school_name !== undefined) recordData.school_name = data.school_name;
+        if (data.main_teacher !== undefined) recordData.main_teacher = data.main_teacher;
+        if (data.other_teachers !== undefined) recordData.other_teachers = data.other_teachers;
+        if (data.class !== undefined) recordData.class = data.class;
+        if (data.registered_child !== undefined) recordData.registered_child = data.registered_child;
+        if (data.parent_first_name !== undefined) recordData.parent_first_name = data.parent_first_name;
+        if (data.parent_email !== undefined) recordData.parent_email = data.parent_email;
+        if (data.parent_telephone !== undefined) recordData.parent_telephone = data.parent_telephone;
+        if (data.email_campaigns !== undefined) recordData.email_campaigns = data.email_campaigns;
+        if (data.order_number !== undefined) recordData.order_number = data.order_number;
+        if (data.event_type !== undefined) recordData.event_type = data.event_type;
+        if (data.parent_id !== undefined) recordData.parent_id = data.parent_id;
+        if (data.booking_date !== undefined) recordData.booking_date = data.booking_date;
+        if (data.child_id !== undefined) recordData.child_id = data.child_id;
+        if (data.registered_complete !== undefined) recordData.registered_complete = data.registered_complete;
+        if (data.total_children !== undefined) recordData.total_children = data.total_children;
+
+        const record = await this.base(TABLE_NAME).update(id, recordData);
+        return this.transformRecord(record);
+      } catch (error) {
+        console.error(`Error updating record in ${TABLE_NAME}:`, error);
+        throw new Error(`Failed to update record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
   // Delete a record
   async delete(id: string): Promise<void> {
-    try {
-      await this.base(TABLE_NAME).destroy(id);
-    } catch (error) {
-      console.error(`Error deleting record from ${TABLE_NAME}:`, error);
-      throw new Error(`Failed to delete record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (this.useNormalizedTables()) {
+      // NEW: Delete Registration record only (not Parent, Event, or Class)
+      try {
+        await this.registrationsTable!.destroy(id);
+      } catch (error) {
+        console.error('Error deleting registration from Registrations table:', error);
+        throw new Error(`Failed to delete registration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // LEGACY: Delete from parent_journey_table
+      try {
+        await this.base(TABLE_NAME).destroy(id);
+      } catch (error) {
+        console.error(`Error deleting record from ${TABLE_NAME}:`, error);
+        throw new Error(`Failed to delete record: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
@@ -182,20 +540,145 @@ class AirtableService {
 
   // Get parent journey by email (for login) - returns first match
   async getParentByEmail(email: string): Promise<ParentJourney | null> {
-    // Use field ID for more reliable filtering
-    const records = await this.query({
-      filterByFormula: `LOWER({${AIRTABLE_FIELD_IDS.parent_email}}) = LOWER('${email.replace(/'/g, "\\'")}')`,
-      maxRecords: 1,
-    });
-    return records[0] || null;
+    if (this.useNormalizedTables()) {
+      // NEW: Query normalized Parents table
+      const parent = await this.queryParentByEmail(email);
+      if (!parent) return null;
+
+      // Get registrations for this parent to populate legacy fields
+      const registrations = await this.queryRegistrationsByParent(parent.id);
+
+      if (registrations.length === 0) {
+        // Parent exists but has no registrations - return minimal data
+        return {
+          id: parent.id,
+          parent_id: parent.parent_id,
+          parent_email: parent.parent_email,
+          parent_first_name: parent.parent_first_name,
+          parent_telephone: parent.parent_telephone,
+          email_campaigns: parent.email_campaigns,
+          booking_id: '',
+          class_id: '',
+          school_name: '',
+          main_teacher: '',
+          other_teachers: '',
+          class: '',
+          registered_child: '',
+          order_number: '',
+          school_recording: [],
+          event_type: '',
+          booking_date: '',
+          child_id: '',
+          registered_complete: false,
+          total_children: 0,
+          assigned_staff: [],
+        };
+      }
+
+      // Get the most recent registration
+      const latestRegistration = registrations[0];
+
+      // Get event and class details
+      const eventId = latestRegistration.event_id?.[0];
+      const classId = latestRegistration.class_id?.[0];
+
+      const event = eventId ? await this.queryEventById(eventId) : null;
+      const classInfo = classId ? await this.queryClassById(classId) : null;
+
+      // Transform to ParentJourney format for backward compatibility
+      return {
+        id: parent.id,
+        booking_id: event?.event_id || '',
+        class_id: classInfo?.class_id || '',
+        school_name: event?.school_name || '',
+        main_teacher: classInfo?.main_teacher || '',
+        other_teachers: classInfo?.other_teachers || '',
+        class: classInfo?.class_name || '',
+        registered_child: latestRegistration.registered_child,
+        parent_first_name: parent.parent_first_name,
+        parent_email: parent.parent_email,
+        parent_telephone: parent.parent_telephone,
+        email_campaigns: parent.email_campaigns,
+        order_number: latestRegistration.order_number || '',
+        school_recording: [],
+        event_type: event?.event_type || '',
+        parent_id: parent.parent_id,
+        booking_date: event?.event_date || '',
+        child_id: latestRegistration.child_id || '',
+        registered_complete: latestRegistration.registered_complete,
+        total_children: classInfo?.total_children || 0,
+        assigned_staff: event?.assigned_staff || [],
+      };
+    } else {
+      // LEGACY: Query parent_journey_table
+      const records = await this.query({
+        filterByFormula: `LOWER({${AIRTABLE_FIELD_IDS.parent_email}}) = LOWER('${email.replace(/'/g, "\\'")}')`,
+        maxRecords: 1,
+      });
+      return records[0] || null;
+    }
   }
 
   // Get ALL parent journey records by email (for multi-event support)
   async getParentRecordsByEmail(email: string): Promise<ParentJourney[]> {
-    return this.query({
-      filterByFormula: `LOWER({${AIRTABLE_FIELD_IDS.parent_email}}) = LOWER('${email.replace(/'/g, "\\'")}')`,
-      sort: [{ field: 'booking_date', direction: 'desc' }], // Most recent first
-    });
+    if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
+
+      // NEW: Query normalized tables
+      const parent = await this.queryParentByEmail(email);
+      if (!parent) return [];
+
+      const registrations = await this.queryRegistrationsByParent(parent.id);
+      if (registrations.length === 0) return [];
+
+      // Convert each registration to ParentJourney format
+      const journeys: ParentJourney[] = [];
+
+      for (const reg of registrations) {
+        const eventId = reg.event_id?.[0];
+        const classId = reg.class_id?.[0];
+
+        const event = eventId ? await this.queryEventById(eventId) : null;
+        const classInfo = classId ? await this.queryClassById(classId) : null;
+
+        journeys.push({
+          id: reg.id,
+          booking_id: event?.event_id || '',
+          class_id: classInfo?.class_id || '',
+          school_name: event?.school_name || '',
+          main_teacher: classInfo?.main_teacher || '',
+          other_teachers: classInfo?.other_teachers || '',
+          class: classInfo?.class_name || '',
+          registered_child: reg.registered_child,
+          parent_first_name: parent.parent_first_name,
+          parent_email: parent.parent_email,
+          parent_telephone: parent.parent_telephone,
+          email_campaigns: parent.email_campaigns,
+          order_number: reg.order_number || '',
+          school_recording: [],
+          event_type: event?.event_type || '',
+          parent_id: parent.parent_id,
+          booking_date: event?.event_date || '',
+          child_id: reg.child_id || '',
+          registered_complete: reg.registered_complete,
+          total_children: classInfo?.total_children || 0,
+          assigned_staff: event?.assigned_staff || [],
+        });
+      }
+
+      // Sort by booking_date descending (most recent first)
+      return journeys.sort((a, b) => {
+        const dateA = new Date(a.booking_date || 0).getTime();
+        const dateB = new Date(b.booking_date || 0).getTime();
+        return dateB - dateA;
+      });
+    } else {
+      // LEGACY: Query parent_journey_table
+      return this.query({
+        filterByFormula: `LOWER({${AIRTABLE_FIELD_IDS.parent_email}}) = LOWER('${email.replace(/'/g, "\\'")}')`,
+        sort: [{ field: 'booking_date', direction: 'desc' }],
+      });
+    }
   }
 
   // Get the most recent parent journey record for a given email
@@ -237,52 +720,486 @@ class AirtableService {
 
   // Get parent journey by parent ID
   async getParentById(parentId: string): Promise<ParentJourney | null> {
-    const records = await this.query({
-      filterByFormula: `{${AIRTABLE_FIELD_IDS.parent_id}} = '${parentId}'`,
-      maxRecords: 1,
-    });
-    return records[0] || null;
+    if (this.useNormalizedTables()) {
+      // NEW: Query Parents table by parent_id field
+      try {
+        const parentRecords = await this.parentsTable!.select({
+          filterByFormula: `{${PARENTS_FIELD_IDS.parent_id}} = '${parentId}'`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (parentRecords.length === 0) return null;
+
+        const parentRecord = parentRecords[0];
+        const parentFields = parentRecord.fields as Record<string, any>;
+
+        // Get first registration for this parent to populate event/class data
+        const registrations = await this.queryRegistrationsByParent(parentRecord.id);
+
+        if (registrations.length === 0) {
+          // Parent exists but has no registrations
+          return {
+            id: parentRecord.id,
+            parent_id: parentId,
+            parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+            parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+            parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+            email_campaigns: parentFields[PARENTS_FIELD_IDS.email_campaigns] || '',
+            booking_id: '',
+            class_id: '',
+            school_name: '',
+            main_teacher: '',
+            other_teachers: '',
+            class: '',
+            registered_child: '',
+            order_number: '',
+            school_recording: [],
+            event_type: '',
+            booking_date: '',
+            child_id: '',
+            registered_complete: false,
+            total_children: 0,
+            assigned_staff: [],
+          };
+        }
+
+        const latestReg = registrations[0];
+        const eventId = latestReg.event_id?.[0];
+        const classId = latestReg.class_id?.[0];
+
+        const event = eventId ? await this.queryEventById(eventId) : null;
+        const classInfo = classId ? await this.queryClassById(classId) : null;
+
+        return {
+          id: parentRecord.id,
+          booking_id: event?.event_id || '',
+          class_id: classInfo?.class_id || '',
+          school_name: event?.school_name || '',
+          main_teacher: classInfo?.main_teacher || '',
+          other_teachers: classInfo?.other_teachers || '',
+          class: classInfo?.class_name || '',
+          registered_child: latestReg.registered_child,
+          parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+          parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+          parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+          email_campaigns: parentFields[PARENTS_FIELD_IDS.email_campaigns] || '',
+          order_number: latestReg.order_number || '',
+          school_recording: [],
+          event_type: event?.event_type || '',
+          parent_id: parentId,
+          booking_date: event?.event_date || '',
+          child_id: latestReg.child_id || '',
+          registered_complete: latestReg.registered_complete,
+          total_children: classInfo?.total_children || 0,
+          assigned_staff: event?.assigned_staff || [],
+        };
+      } catch (error) {
+        console.error('Error fetching parent by ID from normalized tables:', error);
+        return null;
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      const records = await this.query({
+        filterByFormula: `{${AIRTABLE_FIELD_IDS.parent_id}} = '${parentId}'`,
+        maxRecords: 1,
+      });
+      return records[0] || null;
+    }
   }
 
   // Get parent journey by booking ID
   async getParentByBookingId(bookingId: string): Promise<ParentJourney | null> {
-    const records = await this.query({
-      filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'`,
-      maxRecords: 1,
-    });
-    return records[0] || null;
+    if (this.useNormalizedTables()) {
+      // NEW: Query Events → Registrations → Parents
+      try {
+        // Find event by event_id (booking_id)
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (eventRecords.length === 0) return null;
+
+        const eventRecord = eventRecords[0];
+        const eventFields = eventRecord.fields as Record<string, any>;
+
+        // Get first registration for this event
+        const registrations = await this.registrationsTable!.select({
+          filterByFormula: `{${REGISTRATIONS_FIELD_IDS.event_id}} = '${eventRecord.id}'`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (registrations.length === 0) return null;
+
+        const regRecord = registrations[0];
+        const regFields = regRecord.fields as Record<string, any>;
+
+        // Get parent, class details
+        const parentRecordId = regFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+        const classRecordId = regFields[REGISTRATIONS_FIELD_IDS.class_id]?.[0];
+
+        const parent = parentRecordId ? await this.parentsTable!.find(parentRecordId) : null;
+        const classInfo = classRecordId ? await this.classesTable!.find(classRecordId) : null;
+
+        const parentFields = parent?.fields as Record<string, any> || {};
+        const classFields = classInfo?.fields as Record<string, any> || {};
+
+        return {
+          id: regRecord.id,
+          booking_id: bookingId,
+          class_id: classFields[CLASSES_FIELD_IDS.class_id] || '',
+          school_name: eventFields[EVENTS_FIELD_IDS.school_name] || '',
+          main_teacher: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+          other_teachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+          class: classFields[CLASSES_FIELD_IDS.class_name] || '',
+          registered_child: regFields[REGISTRATIONS_FIELD_IDS.registered_child] || '',
+          parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+          parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+          parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+          email_campaigns: parentFields[PARENTS_FIELD_IDS.email_campaigns] || '',
+          order_number: regFields[REGISTRATIONS_FIELD_IDS.order_number] || '',
+          school_recording: [],
+          event_type: eventFields[EVENTS_FIELD_IDS.event_type] || '',
+          parent_id: parentFields[PARENTS_FIELD_IDS.parent_id] || '',
+          booking_date: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+          child_id: regFields[REGISTRATIONS_FIELD_IDS.child_id] || '',
+          registered_complete: regFields[REGISTRATIONS_FIELD_IDS.registered_complete] || false,
+          total_children: classFields[CLASSES_FIELD_IDS.total_children] || 0,
+          assigned_staff: eventFields[EVENTS_FIELD_IDS.assigned_staff] || [],
+        };
+      } catch (error) {
+        console.error('Error fetching parent by booking ID from normalized tables:', error);
+        return null;
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      const records = await this.query({
+        filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'`,
+        maxRecords: 1,
+      });
+      return records[0] || null;
+    }
   }
 
   // Get all parent journeys for a specific school
   async getParentsBySchool(schoolName: string): Promise<ParentJourney[]> {
-    return this.query({
-      filterByFormula: `{${AIRTABLE_FIELD_IDS.school_name}} = '${schoolName}'`,
-      sort: [{ field: 'parent_first_name', direction: 'asc' }],
-    });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Events by school → Registrations → Parents
+      try {
+        // Find all events for this school
+        const events = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.school_name}} = '${schoolName}'`,
+        }).all();
+
+        if (events.length === 0) return [];
+
+        const journeys: ParentJourney[] = [];
+
+        for (const event of events) {
+          const eventFields = event.fields as Record<string, any>;
+
+          // Get all registrations for this event
+          const registrations = await this.registrationsTable!.select({
+            filterByFormula: `{${REGISTRATIONS_FIELD_IDS.event_id}} = '${event.id}'`,
+          }).all();
+
+          for (const reg of registrations) {
+            const regFields = reg.fields as Record<string, any>;
+            const parentRecordId = regFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+            const classRecordId = regFields[REGISTRATIONS_FIELD_IDS.class_id]?.[0];
+
+            const parent = parentRecordId ? await this.parentsTable!.find(parentRecordId).catch(() => null) : null;
+            const classInfo = classRecordId ? await this.classesTable!.find(classRecordId).catch(() => null) : null;
+
+            const parentFields = parent?.fields as Record<string, any> || {};
+            const classFields = classInfo?.fields as Record<string, any> || {};
+
+            journeys.push({
+              id: reg.id,
+              booking_id: eventFields[EVENTS_FIELD_IDS.event_id] || '',
+              class_id: classFields[CLASSES_FIELD_IDS.class_id] || '',
+              school_name: schoolName,
+              main_teacher: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+              other_teachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+              class: classFields[CLASSES_FIELD_IDS.class_name] || '',
+              registered_child: regFields[REGISTRATIONS_FIELD_IDS.registered_child] || '',
+              parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+              parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+              parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+              email_campaigns: parentFields[PARENTS_FIELD_IDS.email_campaigns] || '',
+              order_number: regFields[REGISTRATIONS_FIELD_IDS.order_number] || '',
+              school_recording: [],
+              event_type: eventFields[EVENTS_FIELD_IDS.event_type] || '',
+              parent_id: parentFields[PARENTS_FIELD_IDS.parent_id] || '',
+              booking_date: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+              child_id: regFields[REGISTRATIONS_FIELD_IDS.child_id] || '',
+              registered_complete: regFields[REGISTRATIONS_FIELD_IDS.registered_complete] || false,
+              total_children: classFields[CLASSES_FIELD_IDS.total_children] || 0,
+              assigned_staff: eventFields[EVENTS_FIELD_IDS.assigned_staff] || [],
+            });
+          }
+        }
+
+        // Sort by parent_first_name
+        return journeys.sort((a, b) => (a.parent_first_name || '').localeCompare(b.parent_first_name || ''));
+      } catch (error) {
+        console.error('Error fetching parents by school from normalized tables:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      return this.query({
+        filterByFormula: `{${AIRTABLE_FIELD_IDS.school_name}} = '${schoolName}'`,
+        sort: [{ field: 'parent_first_name', direction: 'asc' }],
+      });
+    }
   }
 
   // Get all parent journeys for a specific event type
   async getParentsByEventType(eventType: string): Promise<ParentJourney[]> {
-    return this.query({
-      filterByFormula: `{${AIRTABLE_FIELD_IDS.event_type}} = '${eventType}'`,
-      sort: [{ field: 'school_name', direction: 'asc' }],
-    });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Events by event_type → Registrations → Parents
+      try {
+        // Find all events for this event type
+        const events = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_type}} = '${eventType}'`,
+        }).all();
+
+        if (events.length === 0) return [];
+
+        const journeys: ParentJourney[] = [];
+
+        for (const event of events) {
+          const eventFields = event.fields as Record<string, any>;
+
+          // Get all registrations for this event
+          const registrations = await this.registrationsTable!.select({
+            filterByFormula: `{${REGISTRATIONS_FIELD_IDS.event_id}} = '${event.id}'`,
+          }).all();
+
+          for (const reg of registrations) {
+            const regFields = reg.fields as Record<string, any>;
+            const parentRecordId = regFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+            const classRecordId = regFields[REGISTRATIONS_FIELD_IDS.class_id]?.[0];
+
+            const parent = parentRecordId ? await this.parentsTable!.find(parentRecordId).catch(() => null) : null;
+            const classInfo = classRecordId ? await this.classesTable!.find(classRecordId).catch(() => null) : null;
+
+            const parentFields = parent?.fields as Record<string, any> || {};
+            const classFields = classInfo?.fields as Record<string, any> || {};
+
+            journeys.push({
+              id: reg.id,
+              booking_id: eventFields[EVENTS_FIELD_IDS.event_id] || '',
+              class_id: classFields[CLASSES_FIELD_IDS.class_id] || '',
+              school_name: eventFields[EVENTS_FIELD_IDS.school_name] || '',
+              main_teacher: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+              other_teachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+              class: classFields[CLASSES_FIELD_IDS.class_name] || '',
+              registered_child: regFields[REGISTRATIONS_FIELD_IDS.registered_child] || '',
+              parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+              parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+              parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+              email_campaigns: parentFields[PARENTS_FIELD_IDS.email_campaigns] || '',
+              order_number: regFields[REGISTRATIONS_FIELD_IDS.order_number] || '',
+              school_recording: [],
+              event_type: eventType,
+              parent_id: parentFields[PARENTS_FIELD_IDS.parent_id] || '',
+              booking_date: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+              child_id: regFields[REGISTRATIONS_FIELD_IDS.child_id] || '',
+              registered_complete: regFields[REGISTRATIONS_FIELD_IDS.registered_complete] || false,
+              total_children: classFields[CLASSES_FIELD_IDS.total_children] || 0,
+              assigned_staff: eventFields[EVENTS_FIELD_IDS.assigned_staff] || [],
+            });
+          }
+        }
+
+        // Sort by school_name
+        return journeys.sort((a, b) => (a.school_name || '').localeCompare(b.school_name || ''));
+      } catch (error) {
+        console.error('Error fetching parents by event type from normalized tables:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      return this.query({
+        filterByFormula: `{${AIRTABLE_FIELD_IDS.event_type}} = '${eventType}'`,
+        sort: [{ field: 'school_name', direction: 'asc' }],
+      });
+    }
   }
 
   // Get all parent journeys for a specific class
   async getParentsByClass(className: string): Promise<ParentJourney[]> {
-    return this.query({
-      filterByFormula: `{${AIRTABLE_FIELD_IDS.class}} = '${className}'`,
-      sort: [{ field: 'registered_child', direction: 'asc' }],
-    });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Classes by class_name → Registrations → Parents
+      try {
+        // Find all classes with this name
+        const classes = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_name}} = '${className}'`,
+        }).all();
+
+        if (classes.length === 0) return [];
+
+        const journeys: ParentJourney[] = [];
+
+        for (const classInfo of classes) {
+          const classFields = classInfo.fields as Record<string, any>;
+          const eventRecordId = classFields[CLASSES_FIELD_IDS.event_id]?.[0];
+
+          // Get event details
+          const event = eventRecordId ? await this.eventsTable!.find(eventRecordId).catch(() => null) : null;
+          const eventFields = event?.fields as Record<string, any> || {};
+
+          // Get all registrations for this class
+          const registrations = await this.registrationsTable!.select({
+            filterByFormula: `{${REGISTRATIONS_FIELD_IDS.class_id}} = '${classInfo.id}'`,
+          }).all();
+
+          for (const reg of registrations) {
+            const regFields = reg.fields as Record<string, any>;
+            const parentRecordId = regFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+
+            const parent = parentRecordId ? await this.parentsTable!.find(parentRecordId).catch(() => null) : null;
+            const parentFields = parent?.fields as Record<string, any> || {};
+
+            journeys.push({
+              id: reg.id,
+              booking_id: eventFields[EVENTS_FIELD_IDS.event_id] || '',
+              class_id: classFields[CLASSES_FIELD_IDS.class_id] || '',
+              school_name: eventFields[EVENTS_FIELD_IDS.school_name] || '',
+              main_teacher: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+              other_teachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+              class: className,
+              registered_child: regFields[REGISTRATIONS_FIELD_IDS.registered_child] || '',
+              parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+              parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+              parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+              email_campaigns: parentFields[PARENTS_FIELD_IDS.email_campaigns] || '',
+              order_number: regFields[REGISTRATIONS_FIELD_IDS.order_number] || '',
+              school_recording: [],
+              event_type: eventFields[EVENTS_FIELD_IDS.event_type] || '',
+              parent_id: parentFields[PARENTS_FIELD_IDS.parent_id] || '',
+              booking_date: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+              child_id: regFields[REGISTRATIONS_FIELD_IDS.child_id] || '',
+              registered_complete: regFields[REGISTRATIONS_FIELD_IDS.registered_complete] || false,
+              total_children: classFields[CLASSES_FIELD_IDS.total_children] || 0,
+              assigned_staff: eventFields[EVENTS_FIELD_IDS.assigned_staff] || [],
+            });
+          }
+        }
+
+        // Sort by registered_child
+        return journeys.sort((a, b) => (a.registered_child || '').localeCompare(b.registered_child || ''));
+      } catch (error) {
+        console.error('Error fetching parents by class from normalized tables:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      return this.query({
+        filterByFormula: `{${AIRTABLE_FIELD_IDS.class}} = '${className}'`,
+        sort: [{ field: 'registered_child', direction: 'asc' }],
+      });
+    }
   }
 
   // Get all parent journeys for a specific class_id
   async getRecordsByClassId(classId: string): Promise<ParentJourney[]> {
-    return this.query({
-      filterByFormula: `{${AIRTABLE_FIELD_IDS.class_id}} = '${classId}'`,
-      sort: [{ field: 'registered_child', direction: 'asc' }],
-    });
+    if (this.useNormalizedTables()) {
+      // NEW: Query normalized tables
+      try {
+        // Find the class by class_id field
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId}'`,
+            returnFieldsByFieldId: true,
+            maxRecords: 1,
+          })
+          .firstPage();
+
+        if (classRecords.length === 0) return [];
+
+        const classRecord = classRecords[0];
+        const eventRecordId = (classRecord.fields[CLASSES_FIELD_IDS.event_id] as string[])?.[0];
+
+        // Get event details
+        const event = eventRecordId ? await this.queryEventById(eventRecordId) : null;
+
+        // Get all registrations for this class
+        const registrations = await this.base(REGISTRATIONS_TABLE_ID)
+          .select({
+            filterByFormula: `SEARCH('${classRecord.id}', {${REGISTRATIONS_FIELD_IDS.class_id}})`,
+            returnFieldsByFieldId: true,
+          })
+          .all();
+
+        // Convert each registration to ParentJourney format
+        const journeys: ParentJourney[] = [];
+
+        for (const reg of registrations) {
+          const parentRecordId = (reg.fields[REGISTRATIONS_FIELD_IDS.parent_id] as string[])?.[0];
+
+          // Get parent details
+          let parent: Parent | null = null;
+          if (parentRecordId) {
+            try {
+              const parentRecord = await this.base(PARENTS_TABLE_ID).find(parentRecordId);
+              parent = {
+                id: parentRecord.id,
+                parents_id: parentRecord.fields[PARENTS_FIELD_IDS.parents_id] as string,
+                parent_id: parentRecord.fields[PARENTS_FIELD_IDS.parent_id] as string,
+                parent_email: parentRecord.fields[PARENTS_FIELD_IDS.parent_email] as string,
+                parent_first_name: parentRecord.fields[PARENTS_FIELD_IDS.parent_first_name] as string,
+                parent_telephone: parentRecord.fields[PARENTS_FIELD_IDS.parent_telephone] as string,
+                email_campaigns: parentRecord.fields[PARENTS_FIELD_IDS.email_campaigns] as 'yes' | 'no' | undefined,
+                created_at: parentRecord.fields[PARENTS_FIELD_IDS.created_at] as string,
+              };
+            } catch (error) {
+              console.error('Error fetching parent:', error);
+            }
+          }
+
+          journeys.push({
+            id: reg.id,
+            booking_id: event?.event_id || '',
+            class_id: classId,
+            school_name: event?.school_name || '',
+            main_teacher: classRecord.fields[CLASSES_FIELD_IDS.main_teacher] as string,
+            other_teachers: classRecord.fields[CLASSES_FIELD_IDS.other_teachers] as string,
+            class: classRecord.fields[CLASSES_FIELD_IDS.class_name] as string,
+            registered_child: reg.fields[REGISTRATIONS_FIELD_IDS.registered_child] as string,
+            parent_first_name: parent?.parent_first_name || '',
+            parent_email: parent?.parent_email || '',
+            parent_telephone: parent?.parent_telephone || '',
+            email_campaigns: parent?.email_campaigns || '',
+            order_number: reg.fields[REGISTRATIONS_FIELD_IDS.order_number] as string || '',
+            school_recording: [],
+            event_type: event?.event_type || '',
+            parent_id: parent?.parent_id || '',
+            booking_date: event?.event_date || '',
+            child_id: reg.fields[REGISTRATIONS_FIELD_IDS.child_id] as string || '',
+            registered_complete: reg.fields[REGISTRATIONS_FIELD_IDS.registered_complete] as boolean,
+            total_children: classRecord.fields[CLASSES_FIELD_IDS.total_children] as number,
+            assigned_staff: event?.assigned_staff || [],
+          });
+        }
+
+        // Sort by registered_child name
+        return journeys.sort((a, b) =>
+          a.registered_child.localeCompare(b.registered_child)
+        );
+      } catch (error) {
+        console.error('Error fetching records by class ID:', error);
+        throw error;
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      return this.query({
+        filterByFormula: `{${AIRTABLE_FIELD_IDS.class_id}} = '${classId}'`,
+        sort: [{ field: 'registered_child', direction: 'asc' }],
+      });
+    }
   }
 
   // Get all unique classes for a specific booking_id (event)
@@ -293,37 +1210,91 @@ class AirtableService {
     other_teachers?: string;
     parent_count: number;
   }>> {
-    const records = await this.query({
-      filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'`,
-    });
+    if (this.useNormalizedTables()) {
+      // NEW: Query normalized tables
+      try {
+        // Find the event by event_id (booking_id)
+        const eventRecords = await this.base(EVENTS_TABLE_ID)
+          .select({
+            filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
+            returnFieldsByFieldId: true,
+            maxRecords: 1,
+          })
+          .firstPage();
 
-    // Group by class_id to get unique classes
-    const classesMap = new Map<string, {
-      class_id: string;
-      class_name: string;
-      main_teacher?: string;
-      other_teachers?: string;
-      parent_count: number;
-    }>();
+        if (eventRecords.length === 0) return [];
 
-    records.forEach((record) => {
-      if (!record.class_id) return;
+        const eventRecord = eventRecords[0];
 
-      if (!classesMap.has(record.class_id)) {
-        classesMap.set(record.class_id, {
-          class_id: record.class_id,
-          class_name: record.class,
-          main_teacher: record.main_teacher,
-          other_teachers: record.other_teachers,
-          parent_count: 1,
-        });
-      } else {
-        const existing = classesMap.get(record.class_id)!;
-        existing.parent_count += 1;
+        // Get all classes for this event
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `SEARCH('${eventRecord.id}', {${CLASSES_FIELD_IDS.event_id}})`,
+            returnFieldsByFieldId: true,
+          })
+          .all();
+
+        const results = [];
+
+        for (const classRecord of classRecords) {
+          const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
+
+          // Count registrations for this class
+          const registrations = await this.base(REGISTRATIONS_TABLE_ID)
+            .select({
+              filterByFormula: `SEARCH('${classRecord.id}', {${REGISTRATIONS_FIELD_IDS.class_id}})`,
+              returnFieldsByFieldId: true,
+            })
+            .all();
+
+          results.push({
+            class_id: classId,
+            class_name: classRecord.fields[CLASSES_FIELD_IDS.class_name] as string,
+            main_teacher: classRecord.fields[CLASSES_FIELD_IDS.main_teacher] as string,
+            other_teachers: classRecord.fields[CLASSES_FIELD_IDS.other_teachers] as string,
+            parent_count: registrations.length,
+          });
+        }
+
+        return results;
+      } catch (error) {
+        console.error('Error fetching classes by booking ID:', error);
+        throw error;
       }
-    });
+    } else {
+      // LEGACY: Query parent_journey_table
+      const records = await this.query({
+        filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'`,
+      });
 
-    return Array.from(classesMap.values());
+      // Group by class_id to get unique classes
+      const classesMap = new Map<string, {
+        class_id: string;
+        class_name: string;
+        main_teacher?: string;
+        other_teachers?: string;
+        parent_count: number;
+      }>();
+
+      records.forEach((record) => {
+        if (!record.class_id) return;
+
+        if (!classesMap.has(record.class_id)) {
+          classesMap.set(record.class_id, {
+            class_id: record.class_id,
+            class_name: record.class,
+            main_teacher: record.main_teacher,
+            other_teachers: record.other_teachers,
+            parent_count: 1,
+          });
+        } else {
+          const existing = classesMap.get(record.class_id)!;
+          existing.parent_count += 1;
+        }
+      });
+
+      return Array.from(classesMap.values());
+    }
   }
 
   // Update class_id for specific records (used during migration or event creation)
@@ -331,22 +1302,57 @@ class AirtableService {
     recordIds: string[],
     classId: string
   ): Promise<void> {
-    try {
-      const updates = recordIds.map((id) => ({
-        id,
-        fields: {
-          class_id: classId,
-        },
-      }));
+    if (this.useNormalizedTables()) {
+      // NEW: Update class_id link in Registrations table
+      try {
+        // First, find the Classes record by its class_id field
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId}'`,
+          maxRecords: 1,
+        }).firstPage();
 
-      // Airtable allows updating up to 10 records at once
-      for (let i = 0; i < updates.length; i += 10) {
-        const batch = updates.slice(i, i + 10);
-        await this.base(TABLE_NAME).update(batch as any);
+        if (classRecords.length === 0) {
+          throw new Error(`Class with ID ${classId} not found`);
+        }
+
+        const classRecordId = classRecords[0].id;
+
+        // Update registrations to link to this class (recordIds are Registration table IDs)
+        const updates = recordIds.map((id) => ({
+          id,
+          fields: {
+            [REGISTRATIONS_FIELD_IDS.class_id]: [classRecordId], // Linked record array
+          },
+        }));
+
+        // Update in batches of 10
+        for (let i = 0; i < updates.length; i += 10) {
+          const batch = updates.slice(i, i + 10);
+          await this.registrationsTable!.update(batch as any);
+        }
+      } catch (error) {
+        console.error('Error updating class_id in Registrations:', error);
+        throw new Error(`Failed to update class_id: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-    } catch (error) {
-      console.error('Error updating class_id:', error);
-      throw new Error(`Failed to update class_id: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } else {
+      // LEGACY: Update class_id field in parent_journey_table
+      try {
+        const updates = recordIds.map((id) => ({
+          id,
+          fields: {
+            class_id: classId,
+          },
+        }));
+
+        // Airtable allows updating up to 10 records at once
+        for (let i = 0; i < updates.length; i += 10) {
+          const batch = updates.slice(i, i + 10);
+          await this.base(TABLE_NAME).update(batch as any);
+        }
+      } catch (error) {
+        console.error('Error updating class_id:', error);
+        throw new Error(`Failed to update class_id: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
@@ -357,61 +1363,315 @@ class AirtableService {
     className: string,
     classId: string
   ): Promise<number> {
-    try {
-      // Find all records matching the criteria
-      const records = await this.query({
-        filterByFormula: `AND(
-          {${AIRTABLE_FIELD_IDS.school_name}} = '${schoolName}',
-          {booking_date} = '${bookingDate}',
-          {${AIRTABLE_FIELD_IDS.class}} = '${className}'
-        )`,
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Find registrations and update class_id link
+      try {
+        // First, find the Classes record by its class_id field
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId}'`,
+          maxRecords: 1,
+        }).firstPage();
 
-      if (records.length === 0) {
-        return 0;
+        if (classRecords.length === 0) {
+          return 0;
+        }
+
+        const classRecordId = classRecords[0].id;
+
+        // Find the event by school_name and booking_date
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `AND(
+            {${EVENTS_FIELD_IDS.school_name}} = '${schoolName.replace(/'/g, "\\'")}',
+            {${EVENTS_FIELD_IDS.event_date}} = '${bookingDate}'
+          )`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (eventRecords.length === 0) {
+          return 0;
+        }
+
+        const eventRecordId = eventRecords[0].id;
+
+        // Find all registrations for this event (we can't filter by className in registrations directly)
+        // So we'll need to fetch registrations and check their class link
+        const allRegistrations = await this.registrationsTable!.select({
+          filterByFormula: `{${REGISTRATIONS_FIELD_IDS.event_id}} = '${eventRecordId}'`,
+        }).all();
+
+        // Filter by matching class name (need to lookup each registration's class)
+        const matchingRegistrations: string[] = [];
+
+        for (const reg of allRegistrations) {
+          const regFields = reg.fields as Record<string, any>;
+          const regClassRecordId = regFields[REGISTRATIONS_FIELD_IDS.class_id]?.[0];
+
+          if (regClassRecordId) {
+            const regClass = await this.classesTable!.find(regClassRecordId).catch(() => null);
+            const regClassFields = regClass?.fields as Record<string, any> || {};
+
+            if (regClassFields[CLASSES_FIELD_IDS.class_name] === className) {
+              matchingRegistrations.push(reg.id);
+            }
+          }
+        }
+
+        if (matchingRegistrations.length === 0) {
+          return 0;
+        }
+
+        // Update all matching registrations with the new class_id link
+        const updates = matchingRegistrations.map((id) => ({
+          id,
+          fields: {
+            [REGISTRATIONS_FIELD_IDS.class_id]: [classRecordId],
+          },
+        }));
+
+        // Update in batches of 10
+        for (let i = 0; i < updates.length; i += 10) {
+          const batch = updates.slice(i, i + 10);
+          await this.registrationsTable!.update(batch as any);
+        }
+
+        return matchingRegistrations.length;
+      } catch (error) {
+        console.error('Error assigning class_id in Registrations:', error);
+        throw new Error(`Failed to assign class_id: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
+    } else {
+      // LEGACY: Query and update parent_journey_table
+      try {
+        // Find all records matching the criteria
+        const records = await this.query({
+          filterByFormula: `AND(
+            {${AIRTABLE_FIELD_IDS.school_name}} = '${schoolName}',
+            {booking_date} = '${bookingDate}',
+            {${AIRTABLE_FIELD_IDS.class}} = '${className}'
+          )`,
+        });
 
-      // Update all matching records with the class_id
-      const updates = records.map((record) => ({
-        id: record.id,
-        fields: {
-          class_id: classId,
-        },
-      }));
+        if (records.length === 0) {
+          return 0;
+        }
 
-      // Update in batches of 10
-      for (let i = 0; i < updates.length; i += 10) {
-        const batch = updates.slice(i, i + 10);
-        await this.base(TABLE_NAME).update(batch as any);
+        // Update all matching records with the class_id
+        const updates = records.map((record) => ({
+          id: record.id,
+          fields: {
+            class_id: classId,
+          },
+        }));
+
+        // Update in batches of 10
+        for (let i = 0; i < updates.length; i += 10) {
+          const batch = updates.slice(i, i + 10);
+          await this.base(TABLE_NAME).update(batch as any);
+        }
+
+        return records.length;
+      } catch (error) {
+        console.error('Error assigning class_id:', error);
+        throw new Error(`Failed to assign class_id: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-
-      return records.length;
-    } catch (error) {
-      console.error('Error assigning class_id:', error);
-      throw new Error(`Failed to assign class_id: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
   // Search parent journeys by child name
   async searchByChildName(childName: string): Promise<ParentJourney[]> {
-    return this.query({
-      filterByFormula: `SEARCH(LOWER('${childName}'), LOWER({${AIRTABLE_FIELD_IDS.registered_child}}))`,
-    });
+    if (this.useNormalizedTables()) {
+      // NEW: Search Registrations by registered_child field
+      try {
+        const registrations = await this.registrationsTable!.select({
+          filterByFormula: `SEARCH(LOWER('${childName}'), LOWER({${REGISTRATIONS_FIELD_IDS.registered_child}}))`,
+        }).all();
+
+        const journeys: ParentJourney[] = [];
+
+        for (const reg of registrations) {
+          const regFields = reg.fields as Record<string, any>;
+          const parentRecordId = regFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+          const eventRecordId = regFields[REGISTRATIONS_FIELD_IDS.event_id]?.[0];
+          const classRecordId = regFields[REGISTRATIONS_FIELD_IDS.class_id]?.[0];
+
+          const parent = parentRecordId ? await this.parentsTable!.find(parentRecordId).catch(() => null) : null;
+          const event = eventRecordId ? await this.eventsTable!.find(eventRecordId).catch(() => null) : null;
+          const classInfo = classRecordId ? await this.classesTable!.find(classRecordId).catch(() => null) : null;
+
+          const parentFields = parent?.fields as Record<string, any> || {};
+          const eventFields = event?.fields as Record<string, any> || {};
+          const classFields = classInfo?.fields as Record<string, any> || {};
+
+          journeys.push({
+            id: reg.id,
+            booking_id: eventFields[EVENTS_FIELD_IDS.event_id] || '',
+            class_id: classFields[CLASSES_FIELD_IDS.class_id] || '',
+            school_name: eventFields[EVENTS_FIELD_IDS.school_name] || '',
+            main_teacher: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+            other_teachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+            class: classFields[CLASSES_FIELD_IDS.class_name] || '',
+            registered_child: regFields[REGISTRATIONS_FIELD_IDS.registered_child] || '',
+            parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+            parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+            parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+            email_campaigns: parentFields[PARENTS_FIELD_IDS.email_campaigns] || '',
+            order_number: regFields[REGISTRATIONS_FIELD_IDS.order_number] || '',
+            school_recording: [],
+            event_type: eventFields[EVENTS_FIELD_IDS.event_type] || '',
+            parent_id: parentFields[PARENTS_FIELD_IDS.parent_id] || '',
+            booking_date: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+            child_id: regFields[REGISTRATIONS_FIELD_IDS.child_id] || '',
+            registered_complete: regFields[REGISTRATIONS_FIELD_IDS.registered_complete] || false,
+            total_children: classFields[CLASSES_FIELD_IDS.total_children] || 0,
+            assigned_staff: eventFields[EVENTS_FIELD_IDS.assigned_staff] || [],
+          });
+        }
+
+        return journeys;
+      } catch (error) {
+        console.error('Error searching by child name from normalized tables:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      return this.query({
+        filterByFormula: `SEARCH(LOWER('${childName}'), LOWER({${AIRTABLE_FIELD_IDS.registered_child}}))`,
+      });
+    }
   }
 
   // Get parent journeys with orders
   async getParentsWithOrders(): Promise<ParentJourney[]> {
-    return this.query({
-      filterByFormula: `NOT({${AIRTABLE_FIELD_IDS.order_number}} = '')`,
-      sort: [{ field: 'order_number', direction: 'desc' }],
-    });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Registrations with order_number
+      try {
+        const registrations = await this.registrationsTable!.select({
+          filterByFormula: `NOT({${REGISTRATIONS_FIELD_IDS.order_number}} = '')`,
+        }).all();
+
+        const journeys: ParentJourney[] = [];
+
+        for (const reg of registrations) {
+          const regFields = reg.fields as Record<string, any>;
+          const parentRecordId = regFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+          const eventRecordId = regFields[REGISTRATIONS_FIELD_IDS.event_id]?.[0];
+          const classRecordId = regFields[REGISTRATIONS_FIELD_IDS.class_id]?.[0];
+
+          const parent = parentRecordId ? await this.parentsTable!.find(parentRecordId).catch(() => null) : null;
+          const event = eventRecordId ? await this.eventsTable!.find(eventRecordId).catch(() => null) : null;
+          const classInfo = classRecordId ? await this.classesTable!.find(classRecordId).catch(() => null) : null;
+
+          const parentFields = parent?.fields as Record<string, any> || {};
+          const eventFields = event?.fields as Record<string, any> || {};
+          const classFields = classInfo?.fields as Record<string, any> || {};
+
+          journeys.push({
+            id: reg.id,
+            booking_id: eventFields[EVENTS_FIELD_IDS.event_id] || '',
+            class_id: classFields[CLASSES_FIELD_IDS.class_id] || '',
+            school_name: eventFields[EVENTS_FIELD_IDS.school_name] || '',
+            main_teacher: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+            other_teachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+            class: classFields[CLASSES_FIELD_IDS.class_name] || '',
+            registered_child: regFields[REGISTRATIONS_FIELD_IDS.registered_child] || '',
+            parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+            parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+            parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+            email_campaigns: parentFields[PARENTS_FIELD_IDS.email_campaigns] || '',
+            order_number: regFields[REGISTRATIONS_FIELD_IDS.order_number] || '',
+            school_recording: [],
+            event_type: eventFields[EVENTS_FIELD_IDS.event_type] || '',
+            parent_id: parentFields[PARENTS_FIELD_IDS.parent_id] || '',
+            booking_date: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+            child_id: regFields[REGISTRATIONS_FIELD_IDS.child_id] || '',
+            registered_complete: regFields[REGISTRATIONS_FIELD_IDS.registered_complete] || false,
+            total_children: classFields[CLASSES_FIELD_IDS.total_children] || 0,
+            assigned_staff: eventFields[EVENTS_FIELD_IDS.assigned_staff] || [],
+          });
+        }
+
+        // Sort by order_number descending
+        return journeys.sort((a, b) => (b.order_number || '').localeCompare(a.order_number || ''));
+      } catch (error) {
+        console.error('Error fetching parents with orders from normalized tables:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      return this.query({
+        filterByFormula: `NOT({${AIRTABLE_FIELD_IDS.order_number}} = '')`,
+        sort: [{ field: 'order_number', direction: 'desc' }],
+      });
+    }
   }
 
   // Get parent journeys opted into email campaigns
   async getEmailCampaignOptIns(): Promise<ParentJourney[]> {
-    return this.query({
-      filterByFormula: `{${AIRTABLE_FIELD_IDS.email_campaigns}} = 'yes'`,
-    });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Parents with email_campaigns = 'yes' → Get their registrations
+      try {
+        const parents = await this.parentsTable!.select({
+          filterByFormula: `{${PARENTS_FIELD_IDS.email_campaigns}} = 'yes'`,
+        }).all();
+
+        const journeys: ParentJourney[] = [];
+
+        for (const parent of parents) {
+          const parentFields = parent.fields as Record<string, any>;
+
+          // Get all registrations for this parent
+          const registrations = await this.registrationsTable!.select({
+            filterByFormula: `SEARCH('${parent.id}', {${REGISTRATIONS_FIELD_IDS.parent_id}})`,
+          }).all();
+
+          for (const reg of registrations) {
+            const regFields = reg.fields as Record<string, any>;
+            const eventRecordId = regFields[REGISTRATIONS_FIELD_IDS.event_id]?.[0];
+            const classRecordId = regFields[REGISTRATIONS_FIELD_IDS.class_id]?.[0];
+
+            const event = eventRecordId ? await this.eventsTable!.find(eventRecordId).catch(() => null) : null;
+            const classInfo = classRecordId ? await this.classesTable!.find(classRecordId).catch(() => null) : null;
+
+            const eventFields = event?.fields as Record<string, any> || {};
+            const classFields = classInfo?.fields as Record<string, any> || {};
+
+            journeys.push({
+              id: reg.id,
+              booking_id: eventFields[EVENTS_FIELD_IDS.event_id] || '',
+              class_id: classFields[CLASSES_FIELD_IDS.class_id] || '',
+              school_name: eventFields[EVENTS_FIELD_IDS.school_name] || '',
+              main_teacher: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+              other_teachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+              class: classFields[CLASSES_FIELD_IDS.class_name] || '',
+              registered_child: regFields[REGISTRATIONS_FIELD_IDS.registered_child] || '',
+              parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+              parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+              parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+              email_campaigns: 'yes',
+              order_number: regFields[REGISTRATIONS_FIELD_IDS.order_number] || '',
+              school_recording: [],
+              event_type: eventFields[EVENTS_FIELD_IDS.event_type] || '',
+              parent_id: parentFields[PARENTS_FIELD_IDS.parent_id] || '',
+              booking_date: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+              child_id: regFields[REGISTRATIONS_FIELD_IDS.child_id] || '',
+              registered_complete: regFields[REGISTRATIONS_FIELD_IDS.registered_complete] || false,
+              total_children: classFields[CLASSES_FIELD_IDS.total_children] || 0,
+              assigned_staff: eventFields[EVENTS_FIELD_IDS.assigned_staff] || [],
+            });
+          }
+        }
+
+        return journeys;
+      } catch (error) {
+        console.error('Error fetching email campaign opt-ins from normalized tables:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      return this.query({
+        filterByFormula: `{${AIRTABLE_FIELD_IDS.email_campaigns}} = 'yes'`,
+      });
+    }
   }
 
   // ==================== Parent Portal Data Methods ====================
@@ -456,53 +1716,149 @@ class AirtableService {
 
   // Get all records (with pagination support)
   async getAllRecords(offset?: string): Promise<{ records: ParentJourney[]; offset?: string }> {
-    try {
-      const selectOptions: any = {
-        pageSize: 100,
-      };
+    if (this.useNormalizedTables()) {
+      // NEW: Get all registrations with pagination
+      try {
+        // Get one page of registrations (100 records)
+        const selectOptions: any = {
+          pageSize: 100,
+        };
 
-      // Only add offset if it's provided
-      if (offset) {
-        selectOptions.offset = offset;
+        if (offset) {
+          // In new structure, offset would be a registration record ID
+          // Airtable doesn't support offset by ID in the same way, so we'll fetch from beginning
+          // This is a limitation - proper pagination would require cursor-based approach
+          console.warn('Offset-based pagination not fully supported in normalized tables');
+        }
+
+        const registrations = await this.registrationsTable!.select(selectOptions).firstPage();
+        const journeys: ParentJourney[] = [];
+
+        for (const reg of registrations) {
+          const regFields = reg.fields as Record<string, any>;
+          const parentRecordId = regFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+          const eventRecordId = regFields[REGISTRATIONS_FIELD_IDS.event_id]?.[0];
+          const classRecordId = regFields[REGISTRATIONS_FIELD_IDS.class_id]?.[0];
+
+          const parent = parentRecordId ? await this.parentsTable!.find(parentRecordId).catch(() => null) : null;
+          const event = eventRecordId ? await this.eventsTable!.find(eventRecordId).catch(() => null) : null;
+          const classInfo = classRecordId ? await this.classesTable!.find(classRecordId).catch(() => null) : null;
+
+          const parentFields = parent?.fields as Record<string, any> || {};
+          const eventFields = event?.fields as Record<string, any> || {};
+          const classFields = classInfo?.fields as Record<string, any> || {};
+
+          journeys.push({
+            id: reg.id,
+            booking_id: eventFields[EVENTS_FIELD_IDS.event_id] || '',
+            class_id: classFields[CLASSES_FIELD_IDS.class_id] || '',
+            school_name: eventFields[EVENTS_FIELD_IDS.school_name] || '',
+            main_teacher: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+            other_teachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+            class: classFields[CLASSES_FIELD_IDS.class_name] || '',
+            registered_child: regFields[REGISTRATIONS_FIELD_IDS.registered_child] || '',
+            parent_first_name: parentFields[PARENTS_FIELD_IDS.parent_first_name] || '',
+            parent_email: parentFields[PARENTS_FIELD_IDS.parent_email] || '',
+            parent_telephone: parentFields[PARENTS_FIELD_IDS.parent_telephone] || '',
+            email_campaigns: parentFields[PARENTS_FIELD_IDS.email_campaigns] || '',
+            order_number: regFields[REGISTRATIONS_FIELD_IDS.order_number] || '',
+            school_recording: [],
+            event_type: eventFields[EVENTS_FIELD_IDS.event_type] || '',
+            parent_id: parentFields[PARENTS_FIELD_IDS.parent_id] || '',
+            booking_date: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+            child_id: regFields[REGISTRATIONS_FIELD_IDS.child_id] || '',
+            registered_complete: regFields[REGISTRATIONS_FIELD_IDS.registered_complete] || false,
+            total_children: classFields[CLASSES_FIELD_IDS.total_children] || 0,
+            assigned_staff: eventFields[EVENTS_FIELD_IDS.assigned_staff] || [],
+          });
+        }
+
+        // Calculate next offset (last record ID if page is full)
+        const newOffset = registrations.length === 100 ? registrations[registrations.length - 1].id : undefined;
+
+        return {
+          records: journeys,
+          offset: newOffset,
+        };
+      } catch (error) {
+        console.error('Error fetching all records from normalized tables:', error);
+        throw new Error(`Failed to fetch records: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const selectOptions: any = {
+          pageSize: 100,
+        };
 
-      const result = await this.base(TABLE_NAME)
-        .select(selectOptions)
-        .firstPage();
+        // Only add offset if it's provided
+        if (offset) {
+          selectOptions.offset = offset;
+        }
 
-      const records = result.map((record) => this.transformRecord(record));
+        const result = await this.base(TABLE_NAME)
+          .select(selectOptions)
+          .firstPage();
 
-      // Airtable provides offset if there are more pages
-      const newOffset = result.length === 100 ? result[result.length - 1].id : undefined;
+        const records = result.map((record) => this.transformRecord(record));
 
-      return {
-        records,
-        offset: newOffset,
-      };
-    } catch (error) {
-      console.error('Error fetching all records:', error);
-      throw new Error(`Failed to fetch records: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // Airtable provides offset if there are more pages
+        const newOffset = result.length === 100 ? result[result.length - 1].id : undefined;
+
+        return {
+          records,
+          offset: newOffset,
+        };
+      } catch (error) {
+        console.error('Error fetching all records:', error);
+        throw new Error(`Failed to fetch records: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
   // Update email campaign preference for multiple parents
   async updateEmailCampaignPreferences(parentIds: string[], preference: string): Promise<void> {
-    try {
-      const updates = parentIds.map((parentId) => ({
-        id: parentId,
-        fields: {
-          [AIRTABLE_FIELD_IDS.email_campaigns]: preference,
-        },
-      }));
+    if (this.useNormalizedTables()) {
+      // NEW: In normalized tables, these IDs could be registration IDs
+      // We need to find the unique parent records and update them
+      try {
+        // First, try to interpret these as parent record IDs
+        // (In the new structure, callers should pass parent Airtable record IDs)
+        const updates = parentIds.map((parentRecordId) => ({
+          id: parentRecordId,
+          fields: {
+            [PARENTS_FIELD_IDS.email_campaigns]: preference,
+          },
+        }));
 
-      // Airtable allows updating up to 10 records at once
-      for (let i = 0; i < updates.length; i += 10) {
-        const batch = updates.slice(i, i + 10);
-        await this.base(TABLE_NAME).update(batch as any);
+        // Airtable allows updating up to 10 records at once
+        for (let i = 0; i < updates.length; i += 10) {
+          const batch = updates.slice(i, i + 10);
+          await this.parentsTable!.update(batch as any);
+        }
+      } catch (error) {
+        console.error('Error updating email preferences in normalized tables:', error);
+        throw new Error(`Failed to update email preferences: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-    } catch (error) {
-      console.error('Error updating email preferences:', error);
-      throw new Error(`Failed to update email preferences: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } else {
+      // LEGACY: Update parent_journey_table records
+      try {
+        const updates = parentIds.map((parentId) => ({
+          id: parentId,
+          fields: {
+            [AIRTABLE_FIELD_IDS.email_campaigns]: preference,
+          },
+        }));
+
+        // Airtable allows updating up to 10 records at once
+        for (let i = 0; i < updates.length; i += 10) {
+          const batch = updates.slice(i, i + 10);
+          await this.base(TABLE_NAME).update(batch as any);
+        }
+      } catch (error) {
+        console.error('Error updating email preferences:', error);
+        throw new Error(`Failed to update email preferences: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
@@ -522,302 +1878,534 @@ class AirtableService {
     parent_count: number;
     booking_ids: string[]; // All booking IDs for this class session
   }>> {
-    try {
-      const allRecords = await this.query({
-        sort: [{ field: 'booking_date', direction: 'desc' }],
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Classes table directly
+      try {
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            returnFieldsByFieldId: true,
+          })
+          .all();
 
-      // Group by class_id if available, otherwise fall back to school + date + class
-      const eventsMap = new Map<string, {
-        booking_id: string;
-        class_id?: string;
-        school_name: string;
-        booking_date?: string;
-        event_type: string;
-        main_teacher?: string;
-        other_teachers?: string;
-        class: string;
-        parent_count: number;
-        booking_ids: string[];
-      }>();
+        const results = [];
 
-      allRecords.forEach((record) => {
-        // Prefer class_id for grouping if available, otherwise use legacy key
-        const key = record.class_id ||
-                    `${record.school_name}|${record.booking_date || 'no-date'}|${record.class}`;
+        for (const classRecord of classRecords) {
+          const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
+          const eventRecordId = (classRecord.fields[CLASSES_FIELD_IDS.event_id] as string[])?.[0];
 
-        // Check if this is a real parent registration or a placeholder
-        const isRealParent = record.parent_id !== 'PLACEHOLDER' && record.parent_id;
+          // Get event details
+          const event = eventRecordId ? await this.queryEventById(eventRecordId) : null;
 
-        if (!eventsMap.has(key)) {
-          eventsMap.set(key, {
-            booking_id: record.booking_id,
-            class_id: record.class_id,
-            school_name: record.school_name,
-            booking_date: record.booking_date,
-            event_type: record.event_type,
-            main_teacher: record.main_teacher,
-            other_teachers: record.other_teachers,
-            class: record.class,
-            parent_count: isRealParent ? 1 : 0, // Only count real parents
-            booking_ids: [record.booking_id],
+          // Count registrations for this class
+          const registrations = await this.base(REGISTRATIONS_TABLE_ID)
+            .select({
+              filterByFormula: `SEARCH('${classRecord.id}', {${REGISTRATIONS_FIELD_IDS.class_id}})`,
+              returnFieldsByFieldId: true,
+            })
+            .all();
+
+          results.push({
+            booking_id: event?.event_id || '',
+            class_id: classId,
+            school_name: event?.school_name || '',
+            booking_date: event?.event_date,
+            event_type: event?.event_type || '',
+            main_teacher: classRecord.fields[CLASSES_FIELD_IDS.main_teacher] as string,
+            other_teachers: classRecord.fields[CLASSES_FIELD_IDS.other_teachers] as string,
+            class: classRecord.fields[CLASSES_FIELD_IDS.class_name] as string,
+            parent_count: registrations.length,
+            booking_ids: event?.event_id ? [event.event_id] : [],
           });
-        } else {
-          const existing = eventsMap.get(key)!;
-          if (isRealParent) {
-            existing.parent_count += 1; // Only increment for real parents
-          }
-          existing.booking_ids.push(record.booking_id);
         }
-      });
 
-      return Array.from(eventsMap.values()).sort((a, b) => {
-        // Sort by date descending (most recent first)
-        if (!a.booking_date) return 1;
-        if (!b.booking_date) return -1;
-        return new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime();
-      });
-    } catch (error) {
-      console.error('Error fetching unique events:', error);
-      throw new Error(`Failed to fetch events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // Sort by date descending
+        return results.sort((a, b) => {
+          if (!a.booking_date) return 1;
+          if (!b.booking_date) return -1;
+          return new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime();
+        });
+      } catch (error) {
+        console.error('Error fetching unique events:', error);
+        throw new Error(`Failed to fetch events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const allRecords = await this.query({
+          sort: [{ field: 'booking_date', direction: 'desc' }],
+        });
+
+        // Group by class_id if available, otherwise fall back to school + date + class
+        const eventsMap = new Map<string, {
+          booking_id: string;
+          class_id?: string;
+          school_name: string;
+          booking_date?: string;
+          event_type: string;
+          main_teacher?: string;
+          other_teachers?: string;
+          class: string;
+          parent_count: number;
+          booking_ids: string[];
+        }>();
+
+        allRecords.forEach((record) => {
+          // Prefer class_id for grouping if available, otherwise use legacy key
+          const key = record.class_id ||
+                      `${record.school_name}|${record.booking_date || 'no-date'}|${record.class}`;
+
+          // Check if this is a real parent registration or a placeholder
+          const isRealParent = record.parent_id !== 'PLACEHOLDER' && record.parent_id;
+
+          if (!eventsMap.has(key)) {
+            eventsMap.set(key, {
+              booking_id: record.booking_id,
+              class_id: record.class_id,
+              school_name: record.school_name,
+              booking_date: record.booking_date,
+              event_type: record.event_type,
+              main_teacher: record.main_teacher,
+              other_teachers: record.other_teachers,
+              class: record.class,
+              parent_count: isRealParent ? 1 : 0,
+              booking_ids: [record.booking_id],
+            });
+          } else {
+            const existing = eventsMap.get(key)!;
+            if (isRealParent) {
+              existing.parent_count += 1;
+            }
+            existing.booking_ids.push(record.booking_id);
+          }
+        });
+
+        return Array.from(eventsMap.values()).sort((a, b) => {
+          if (!a.booking_date) return 1;
+          if (!b.booking_date) return -1;
+          return new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime();
+        });
+      } catch (error) {
+        console.error('Error fetching unique events:', error);
+        throw new Error(`Failed to fetch events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
   // Get school-level event summaries for admin cards view
   // Groups by booking_id (school + date) and aggregates stats
   async getSchoolEventSummaries(): Promise<SchoolEventSummary[]> {
-    try {
-      const allRecords = await this.query({
-        sort: [{ field: 'booking_date', direction: 'desc' }],
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Events table directly
+      try {
+        const eventRecords = await this.base(EVENTS_TABLE_ID)
+          .select({
+            returnFieldsByFieldId: true,
+            sort: [{ field: EVENTS_FIELD_IDS.event_date, direction: 'desc' }],
+          })
+          .all();
 
-      // Group by booking_id (which represents school + date)
-      const eventsMap = new Map<string, {
-        eventId: string;
-        schoolName: string;
-        eventDate: string;
-        eventType: string;
-        mainTeacher: string;
-        classIds: Set<string>;
-        totalChildren: number;
-        parentCount: number;
-        seenClassIds: Set<string>; // Track which classes we've counted children for
-        assignedStaffId?: string;
-      }>();
+        const summaries: SchoolEventSummary[] = [];
 
-      allRecords.forEach((record) => {
-        if (!record.booking_id) return;
+        for (const eventRecord of eventRecords) {
+          const eventId = eventRecord.fields[EVENTS_FIELD_IDS.event_id] as string;
+          const schoolName = eventRecord.fields[EVENTS_FIELD_IDS.school_name] as string;
+          const eventDate = eventRecord.fields[EVENTS_FIELD_IDS.event_date] as string;
+          const eventType = eventRecord.fields[EVENTS_FIELD_IDS.event_type] as string;
+          const assignedStaffIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_staff] as string[];
+          const assignedEngineerIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[];
 
-        const isRealParent = record.parent_id !== 'PLACEHOLDER' && record.parent_id;
-
-        if (!eventsMap.has(record.booking_id)) {
-          const classIdSet = new Set<string>();
-          const seenClassIds = new Set<string>();
-          if (record.class_id) {
-            classIdSet.add(record.class_id);
-            seenClassIds.add(record.class_id);
-          }
-
-          eventsMap.set(record.booking_id, {
-            eventId: record.booking_id,
-            schoolName: record.school_name,
-            eventDate: record.booking_date || '',
-            eventType: record.event_type,
-            mainTeacher: record.main_teacher || '',
-            classIds: classIdSet,
-            totalChildren: record.total_children || 0,
-            parentCount: isRealParent ? 1 : 0,
-            seenClassIds,
-            assignedStaffId: record.assigned_staff?.[0], // Get first linked staff ID
-          });
-        } else {
-          const existing = eventsMap.get(record.booking_id)!;
-
-          // Add class_id to set and count children only once per class
-          if (record.class_id && !existing.seenClassIds.has(record.class_id)) {
-            existing.classIds.add(record.class_id);
-            existing.seenClassIds.add(record.class_id);
-            existing.totalChildren += record.total_children || 0;
-          }
-
-          // Count real parents
-          if (isRealParent) {
-            existing.parentCount += 1;
-          }
-
-          // Capture assigned staff if not already set
-          if (!existing.assignedStaffId && record.assigned_staff?.[0]) {
-            existing.assignedStaffId = record.assigned_staff[0];
-          }
-        }
-      });
-
-      // Collect all unique staff IDs to resolve names
-      const staffIds = new Set<string>();
-      eventsMap.forEach(event => {
-        if (event.assignedStaffId) {
-          staffIds.add(event.assignedStaffId);
-        }
-      });
-
-      // Fetch staff names if there are any assigned staff
-      const staffNames = new Map<string, string>();
-      if (staffIds.size > 0) {
-        try {
-          const staffRecords = await this.base(PERSONEN_TABLE_ID)
+          // Get classes for this event
+          const classRecords = await this.base(CLASSES_TABLE_ID)
             .select({
-              filterByFormula: `OR(${Array.from(staffIds).map(id => `RECORD_ID() = '${id}'`).join(',')})`,
+              filterByFormula: `SEARCH('${eventRecord.id}', {${CLASSES_FIELD_IDS.event_id}})`,
+              returnFieldsByFieldId: true,
             })
             .all();
 
-          staffRecords.forEach(record => {
-            // Airtable returns fields by display name, not field ID
-            const name = record.fields['staff_name'] as string;
-            if (name) {
-              staffNames.set(record.id, name);
-            }
-          });
-        } catch (error) {
-          console.error('Error fetching staff names:', error);
-          // Continue without staff names if fetch fails
-        }
-      }
+          // Get total children and main teacher from first class
+          let totalChildren = 0;
+          let mainTeacher = '';
+          const classIds = new Set<string>();
 
-      // Convert to array with computed fields
-      return Array.from(eventsMap.values())
-        .map(event => ({
-          eventId: event.eventId,
-          schoolName: event.schoolName,
-          eventDate: event.eventDate,
-          eventType: event.eventType,
-          mainTeacher: event.mainTeacher,
-          classCount: event.classIds.size,
-          totalChildren: event.totalChildren,
-          totalParents: event.parentCount,
-          assignedStaffId: event.assignedStaffId,
-          assignedStaffName: event.assignedStaffId ? staffNames.get(event.assignedStaffId) : undefined,
-        }))
-        .sort((a, b) => {
-          // Sort by date descending
-          if (!a.eventDate) return 1;
-          if (!b.eventDate) return -1;
-          return new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime();
+          for (const classRecord of classRecords) {
+            classIds.add(classRecord.id);
+            totalChildren += (classRecord.fields[CLASSES_FIELD_IDS.total_children] as number) || 0;
+            if (!mainTeacher) {
+              mainTeacher = (classRecord.fields[CLASSES_FIELD_IDS.main_teacher] as string) || '';
+            }
+          }
+
+          // Count registrations for this event
+          const registrations = await this.base(REGISTRATIONS_TABLE_ID)
+            .select({
+              filterByFormula: `SEARCH('${eventRecord.id}', {${REGISTRATIONS_FIELD_IDS.event_id}})`,
+              returnFieldsByFieldId: true,
+            })
+            .all();
+
+          // Get staff name if assigned
+          let assignedStaffName: string | undefined;
+          const assignedStaffId = assignedStaffIds?.[0];
+
+          if (assignedStaffId) {
+            try {
+              const staffRecord = await this.base(PERSONEN_TABLE_ID).find(assignedStaffId);
+              assignedStaffName = staffRecord.fields['staff_name'] as string;
+            } catch (error) {
+              console.error('Error fetching staff name:', error);
+            }
+          }
+
+          summaries.push({
+            eventId,
+            schoolName,
+            eventDate,
+            eventType,
+            mainTeacher,
+            classCount: classRecords.length,
+            totalChildren,
+            totalParents: registrations.length,
+            assignedStaffId,
+            assignedStaffName,
+            assignedEngineerId: assignedEngineerIds?.[0],
+          });
+        }
+
+        return summaries;
+      } catch (error) {
+        console.error('Error fetching school event summaries:', error);
+        throw new Error(`Failed to fetch school events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const allRecords = await this.query({
+          sort: [{ field: 'booking_date', direction: 'desc' }],
         });
-    } catch (error) {
-      console.error('Error fetching school event summaries:', error);
-      throw new Error(`Failed to fetch school events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+        // Group by booking_id (which represents school + date)
+        const eventsMap = new Map<string, {
+          eventId: string;
+          schoolName: string;
+          eventDate: string;
+          eventType: string;
+          mainTeacher: string;
+          classIds: Set<string>;
+          totalChildren: number;
+          parentCount: number;
+          seenClassIds: Set<string>;
+          assignedStaffId?: string;
+        }>();
+
+        allRecords.forEach((record) => {
+          if (!record.booking_id) return;
+
+          const isRealParent = record.parent_id !== 'PLACEHOLDER' && record.parent_id;
+
+          if (!eventsMap.has(record.booking_id)) {
+            const classIdSet = new Set<string>();
+            const seenClassIds = new Set<string>();
+            if (record.class_id) {
+              classIdSet.add(record.class_id);
+              seenClassIds.add(record.class_id);
+            }
+
+            eventsMap.set(record.booking_id, {
+              eventId: record.booking_id,
+              schoolName: record.school_name,
+              eventDate: record.booking_date || '',
+              eventType: record.event_type,
+              mainTeacher: record.main_teacher || '',
+              classIds: classIdSet,
+              totalChildren: record.total_children || 0,
+              parentCount: isRealParent ? 1 : 0,
+              seenClassIds,
+              assignedStaffId: record.assigned_staff?.[0],
+            });
+          } else {
+            const existing = eventsMap.get(record.booking_id)!;
+
+            if (record.class_id && !existing.seenClassIds.has(record.class_id)) {
+              existing.classIds.add(record.class_id);
+              existing.seenClassIds.add(record.class_id);
+              existing.totalChildren += record.total_children || 0;
+            }
+
+            if (isRealParent) {
+              existing.parentCount += 1;
+            }
+
+            if (!existing.assignedStaffId && record.assigned_staff?.[0]) {
+              existing.assignedStaffId = record.assigned_staff[0];
+            }
+          }
+        });
+
+        // Collect all unique staff IDs to resolve names
+        const staffIds = new Set<string>();
+        eventsMap.forEach(event => {
+          if (event.assignedStaffId) {
+            staffIds.add(event.assignedStaffId);
+          }
+        });
+
+        // Fetch staff names if there are any assigned staff
+        const staffNames = new Map<string, string>();
+        if (staffIds.size > 0) {
+          try {
+            const staffRecords = await this.base(PERSONEN_TABLE_ID)
+              .select({
+                filterByFormula: `OR(${Array.from(staffIds).map(id => `RECORD_ID() = '${id}'`).join(',')})`,
+              })
+              .all();
+
+            staffRecords.forEach(record => {
+              const name = record.fields['staff_name'] as string;
+              if (name) {
+                staffNames.set(record.id, name);
+              }
+            });
+          } catch (error) {
+            console.error('Error fetching staff names:', error);
+          }
+        }
+
+        // Convert to array with computed fields
+        return Array.from(eventsMap.values())
+          .map(event => ({
+            eventId: event.eventId,
+            schoolName: event.schoolName,
+            eventDate: event.eventDate,
+            eventType: event.eventType,
+            mainTeacher: event.mainTeacher,
+            classCount: event.classIds.size,
+            totalChildren: event.totalChildren,
+            totalParents: event.parentCount,
+            assignedStaffId: event.assignedStaffId,
+            assignedStaffName: event.assignedStaffId ? staffNames.get(event.assignedStaffId) : undefined,
+          }))
+          .sort((a, b) => {
+            if (!a.eventDate) return 1;
+            if (!b.eventDate) return -1;
+            return new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime();
+          });
+      } catch (error) {
+        console.error('Error fetching school event summaries:', error);
+        throw new Error(`Failed to fetch school events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
   // Get full event detail including all classes for detail page
   async getSchoolEventDetail(eventId: string): Promise<SchoolEventDetail | null> {
-    try {
-      const records = await this.query({
-        filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId}'`,
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Query normalized tables
+      try {
+        // Find the event
+        const eventRecords = await this.base(EVENTS_TABLE_ID)
+          .select({
+            filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId}'`,
+            returnFieldsByFieldId: true,
+            maxRecords: 1,
+          })
+          .firstPage();
 
-      if (records.length === 0) return null;
+        if (eventRecords.length === 0) return null;
 
-      // Build class-level aggregations
-      const classesMap = new Map<string, {
-        classId: string;
-        className: string;
-        mainTeacher?: string;
-        totalChildren: number;
-        registeredParents: number;
-      }>();
+        const eventRecord = eventRecords[0];
+        const schoolName = eventRecord.fields[EVENTS_FIELD_IDS.school_name] as string;
+        const eventDate = eventRecord.fields[EVENTS_FIELD_IDS.event_date] as string;
+        const eventType = eventRecord.fields[EVENTS_FIELD_IDS.event_type] as string;
+        const assignedStaffIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_staff] as string[];
+        const assignedStaffId = assignedStaffIds?.[0];
 
-      let schoolName = '';
-      let eventDate = '';
-      let eventType = '';
-      let mainTeacher = '';
-      let assignedStaffId: string | undefined;
+        // Get all classes for this event
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `SEARCH('${eventRecord.id}', {${CLASSES_FIELD_IDS.event_id}})`,
+            returnFieldsByFieldId: true,
+          })
+          .all();
 
-      records.forEach((record) => {
-        // Capture event-level data from first record
-        if (!schoolName) {
-          schoolName = record.school_name;
-          eventDate = record.booking_date || '';
-          eventType = record.event_type;
-          mainTeacher = record.main_teacher || '';
-          assignedStaffId = record.assigned_staff?.[0];
-        }
-        // Also capture assigned staff if not yet set
-        if (!assignedStaffId && record.assigned_staff?.[0]) {
-          assignedStaffId = record.assigned_staff[0];
-        }
+        // Build class details with registration counts
+        const classes: EventClassDetail[] = [];
+        let mainTeacher = '';
 
-        if (!record.class_id) return;
+        for (const classRecord of classRecords) {
+          const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
+          const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
+          const classMainTeacher = classRecord.fields[CLASSES_FIELD_IDS.main_teacher] as string;
+          const totalChildren = (classRecord.fields[CLASSES_FIELD_IDS.total_children] as number) || 0;
 
-        const isRealParent = record.parent_id !== 'PLACEHOLDER' && record.parent_id;
-
-        if (!classesMap.has(record.class_id)) {
-          classesMap.set(record.class_id, {
-            classId: record.class_id,
-            className: record.class,
-            mainTeacher: record.main_teacher,
-            totalChildren: record.total_children || 0,
-            registeredParents: isRealParent ? 1 : 0,
-          });
-        } else {
-          const existing = classesMap.get(record.class_id)!;
-          if (isRealParent) {
-            existing.registeredParents += 1;
+          // Capture first main teacher
+          if (!mainTeacher && classMainTeacher) {
+            mainTeacher = classMainTeacher;
           }
-        }
-      });
 
-      // Convert classes to array with computed fields
-      const classes: EventClassDetail[] = Array.from(classesMap.values()).map(cls => ({
-        ...cls,
-        registrationRate: cls.totalChildren > 0
-          ? Math.round((cls.registeredParents / cls.totalChildren) * 100)
-          : 0,
-      })).sort((a, b) => a.className.localeCompare(b.className));
-
-      // Compute totals
-      const totalChildren = classes.reduce((sum, c) => sum + c.totalChildren, 0);
-      const totalParents = classes.reduce((sum, c) => sum + c.registeredParents, 0);
-
-      // Fetch assigned staff name if there's an assigned staff
-      let assignedStaffName: string | undefined;
-      if (assignedStaffId) {
-        try {
-          const staffRecords = await this.base(PERSONEN_TABLE_ID)
+          // Count registrations for this class
+          const registrations = await this.base(REGISTRATIONS_TABLE_ID)
             .select({
-              filterByFormula: `RECORD_ID() = '${assignedStaffId}'`,
-              maxRecords: 1,
+              filterByFormula: `SEARCH('${classRecord.id}', {${REGISTRATIONS_FIELD_IDS.class_id}})`,
+              returnFieldsByFieldId: true,
             })
             .all();
 
-          if (staffRecords.length > 0) {
-            // Airtable returns fields by display name, not field ID
-            assignedStaffName = staffRecords[0].fields['staff_name'] as string;
-          }
-        } catch (error) {
-          console.error('Error fetching assigned staff name:', error);
-        }
-      }
+          const registeredParents = registrations.length;
 
-      return {
-        eventId,
-        schoolName,
-        eventDate,
-        eventType,
-        mainTeacher,
-        classCount: classes.length,
-        totalChildren,
-        totalParents,
-        assignedStaffId,
-        assignedStaffName,
-        classes,
-        overallRegistrationRate: totalChildren > 0
-          ? Math.round((totalParents / totalChildren) * 100)
-          : 0,
-      };
-    } catch (error) {
-      console.error('Error fetching school event detail:', error);
-      throw new Error(`Failed to fetch event detail: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          classes.push({
+            classId,
+            className,
+            mainTeacher: classMainTeacher,
+            totalChildren,
+            registeredParents,
+            registrationRate: totalChildren > 0
+              ? Math.round((registeredParents / totalChildren) * 100)
+              : 0,
+          });
+        }
+
+        // Sort classes by name
+        classes.sort((a, b) => a.className.localeCompare(b.className));
+
+        // Compute totals
+        const totalChildren = classes.reduce((sum, c) => sum + c.totalChildren, 0);
+        const totalParents = classes.reduce((sum, c) => sum + c.registeredParents, 0);
+
+        // Fetch assigned staff name if present
+        let assignedStaffName: string | undefined;
+        if (assignedStaffId) {
+          try {
+            const staffRecord = await this.base(PERSONEN_TABLE_ID).find(assignedStaffId);
+            assignedStaffName = staffRecord.fields['staff_name'] as string;
+          } catch (error) {
+            console.error('Error fetching assigned staff name:', error);
+          }
+        }
+
+        return {
+          eventId,
+          schoolName,
+          eventDate,
+          eventType,
+          mainTeacher,
+          classCount: classes.length,
+          totalChildren,
+          totalParents,
+          assignedStaffId,
+          assignedStaffName,
+          classes,
+          overallRegistrationRate: totalChildren > 0
+            ? Math.round((totalParents / totalChildren) * 100)
+            : 0,
+        };
+      } catch (error) {
+        console.error('Error fetching school event detail:', error);
+        throw new Error(`Failed to fetch event detail: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const records = await this.query({
+          filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId}'`,
+        });
+
+        if (records.length === 0) return null;
+
+        // Build class-level aggregations
+        const classesMap = new Map<string, {
+          classId: string;
+          className: string;
+          mainTeacher?: string;
+          totalChildren: number;
+          registeredParents: number;
+        }>();
+
+        let schoolName = '';
+        let eventDate = '';
+        let eventType = '';
+        let mainTeacher = '';
+        let assignedStaffId: string | undefined;
+
+        records.forEach((record) => {
+          if (!schoolName) {
+            schoolName = record.school_name;
+            eventDate = record.booking_date || '';
+            eventType = record.event_type;
+            mainTeacher = record.main_teacher || '';
+            assignedStaffId = record.assigned_staff?.[0];
+          }
+          if (!assignedStaffId && record.assigned_staff?.[0]) {
+            assignedStaffId = record.assigned_staff[0];
+          }
+
+          if (!record.class_id) return;
+
+          const isRealParent = record.parent_id !== 'PLACEHOLDER' && record.parent_id;
+
+          if (!classesMap.has(record.class_id)) {
+            classesMap.set(record.class_id, {
+              classId: record.class_id,
+              className: record.class,
+              mainTeacher: record.main_teacher,
+              totalChildren: record.total_children || 0,
+              registeredParents: isRealParent ? 1 : 0,
+            });
+          } else {
+            const existing = classesMap.get(record.class_id)!;
+            if (isRealParent) {
+              existing.registeredParents += 1;
+            }
+          }
+        });
+
+        const classes: EventClassDetail[] = Array.from(classesMap.values()).map(cls => ({
+          ...cls,
+          registrationRate: cls.totalChildren > 0
+            ? Math.round((cls.registeredParents / cls.totalChildren) * 100)
+            : 0,
+        })).sort((a, b) => a.className.localeCompare(b.className));
+
+        const totalChildren = classes.reduce((sum, c) => sum + c.totalChildren, 0);
+        const totalParents = classes.reduce((sum, c) => sum + c.registeredParents, 0);
+
+        let assignedStaffName: string | undefined;
+        if (assignedStaffId) {
+          try {
+            const staffRecords = await this.base(PERSONEN_TABLE_ID)
+              .select({
+                filterByFormula: `RECORD_ID() = '${assignedStaffId}'`,
+                maxRecords: 1,
+              })
+              .all();
+
+            if (staffRecords.length > 0) {
+              assignedStaffName = staffRecords[0].fields['staff_name'] as string;
+            }
+          } catch (error) {
+            console.error('Error fetching assigned staff name:', error);
+          }
+        }
+
+        return {
+          eventId,
+          schoolName,
+          eventDate,
+          eventType,
+          mainTeacher,
+          classCount: classes.length,
+          totalChildren,
+          totalParents,
+          assignedStaffId,
+          assignedStaffName,
+          classes,
+          overallRegistrationRate: totalChildren > 0
+            ? Math.round((totalParents / totalChildren) * 100)
+            : 0,
+        };
+      } catch (error) {
+        console.error('Error fetching school event detail:', error);
+        throw new Error(`Failed to fetch event detail: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
@@ -830,18 +2418,58 @@ class AirtableService {
     email: string,
     bookingId: string
   ): Promise<boolean> {
-    try {
-      const records = await this.query({
-        filterByFormula: `AND(
-          LOWER({${AIRTABLE_FIELD_IDS.parent_email}}) = LOWER('${email.replace(/'/g, "\\'")}'),
-          {${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'
-        )`,
-        maxRecords: 1,
-      });
-      return records.length > 0;
-    } catch (error) {
-      console.error('Error checking parent registration:', error);
-      throw new Error(`Failed to check registration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (this.useNormalizedTables()) {
+      // NEW: Query Parents → Registrations → Events
+      try {
+        // Find parent by email
+        const parents = await this.parentsTable!.select({
+          filterByFormula: `LOWER({${PARENTS_FIELD_IDS.parent_email}}) = LOWER('${email.replace(/'/g, "\\'")}')`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (parents.length === 0) return false;
+
+        const parentRecordId = parents[0].id;
+
+        // Find event by event_id (bookingId)
+        const events = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (events.length === 0) return false;
+
+        const eventRecordId = events[0].id;
+
+        // Check if there's a registration linking this parent to this event
+        const registrations = await this.registrationsTable!.select({
+          filterByFormula: `AND(
+            {${REGISTRATIONS_FIELD_IDS.parent_id}} = '${parentRecordId}',
+            {${REGISTRATIONS_FIELD_IDS.event_id}} = '${eventRecordId}'
+          )`,
+          maxRecords: 1,
+        }).firstPage();
+
+        return registrations.length > 0;
+      } catch (error) {
+        console.error('Error checking parent registration:', error);
+        throw new Error(`Failed to check registration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const records = await this.query({
+          filterByFormula: `AND(
+            LOWER({${AIRTABLE_FIELD_IDS.parent_email}}) = LOWER('${email.replace(/'/g, "\\'")}'),
+            {${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'
+          )`,
+          maxRecords: 1,
+        });
+        return records.length > 0;
+      } catch (error) {
+        console.error('Error checking parent registration:', error);
+        throw new Error(`Failed to check registration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
@@ -852,30 +2480,75 @@ class AirtableService {
     bookingId: string,
     classId: string
   ): Promise<import('@/lib/types/airtable').EventClassDetails | null> {
-    try {
-      const records = await this.query({
-        filterByFormula: `AND(
-          {${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}',
-          {${AIRTABLE_FIELD_IDS.class_id}} = '${classId}'
-        )`,
-        maxRecords: 1,
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Events and Classes tables
+      try {
+        // Query event by event_id (booking_id)
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
+          maxRecords: 1,
+        }).firstPage();
 
-      if (records.length === 0) return null;
+        if (eventRecords.length === 0) return null;
 
-      const record = records[0];
-      return {
-        schoolName: record.school_name,
-        eventType: record.event_type,
-        bookingDate: record.booking_date,
-        className: record.class,
-        teacherName: record.main_teacher || '',
-        otherTeachers: record.other_teachers,
-        bookingId: record.booking_id,
-      };
-    } catch (error) {
-      console.error('Error fetching event details:', error);
-      throw new Error(`Failed to fetch event details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const eventRecord = eventRecords[0];
+        const eventFields = eventRecord.fields as Record<string, any>;
+
+        // Query class by class_id and verify it belongs to this event
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `AND(
+            {${CLASSES_FIELD_IDS.class_id}} = '${classId}',
+            {${CLASSES_FIELD_IDS.event_id}} = '${eventRecord.id}'
+          )`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (classRecords.length === 0) return null;
+
+        const classRecord = classRecords[0];
+        const classFields = classRecord.fields as Record<string, any>;
+
+        // Transform to EventClassDetails format
+        return {
+          schoolName: eventFields[EVENTS_FIELD_IDS.school_name] || '',
+          eventType: eventFields[EVENTS_FIELD_IDS.event_type] || '',
+          bookingDate: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+          className: classFields[CLASSES_FIELD_IDS.class_name] || '',
+          teacherName: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+          otherTeachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+          bookingId: bookingId,
+        };
+      } catch (error) {
+        console.error('Error fetching event and class details:', error);
+        throw new Error(`Failed to fetch event and class details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const records = await this.query({
+          filterByFormula: `AND(
+            {${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}',
+            {${AIRTABLE_FIELD_IDS.class_id}} = '${classId}'
+          )`,
+          maxRecords: 1,
+        });
+
+        if (records.length === 0) return null;
+
+        const record = records[0];
+        return {
+          schoolName: record.school_name,
+          eventType: record.event_type,
+          bookingDate: record.booking_date,
+          className: record.class,
+          teacherName: record.main_teacher || '',
+          otherTeachers: record.other_teachers,
+          bookingId: record.booking_id,
+        };
+      } catch (error) {
+        console.error('Error fetching event details:', error);
+        throw new Error(`Failed to fetch event details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
@@ -925,41 +2598,79 @@ class AirtableService {
     schoolName: string;
     eventCount: number;
   }>> {
-    try {
-      const today = new Date().toISOString().split('T')[0];
+    if (this.useNormalizedTables()) {
+      // NEW: Query Events table directly
+      try {
+        const today = new Date().toISOString().split('T')[0];
 
-      // Get all records with future booking dates
-      const allRecords = await this.query({
-        filterByFormula: `IS_AFTER({booking_date}, '${today}')`,
-      });
+        // Get all events with future dates and matching school name
+        const events = await this.eventsTable!.select({
+          filterByFormula: `AND(
+            IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${today}'),
+            SEARCH(LOWER('${searchQuery.toLowerCase()}'), LOWER({${EVENTS_FIELD_IDS.school_name}}))
+          )`,
+        }).all();
 
-      // Filter by search query (case-insensitive)
-      const matchingRecords = allRecords.filter(r =>
-        r.school_name &&
-        r.school_name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+        // Group by school and count events
+        const schoolMap = new Map<string, number>();
+        events.forEach(event => {
+          const eventFields = event.fields as Record<string, any>;
+          const schoolName = eventFields[EVENTS_FIELD_IDS.school_name];
 
-      // Group by school and count unique events
-      const schoolMap = new Map<string, Set<string>>();
-      matchingRecords.forEach(r => {
-        if (r.school_name && r.booking_id) {
-          if (!schoolMap.has(r.school_name)) {
-            schoolMap.set(r.school_name, new Set());
+          if (schoolName) {
+            schoolMap.set(schoolName, (schoolMap.get(schoolName) || 0) + 1);
           }
-          schoolMap.get(r.school_name)!.add(r.booking_id);
-        }
-      });
+        });
 
-      // Convert to array and sort by event count
-      return Array.from(schoolMap.entries())
-        .map(([schoolName, events]) => ({
-          schoolName,
-          eventCount: events.size,
-        }))
-        .sort((a, b) => b.eventCount - a.eventCount);
-    } catch (error) {
-      console.error('Error searching active schools:', error);
-      return [];
+        // Convert to array and sort by event count
+        return Array.from(schoolMap.entries())
+          .map(([schoolName, eventCount]) => ({
+            schoolName,
+            eventCount,
+          }))
+          .sort((a, b) => b.eventCount - a.eventCount);
+      } catch (error) {
+        console.error('Error searching active schools:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const today = new Date().toISOString().split('T')[0];
+
+        // Get all records with future booking dates
+        const allRecords = await this.query({
+          filterByFormula: `IS_AFTER({booking_date}, '${today}')`,
+        });
+
+        // Filter by search query (case-insensitive)
+        const matchingRecords = allRecords.filter(r =>
+          r.school_name &&
+          r.school_name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        // Group by school and count unique events
+        const schoolMap = new Map<string, Set<string>>();
+        matchingRecords.forEach(r => {
+          if (r.school_name && r.booking_id) {
+            if (!schoolMap.has(r.school_name)) {
+              schoolMap.set(r.school_name, new Set());
+            }
+            schoolMap.get(r.school_name)!.add(r.booking_id);
+          }
+        });
+
+        // Convert to array and sort by event count
+        return Array.from(schoolMap.entries())
+          .map(([schoolName, events]) => ({
+            schoolName,
+            eventCount: events.size,
+          }))
+          .sort((a, b) => b.eventCount - a.eventCount);
+      } catch (error) {
+        console.error('Error searching active schools:', error);
+        return [];
+      }
     }
   }
 
@@ -970,51 +2681,92 @@ class AirtableService {
     eventDate: string;
     classCount: number;
   }>> {
-    try {
-      const today = new Date().toISOString().split('T')[0];
+    if (this.useNormalizedTables()) {
+      // NEW: Query Events table and count classes
+      try {
+        const today = new Date().toISOString().split('T')[0];
 
-      // Get all records for this school with future dates
-      const records = await this.query({
-        filterByFormula: `AND(
-          {school_name} = '${schoolName.replace(/'/g, "\\'")}',
-          IS_AFTER({booking_date}, '${today}')
-        )`,
-      });
+        // Get all events for this school with future dates
+        const events = await this.eventsTable!.select({
+          filterByFormula: `AND(
+            {${EVENTS_FIELD_IDS.school_name}} = '${schoolName.replace(/'/g, "\\'")}',
+            IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${today}')
+          )`,
+        }).all();
 
-      // Group by booking_id to get unique events
-      const eventMap = new Map<string, {
-        eventType: string;
-        eventDate: string;
-        classes: Set<string>;
-      }>();
+        // For each event, count the number of classes
+        const eventDetails = await Promise.all(
+          events.map(async (event) => {
+            const eventFields = event.fields as Record<string, any>;
 
-      records.forEach(r => {
-        if (r.booking_id) {
-          if (!eventMap.has(r.booking_id)) {
-            eventMap.set(r.booking_id, {
-              eventType: r.event_type || 'Event',
-              eventDate: r.booking_date || '',
-              classes: new Set(),
-            });
+            // Count classes for this event
+            const classes = await this.classesTable!.select({
+              filterByFormula: `{${CLASSES_FIELD_IDS.event_id}} = '${event.id}'`,
+            }).all();
+
+            return {
+              bookingId: eventFields[EVENTS_FIELD_IDS.event_id] || '',
+              eventType: eventFields[EVENTS_FIELD_IDS.event_type] || 'Event',
+              eventDate: eventFields[EVENTS_FIELD_IDS.event_date] || '',
+              classCount: classes.length,
+            };
+          })
+        );
+
+        // Sort by date
+        return eventDetails.sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+      } catch (error) {
+        console.error('Error getting school events:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const today = new Date().toISOString().split('T')[0];
+
+        // Get all records for this school with future dates
+        const records = await this.query({
+          filterByFormula: `AND(
+            {school_name} = '${schoolName.replace(/'/g, "\\'")}',
+            IS_AFTER({booking_date}, '${today}')
+          )`,
+        });
+
+        // Group by booking_id to get unique events
+        const eventMap = new Map<string, {
+          eventType: string;
+          eventDate: string;
+          classes: Set<string>;
+        }>();
+
+        records.forEach(r => {
+          if (r.booking_id) {
+            if (!eventMap.has(r.booking_id)) {
+              eventMap.set(r.booking_id, {
+                eventType: r.event_type || 'Event',
+                eventDate: r.booking_date || '',
+                classes: new Set(),
+              });
+            }
+            if (r.class_id) {
+              eventMap.get(r.booking_id)!.classes.add(r.class_id);
+            }
           }
-          if (r.class_id) {
-            eventMap.get(r.booking_id)!.classes.add(r.class_id);
-          }
-        }
-      });
+        });
 
-      // Convert to array and sort by date
-      return Array.from(eventMap.entries())
-        .map(([bookingId, data]) => ({
-          bookingId,
-          eventType: data.eventType,
-          eventDate: data.eventDate,
-          classCount: data.classes.size,
-        }))
-        .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
-    } catch (error) {
-      console.error('Error getting school events:', error);
-      return [];
+        // Convert to array and sort by date
+        return Array.from(eventMap.entries())
+          .map(([bookingId, data]) => ({
+            bookingId,
+            eventType: data.eventType,
+            eventDate: data.eventDate,
+            classCount: data.classes.size,
+          }))
+          .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
+      } catch (error) {
+        console.error('Error getting school events:', error);
+        return [];
+      }
     }
   }
 
@@ -1025,48 +2777,102 @@ class AirtableService {
     teacherName: string;
     registeredCount: number;
   }>> {
-    try {
-      // Get all records for this event
-      const records = await this.query({
-        filterByFormula: `{booking_id} = '${bookingId}'`,
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Classes table and Registrations
+      try {
+        // First, get the event by event_id (bookingId)
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
+          maxRecords: 1,
+        }).firstPage();
 
-      // Group by class_id
-      const classMap = new Map<string, {
-        className: string;
-        teacherName: string;
-        registeredCount: number;
-      }>();
+        if (eventRecords.length === 0) return [];
 
-      records.forEach(r => {
-        if (r.class_id) {
-          if (!classMap.has(r.class_id)) {
-            classMap.set(r.class_id, {
-              className: r.class || 'Unknown Class',
-              teacherName: r.main_teacher || '',
-              registeredCount: 0,
+        const eventRecordId = eventRecords[0].id;
+
+        // Get all classes for this event
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.event_id}} = '${eventRecordId}'`,
+        }).all();
+
+        // For each class, count registered children
+        const classesWithCounts = await Promise.all(
+          classRecords.map(async (classRecord) => {
+            const classFields = classRecord.fields as Record<string, any>;
+            const classId = classFields[CLASSES_FIELD_IDS.class_id];
+
+            // Count registrations for this class (excluding placeholders if any)
+            const registrations = await this.registrationsTable!.select({
+              filterByFormula: `{${REGISTRATIONS_FIELD_IDS.class_id}} = '${classRecord.id}'`,
+            }).all();
+
+            // Filter out any placeholder records (no parent_id link)
+            const realRegistrations = registrations.filter(reg => {
+              const regFields = reg.fields as Record<string, any>;
+              return regFields[REGISTRATIONS_FIELD_IDS.parent_id] &&
+                     regFields[REGISTRATIONS_FIELD_IDS.parent_id].length > 0;
             });
-          }
-          // Only count non-placeholder records
-          if (r.parent_id && r.parent_id !== 'PLACEHOLDER') {
-            const current = classMap.get(r.class_id)!;
-            current.registeredCount++;
-          }
-        }
-      });
 
-      // Convert to array and sort by class name
-      return Array.from(classMap.entries())
-        .map(([classId, data]) => ({
-          classId,
-          className: data.className,
-          teacherName: data.teacherName,
-          registeredCount: data.registeredCount,
-        }))
-        .sort((a, b) => a.className.localeCompare(b.className));
-    } catch (error) {
-      console.error('Error getting event classes:', error);
-      return [];
+            return {
+              classId: classId || '',
+              className: classFields[CLASSES_FIELD_IDS.class_name] || 'Unknown Class',
+              teacherName: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+              registeredCount: realRegistrations.length,
+            };
+          })
+        );
+
+        // Sort by class name
+        return classesWithCounts.sort((a, b) => a.className.localeCompare(b.className));
+      } catch (error) {
+        console.error('Error getting event classes:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        // Get all records for this event
+        const records = await this.query({
+          filterByFormula: `{booking_id} = '${bookingId}'`,
+        });
+
+        // Group by class_id
+        const classMap = new Map<string, {
+          className: string;
+          teacherName: string;
+          registeredCount: number;
+        }>();
+
+        records.forEach(r => {
+          if (r.class_id) {
+            if (!classMap.has(r.class_id)) {
+              classMap.set(r.class_id, {
+                className: r.class || 'Unknown Class',
+                teacherName: r.main_teacher || '',
+                registeredCount: 0,
+              });
+            }
+            // Only count non-placeholder records
+            if (r.parent_id && r.parent_id !== 'PLACEHOLDER') {
+              const current = classMap.get(r.class_id)!;
+              current.registeredCount++;
+            }
+          }
+        });
+
+        // Convert to array and sort by class name
+        return Array.from(classMap.entries())
+          .map(([classId, data]) => ({
+            classId,
+            className: data.className,
+            teacherName: data.teacherName,
+            registeredCount: data.registeredCount,
+          }))
+          .sort((a, b) => a.className.localeCompare(b.className));
+      } catch (error) {
+        console.error('Error getting event classes:', error);
+        return [];
+      }
     }
   }
 
@@ -1082,62 +2888,123 @@ class AirtableService {
     conversionRate: number;
     activeEvents: number;
   }> {
-    try {
-      // Get all records to calculate stats
-      const allRecords = await this.query({});
+    if (this.useNormalizedTables()) {
+      // NEW: Query from normalized tables
+      try {
+        // Count unique parents from Parents table
+        const parents = await this.parentsTable!.select().all();
+        const totalParents = parents.length;
 
-      // Count unique parents
-      const uniqueParents = new Set(
-        allRecords
-          .filter(r => r.parent_email)
-          .map(r => r.parent_email)
-      );
+        // Count parents who opted into email campaigns
+        const emailsSent = parents.filter(p => {
+          const fields = p.fields as Record<string, any>;
+          return fields[PARENTS_FIELD_IDS.email_campaigns] === 'yes';
+        }).length;
 
-      // Count unique events
-      const uniqueEvents = new Set(
-        allRecords
-          .filter(r => r.booking_id)
-          .map(r => r.booking_id)
-      );
+        // Count unique events from Events table
+        const events = await this.eventsTable!.select().all();
+        const activeEvents = events.length;
 
-      // Count orders (records with order_number)
-      const orders = allRecords.filter(r => r.order_number);
+        // Count registrations with order numbers (completed orders)
+        const registrations = await this.registrationsTable!.select().all();
+        const orders = registrations.filter(r => {
+          const fields = r.fields as Record<string, any>;
+          return fields[REGISTRATIONS_FIELD_IDS.order_number];
+        });
+        const totalOrders = orders.length;
 
-      // Calculate total revenue from orders (would need actual order data)
-      const totalRevenue = 0; // Placeholder - actual revenue would come from order system
+        // Calculate total revenue from orders (placeholder)
+        const totalRevenue = 0; // Actual revenue would come from order system
 
-      // Count emails sent (using email_campaigns field as proxy)
-      const emailsSent = allRecords.filter(r => r.email_campaigns === 'yes').length;
+        // Calculate email open rate (mock for now)
+        const emailOpenRate = emailsSent > 0 ? 0.65 : 0;
 
-      // Calculate email open rate (mock for now)
-      const emailOpenRate = emailsSent > 0 ? 0.65 : 0;
+        // Calculate conversion rate
+        const conversionRate = totalParents > 0
+          ? (totalOrders / totalParents) * 100
+          : 0;
 
-      // Calculate conversion rate
-      const conversionRate = uniqueParents.size > 0
-        ? (orders.length / uniqueParents.size) * 100
-        : 0;
+        return {
+          totalRevenue,
+          totalOrders,
+          totalParents,
+          emailsSent,
+          emailOpenRate,
+          conversionRate: Math.round(conversionRate * 100) / 100,
+          activeEvents,
+        };
+      } catch (error) {
+        console.error('Error fetching dashboard stats from normalized tables:', error);
+        // Return default stats on error
+        return {
+          totalRevenue: 0,
+          totalOrders: 0,
+          totalParents: 0,
+          emailsSent: 0,
+          emailOpenRate: 0,
+          conversionRate: 0,
+          activeEvents: 0,
+        };
+      }
+    } else {
+      // LEGACY: Query from parent_journey_table
+      try {
+        // Get all records to calculate stats
+        const allRecords = await this.query({});
 
-      return {
-        totalRevenue,
-        totalOrders: orders.length,
-        totalParents: uniqueParents.size,
-        emailsSent,
-        emailOpenRate,
-        conversionRate: Math.round(conversionRate * 100) / 100,
-        activeEvents: uniqueEvents.size,
-      };
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-      // Return default stats on error
-      return {
-        totalRevenue: 0,
-        totalOrders: 0,
-        totalParents: 0,
-        emailsSent: 0,
-        emailOpenRate: 0,
-        conversionRate: 0,
-        activeEvents: 0,
-      };
+        // Count unique parents
+        const uniqueParents = new Set(
+          allRecords
+            .filter(r => r.parent_email)
+            .map(r => r.parent_email)
+        );
+
+        // Count unique events
+        const uniqueEvents = new Set(
+          allRecords
+            .filter(r => r.booking_id)
+            .map(r => r.booking_id)
+        );
+
+        // Count orders (records with order_number)
+        const orders = allRecords.filter(r => r.order_number);
+
+        // Calculate total revenue from orders (would need actual order data)
+        const totalRevenue = 0; // Placeholder - actual revenue would come from order system
+
+        // Count emails sent (using email_campaigns field as proxy)
+        const emailsSent = allRecords.filter(r => r.email_campaigns === 'yes').length;
+
+        // Calculate email open rate (mock for now)
+        const emailOpenRate = emailsSent > 0 ? 0.65 : 0;
+
+        // Calculate conversion rate
+        const conversionRate = uniqueParents.size > 0
+          ? (orders.length / uniqueParents.size) * 100
+          : 0;
+
+        return {
+          totalRevenue,
+          totalOrders: orders.length,
+          totalParents: uniqueParents.size,
+          emailsSent,
+          emailOpenRate,
+          conversionRate: Math.round(conversionRate * 100) / 100,
+          activeEvents: uniqueEvents.size,
+        };
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+        // Return default stats on error
+        return {
+          totalRevenue: 0,
+          totalOrders: 0,
+          totalParents: 0,
+          emailsSent: 0,
+          emailOpenRate: 0,
+          conversionRate: 0,
+          activeEvents: 0,
+        };
+      }
     }
   }
 
@@ -1149,35 +3016,97 @@ class AirtableService {
     totalRevenue: number;
     conversionRate: number;
   }> {
-    try {
-      const records = await this.query({
-        filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId}'`,
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Query from normalized tables
+      try {
+        // Find event by event_id
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId}'`,
+          maxRecords: 1,
+        }).firstPage();
 
-      const eventName = records[0]?.school_name || 'Unknown Event';
-      const orders = records.filter(r => r.order_number);
-      const totalRevenue = 0; // Placeholder - actual revenue would come from order system
+        if (eventRecords.length === 0) {
+          return {
+            eventId,
+            eventName: 'Unknown Event',
+            totalRegistrations: 0,
+            totalRevenue: 0,
+            conversionRate: 0,
+          };
+        }
 
-      const conversionRate = records.length > 0
-        ? (orders.length / records.length) * 100
-        : 0;
+        const eventRecord = eventRecords[0];
+        const eventFields = eventRecord.fields as Record<string, any>;
+        const eventName = eventFields[EVENTS_FIELD_IDS.school_name] || 'Unknown Event';
 
-      return {
-        eventId,
-        eventName,
-        totalRegistrations: records.length,
-        totalRevenue,
-        conversionRate: Math.round(conversionRate * 100) / 100,
-      };
-    } catch (error) {
-      console.error('Error fetching event analytics:', error);
-      return {
-        eventId,
-        eventName: 'Unknown',
-        totalRegistrations: 0,
-        totalRevenue: 0,
-        conversionRate: 0,
-      };
+        // Get all registrations for this event
+        const registrations = await this.registrationsTable!.select({
+          filterByFormula: `{${REGISTRATIONS_FIELD_IDS.event_id}} = '${eventRecord.id}'`,
+        }).all();
+
+        const totalRegistrations = registrations.length;
+
+        // Count registrations with order numbers
+        const orders = registrations.filter(r => {
+          const fields = r.fields as Record<string, any>;
+          return fields[REGISTRATIONS_FIELD_IDS.order_number];
+        });
+
+        const totalRevenue = 0; // Placeholder - actual revenue would come from order system
+
+        const conversionRate = totalRegistrations > 0
+          ? (orders.length / totalRegistrations) * 100
+          : 0;
+
+        return {
+          eventId,
+          eventName,
+          totalRegistrations,
+          totalRevenue,
+          conversionRate: Math.round(conversionRate * 100) / 100,
+        };
+      } catch (error) {
+        console.error('Error fetching event analytics from normalized tables:', error);
+        return {
+          eventId,
+          eventName: 'Unknown',
+          totalRegistrations: 0,
+          totalRevenue: 0,
+          conversionRate: 0,
+        };
+      }
+    } else {
+      // LEGACY: Query from parent_journey_table
+      try {
+        const records = await this.query({
+          filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId}'`,
+        });
+
+        const eventName = records[0]?.school_name || 'Unknown Event';
+        const orders = records.filter(r => r.order_number);
+        const totalRevenue = 0; // Placeholder - actual revenue would come from order system
+
+        const conversionRate = records.length > 0
+          ? (orders.length / records.length) * 100
+          : 0;
+
+        return {
+          eventId,
+          eventName,
+          totalRegistrations: records.length,
+          totalRevenue,
+          conversionRate: Math.round(conversionRate * 100) / 100,
+        };
+      } catch (error) {
+        console.error('Error fetching event analytics:', error);
+        return {
+          eventId,
+          eventName: 'Unknown',
+          totalRegistrations: 0,
+          totalRevenue: 0,
+          conversionRate: 0,
+        };
+      }
     }
   }
 
@@ -1272,52 +3201,96 @@ class AirtableService {
    * @param staffId - The Personen record ID to assign, or null to unassign
    */
   async assignStaffToEvent(bookingId: string, staffId: string | null): Promise<number> {
-    try {
-      // First, try to find records in parent_journey_table
-      const records = await this.query({
-        filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'`,
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Update Events table assigned_staff field
+      try {
+        // Find the event by event_id (bookingId)
+        const events = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
+          maxRecords: 1,
+        }).firstPage();
 
-      if (records.length > 0) {
-        // Has class data - update parent_journey_table records
-        const updates = records.map(record => ({
-          id: record.id,
-          fields: {
-            'assigned_staff': staffId ? [staffId] : [],
-          },
-        }));
+        if (events.length === 0) {
+          // No event found - try SchoolBookings table instead
+          const bookingRecords = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
+            .select({
+              filterByFormula: `{${SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id}} = '${bookingId}'`,
+              maxRecords: 1,
+              returnFieldsByFieldId: true,
+            })
+            .firstPage();
 
-        // Update in batches of 10 (Airtable limit)
-        for (let i = 0; i < updates.length; i += 10) {
-          const batch = updates.slice(i, i + 10);
-          await this.base(TABLE_NAME).update(batch as any);
+          if (bookingRecords.length === 0) {
+            return 0;
+          }
+
+          // Update the SchoolBookings record
+          await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecords[0].id, {
+            [SCHOOL_BOOKINGS_FIELD_IDS.assigned_staff]: staffId ? [staffId] : [],
+          });
+
+          return 1;
         }
 
-        return records.length;
+        // Update the Events record
+        await this.eventsTable!.update(events[0].id, {
+          [EVENTS_FIELD_IDS.assigned_staff]: staffId ? [staffId] : [],
+        });
+
+        return 1;
+      } catch (error) {
+        console.error('Error assigning staff to event:', error);
+        throw new Error(`Failed to assign staff: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
+    } else {
+      // LEGACY: Update parent_journey_table records
+      try {
+        // First, try to find records in parent_journey_table
+        const records = await this.query({
+          filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'`,
+        });
 
-      // No class data - try to update SchoolBookings table instead
-      const bookingRecords = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
-        .select({
-          filterByFormula: `{${SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id}} = '${bookingId}'`,
-          maxRecords: 1,
-          returnFieldsByFieldId: true,
-        })
-        .firstPage();
+        if (records.length > 0) {
+          // Has class data - update parent_journey_table records
+          const updates = records.map(record => ({
+            id: record.id,
+            fields: {
+              'assigned_staff': staffId ? [staffId] : [],
+            },
+          }));
 
-      if (bookingRecords.length === 0) {
-        return 0;
+          // Update in batches of 10 (Airtable limit)
+          for (let i = 0; i < updates.length; i += 10) {
+            const batch = updates.slice(i, i + 10);
+            await this.base(TABLE_NAME).update(batch as any);
+          }
+
+          return records.length;
+        }
+
+        // No class data - try to update SchoolBookings table instead
+        const bookingRecords = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
+          .select({
+            filterByFormula: `{${SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id}} = '${bookingId}'`,
+            maxRecords: 1,
+            returnFieldsByFieldId: true,
+          })
+          .firstPage();
+
+        if (bookingRecords.length === 0) {
+          return 0;
+        }
+
+        // Update the SchoolBookings record
+        await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecords[0].id, {
+          [SCHOOL_BOOKINGS_FIELD_IDS.assigned_staff]: staffId ? [staffId] : [],
+        });
+
+        return 1;
+      } catch (error) {
+        console.error('Error assigning staff to event:', error);
+        throw new Error(`Failed to assign staff: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-
-      // Update the SchoolBookings record
-      await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecords[0].id, {
-        [SCHOOL_BOOKINGS_FIELD_IDS.assigned_staff]: staffId ? [staffId] : [],
-      });
-
-      return 1;
-    } catch (error) {
-      console.error('Error assigning staff to event:', error);
-      throw new Error(`Failed to assign staff: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -1430,34 +3403,60 @@ class AirtableService {
    * @param engineerId - The Personen record ID to assign, or null to unassign
    */
   async assignEngineerToEvent(bookingId: string, engineerId: string | null): Promise<number> {
-    try {
-      // Find all records with this booking_id
-      const records = await this.query({
-        filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'`,
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Update Events table assigned_engineer field
+      try {
+        // Find the event by event_id (bookingId)
+        const events = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
+          maxRecords: 1,
+        }).firstPage();
 
-      if (records.length === 0) {
-        return 0;
+        if (events.length === 0) {
+          return 0;
+        }
+
+        // Update the Events record
+        await this.eventsTable!.update(events[0].id, {
+          [EVENTS_FIELD_IDS.assigned_engineer]: engineerId ? [engineerId] : [],
+        });
+
+        return 1;
+      } catch (error) {
+        console.error('Error assigning engineer to event:', error);
+        throw new Error(`Failed to assign engineer: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
+    } else {
+      // LEGACY: Update parent_journey_table records
+      try {
+        // Find all records with this booking_id
+        const records = await this.query({
+          filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'`,
+        });
 
-      // Prepare updates - assigned_engineer is a linked record field (array)
-      const updates = records.map(record => ({
-        id: record.id,
-        fields: {
-          'assigned_engineer': engineerId ? [engineerId] : [],
-        },
-      }));
+        if (records.length === 0) {
+          return 0;
+        }
 
-      // Update in batches of 10 (Airtable limit)
-      for (let i = 0; i < updates.length; i += 10) {
-        const batch = updates.slice(i, i + 10);
-        await this.base(TABLE_NAME).update(batch as any);
+        // Prepare updates - assigned_engineer is a linked record field (array)
+        const updates = records.map(record => ({
+          id: record.id,
+          fields: {
+            'assigned_engineer': engineerId ? [engineerId] : [],
+          },
+        }));
+
+        // Update in batches of 10 (Airtable limit)
+        for (let i = 0; i < updates.length; i += 10) {
+          const batch = updates.slice(i, i + 10);
+          await this.base(TABLE_NAME).update(batch as any);
+        }
+
+        return records.length;
+      } catch (error) {
+        console.error('Error assigning engineer to event:', error);
+        throw new Error(`Failed to assign engineer: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
-
-      return records.length;
-    } catch (error) {
-      console.error('Error assigning engineer to event:', error);
-      throw new Error(`Failed to assign engineer: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -1466,95 +3465,109 @@ class AirtableService {
    * Used for Engineer Portal to show only assigned events
    */
   async getSchoolEventSummariesByEngineer(engineerId: string): Promise<SchoolEventSummary[]> {
-    try {
-      const allRecords = await this.query({
-        sort: [{ field: 'booking_date', direction: 'desc' }],
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Use getSchoolEventSummaries and filter
+      try {
+        const allEvents = await this.getSchoolEventSummaries();
 
-      // Group by booking_id and filter for assigned engineer
-      const eventsMap = new Map<string, {
-        eventId: string;
-        schoolName: string;
-        eventDate: string;
-        eventType: string;
-        mainTeacher: string;
-        classIds: Set<string>;
-        totalChildren: number;
-        parentCount: number;
-        seenClassIds: Set<string>;
-        assignedEngineerId?: string;
-      }>();
+        // Filter to only events assigned to this engineer
+        return allEvents.filter(event => event.assignedEngineerId === engineerId);
+      } catch (error) {
+        console.error('Error fetching engineer event summaries:', error);
+        throw new Error(`Failed to fetch engineer events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // LEGACY: Query parent_journey_table and aggregate
+      try {
+        const allRecords = await this.query({
+          sort: [{ field: 'booking_date', direction: 'desc' }],
+        });
 
-      allRecords.forEach((record) => {
-        if (!record.booking_id) return;
+        // Group by booking_id and filter for assigned engineer
+        const eventsMap = new Map<string, {
+          eventId: string;
+          schoolName: string;
+          eventDate: string;
+          eventType: string;
+          mainTeacher: string;
+          classIds: Set<string>;
+          totalChildren: number;
+          parentCount: number;
+          seenClassIds: Set<string>;
+          assignedEngineerId?: string;
+        }>();
 
-        // Check if this record has the engineer assigned
-        const recordEngineerId = record.assigned_engineer?.[0];
+        allRecords.forEach((record) => {
+          if (!record.booking_id) return;
 
-        const isRealParent = record.parent_id !== 'PLACEHOLDER' && record.parent_id;
+          // Check if this record has the engineer assigned
+          const recordEngineerId = record.assigned_engineer?.[0];
 
-        if (!eventsMap.has(record.booking_id)) {
-          const classIdSet = new Set<string>();
-          const seenClassIds = new Set<string>();
-          if (record.class_id) {
-            classIdSet.add(record.class_id);
-            seenClassIds.add(record.class_id);
+          const isRealParent = record.parent_id !== 'PLACEHOLDER' && record.parent_id;
+
+          if (!eventsMap.has(record.booking_id)) {
+            const classIdSet = new Set<string>();
+            const seenClassIds = new Set<string>();
+            if (record.class_id) {
+              classIdSet.add(record.class_id);
+              seenClassIds.add(record.class_id);
+            }
+
+            eventsMap.set(record.booking_id, {
+              eventId: record.booking_id,
+              schoolName: record.school_name,
+              eventDate: record.booking_date || '',
+              eventType: record.event_type,
+              mainTeacher: record.main_teacher || '',
+              classIds: classIdSet,
+              totalChildren: record.total_children || 0,
+              parentCount: isRealParent ? 1 : 0,
+              seenClassIds,
+              assignedEngineerId: recordEngineerId,
+            });
+          } else {
+            const existing = eventsMap.get(record.booking_id)!;
+
+            if (record.class_id && !existing.seenClassIds.has(record.class_id)) {
+              existing.classIds.add(record.class_id);
+              existing.seenClassIds.add(record.class_id);
+              existing.totalChildren += record.total_children || 0;
+            }
+
+            if (isRealParent) {
+              existing.parentCount += 1;
+            }
+
+            // Capture assigned engineer if not already set
+            if (!existing.assignedEngineerId && recordEngineerId) {
+              existing.assignedEngineerId = recordEngineerId;
+            }
           }
+        });
 
-          eventsMap.set(record.booking_id, {
-            eventId: record.booking_id,
-            schoolName: record.school_name,
-            eventDate: record.booking_date || '',
-            eventType: record.event_type,
-            mainTeacher: record.main_teacher || '',
-            classIds: classIdSet,
-            totalChildren: record.total_children || 0,
-            parentCount: isRealParent ? 1 : 0,
-            seenClassIds,
-            assignedEngineerId: recordEngineerId,
-          });
-        } else {
-          const existing = eventsMap.get(record.booking_id)!;
+        // Filter to only events assigned to this engineer
+        const filteredEvents = Array.from(eventsMap.values())
+          .filter(event => event.assignedEngineerId === engineerId);
 
-          if (record.class_id && !existing.seenClassIds.has(record.class_id)) {
-            existing.classIds.add(record.class_id);
-            existing.seenClassIds.add(record.class_id);
-            existing.totalChildren += record.total_children || 0;
-          }
-
-          if (isRealParent) {
-            existing.parentCount += 1;
-          }
-
-          // Capture assigned engineer if not already set
-          if (!existing.assignedEngineerId && recordEngineerId) {
-            existing.assignedEngineerId = recordEngineerId;
-          }
-        }
-      });
-
-      // Filter to only events assigned to this engineer
-      const filteredEvents = Array.from(eventsMap.values())
-        .filter(event => event.assignedEngineerId === engineerId);
-
-      // Convert to SchoolEventSummary format
-      return filteredEvents.map(event => ({
-        eventId: event.eventId,
-        schoolName: event.schoolName,
-        eventDate: event.eventDate,
-        eventType: event.eventType,
-        mainTeacher: event.mainTeacher,
-        classCount: event.classIds.size,
-        totalChildren: event.totalChildren,
-        totalParents: event.parentCount,
-      })).sort((a, b) => {
-        if (!a.eventDate) return 1;
-        if (!b.eventDate) return -1;
-        return new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime();
-      });
-    } catch (error) {
-      console.error('Error fetching engineer event summaries:', error);
-      throw new Error(`Failed to fetch engineer events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // Convert to SchoolEventSummary format
+        return filteredEvents.map(event => ({
+          eventId: event.eventId,
+          schoolName: event.schoolName,
+          eventDate: event.eventDate,
+          eventType: event.eventType,
+          mainTeacher: event.mainTeacher,
+          classCount: event.classIds.size,
+          totalChildren: event.totalChildren,
+          totalParents: event.parentCount,
+        })).sort((a, b) => {
+          if (!a.eventDate) return 1;
+          if (!b.eventDate) return -1;
+          return new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime();
+        });
+      } catch (error) {
+        console.error('Error fetching engineer event summaries:', error);
+        throw new Error(`Failed to fetch engineer events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   }
 
@@ -1562,18 +3575,39 @@ class AirtableService {
    * Check if an engineer is assigned to a specific event
    */
   async isEngineerAssignedToEvent(engineerId: string, bookingId: string): Promise<boolean> {
-    try {
-      const records = await this.query({
-        filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'`,
-        maxRecords: 1,
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Events table
+      try {
+        const events = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
+          maxRecords: 1,
+        }).firstPage();
 
-      if (records.length === 0) return false;
+        if (events.length === 0) return false;
 
-      return records[0].assigned_engineer?.includes(engineerId) || false;
-    } catch (error) {
-      console.error('Error checking engineer assignment:', error);
-      return false;
+        const eventFields = events[0].fields as Record<string, any>;
+        const assignedEngineers = eventFields[EVENTS_FIELD_IDS.assigned_engineer] as string[] | undefined;
+
+        return assignedEngineers?.includes(engineerId) || false;
+      } catch (error) {
+        console.error('Error checking engineer assignment:', error);
+        return false;
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const records = await this.query({
+          filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${bookingId}'`,
+          maxRecords: 1,
+        });
+
+        if (records.length === 0) return false;
+
+        return records[0].assigned_engineer?.includes(engineerId) || false;
+      } catch (error) {
+        console.error('Error checking engineer assignment:', error);
+        return false;
+      }
     }
   }
 
@@ -1582,25 +3616,71 @@ class AirtableService {
    * Used for notifications when audio is uploaded
    */
   async getParentEmailsByEventId(eventId: string): Promise<string[]> {
-    try {
-      const records = await this.query({
-        filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId}'`,
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Events → Registrations → Parents
+      try {
+        // Find the event
+        const events = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId}'`,
+          maxRecords: 1,
+        }).firstPage();
 
-      // Get unique, valid parent emails (excluding placeholders)
-      const emails = new Set<string>();
-      records.forEach(record => {
-        if (record.parent_email &&
-            record.parent_id !== 'PLACEHOLDER' &&
-            record.parent_email.includes('@')) {
-          emails.add(record.parent_email.toLowerCase());
+        if (events.length === 0) return [];
+
+        const eventRecordId = events[0].id;
+
+        // Get all registrations for this event
+        const registrations = await this.registrationsTable!.select({
+          filterByFormula: `{${REGISTRATIONS_FIELD_IDS.event_id}} = '${eventRecordId}'`,
+        }).all();
+
+        // Get unique parent emails
+        const emails = new Set<string>();
+
+        for (const reg of registrations) {
+          const regFields = reg.fields as Record<string, any>;
+          const parentRecordId = regFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+
+          if (parentRecordId) {
+            const parent = await this.parentsTable!.find(parentRecordId).catch(() => null);
+            if (parent) {
+              const parentFields = parent.fields as Record<string, any>;
+              const email = parentFields[PARENTS_FIELD_IDS.parent_email];
+
+              if (email && email.includes('@')) {
+                emails.add(email.toLowerCase());
+              }
+            }
+          }
         }
-      });
 
-      return Array.from(emails);
-    } catch (error) {
-      console.error('Error fetching parent emails:', error);
-      return [];
+        return Array.from(emails);
+      } catch (error) {
+        console.error('Error fetching parent emails:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const records = await this.query({
+          filterByFormula: `{${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId}'`,
+        });
+
+        // Get unique, valid parent emails (excluding placeholders)
+        const emails = new Set<string>();
+        records.forEach(record => {
+          if (record.parent_email &&
+              record.parent_id !== 'PLACEHOLDER' &&
+              record.parent_email.includes('@')) {
+            emails.add(record.parent_email.toLowerCase());
+          }
+        });
+
+        return Array.from(emails);
+      } catch (error) {
+        console.error('Error fetching parent emails:', error);
+        return [];
+      }
     }
   }
 
@@ -1608,24 +3688,70 @@ class AirtableService {
    * Get parent emails for a specific class within an event
    */
   async getParentEmailsByClassId(classId: string): Promise<string[]> {
-    try {
-      const records = await this.query({
-        filterByFormula: `{${AIRTABLE_FIELD_IDS.class_id}} = '${classId}'`,
-      });
+    if (this.useNormalizedTables()) {
+      // NEW: Query Classes → Registrations → Parents
+      try {
+        // Find the class by class_id
+        const classes = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId}'`,
+          maxRecords: 1,
+        }).firstPage();
 
-      const emails = new Set<string>();
-      records.forEach(record => {
-        if (record.parent_email &&
-            record.parent_id !== 'PLACEHOLDER' &&
-            record.parent_email.includes('@')) {
-          emails.add(record.parent_email.toLowerCase());
+        if (classes.length === 0) return [];
+
+        const classRecordId = classes[0].id;
+
+        // Get all registrations for this class
+        const registrations = await this.registrationsTable!.select({
+          filterByFormula: `{${REGISTRATIONS_FIELD_IDS.class_id}} = '${classRecordId}'`,
+        }).all();
+
+        // Get unique parent emails
+        const emails = new Set<string>();
+
+        for (const reg of registrations) {
+          const regFields = reg.fields as Record<string, any>;
+          const parentRecordId = regFields[REGISTRATIONS_FIELD_IDS.parent_id]?.[0];
+
+          if (parentRecordId) {
+            const parent = await this.parentsTable!.find(parentRecordId).catch(() => null);
+            if (parent) {
+              const parentFields = parent.fields as Record<string, any>;
+              const email = parentFields[PARENTS_FIELD_IDS.parent_email];
+
+              if (email && email.includes('@')) {
+                emails.add(email.toLowerCase());
+              }
+            }
+          }
         }
-      });
 
-      return Array.from(emails);
-    } catch (error) {
-      console.error('Error fetching parent emails by class:', error);
-      return [];
+        return Array.from(emails);
+      } catch (error) {
+        console.error('Error fetching parent emails by class:', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Query parent_journey_table
+      try {
+        const records = await this.query({
+          filterByFormula: `{${AIRTABLE_FIELD_IDS.class_id}} = '${classId}'`,
+        });
+
+        const emails = new Set<string>();
+        records.forEach(record => {
+          if (record.parent_email &&
+              record.parent_id !== 'PLACEHOLDER' &&
+              record.parent_email.includes('@')) {
+            emails.add(record.parent_email.toLowerCase());
+          }
+        });
+
+        return Array.from(emails);
+      } catch (error) {
+        console.error('Error fetching parent emails by class:', error);
+        return [];
+      }
     }
   }
 
@@ -1641,6 +3767,7 @@ class AirtableService {
       id: record.id,
       simplybookId: record.fields[SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id] || '',
       simplybookHash: record.fields[SCHOOL_BOOKINGS_FIELD_IDS.simplybook_hash],
+      schoolName: record.fields[SCHOOL_BOOKINGS_FIELD_IDS.school_name] || '',
       schoolContactName: record.fields[SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name] || '',
       schoolContactEmail: record.fields[SCHOOL_BOOKINGS_FIELD_IDS.school_contact_email] || '',
       schoolPhone: record.fields[SCHOOL_BOOKINGS_FIELD_IDS.school_phone],

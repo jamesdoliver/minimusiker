@@ -33,6 +33,9 @@ export const PERSONEN_FIELD_IDS = {
   rollen: 'fldoyimmjNZY3sBLa',
   id: 'fld72aa8nR2Nizq1v',
   teams_regionen: 'fldsd73JGjVM7BpYW',
+  // New fields for teacher portal representative cards
+  bio: 'fldTKYnqcGgBZrKK9', // Long text - Personal introduction shown to teachers
+  profile_photo: 'fldcSWJFKy1DW8pXA', // Attachment - Profile photo for representative card
 } as const;
 
 // SchoolBookings table (SimplyBook integration)
@@ -66,6 +69,8 @@ export const SCHOOL_BOOKINGS_FIELD_IDS = {
   assigned_staff: 'fldDz8ap9nevnAzp2',
   // City field for location data
   city: 'fldiVb8duhKGIzDkD',
+  // School name field (actual institution name, not contact person)
+  school_name: 'fldVgEyfHufAuNovP',
 } as const;
 
 // Einrichtungen (Schools) table
@@ -371,6 +376,7 @@ export interface SchoolEventSummary {
   totalParents: number;
   assignedStaffId?: string;   // Personen record ID
   assignedStaffName?: string; // Staff name for display
+  assignedEngineerId?: string; // Personen record ID for engineer
 }
 
 // Team staff member from Personen table
@@ -379,6 +385,17 @@ export interface TeamStaffMember {
   name: string;      // staff_name field
   email: string;     // E-Mail field
   numericId?: number; // ID autonumber field (used for login password)
+}
+
+// Minimusiker representative for teacher portal (from Personen table)
+export interface MinimusikanRepresentative {
+  id: string;              // Airtable record ID
+  name: string;            // staff_name field
+  email: string;           // Email field
+  phone?: string;          // telefon field
+  bio?: string;            // Personal introduction shown to teachers
+  profilePhotoUrl?: string; // URL from profile_photo attachment
+  region?: string;         // Region assignment (from teams_regionen linked record)
 }
 
 // Class detail within an event for the detail page
@@ -420,7 +437,8 @@ export interface SchoolBooking {
   id: string;
   simplybookId: string;
   simplybookHash?: string;
-  schoolContactName: string;
+  schoolName?: string;                // Actual school/institution name
+  schoolContactName: string;          // Contact person's name
   schoolContactEmail: string;
   schoolPhone?: string;
   schoolAddress?: string;
@@ -468,4 +486,233 @@ export interface Einrichtung {
   logoUrl?: string;
   logoUploadedAt?: string;
   logoUploadedBy?: string;
+}
+
+// ======================================================================
+// NEW NORMALIZED TABLE STRUCTURE - Migration to Linked Records
+// ======================================================================
+
+// Events Table - 1 row per school event
+export const EVENTS_TABLE_ID = 'tblVWx1RrsGRjsNn5';
+
+export const EVENTS_FIELD_IDS = {
+  event_id: 'fldcNaHZyr6E5khDe',        // Primary field
+  school_name: 'fld5QcpEsDFrLun6w',
+  event_date: 'fld7pswBblm9jlOsS',
+  event_type: 'fldnWvlgaik73WwsE',
+  assigned_staff: 'fldKFG7lVsO1w9Td3',  // Linked record → Personen
+  assigned_engineer: 'fldHK6sQA3jrU6O2H',  // Linked record → Personen
+  created_at: 'fldnOuSFihr3HrJkF',
+  legacy_booking_id: 'fldYrZSh7tdkwuWp4',  // Original booking_id from parent_journey_table
+  simplybook_booking: 'fldK7vyxLd9MxgmES',  // Linked record → SchoolBookings
+} as const;
+
+// Classes Table - 1 row per class
+export const CLASSES_TABLE_ID = 'tbl17SVI5gacwOP0n';
+
+export const CLASSES_FIELD_IDS = {
+  class_id: 'fld1dXGae9I7xldun',        // Primary field
+  event_id: 'fldSSaeBuQDkOhOIT',        // Linked record → Events
+  class_name: 'fld1kaSb8my7q5mHt',
+  main_teacher: 'fldsODu2rjT8ZMqLl',
+  other_teachers: 'fldXGPDDeLPW3Zoli',
+  total_children: 'flddABwj9UilV2OtG',
+  created_at: 'fld3q0jZPIAlsx8FD',
+  legacy_booking_id: 'fldXGF3yXrHeI4vWn',  // Original booking_id from parent_journey_table
+} as const;
+
+// Parents Table - 1 row per unique parent (deduplicated by email)
+export const PARENTS_TABLE_ID = 'tblaMYOUj93yp7jHE';
+
+export const PARENTS_FIELD_IDS = {
+  parents_id: 'fldFkUhGlISNXCOZw',       // Primary field (Airtable's autonumber)
+  parent_id: 'fldnnzCB0aesXJdxu',       // Our custom parent identifier
+  parent_email: 'fldd3LuRL0TmzVESR',
+  parent_first_name: 'fldtaXHWE5RP0nrw5',
+  parent_telephone: 'fldG9NgGysXmZcQcu',
+  email_campaigns: 'flddJfUYApbFbXbjy',
+  created_at: 'fld3lXrbHzVyyomC5',
+} as const;
+
+// Registrations Table - 1 row per child registration
+export const REGISTRATIONS_TABLE_ID = 'tblXsmPuZcePcre5u';
+
+export const REGISTRATIONS_FIELD_IDS = {
+  Id: 'fldBFsyhX7BFAmNLV',              // Autonumber, Primary
+  event_id: 'fld4U9Wq5Skqf2Poq',        // Linked record → Events
+  parent_id: 'fldqfoJhaXH0Oj32J',       // Linked record → Parents
+  class_id: 'fldfZeZiOGFg5UD0I',        // Linked record → Classes
+  registered_child: 'fldkdMkuuJ21sIjOQ',
+  child_id: 'fldjejm0H9GoBIg5h',
+  registered_complete: 'fld9j3Y4ez5eYqFtU',
+  order_number: 'fldxoKh20d5WuW4vt',
+  legacy_record: 'fldphliFEPY9WlIFJ',   // Original record ID from parent_journey_table
+  registration_date: 'fldXlB5zyf1FXwxo9',
+  registration_status: 'fldFx38yx2wrlvUeG',
+  notes: 'fldVF6VpiV5cCxUnK',
+} as const;
+
+// Songs Table - New linked record fields (existing table)
+export const SONGS_LINKED_FIELD_IDS = {
+  class_link: 'fldMPAHLnyNralsLS',      // Linked record → Classes
+  event_link: 'fldygKERszsLFRBaS',      // Linked record → Events
+} as const;
+
+// AudioFiles Table - New linked record fields (existing table)
+export const AUDIO_FILES_LINKED_FIELD_IDS = {
+  class_link: 'fld04rZUWLKCv15s2',      // Linked record → Classes
+  event_link: 'fldTFdrvuzIWd9WbK',      // Linked record → Events
+  song_link: 'fld4E2dFKJqkB0CuA',       // Linked record → Songs
+} as const;
+
+// Orders Table - Shopify order tracking
+export const ORDERS_TABLE_ID = 'tblu9AGaLSoEVwqq7';
+
+export const ORDERS_FIELD_IDS = {
+  order_id: 'fldPfSw1zCFI7gqXo',           // Primary field - Shopify order ID
+  order_number: 'fldKVJtsO24WemkgA',       // Display order number (#1001)
+  parent_id: 'fldLbmO6NwPAfcqMX',          // Link to Parents table
+  event_id: 'fldxJwmQCsx533oe0',           // Link to Events table
+  booking_id: 'fldF4eBUFu5NcRYjd',         // Booking ID from custom attributes
+  school_name: 'fld0oMH0XTGHi7fV0',        // Denormalized for reporting
+  order_date: 'fldpQj3Pba3Y2D6wo',         // When order was placed
+  total_amount: 'fldp5IVjGhtfnBKlR',       // Total order value (EUR)
+  subtotal: 'fld0BuoKBTewHyoM3',           // Before tax/shipping
+  tax_amount: 'fldbImGVnC7SvMPyn',         // Tax charged
+  shipping_amount: 'fldRENpTADdrTSf2p',    // Shipping charged
+  line_items: 'fld9iRwg7rV6nMWrN',         // JSON array of products
+  fulfillment_status: 'fldAipl3jqPM46q5y', // pending, fulfilled, partial, restocked
+  payment_status: 'fld1zfZ9ouEPJv8ju',     // pending, paid, refunded, voided
+  digital_delivered: 'fldj92CkKEXZutMsS',  // Has digital content been delivered?
+  created_at: 'fldfmBl2c5pJ6zxL4',         // Record creation timestamp
+  updated_at: 'fldXyxRPkMSztS8Ff',         // Last update timestamp
+} as const;
+
+// ======================================================================
+// Normalized Table Interfaces
+// ======================================================================
+
+/**
+ * Event record - One row per school event
+ */
+export interface Event {
+  id: string;                           // Airtable record ID
+  event_id: string;                     // Our event identifier (was booking_id)
+  school_name: string;
+  event_date: string;                   // ISO date string
+  event_type: 'concert' | 'recital' | 'competition' | 'showcase';
+  assigned_staff?: string[];            // Linked record IDs → Personen
+  assigned_engineer?: string[];         // Linked record IDs → Personen
+  created_at: string;
+  legacy_booking_id?: string;           // Original booking_id from parent_journey_table
+  simplybook_booking?: string[];        // Linked record IDs → SchoolBookings
+}
+
+/**
+ * Class record - One row per class within an event
+ */
+export interface Class {
+  id: string;                           // Airtable record ID
+  class_id: string;                     // Our class identifier
+  event_id: string[];                   // Linked record IDs → Events
+  class_name: string;
+  main_teacher?: string;
+  other_teachers?: string;
+  total_children: number;
+  created_at: string;
+  legacy_booking_id?: string;           // Original booking_id from parent_journey_table
+}
+
+/**
+ * Parent record - One row per unique parent (deduplicated by email)
+ */
+export interface Parent {
+  id: string;                           // Airtable record ID
+  parents_id: string;                   // Airtable autonumber primary field
+  parent_id: string;                    // Our custom parent identifier
+  parent_email: string;
+  parent_first_name: string;
+  parent_telephone: string;
+  email_campaigns?: 'yes' | 'no';
+  created_at: string;
+}
+
+/**
+ * Registration record - One row per child registration
+ */
+export interface Registration {
+  id: string;                           // Airtable record ID
+  Id: number;                           // Autonumber primary field
+  event_id: string[];                   // Linked record IDs → Events
+  parent_id: string[];                  // Linked record IDs → Parents
+  class_id: string[];                   // Linked record IDs → Classes
+  registered_child: string;
+  child_id?: string;
+  registered_complete: boolean;
+  order_number?: string;
+  legacy_record?: string;               // Original record ID from parent_journey_table
+  registration_date?: string;           // ISO date string
+  registration_status?: string;
+  notes?: string;
+}
+
+// ======================================================================
+// Shopify Order Types
+// ======================================================================
+
+/**
+ * Line item within a Shopify order
+ */
+export interface ShopifyOrderLineItem {
+  variant_id: string;
+  product_title: string;
+  variant_title?: string;
+  quantity: number;
+  price: number;
+  total: number;
+}
+
+/**
+ * Shopify order record stored in Airtable
+ */
+export interface ShopifyOrder {
+  id: string;                                    // Airtable record ID
+  order_id: string;                              // Shopify order ID (gid://shopify/Order/...)
+  order_number: string;                          // Display order number (#1001)
+  parent_id?: string[];                          // Linked record IDs → Parents
+  event_id?: string[];                           // Linked record IDs → Events
+  booking_id?: string;                           // Booking ID from custom attributes
+  school_name?: string;                          // Denormalized for reporting
+  order_date: string;                            // ISO datetime string
+  total_amount: number;                          // Total order value (EUR)
+  subtotal: number;                              // Before tax/shipping
+  tax_amount: number;                            // Tax charged
+  shipping_amount?: number;                      // Shipping charged
+  line_items: ShopifyOrderLineItem[];            // Parsed JSON array
+  fulfillment_status: 'pending' | 'fulfilled' | 'partial' | 'restocked';
+  payment_status: 'pending' | 'paid' | 'refunded' | 'voided';
+  digital_delivered: boolean;                    // Has digital content been delivered?
+  created_at: string;                            // Record creation timestamp
+  updated_at: string;                            // Last update timestamp
+}
+
+/**
+ * Data for creating a new Shopify order in Airtable
+ */
+export interface CreateShopifyOrderInput {
+  order_id: string;
+  order_number: string;
+  parent_id?: string[];
+  event_id?: string[];
+  booking_id?: string;
+  school_name?: string;
+  order_date: string;
+  total_amount: number;
+  subtotal: number;
+  tax_amount: number;
+  shipping_amount?: number;
+  line_items: ShopifyOrderLineItem[];
+  fulfillment_status: 'pending' | 'fulfilled' | 'partial' | 'restocked';
+  payment_status: 'pending' | 'paid' | 'refunded' | 'voided';
+  digital_delivered?: boolean;
 }

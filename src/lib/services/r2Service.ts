@@ -481,6 +481,151 @@ class R2Service {
   }
 
   // ========================================
+  // Song-Level Audio Methods
+  // ========================================
+
+  /**
+   * Generate presigned URL for uploading raw audio for a specific song
+   * Path: recordings/{eventId}/{classId}/{songId}/raw/{timestamp}_{filename}
+   */
+  async generateSongRawUploadUrl(
+    eventId: string,
+    classId: string,
+    songId: string,
+    filename: string,
+    contentType: string = 'audio/mpeg'
+  ): Promise<{ uploadUrl: string; key: string }> {
+    const timestamp = Date.now();
+    const sanitizedFilename = filename
+      .toLowerCase()
+      .replace(/[^a-z0-9.-]/g, '_')
+      .substring(0, 50);
+    const key = `recordings/${eventId}/${classId}/${songId}/raw/${timestamp}_${sanitizedFilename}`;
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: 3600 });
+
+    return {
+      uploadUrl,
+      key,
+    };
+  }
+
+  /**
+   * Generate presigned URL for uploading final audio for a specific song
+   * Path: recordings/{eventId}/{classId}/{songId}/final/final_{timestamp}.{ext}
+   */
+  async generateSongFinalUploadUrl(
+    eventId: string,
+    classId: string,
+    songId: string,
+    filename: string,
+    contentType: string = 'audio/mpeg'
+  ): Promise<{ uploadUrl: string; key: string }> {
+    const timestamp = Date.now();
+    const ext = filename.split('.').pop()?.toLowerCase() || 'mp3';
+    const key = `recordings/${eventId}/${classId}/${songId}/final/final_${timestamp}.${ext}`;
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: 3600 });
+
+    return {
+      uploadUrl,
+      key,
+    };
+  }
+
+  /**
+   * Get signed URL for a song's raw or final audio file
+   */
+  async getSongAudioUrl(key: string, expiresIn: number = 3600): Promise<string> {
+    return this.generateSignedUrl(key, expiresIn);
+  }
+
+  /**
+   * Upload file to temporary location (for batch uploads before confirmation)
+   * Path: temp/{uploadId}/{filename}
+   */
+  async uploadToTemp(
+    uploadId: string,
+    filename: string,
+    buffer: Buffer,
+    contentType: string = 'audio/mpeg'
+  ): Promise<{ success: boolean; key: string; error?: string }> {
+    const key = `temp/${uploadId}/${filename}`;
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        Metadata: {
+          uploadId: uploadId,
+          originalFilename: filename,
+          uploadDate: new Date().toISOString(),
+        },
+      });
+
+      await this.client.send(command);
+
+      return {
+        success: true,
+        key: key,
+      };
+    } catch (error) {
+      console.error('Error uploading to temp:', error);
+      return {
+        success: false,
+        key: key,
+        error: error instanceof Error ? error.message : 'Unknown upload error',
+      };
+    }
+  }
+
+  /**
+   * Move file from temporary location to final location
+   * Used after batch upload confirmation
+   */
+  async moveFile(fromKey: string, toKey: string): Promise<boolean> {
+    try {
+      // Get the file from temp location
+      const buffer = await this.getFileBuffer(fromKey);
+      if (!buffer) {
+        console.error('Could not retrieve file from temp location:', fromKey);
+        return false;
+      }
+
+      // Upload to final location
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: toKey,
+        Body: buffer,
+      });
+
+      await this.client.send(command);
+
+      // Delete from temp location
+      await this.deleteFile(fromKey);
+
+      return true;
+    } catch (error) {
+      console.error('Error moving file:', error);
+      return false;
+    }
+  }
+
+  // ========================================
   // School Logo Methods
   // ========================================
 

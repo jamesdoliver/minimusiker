@@ -83,6 +83,7 @@ export async function POST(request: Request) {
     const record = await airtable.table(SCHOOL_BOOKINGS_TABLE_ID).create({
       [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id]: payload.booking_id,
       [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_hash]: payload.booking_hash,
+      [SCHOOL_BOOKINGS_FIELD_IDS.school_name]: mappedData.schoolName || '',
       [SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name]: mappedData.contactPerson,
       [SCHOOL_BOOKINGS_FIELD_IDS.school_contact_email]: mappedData.contactEmail,
       [SCHOOL_BOOKINGS_FIELD_IDS.school_phone]: mappedData.phone || '',
