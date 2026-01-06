@@ -2,20 +2,19 @@
  * Backfill Script: Populate school_name field for existing SchoolBookings
  *
  * This script:
- * 1. Fetches all SchoolBookings records that have empty school_name
- * 2. For each, fetches booking details from SimplyBook API
- * 3. Extracts school name from intake form fields
- * 4. Updates Airtable record with school_name
+ * 1. Fetches all bookings from SimplyBook API (which includes the 'client' field with school names)
+ * 2. Fetches all SchoolBookings records from Airtable
+ * 3. Matches by simplybook_id and updates school_name from SimplyBook's 'client' field
  *
  * Usage: node scripts/backfill-school-names.js
  *
  * Environment variables required:
  * - AIRTABLE_API_KEY
  * - AIRTABLE_BASE_ID
- * - SIMPLYBOOK_API_KEY (optional - for re-fetching from SimplyBook)
- * - SIMPLY_BOOK_ACCOUNT_NAME (optional)
- * - SIMPLYBOOK_USER_LOGIN (optional)
- * - SIMPLYBOOK_USER_PASSWORD (optional)
+ * - SIMPLYBOOK_API_KEY
+ * - SIMPLY_BOOK_ACCOUNT_NAME
+ * - SIMPLYBOOK_USER_LOGIN
+ * - SIMPLYBOOK_USER_PASSWORD
  */
 
 require('dotenv').config({ path: '.env.local' });
@@ -45,7 +44,7 @@ if (!airtableApiKey || !airtableBaseId) {
 
 const airtable = new Airtable({ apiKey: airtableApiKey }).base(airtableBaseId);
 
-// SimplyBook credentials (optional - for re-fetching)
+// SimplyBook credentials
 const SIMPLYBOOK_CONFIG = {
   apiKey: process.env.SIMPLYBOOK_API_KEY,
   companyLogin: process.env.SIMPLY_BOOK_ACCOUNT_NAME,
@@ -54,21 +53,18 @@ const SIMPLYBOOK_CONFIG = {
   jsonRpcEndpoint: 'https://user-api.simplybook.it/',
 };
 
-let adminToken = null;
-
 /**
- * Get admin token from SimplyBook
+ * Get all bookings from SimplyBook API
+ * Returns a map of booking ID -> school name (from 'client' field)
  */
-async function getSimplyBookAdminToken() {
-  if (adminToken) return adminToken;
-
+async function getSimplyBookBookings() {
   if (!SIMPLYBOOK_CONFIG.apiKey || !SIMPLYBOOK_CONFIG.userLogin) {
-    console.log('SimplyBook credentials not configured - will use fallback strategy');
-    return null;
+    console.log('SimplyBook credentials not configured');
+    return new Map();
   }
 
   try {
-    // First get API token
+    // Get API token
     const tokenResponse = await fetch(`${SIMPLYBOOK_CONFIG.jsonRpcEndpoint}login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -79,13 +75,10 @@ async function getSimplyBookAdminToken() {
         id: 1,
       }),
     });
-
     const tokenData = await tokenResponse.json();
-    if (!tokenData.result) {
-      throw new Error('Failed to get SimplyBook token');
-    }
+    if (!tokenData.result) throw new Error('Failed to get SimplyBook token');
 
-    // Then get user token
+    // Get user token
     const userTokenResponse = await fetch(`${SIMPLYBOOK_CONFIG.jsonRpcEndpoint}login`, {
       method: 'POST',
       headers: {
@@ -100,80 +93,46 @@ async function getSimplyBookAdminToken() {
         id: 2,
       }),
     });
-
     const userTokenData = await userTokenResponse.json();
-    if (!userTokenData.result) {
-      throw new Error('Failed to get SimplyBook user token');
-    }
+    if (!userTokenData.result) throw new Error('Failed to get SimplyBook user token');
 
-    adminToken = userTokenData.result;
-    return adminToken;
-  } catch (error) {
-    console.error('SimplyBook auth error:', error.message);
-    return null;
-  }
-}
-
-/**
- * Fetch booking details from SimplyBook
- */
-async function getBookingFromSimplyBook(bookingId) {
-  const token = await getSimplyBookAdminToken();
-  if (!token) return null;
-
-  try {
+    // Fetch all bookings
     const response = await fetch(`${SIMPLYBOOK_CONFIG.jsonRpcEndpoint}admin`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Company-Login': SIMPLYBOOK_CONFIG.companyLogin,
-        'X-Token': token,
+        'X-User-Token': userTokenData.result,
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        method: 'getBookingDetails',
-        params: [bookingId],
+        method: 'getBookings',
+        params: [{}],
         id: 3,
       }),
     });
-
     const data = await response.json();
-    return data.result || null;
-  } catch (error) {
-    console.error(`Failed to fetch booking ${bookingId}:`, error.message);
-    return null;
-  }
-}
 
-/**
- * Extract school name from SimplyBook booking data
- * Mirrors the logic in simplybookService.mapIntakeFields
- */
-function extractSchoolName(booking) {
-  if (!booking) return null;
+    if (!data.result) {
+      console.log('No bookings returned from SimplyBook');
+      return new Map();
+    }
 
-  const rawFields = booking.additional_fields || [];
-  const fieldsArray = Array.isArray(rawFields) ? rawFields : Object.values(rawFields);
-
-  // Helper to find field by partial title match
-  const findField = (keywords) => {
-    for (const field of fieldsArray) {
-      if (!field) continue;
-      const title = field.field_title || field.title || '';
-      if (!title) continue;
-      const titleLower = title.toLowerCase();
-      if (keywords.some(kw => titleLower.includes(kw.toLowerCase()))) {
-        return field.value || '';
+    // Create map of booking ID -> school name (from 'client' field)
+    const bookingsMap = new Map();
+    for (const booking of data.result) {
+      // The 'client' field contains the school/institution name
+      if (booking.id && booking.client) {
+        bookingsMap.set(booking.id.toString(), booking.client);
       }
     }
-    return '';
-  };
 
-  // Look for school name field (same keywords as simplybookService)
-  const schoolName = findField(['name', 'schule', 'school', 'einrichtung']);
-
-  // Fall back to client_name if no school name found
-  return schoolName || booking.client_name || null;
+    console.log(`Fetched ${bookingsMap.size} bookings from SimplyBook with school names`);
+    return bookingsMap;
+  } catch (error) {
+    console.error('SimplyBook error:', error.message);
+    return new Map();
+  }
 }
 
 /**
@@ -182,9 +141,12 @@ function extractSchoolName(booking) {
 async function backfillSchoolNames() {
   console.log('Starting school name backfill...\n');
 
-  // Fetch all records - we'll check school_name in code
-  console.log('Fetching all SchoolBookings records...');
+  // Step 1: Fetch all bookings from SimplyBook
+  console.log('Step 1: Fetching bookings from SimplyBook...');
+  const simplybookData = await getSimplyBookBookings();
 
+  // Step 2: Fetch all records from Airtable
+  console.log('\nStep 2: Fetching SchoolBookings from Airtable...');
   const records = [];
   await airtable
     .table(SCHOOL_BOOKINGS_TABLE_ID)
@@ -200,87 +162,62 @@ async function backfillSchoolNames() {
       fetchNextPage();
     });
 
-  // Filter to only records without school_name
-  const recordsToUpdate = records.filter(r => {
-    const schoolName = r.fields[FIELD_NAMES.school_name];
-    return !schoolName || schoolName.trim() === '';
-  });
-
-  console.log(`Found ${records.length} total records, ${recordsToUpdate.length} need school_name\n`);
-
-  if (recordsToUpdate.length === 0) {
-    console.log('No records to update. Done!');
-    return;
-  }
+  console.log(`Found ${records.length} total records in Airtable\n`);
 
   // Track results
   const results = {
     updated: 0,
     skipped: 0,
-    failed: 0,
-    details: [],
+    alreadySet: 0,
+    noMatch: 0,
   };
 
-  // Process each record
-  for (const record of recordsToUpdate) {
+  // Step 3: Process each record
+  console.log('Step 3: Updating school names...\n');
+  for (const record of records) {
     const simplybookId = record.fields[FIELD_NAMES.simplybook_id];
+    const currentSchoolName = record.fields[FIELD_NAMES.school_name];
     const contactName = record.fields[FIELD_NAMES.school_contact_name];
 
-    console.log(`Processing record ${record.id} (SimplyBook ID: ${simplybookId})`);
-
-    let schoolName = null;
-
-    // Try to fetch from SimplyBook if we have credentials
-    if (simplybookId && SIMPLYBOOK_CONFIG.apiKey) {
-      const booking = await getBookingFromSimplyBook(simplybookId);
-      schoolName = extractSchoolName(booking);
+    // Skip if already has a school name that's different from contact name
+    if (currentSchoolName && currentSchoolName !== contactName) {
+      results.alreadySet++;
+      continue;
     }
 
-    // If no school name from SimplyBook, use contact name as fallback
-    // (You may want to manually review these later)
-    if (!schoolName && contactName) {
-      console.log(`  - Using contact name as fallback: ${contactName}`);
-      schoolName = contactName;
-      results.details.push({
-        recordId: record.id,
-        status: 'fallback',
-        schoolName,
-        note: 'Used contact name as fallback - may need manual review',
-      });
+    // Try to get school name from SimplyBook data
+    let newSchoolName = null;
+    if (simplybookId) {
+      newSchoolName = simplybookData.get(simplybookId.toString());
     }
 
-    if (schoolName) {
+    if (newSchoolName && newSchoolName !== currentSchoolName) {
       try {
         await airtable.table(SCHOOL_BOOKINGS_TABLE_ID).update(record.id, {
-          [SCHOOL_BOOKINGS_FIELD_IDS.school_name]: schoolName,
+          [SCHOOL_BOOKINGS_FIELD_IDS.school_name]: newSchoolName,
         });
-        console.log(`  - Updated: ${schoolName}`);
+        console.log(`✓ ${simplybookId}: "${newSchoolName}"`);
         results.updated++;
       } catch (error) {
-        console.error(`  - Failed to update: ${error.message}`);
-        results.failed++;
+        console.error(`✗ ${simplybookId}: Failed - ${error.message}`);
+        results.skipped++;
       }
+    } else if (!newSchoolName && simplybookId) {
+      results.noMatch++;
     } else {
-      console.log(`  - Skipped: No school name found`);
       results.skipped++;
     }
 
-    // Rate limiting - avoid hitting Airtable API limits
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Rate limiting
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   // Print summary
   console.log('\n=== Backfill Complete ===');
   console.log(`Updated: ${results.updated}`);
+  console.log(`Already set: ${results.alreadySet}`);
+  console.log(`No SimplyBook match: ${results.noMatch}`);
   console.log(`Skipped: ${results.skipped}`);
-  console.log(`Failed: ${results.failed}`);
-
-  if (results.details.length > 0) {
-    console.log('\nRecords using fallback (may need manual review):');
-    results.details.forEach(d => {
-      console.log(`  - ${d.recordId}: ${d.schoolName}`);
-    });
-  }
 }
 
 // Run the script

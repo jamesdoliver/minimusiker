@@ -51,12 +51,16 @@ export interface SimplybookBooking {
   event_name?: string;
   unit_id?: string;
   unit_name?: string;
+  unit?: string;              // Region/team name (e.g., "Minimusiker Stuttgart")
   client_id: string;
+  client?: string;            // School/institution name from SimplyBook
   client_name?: string;
   client_email?: string;
   client_phone?: string;
+  text?: string;              // Often same as client
   is_confirmed: boolean;
   status?: string;
+  record_date?: string;       // When booking was created
   additional_fields?: SimplybookIntakeField[] | Record<string, SimplybookIntakeField>;
   location?: {
     id: string;

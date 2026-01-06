@@ -285,8 +285,12 @@ class SimplybookService {
     // Extract booking date from start_date_time or start_date
     const bookingDate = booking.start_date || booking.start_date_time?.split(' ')[0] || '';
 
+    // School name: prefer 'client' field (where SimplyBook stores it), then additional_fields, then client_name
+    const schoolNameFromFields = findField(['name', 'schule', 'school', 'einrichtung']);
+    const schoolName = booking.client || schoolNameFromFields || booking.client_name || '';
+
     return {
-      schoolName: findField(['name', 'schule', 'school', 'einrichtung']) || booking.client_name || '',
+      schoolName,
       contactPerson: findField(['ansprechpartner', 'ansprechperson', 'contact person', 'contact', 'kontakt']) || booking.client_name || '',
       contactEmail: booking.client_email || findField(['email', 'e-mail']) || '',
       phone: booking.client_phone || findField(['telefon', 'phone', 'tel']) || undefined,
