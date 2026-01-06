@@ -15,6 +15,8 @@ function ShopContent() {
   const router = useRouter();
   const [parentId, setParentId] = useState<string>('');
   const [parentEmail, setParentEmail] = useState<string>('');
+  const [eventId, setEventId] = useState<string>('');
+  const [classId, setClassId] = useState<string>('');
   const [isVerifying, setIsVerifying] = useState(true);
 
   const { products, isLoading, error } = useProducts({
@@ -35,6 +37,11 @@ function ShopContent() {
         if (data.session) {
           setParentId(data.session.parentId || '');
           setParentEmail(data.session.email || '');
+          // Extract eventId and classId from first child for checkout
+          if (data.session.children?.length > 0) {
+            setEventId(data.session.children[0].eventId || '');
+            setClassId(data.session.children[0].classId || '');
+          }
         }
       } catch (error) {
         console.error('Session verification error:', error);
@@ -68,7 +75,7 @@ function ShopContent() {
       </main>
 
       <CartSummary />
-      <CartDrawer parentId={parentId} parentEmail={parentEmail} />
+      <CartDrawer parentId={parentId} parentEmail={parentEmail} eventId={eventId} classId={classId} />
     </div>
   );
 }

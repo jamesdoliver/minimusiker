@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
     const children = allParentRecords.map(record => ({
       childName: record.registered_child,
       bookingId: record.booking_id,
+      classId: record.class_id,
       class: record.class,
       eventId: generateEventId(record.school_name, record.event_type, record.booking_date),
       schoolName: record.school_name,

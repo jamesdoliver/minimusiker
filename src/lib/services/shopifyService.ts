@@ -589,6 +589,7 @@ class ShopifyService {
           parentId: customAttributes.parentId,
           parentEmail: customAttributes.parentEmail,
           eventId: customAttributes.eventId,
+          classId: customAttributes.classId,
           schoolName: customAttributes.schoolName,
         }
       : undefined;

@@ -45,6 +45,7 @@ export interface CheckoutCustomAttributes {
   parentId: string;
   parentEmail: string;
   eventId?: string;
+  classId?: string;
   schoolName?: string;
 }
 
@@ -90,6 +91,7 @@ export interface MiniMusikerCartAttributes {
   parentId: string;
   parentEmail: string;
   eventId?: string;
+  classId?: string;
   bookingId?: string;
   schoolName?: string;
 }

@@ -10,9 +10,11 @@ import { formatPrice } from '@/lib/utils';
 interface CartDrawerProps {
   parentId?: string;
   parentEmail?: string;
+  eventId?: string;
+  classId?: string;
 }
 
-export default function CartDrawer({ parentId, parentEmail }: CartDrawerProps) {
+export default function CartDrawer({ parentId, parentEmail, eventId, classId }: CartDrawerProps) {
   const t = useTranslations('shop.cart');
   const { cart, removeItem, updateQuantity, isCartOpen, setIsCartOpen } = useCart();
   const { checkout, isCheckingOut, error: checkoutError } = useCheckout();
@@ -41,6 +43,8 @@ export default function CartDrawer({ parentId, parentEmail }: CartDrawerProps) {
     checkout({
       parentId: parentId || '',
       parentEmail: parentEmail || '',
+      eventId: eventId || '',
+      classId: classId || '',
     });
   };
 

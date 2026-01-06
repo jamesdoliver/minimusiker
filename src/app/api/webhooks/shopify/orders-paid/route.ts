@@ -79,11 +79,14 @@ export async function POST(request: NextRequest) {
     const totalAmount = parseFloat(order.total_price);
 
     // Prepare order data for Airtable
+    // Note: class_id is a linked record field and expects an array of record IDs
+    const classId = attributes.classId || attributes.class_id;
     const orderData = {
       [ORDERS_FIELD_IDS.order_id]: order.admin_graphql_api_id,
       [ORDERS_FIELD_IDS.order_number]: order.name,
       [ORDERS_FIELD_IDS.booking_id]: attributes.bookingId || attributes.booking_id || '',
       [ORDERS_FIELD_IDS.school_name]: attributes.schoolName || attributes.school_name || '',
+      ...(classId ? { [ORDERS_FIELD_IDS.class_id]: [classId] } : {}),
       [ORDERS_FIELD_IDS.order_date]: order.created_at,
       [ORDERS_FIELD_IDS.total_amount]: totalAmount,
       [ORDERS_FIELD_IDS.subtotal]: subtotal,

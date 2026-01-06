@@ -573,6 +573,7 @@ export const ORDERS_FIELD_IDS = {
   order_number: 'fldKVJtsO24WemkgA',       // Display order number (#1001)
   parent_id: 'fldLbmO6NwPAfcqMX',          // Link to Parents table
   event_id: 'fldxJwmQCsx533oe0',           // Link to Events table
+  class_id: 'fldvwFX0XhPPZ9XBd',           // Link to Classes table
   booking_id: 'fldF4eBUFu5NcRYjd',         // Booking ID from custom attributes
   school_name: 'fld0oMH0XTGHi7fV0',        // Denormalized for reporting
   order_date: 'fldpQj3Pba3Y2D6wo',         // When order was placed
