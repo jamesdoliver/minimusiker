@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const engineers = await airtableService.getEngineerStaff();
+    const engineers = await getAirtableService().getEngineerStaff();
 
     return NextResponse.json({
       success: true,

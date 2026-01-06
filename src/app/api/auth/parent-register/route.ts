@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { ParentSession } from '@/lib/types/airtable';
 import {
   RegistrationRequest,
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     const sanitizedData = sanitizeRegistrationData(body);
 
     // Step 1: Validate that event and class exist
-    const eventDetails = await airtableService.getEventAndClassDetails(
+    const eventDetails = await getAirtableService().getEventAndClassDetails(
       sanitizedData.eventId,
       sanitizedData.classId
     );
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2: Check if parent is already registered for this event
-    const isAlreadyRegistered = await airtableService.isParentRegisteredForEvent(
+    const isAlreadyRegistered = await getAirtableService().isParentRegisteredForEvent(
       sanitizedData.parentEmail,
       sanitizedData.eventId
     );
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     if (isAlreadyRegistered) {
       // Don't error - just log them in instead!
       // Fetch their existing records to create session
-      const existingRecords = await airtableService.getParentRecordsByEmail(
+      const existingRecords = await getAirtableService().getParentRecordsByEmail(
         sanitizedData.parentEmail
       );
 
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 3: Generate or reuse parent_id
-    const existingParent = await airtableService.getParentByEmail(
+    const existingParent = await getAirtableService().getParentByEmail(
       sanitizedData.parentEmail
     );
     const parentId = existingParent?.parent_id || generateParentId(sanitizedData.parentEmail);
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
       // For now, we'll just use the child name
     }));
 
-    const createdRecords = await airtableService.createBulkParentJourneys(
+    const createdRecords = await getAirtableService().createBulkParentJourneys(
       recordsToCreate
     );
 

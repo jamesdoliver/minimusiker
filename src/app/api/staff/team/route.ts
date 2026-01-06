@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 /**
  * GET /api/staff/team
@@ -11,7 +11,7 @@ import airtableService from '@/lib/services/airtableService';
  */
 export async function GET(request: NextRequest) {
   try {
-    const teamStaff = await airtableService.getTeamStaff();
+    const teamStaff = await getAirtableService().getTeamStaff();
 
     return NextResponse.json({
       success: true,

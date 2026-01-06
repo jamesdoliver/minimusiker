@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 export async function GET() {
   try {
-    const events = await airtableService.getSchoolEventSummaries();
+    const events = await getAirtableService().getSchoolEventSummaries();
     return NextResponse.json({ events });
   } catch (error) {
     console.error('Error fetching events:', error);

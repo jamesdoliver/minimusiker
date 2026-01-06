@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { generateClassId } from '@/lib/utils/eventIdentifiers';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { validateEventCreation, sanitizeString } from '@/lib/utils/validators';
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       // Update existing records or prepare for future parent records
       // This assigns the class_id to any existing parent records matching this criteria
       try {
-        const updatedCount = await airtableService.assignClassIdToRecords(
+        const updatedCount = await getAirtableService().assignClassIdToRecords(
           sanitizedSchoolName,
           body.eventDate,
           classInput.className,
@@ -145,13 +145,13 @@ export async function POST(request: NextRequest) {
     }));
 
     try {
-      await airtableService.createBulkParentJourneys(placeholderRecords);
+      await getAirtableService().createBulkParentJourneys(placeholderRecords);
       console.log(`Created ${placeholderRecords.length} placeholder records for event`);
 
       // Optional verification - don't fail if records aren't immediately queryable
       // Airtable sometimes has a slight delay before new records are searchable
       try {
-        const verifyClasses = await airtableService.getClassesByBookingId(bookingId);
+        const verifyClasses = await getAirtableService().getClassesByBookingId(bookingId);
         if (verifyClasses.length > 0) {
           console.log(`Verified ${verifyClasses.length} classes created for booking ${bookingId}`);
         } else {
@@ -230,7 +230,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch classes for this booking_id
-    const classes = await airtableService.getClassesByBookingId(bookingId);
+    const classes = await getAirtableService().getClassesByBookingId(bookingId);
 
     if (classes.length === 0) {
       return NextResponse.json(

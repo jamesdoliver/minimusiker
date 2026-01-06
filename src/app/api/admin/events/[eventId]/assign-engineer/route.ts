@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
 /**
@@ -35,7 +35,7 @@ export async function POST(
     }
 
     // Verify event exists
-    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
     if (!eventDetail) {
       return NextResponse.json(
         { error: 'Event not found' },
@@ -45,7 +45,7 @@ export async function POST(
 
     // If engineerId provided, verify the engineer exists and has Engineer role
     if (engineerId) {
-      const hasRole = await airtableService.hasEngineerRole(engineerId);
+      const hasRole = await getAirtableService().hasEngineerRole(engineerId);
       if (!hasRole) {
         return NextResponse.json(
           { error: 'Selected person does not have Engineer role' },
@@ -55,7 +55,7 @@ export async function POST(
     }
 
     // Assign engineer to event
-    const updatedRecords = await airtableService.assignEngineerToEvent(
+    const updatedRecords = await getAirtableService().assignEngineerToEvent(
       eventId,
       engineerId
     );
@@ -63,7 +63,7 @@ export async function POST(
     // Get engineer name for response
     let engineerName: string | undefined;
     if (engineerId) {
-      const engineers = await airtableService.getEngineerStaff();
+      const engineers = await getAirtableService().getEngineerStaff();
       const engineer = engineers.find((e) => e.id === engineerId);
       engineerName = engineer?.name;
     }
@@ -111,7 +111,7 @@ export async function GET(
     const eventId = decodeURIComponent(params.eventId);
 
     // Get event detail which includes assigned engineer info
-    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
     if (!eventDetail) {
       return NextResponse.json(
         { error: 'Event not found' },

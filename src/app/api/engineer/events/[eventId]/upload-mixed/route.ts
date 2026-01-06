@@ -3,7 +3,7 @@ import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getEmailService } from '@/lib/services/emailService';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
@@ -50,7 +50,7 @@ export async function POST(
     }
 
     // Verify engineer is assigned to this event
-    const isAssigned = await airtableService.isEngineerAssignedToEvent(
+    const isAssigned = await getAirtableService().isEngineerAssignedToEvent(
       session.engineerId,
       eventId
     );
@@ -63,7 +63,7 @@ export async function POST(
     }
 
     // Verify event exists
-    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
     if (!eventDetail) {
       return NextResponse.json(
         { error: 'Event not found' },
@@ -135,7 +135,7 @@ export async function PUT(
     }
 
     // Verify engineer is assigned to this event
-    const isAssigned = await airtableService.isEngineerAssignedToEvent(
+    const isAssigned = await getAirtableService().isEngineerAssignedToEvent(
       session.engineerId,
       eventId
     );
@@ -189,7 +189,7 @@ export async function PUT(
     }
 
     // Get event details for notifications
-    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
 
     // Get class name for the notification
     const classInfo = eventDetail?.classes.find((c) => c.classId === classId);
@@ -199,7 +199,7 @@ export async function PUT(
     if (eventDetail) {
       try {
         // Get parent emails for this class
-        const parentEmails = await airtableService.getParentEmailsByClassId(classId);
+        const parentEmails = await getAirtableService().getParentEmailsByClassId(classId);
 
         if (parentEmails.length > 0) {
           const emailService = getEmailService();

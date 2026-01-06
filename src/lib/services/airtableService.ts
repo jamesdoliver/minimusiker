@@ -4173,4 +4173,7 @@ class AirtableService {
   }
 }
 
-export default AirtableService.getInstance();
+// Lazy getter to prevent build-time instantiation
+export function getAirtableService(): AirtableService {
+  return AirtableService.getInstance();
+}

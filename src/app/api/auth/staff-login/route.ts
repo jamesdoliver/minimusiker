@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createStaffSessionToken } from '@/lib/auth/verifyStaffSession';
 import { StaffSession } from '@/lib/types/airtable';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 /**
  * Staff login via Airtable Personen table
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find staff member by email in Personen table
-    const staff = await airtableService.getStaffByEmail(email);
+    const staff = await getAirtableService().getStaffByEmail(email);
 
     if (!staff) {
       return NextResponse.json(

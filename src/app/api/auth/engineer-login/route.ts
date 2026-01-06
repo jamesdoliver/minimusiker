@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createEngineerSessionToken } from '@/lib/auth/verifyEngineerSession';
 import { EngineerSession, ENGINEER_SESSION_COOKIE } from '@/lib/types/engineer';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 /**
  * Engineer login via Airtable Personen table
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find staff member by email in Personen table
-    const staff = await airtableService.getStaffByEmail(email);
+    const staff = await getAirtableService().getStaffByEmail(email);
 
     if (!staff) {
       return NextResponse.json(
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has Engineer role
-    const hasEngineerRole = await airtableService.hasEngineerRole(staff.id);
+    const hasEngineerRole = await getAirtableService().hasEngineerRole(staff.id);
     if (!hasEngineerRole) {
       return NextResponse.json(
         { error: 'Access denied. Engineer role required.' },

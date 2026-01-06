@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 export async function GET(
   request: NextRequest,
@@ -19,7 +19,7 @@ export async function GET(
 
     const eventId = decodeURIComponent(params.eventId);
 
-    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
 
     if (!eventDetail) {
       return NextResponse.json(

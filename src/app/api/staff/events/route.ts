@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Look up the staff member's Personen record by email
-    const staffRecord = await airtableService.getStaffByEmail(session.email);
+    const staffRecord = await getAirtableService().getStaffByEmail(session.email);
 
     if (!staffRecord) {
       // Staff member not found in Personen table - return empty list
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get only events assigned to this staff member
-    const assignedEvents = await airtableService.getSchoolEventSummariesByStaff(staffRecord.id);
+    const assignedEvents = await getAirtableService().getSchoolEventSummariesByStaff(staffRecord.id);
 
     return NextResponse.json({
       success: true,

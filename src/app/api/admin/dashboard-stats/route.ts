@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { ApiResponse, DashboardStats } from '@/lib/types';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch dashboard statistics
-    const stats = await airtableService.getDashboardStats();
+    const stats = await getAirtableService().getDashboardStats();
 
     return NextResponse.json<ApiResponse<DashboardStats>>({
       success: true,
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     if (!eventId) {
       // Return general dashboard stats
-      const stats = await airtableService.getDashboardStats();
+      const stats = await getAirtableService().getDashboardStats();
       return NextResponse.json<ApiResponse>({
         success: true,
         data: stats,
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get event-specific analytics
-    const eventAnalytics = await airtableService.getEventAnalytics(eventId);
+    const eventAnalytics = await getAirtableService().getEventAnalytics(eventId);
 
     if (!eventAnalytics) {
       return NextResponse.json<ApiResponse>(

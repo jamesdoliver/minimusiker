@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { ApiResponse, ParentSession } from '@/lib/types';
 import { generateEventId, generateSchoolId } from '@/lib/utils/eventIdentifiers';
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up ALL parent records and get the most recent one
-    const allParentRecords = await airtableService.getParentRecordsByEmail(email.toLowerCase().trim());
+    const allParentRecords = await getAirtableService().getParentRecordsByEmail(email.toLowerCase().trim());
 
     if (!allParentRecords || allParentRecords.length === 0) {
       // Email not found - suggest registration
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the most recent/relevant event for this parent
-    const mostRecentRecord = await airtableService.getMostRecentParentRecord(email.toLowerCase().trim());
+    const mostRecentRecord = await getAirtableService().getMostRecentParentRecord(email.toLowerCase().trim());
     const parentJourney = mostRecentRecord!; // We know it exists from the check above
 
     // Check if parent has multiple events

@@ -7,7 +7,7 @@ import {
   webhookError,
   ShopifyWebhookOrder,
 } from '@/lib/utils/shopifyWebhook';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import {
   ORDERS_TABLE_ID,
   ORDERS_FIELD_IDS,

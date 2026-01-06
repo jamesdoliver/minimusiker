@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 /**
  * GET /api/staff/events/[eventId]/audio-files
@@ -21,7 +21,7 @@ export async function GET(
     const eventId = decodeURIComponent(params.eventId);
 
     // Verify event exists
-    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
     if (!eventDetail) {
       return NextResponse.json(
         { error: 'Event not found' },

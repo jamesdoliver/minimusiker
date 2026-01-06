@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
 /**
@@ -34,7 +34,7 @@ export async function POST(
     }
 
     // Assign staff to all records with this booking_id
-    const updatedCount = await airtableService.assignStaffToEvent(eventId, staffId);
+    const updatedCount = await getAirtableService().assignStaffToEvent(eventId, staffId);
 
     if (updatedCount === 0) {
       return NextResponse.json(
@@ -47,7 +47,7 @@ export async function POST(
     }
 
     // Get updated event data with staff info
-    const updatedEvents = await airtableService.getSchoolEventSummaries();
+    const updatedEvents = await getAirtableService().getSchoolEventSummaries();
     const updatedEvent = updatedEvents.find(e => e.eventId === eventId);
 
     return NextResponse.json({

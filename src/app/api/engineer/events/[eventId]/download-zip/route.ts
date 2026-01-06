@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import archiver from 'archiver';
 import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 
@@ -25,7 +25,7 @@ export async function GET(
     const classId = searchParams.get('classId');
 
     // Verify engineer is assigned to this event
-    const isAssigned = await airtableService.isEngineerAssignedToEvent(
+    const isAssigned = await getAirtableService().isEngineerAssignedToEvent(
       session.engineerId,
       eventId
     );
@@ -38,7 +38,7 @@ export async function GET(
     }
 
     // Get event details for filename
-    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
     if (!eventDetail) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }

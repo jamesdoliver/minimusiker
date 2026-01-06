@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 /**
  * POST /api/teacher/bookings/[bookingId]/setup
@@ -29,7 +29,7 @@ export async function POST(
     }
 
     // Get the school booking
-    const booking = await airtableService.getSchoolBookingById(bookingId);
+    const booking = await getAirtableService().getSchoolBookingById(bookingId);
 
     if (!booking) {
       return NextResponse.json(
@@ -64,7 +64,7 @@ export async function POST(
     // Create a placeholder record in parent_journey_table
     // This serves as the "event shell" that classes will be added to
     // The placeholder is marked with PLACEHOLDER parent_id so it won't be counted as a real registration
-    await airtableService.create({
+    await getAirtableService().create({
       booking_id: eventBookingId,
       school_name: booking.schoolContactName || 'Unknown School',
       main_teacher: session.name || '',
@@ -80,7 +80,7 @@ export async function POST(
 
     // Update the school booking portal status to 'classes_added'
     // (Even though no classes are added yet, we're moving past 'pending_setup')
-    await airtableService.updateBookingPortalStatus(bookingId, 'classes_added');
+    await getAirtableService().updateBookingPortalStatus(bookingId, 'classes_added');
 
     return NextResponse.json({
       success: true,
@@ -132,7 +132,7 @@ export async function GET(
     }
 
     // Get the school booking
-    const booking = await airtableService.getSchoolBookingById(bookingId);
+    const booking = await getAirtableService().getSchoolBookingById(bookingId);
 
     if (!booking) {
       return NextResponse.json(
@@ -158,7 +158,7 @@ export async function GET(
     }> = [];
 
     if (booking.portalStatus === 'classes_added' || booking.portalStatus === 'ready') {
-      classes = await airtableService.getEventClasses(booking.simplybookId);
+      classes = await getAirtableService().getEventClasses(booking.simplybookId);
       // Filter out the placeholder class
       classes = classes.filter(c => c.className !== 'SETUP_PLACEHOLDER');
     }

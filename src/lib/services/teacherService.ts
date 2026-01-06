@@ -30,7 +30,7 @@ import {
   EVENTS_TABLE_ID,
   CLASSES_TABLE_ID,
 } from '@/lib/types/airtable';
-import airtableService from './airtableService';
+import { getAirtableService } from './airtableService';
 
 // Table names in Airtable - use table IDs for API calls
 const TEACHERS_TABLE = TEACHERS_TABLE_ID; // tblLO2vXcgvNjrJ0T
@@ -1355,7 +1355,7 @@ class TeacherService {
         // Check if school logo is uploaded
         let hasLogo = false;
         try {
-          const einrichtung = await airtableService.getEinrichtungForTeacher(teacherEmail, eventData.schoolName);
+          const einrichtung = await getAirtableService().getEinrichtungForTeacher(teacherEmail, eventData.schoolName);
           hasLogo = !!(einrichtung?.logoUrl);
         } catch (error) {
           console.error('Error checking logo status:', error);

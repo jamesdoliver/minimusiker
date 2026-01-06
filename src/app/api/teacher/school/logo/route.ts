@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getR2Service } from '@/lib/services/r2Service';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 // Allowed MIME types for logo upload
 const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Find Einrichtung for this teacher
-    const einrichtung = await airtableService.getEinrichtungForTeacher(
+    const einrichtung = await getAirtableService().getEinrichtungForTeacher(
       session.email,
       session.schoolName
     );
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find or create Einrichtung for this teacher
-    const einrichtung = await airtableService.findOrCreateEinrichtung(
+    const einrichtung = await getAirtableService().findOrCreateEinrichtung(
       session.schoolName,
       session.email
     );
@@ -170,7 +170,7 @@ export async function PUT(request: NextRequest) {
 
     // Update Einrichtung record with logo URL
     // Store the R2 key as the URL (we'll generate fresh signed URLs when displaying)
-    await airtableService.updateEinrichtungLogo(
+    await getAirtableService().updateEinrichtungLogo(
       einrichtungId,
       r2Key, // Store key, not signed URL
       session.email
@@ -202,7 +202,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Find Einrichtung for this teacher
-    const einrichtung = await airtableService.getEinrichtungForTeacher(
+    const einrichtung = await getAirtableService().getEinrichtungForTeacher(
       session.email,
       session.schoolName
     );
@@ -219,7 +219,7 @@ export async function DELETE(request: NextRequest) {
     await r2Service.deleteLogo(einrichtung.id);
 
     // Clear logo URL in Airtable
-    await airtableService.clearEinrichtungLogo(einrichtung.id);
+    await getAirtableService().clearEinrichtungLogo(einrichtung.id);
 
     return NextResponse.json({
       success: true,

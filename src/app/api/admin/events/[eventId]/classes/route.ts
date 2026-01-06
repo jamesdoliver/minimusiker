@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 /**
  * POST /api/admin/events/[eventId]/classes
@@ -29,11 +29,11 @@ export async function POST(
     }
 
     // Get event detail to find teacher email
-    let eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    let eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
 
     // If no event in parent_journey, try SchoolBookings
     if (!eventDetail) {
-      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      const booking = await getAirtableService().getSchoolBookingBySimplybookId(eventId);
       if (booking) {
         eventDetail = {
           eventId: booking.simplybookId,

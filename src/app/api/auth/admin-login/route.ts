@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { ApiResponse } from '@/lib/types';
 import { verifyAdminSession, AdminSession } from '@/lib/auth/verifyAdminSession';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 const ADMIN_SESSION_COOKIE = 'admin_token';
 const ADMIN_SESSION_EXPIRY = 60 * 60 * 8; // 8 hours in seconds
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find staff member by email in Personen table
-    const staff = await airtableService.getStaffByEmail(email);
+    const staff = await getAirtableService().getStaffByEmail(email);
 
     if (!staff) {
       return NextResponse.json<ApiResponse>(
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has Admin role
-    const hasAdminRole = await airtableService.hasAdminRole(staff.id);
+    const hasAdminRole = await getAirtableService().hasAdminRole(staff.id);
     if (!hasAdminRole) {
       return NextResponse.json<ApiResponse>(
         { success: false, error: 'Access denied. Admin role required.' },

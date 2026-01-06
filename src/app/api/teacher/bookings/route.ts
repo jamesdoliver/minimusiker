@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { SchoolBooking } from '@/lib/types/airtable';
 
 export const dynamic = 'force-dynamic';
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get bookings from SchoolBookings table where email matches
-    const bookings = await airtableService.getBookingsForTeacher(session.email);
+    const bookings = await getAirtableService().getBookingsForTeacher(session.email);
 
     // Transform to teacher view
     const bookingViews = bookings.map(transformToTeacherView);

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherRepresentative } from '@/lib/services/representativeService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/teacher/representative
  * Get the assigned Minimusiker representative for the authenticated teacher

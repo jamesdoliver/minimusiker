@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { SchoolEventDetail } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
@@ -21,11 +21,11 @@ export async function GET(
     const eventId = decodeURIComponent(params.eventId);
 
     // First try to get event detail from parent_journey_table (has class data)
-    let eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    let eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
 
     // If no class data exists, try to get basic info from SchoolBookings table
     if (!eventDetail) {
-      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      const booking = await getAirtableService().getSchoolBookingBySimplybookId(eventId);
 
       if (booking) {
         // Create a minimal event detail from booking data

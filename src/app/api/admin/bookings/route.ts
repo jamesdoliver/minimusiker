@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import airtableService from '@/lib/services/airtableService';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { SchoolBooking } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     const statusFilter = searchParams.get('status') as 'confirmed' | 'pending' | 'cancelled' | null;
 
     // Fetch future bookings from Airtable
-    const airtableBookings = await airtableService.getFutureBookings();
+    const airtableBookings = await getAirtableService().getFutureBookings();
 
     // Transform to API format
     let bookings: BookingWithDetails[] = airtableBookings.map(transformToBookingWithDetails);

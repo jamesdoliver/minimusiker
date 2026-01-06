@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getPreparationTips } from '@/lib/services/preparationTipsService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/teacher/tips
  * Get all active preparation tips for teachers
