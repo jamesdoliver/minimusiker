@@ -21,12 +21,17 @@
 require('dotenv').config({ path: '.env.local' });
 const Airtable = require('airtable');
 
-// Field IDs from airtable.ts
+// Field IDs for updating (Airtable accepts IDs for writes)
 const SCHOOL_BOOKINGS_TABLE_ID = 'tblrktl5eLJEWE4M6';
 const SCHOOL_BOOKINGS_FIELD_IDS = {
-  simplybook_id: 'fldb5FI6ij00eICaT',
-  school_name: 'fldVgEyfHufAuNovP',
-  school_contact_name: 'fldlRful9AwfzUrOc',
+  school_name: 'fldVgEyfHufAuNovP', // Field ID for updating
+};
+
+// Field names for reading (Airtable returns field names in responses)
+const FIELD_NAMES = {
+  simplybook_id: 'simplybook_id',
+  school_name: 'school_name',
+  school_contact_name: 'school_contact_name',
 };
 
 // Initialize Airtable
@@ -177,18 +182,17 @@ function extractSchoolName(booking) {
 async function backfillSchoolNames() {
   console.log('Starting school name backfill...\n');
 
-  // Fetch all records without school_name
-  console.log('Fetching records with empty school_name...');
+  // Fetch all records - we'll check school_name in code
+  console.log('Fetching all SchoolBookings records...');
 
   const records = [];
   await airtable
     .table(SCHOOL_BOOKINGS_TABLE_ID)
     .select({
-      filterByFormula: `OR({${SCHOOL_BOOKINGS_FIELD_IDS.school_name}} = '', {${SCHOOL_BOOKINGS_FIELD_IDS.school_name}} = BLANK())`,
       fields: [
-        SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id,
-        SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name,
-        SCHOOL_BOOKINGS_FIELD_IDS.school_name,
+        FIELD_NAMES.simplybook_id,
+        FIELD_NAMES.school_contact_name,
+        FIELD_NAMES.school_name,
       ],
     })
     .eachPage((pageRecords, fetchNextPage) => {
@@ -196,9 +200,15 @@ async function backfillSchoolNames() {
       fetchNextPage();
     });
 
-  console.log(`Found ${records.length} records without school_name\n`);
+  // Filter to only records without school_name
+  const recordsToUpdate = records.filter(r => {
+    const schoolName = r.fields[FIELD_NAMES.school_name];
+    return !schoolName || schoolName.trim() === '';
+  });
 
-  if (records.length === 0) {
+  console.log(`Found ${records.length} total records, ${recordsToUpdate.length} need school_name\n`);
+
+  if (recordsToUpdate.length === 0) {
     console.log('No records to update. Done!');
     return;
   }
@@ -212,9 +222,9 @@ async function backfillSchoolNames() {
   };
 
   // Process each record
-  for (const record of records) {
-    const simplybookId = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id];
-    const contactName = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name];
+  for (const record of recordsToUpdate) {
+    const simplybookId = record.fields[FIELD_NAMES.simplybook_id];
+    const contactName = record.fields[FIELD_NAMES.school_contact_name];
 
     console.log(`Processing record ${record.id} (SimplyBook ID: ${simplybookId})`);
 
