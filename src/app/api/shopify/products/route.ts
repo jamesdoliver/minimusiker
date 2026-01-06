@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import shopifyService from '@/lib/services/shopifyService';
 import { Product } from '@/lib/types/airtable';
 
+export const dynamic = 'force-dynamic';
+
 // Mock products with local images for development
 const MOCK_PRODUCTS: Product[] = [
   {

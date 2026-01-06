@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { ApiResponse, ParentSession } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 const PARENT_JWT_SECRET = process.env.PARENT_JWT_SECRET || process.env.JWT_SECRET || 'parent-secret-key';
 
 export async function GET(request: NextRequest) {

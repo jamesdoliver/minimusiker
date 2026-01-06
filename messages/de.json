@@ -1,0 +1,115 @@
+{
+  "common": {
+    "shop": "Shop",
+    "signOut": "Abmelden",
+    "loading": "Wird geladen...",
+    "error": "Fehler"
+  },
+  "header": {
+    "minimusiker": "MiniMusiker",
+    "parentPortal": "Elternportal",
+    "welcome": "Willkommen, {firstName}!"
+  },
+  "childSelector": {
+    "viewingFor": "Ansicht für:"
+  },
+  "schoolBanner": {
+    "class": "Klasse: {className}",
+    "recordingFor": "Aufnahme für: {childName}"
+  },
+  "recordingPreview": {
+    "title": "Schulaufnahme-Vorschau",
+    "previewDescription": "Dies ist eine 30-sekündige Vorschau der Aufführung von {childName}. Kaufen Sie das Paket unten, um die vollständige Aufnahme freizuschalten!",
+    "previewDescriptionSchool": "Dies ist eine 30-sekündige Vorschau der Aufführung Ihrer Schule. Kaufen Sie das Paket unten, um die vollständige Aufnahme freizuschalten!",
+    "availableSoon": "Die Aufnahme wird nach der Veranstaltung verfügbar sein"
+  },
+  "productSelector": {
+    "title": "Vervollständigen Sie Ihre Bestellung",
+    "subtitle": "Halten Sie die Erinnerungen von {schoolName} fest",
+    "chooseAudio": "Wählen Sie Ihr Audio",
+    "required": "(Erforderlich)",
+    "addClothing": "Kleidung hinzufügen",
+    "optional": "(Optional)",
+    "discountBanner": "Sparen Sie 10%, wenn Sie Kleidung zu Ihrer Bestellung hinzufügen!",
+    "comboHint": "10% Rabatt mit Audio!",
+    "addButton": "Hinzufügen",
+    "addedItems": "Hinzugefügte Artikel:",
+    "size": "Größe:",
+    "tshirtLabel": "T-Shirt:",
+    "hoodieLabel": "Hoodie:"
+  },
+  "audio": {
+    "minicard": "Minicard",
+    "minicardDescription": "Digitale Audiokarte mit QR-Code",
+    "cd": "CD",
+    "cdDescription": "Physische CD mit Albumcover",
+    "bundle": "Minicard + CD",
+    "bundleDescription": "Beide Formate enthalten",
+    "bundleLabel": "Minicard + CD Paket",
+    "save": "Sparen Sie €{amount}"
+  },
+  "clothing": {
+    "tshirt": "T-Shirt",
+    "tshirtDescription": "Premium Baumwolle Event-T-Shirt",
+    "hoodie": "Hoodie",
+    "hoodieDescription": "Gemütlicher Kapuzenpullover",
+    "bundle": "T-Shirt + Hoodie",
+    "bundleDescription": "Beide Artikel enthalten",
+    "bundleLabel": "T-Shirt + Hoodie Paket",
+    "save": "Sparen Sie €{amount}"
+  },
+  "orderSummary": {
+    "title": "Bestellübersicht",
+    "selectItems": "Wählen Sie oben Artikel aus, um Ihre Bestellung zusammenzustellen",
+    "subtotal": "Zwischensumme",
+    "comboDiscount": "Kombi-Rabatt ({percent}%)",
+    "total": "Gesamt",
+    "processing": "Wird verarbeitet...",
+    "checkout": "Zur Kasse - €{total}",
+    "selectAudio": "Wählen Sie Audio, um fortzufahren",
+    "secure": "Sicher",
+    "fastDelivery": "Schnelle Lieferung"
+  },
+  "shop": {
+    "header": {
+      "breadcrumbPortal": "Elternportal",
+      "breadcrumbShop": "Shop",
+      "title": "MiniMusiker Shop",
+      "subtitle": "Exklusive Merchandise für unsere Musikfamilien"
+    },
+    "catalog": {
+      "categoryAll": "Alle Produkte",
+      "categoryApparel": "Bekleidung",
+      "categoryAccessories": "Accessoires",
+      "categoryDigital": "Digital",
+      "errorLoading": "Fehler beim Laden der Produkte",
+      "noProducts": "Keine Produkte verfügbar",
+      "noProductsSubtext": "Schauen Sie bald wieder vorbei für neue Artikel!",
+      "noProductsInCategory": "Keine Produkte in dieser Kategorie",
+      "showingCount": "Zeige {count} von {total} Produkten"
+    },
+    "productCard": {
+      "sale": "SALE",
+      "outOfStock": "Nicht verfügbar",
+      "size": "Größe",
+      "quantity": "Menge",
+      "adding": "Wird hinzugefügt...",
+      "addToCart": "In den Warenkorb"
+    },
+    "cart": {
+      "title": "Ihr Warenkorb ({count})",
+      "empty": "Ihr Warenkorb ist leer",
+      "continueShopping": "Weiter einkaufen",
+      "remove": "Entfernen",
+      "subtotal": "Zwischensumme",
+      "shippingInfo": "Versand und Steuern werden an der Kasse berechnet",
+      "processing": "Wird verarbeitet...",
+      "checkout": "Zur Kasse gehen"
+    },
+    "featured": {
+      "title": "Unsere Merchandise-Produkte",
+      "viewAll": "Alle anzeigen",
+      "viewOptions": "Optionen anzeigen"
+    }
+  }
+}

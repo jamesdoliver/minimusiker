@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Product } from '@/lib/types/airtable';
 import ProductCard from './ProductCard';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -11,16 +12,17 @@ interface ProductCatalogProps {
   error?: string | null;
 }
 
-// Define product categories
-const CATEGORIES = [
-  { id: 'all', label: 'All Products' },
-  { id: 'apparel', label: 'Apparel', types: ['T-Shirt', 'Hoodie'] },
-  { id: 'accessories', label: 'Accessories', types: ['Baseball Cap', 'Tote Bag', 'Bluetooth Box'] },
-  { id: 'digital', label: 'Digital', types: ['PDF', 'Digital'] },
-];
-
 export default function ProductCatalog({ products, isLoading, error }: ProductCatalogProps) {
+  const t = useTranslations('shop.catalog');
   const [selectedCategory, setSelectedCategory] = useState('all');
+
+  // Define product categories with translations
+  const CATEGORIES = [
+    { id: 'all', label: t('categoryAll') },
+    { id: 'apparel', label: t('categoryApparel'), types: ['T-Shirt', 'Hoodie'] },
+    { id: 'accessories', label: t('categoryAccessories'), types: ['Baseball Cap', 'Tote Bag', 'Bluetooth Box'] },
+    { id: 'digital', label: t('categoryDigital'), types: ['PDF', 'Digital'] },
+  ];
 
   // Filter products by category
   const filteredProducts =
@@ -47,7 +49,7 @@ export default function ProductCatalog({ products, isLoading, error }: ProductCa
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-        <p className="text-red-600 font-medium">Error loading products</p>
+        <p className="text-red-600 font-medium">{t('errorLoading')}</p>
         <p className="text-red-500 text-sm mt-1">{error}</p>
       </div>
     );
@@ -69,8 +71,8 @@ export default function ProductCatalog({ products, isLoading, error }: ProductCa
             d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
           />
         </svg>
-        <h3 className="font-heading text-xl text-gray-600 mb-2">No Products Available</h3>
-        <p className="text-gray-500">Check back soon for new merchandise!</p>
+        <h3 className="font-heading text-xl text-gray-600 mb-2">{t('noProducts')}</h3>
+        <p className="text-gray-500">{t('noProductsSubtext')}</p>
       </div>
     );
   }
@@ -102,7 +104,7 @@ export default function ProductCatalog({ products, isLoading, error }: ProductCa
       {/* Products Grid */}
       {filteredProducts.length === 0 ? (
         <div className="bg-cream-100 rounded-lg p-8 text-center">
-          <p className="text-gray-600">No products in this category</p>
+          <p className="text-gray-600">{t('noProductsInCategory')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -115,7 +117,7 @@ export default function ProductCatalog({ products, isLoading, error }: ProductCa
       {/* Product Count */}
       <div className="mt-8 text-center">
         <p className="text-sm text-gray-500">
-          Showing {filteredProducts.length} of {products.length} products
+          {t('showingCount', { count: filteredProducts.length, total: products.length })}
         </p>
       </div>
     </div>

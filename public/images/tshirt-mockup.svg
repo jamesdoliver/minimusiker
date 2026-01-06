@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" fill="none">
+  <!-- T-shirt shape -->
+  <path d="M80 100 L160 80 L200 100 L240 80 L320 100 L340 180 L280 180 L280 450 L120 450 L120 180 L60 180 Z" fill="#3B5998" stroke="#2D4373" stroke-width="3"/>
+
+  <!-- Collar -->
+  <ellipse cx="200" cy="95" rx="45" ry="20" fill="#2D4373"/>
+  <ellipse cx="200" cy="95" rx="35" ry="12" fill="#3B5998"/>
+
+  <!-- Left sleeve detail -->
+  <path d="M80 100 L60 180 L120 180 L140 120" fill="none" stroke="#2D4373" stroke-width="2" opacity="0.5"/>
+
+  <!-- Right sleeve detail -->
+  <path d="M320 100 L340 180 L280 180 L260 120" fill="none" stroke="#2D4373" stroke-width="2" opacity="0.5"/>
+
+  <!-- Placeholder text area indicator -->
+  <rect x="140" y="180" width="120" height="40" rx="5" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- "SCHOOL NAME" placeholder text -->
+  <text x="200" y="205" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="Arial, sans-serif" font-size="12" font-weight="bold">SCHULNAME</text>
+</svg>

@@ -1,0 +1,32 @@
+[
+  {
+    "parent_id": "",
+    "parent_email": "admin@minimusiker.de",
+    "parent_first_name": "",
+    "parent_telephone": ""
+  },
+  {
+    "parent_id": "P5",
+    "parent_email": "till@minimusiker.de",
+    "parent_first_name": "Till",
+    "parent_telephone": ""
+  },
+  {
+    "parent_id": "P1",
+    "parent_email": "james.oliver@guesstimate.de",
+    "parent_first_name": "Alison",
+    "parent_telephone": "+447380998886"
+  },
+  {
+    "parent_id": "P2",
+    "parent_email": "jamesfrenchvocals@gmail.com",
+    "parent_first_name": "Mark",
+    "parent_telephone": "+447970900641"
+  },
+  {
+    "parent_id": "P3",
+    "parent_email": "imallrytmusic@gmail.com",
+    "parent_first_name": "James",
+    "parent_telephone": "+4412412412412"
+  }
+]

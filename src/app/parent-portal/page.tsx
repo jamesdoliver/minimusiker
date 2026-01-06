@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import LanguageSelector from '@/components/shared/LanguageSelector';
 import PreviewPlayer from '@/components/landing/PreviewPlayer';
 import ProductSelector from '@/components/parent-portal/ProductSelector';
+import PersonalizedTshirtPromo from '@/components/parent-portal/PersonalizedTshirtPromo';
 import { CartProvider } from '@/lib/contexts/CartContext';
 import { FeaturedProducts, CartSummary, CartDrawer } from '@/components/shop';
 import { useProducts } from '@/lib/hooks/useProducts';
@@ -14,6 +17,11 @@ import { ParentSession, ParentPortalData } from '@/lib/types';
 // Inner component that uses hooks
 function ParentPortalContent() {
   const router = useRouter();
+  const t = useTranslations('header');
+  const tCommon = useTranslations('common');
+  const tChild = useTranslations('childSelector');
+  const tBanner = useTranslations('schoolBanner');
+  const tPreview = useTranslations('recordingPreview');
   const [session, setSession] = useState<ParentSession | null>(null);
   const [portalData, setPortalData] = useState<ParentPortalData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -140,8 +148,8 @@ function ParentPortalContent() {
                 className="h-10 w-auto"
               />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">MiniMusiker</h1>
-                <p className="text-xs text-gray-600">Parent Portal</p>
+                <h1 className="text-xl font-bold text-gray-900">{t('minimusiker')}</h1>
+                <p className="text-xs text-gray-600">{t('parentPortal')}</p>
               </div>
             </div>
 
@@ -164,16 +172,18 @@ function ParentPortalContent() {
                     d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                   />
                 </svg>
-                Shop
+                {tCommon('shop')}
               </Link>
+              {/* Language Selector */}
+              <LanguageSelector />
               <span className="text-sm text-gray-700">
-                Welcome, {session.firstName}!
+                {t('welcome', { firstName: session.firstName })}
               </span>
               <button
                 onClick={handleLogout}
                 className="text-sm text-gray-600 hover:text-gray-900"
               >
-                Sign Out
+                {tCommon('signOut')}
               </button>
             </div>
           </div>
@@ -186,7 +196,7 @@ function ParentPortalContent() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center space-x-2 overflow-x-auto">
               <span className="text-sm font-medium text-gray-700 whitespace-nowrap mr-2">
-                Viewing for:
+                {tChild('viewingFor')}
               </span>
               {children.map((child, index) => (
                 <button
@@ -221,7 +231,7 @@ function ParentPortalContent() {
           <p className="text-xl opacity-95">{eventType}</p>
           {className && (
             <p className="text-lg mt-1 opacity-90 font-medium">
-              Class: {className}
+              {tBanner('class', { className })}
             </p>
           )}
           <p className="text-sm mt-2 opacity-90">
@@ -234,7 +244,7 @@ function ParentPortalContent() {
           </p>
           {hasMultipleChildren && selectedChild && (
             <p className="text-sm mt-1 opacity-90">
-              Recording for: {selectedChild.childName}
+              {tBanner('recordingFor', { childName: selectedChild.childName })}
             </p>
           )}
         </div>
@@ -248,7 +258,7 @@ function ParentPortalContent() {
             <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
               <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 <img src="/images/minimusiker_logo.jpeg" alt="" className="h-6 w-auto mr-2" />
-                School Recording Preview
+                {tPreview('title')}
               </h3>
 
               {hasRecording ? (
@@ -262,8 +272,10 @@ function ParentPortalContent() {
                   />
                   <div className="mt-4 p-4 bg-sage-50 border border-sage-200 rounded-lg">
                     <p className="text-sm text-sage-800">
-                      This is a 30-second preview of {selectedChild ? `${selectedChild.childName}'s` : 'your school\'s'} performance.
-                      Purchase the bundle below to unlock the full recording!
+                      {selectedChild
+                        ? tPreview('previewDescription', { childName: `${selectedChild.childName}'s` })
+                        : tPreview('previewDescriptionSchool')
+                      }
                     </p>
                   </div>
                 </div>
@@ -275,12 +287,17 @@ function ParentPortalContent() {
                     </svg>
                   </div>
                   <p className="text-gray-600">
-                    Recording will be available after the event
+                    {tPreview('availableSoon')}
                   </p>
                 </div>
               )}
             </div>
 
+            {/* Personalized T-Shirt Promo */}
+            <PersonalizedTshirtPromo
+              schoolName={schoolName}
+              eventDate={eventDate}
+            />
           </div>
 
           {/* Right Column - Product Selector */}

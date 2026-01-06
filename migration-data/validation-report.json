@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-01-02T11:29:41.045Z",
+  "passed": true,
+  "stats": {
+    "oldTableRecords": 8,
+    "newEventsRecords": 6,
+    "newClassesRecords": 3,
+    "newParentsRecords": 5,
+    "newRegistrationsRecords": 2
+  },
+  "errors": [],
+  "warnings": []
+}

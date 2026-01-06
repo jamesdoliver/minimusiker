@@ -4,6 +4,7 @@ import {
   Teacher,
   Song,
   AudioFile,
+  SongWithAudio,
   TeacherEventView,
   TeacherClassView,
   UpsertSongRequest,
@@ -18,7 +19,18 @@ import {
   AUDIO_FILES_FIELD_IDS,
   MAGIC_LINK_EXPIRY_MS,
 } from '@/lib/types/teacher';
-import { AIRTABLE_FIELD_IDS } from '@/lib/types/airtable';
+import {
+  AIRTABLE_FIELD_IDS,
+  SCHOOL_BOOKINGS_TABLE_ID,
+  SCHOOL_BOOKINGS_FIELD_IDS,
+  CLASSES_FIELD_IDS,
+  EVENTS_FIELD_IDS,
+  SONGS_LINKED_FIELD_IDS,
+  AUDIO_FILES_LINKED_FIELD_IDS,
+  EVENTS_TABLE_ID,
+  CLASSES_TABLE_ID,
+} from '@/lib/types/airtable';
+import airtableService from './airtableService';
 
 // Table names in Airtable - use table IDs for API calls
 const TEACHERS_TABLE = TEACHERS_TABLE_ID; // tblLO2vXcgvNjrJ0T
@@ -33,12 +45,20 @@ const PARENT_JOURNEY_TABLE = 'parent_journey_table';
 class TeacherService {
   private base: Airtable.Base;
   private static instance: TeacherService;
+  private eventsTable: Airtable.Table<any> | null = null;
+  private classesTable: Airtable.Table<any> | null = null;
 
   private constructor() {
     Airtable.configure({
       apiKey: process.env.AIRTABLE_API_KEY!,
     });
     this.base = Airtable.base(process.env.AIRTABLE_BASE_ID!);
+
+    // Initialize normalized tables if feature flag is enabled
+    if (this.useNormalizedTables()) {
+      this.eventsTable = this.base(EVENTS_TABLE_ID);
+      this.classesTable = this.base(CLASSES_TABLE_ID);
+    }
   }
 
   public static getInstance(): TeacherService {
@@ -46,6 +66,13 @@ class TeacherService {
       TeacherService.instance = new TeacherService();
     }
     return TeacherService.instance;
+  }
+
+  /**
+   * Check if normalized tables should be used (feature flag)
+   */
+  private useNormalizedTables(): boolean {
+    return process.env.USE_NORMALIZED_TABLES === 'true';
   }
 
   // =============================================================================
@@ -68,6 +95,10 @@ class TeacherService {
       tokenExpiresAt: record.fields.token_expires_at || record.fields[TEACHERS_FIELD_IDS.token_expires_at],
       eventIds: record.fields.events || record.fields[TEACHERS_FIELD_IDS.events],
       createdAt: record.fields.created_at || record.fields[TEACHERS_FIELD_IDS.created_at] || record.createdTime,
+      // New fields for portal revamp
+      region: record.fields.region || record.fields[TEACHERS_FIELD_IDS.region],
+      schoolAddress: record.fields.school_address || record.fields[TEACHERS_FIELD_IDS.school_address],
+      schoolPhone: record.fields.school_phone || record.fields[TEACHERS_FIELD_IDS.school_phone],
     };
   }
 
@@ -236,6 +267,102 @@ class TeacherService {
     return teacher;
   }
 
+  /**
+   * Update teacher's school contact information
+   * Allows teachers to edit school_address and school_phone fields
+   */
+  async updateTeacherSchoolInfo(
+    teacherEmail: string,
+    data: {
+      address?: string;
+      phone?: string;
+    }
+  ): Promise<void> {
+    try {
+      // Find teacher by email
+      const teacher = await this.getTeacherByEmail(teacherEmail);
+
+      if (!teacher) {
+        throw new Error(`Teacher not found: ${teacherEmail}`);
+      }
+
+      // Build update object using field IDs
+      const updateFields: Record<string, string> = {};
+
+      if (data.address !== undefined) {
+        updateFields[TEACHERS_FIELD_IDS.school_address] = data.address;
+      }
+
+      if (data.phone !== undefined) {
+        updateFields[TEACHERS_FIELD_IDS.school_phone] = data.phone;
+      }
+
+      // Update teacher record
+      await this.base(TEACHERS_TABLE).update(teacher.id, updateFields);
+    } catch (error) {
+      console.error('Error updating teacher school info:', error);
+      throw new Error(`Failed to update school info: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update school booking information to sync with teacher updates
+   * Ensures admin view reflects teacher portal changes
+   *
+   * This function finds all bookings associated with a teacher's email
+   * and updates the school contact information (address/phone) to match
+   * what the teacher entered in the portal.
+   *
+   * Note: Updates ALL bookings (past and future) for data consistency.
+   * Silently fails if no bookings found or update fails, to avoid blocking teacher updates.
+   */
+  async updateSchoolBookingInfo(
+    teacherEmail: string,
+    data: {
+      address?: string;
+      phone?: string;
+    }
+  ): Promise<void> {
+    try {
+      // Find all school bookings for this teacher's school
+      // Use lowercase comparison to handle email case variations
+      const bookings = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
+        .select({
+          filterByFormula: `LOWER({school_contact_email}) = LOWER('${teacherEmail.replace(/'/g, "\\'")}')`,
+        })
+        .all();
+
+      if (bookings.length === 0) {
+        console.warn(`[updateSchoolBookingInfo] No bookings found for teacher: ${teacherEmail}`);
+        return;
+      }
+
+      // Build update object using field IDs
+      const updateFields: Record<string, string> = {};
+
+      if (data.address !== undefined) {
+        updateFields[SCHOOL_BOOKINGS_FIELD_IDS.school_address] = data.address;
+      }
+
+      if (data.phone !== undefined) {
+        updateFields[SCHOOL_BOOKINGS_FIELD_IDS.school_phone] = data.phone;
+      }
+
+      // Update all bookings for this school
+      console.log(`[updateSchoolBookingInfo] Updating ${bookings.length} booking(s) for ${teacherEmail}`);
+
+      for (const booking of bookings) {
+        await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(booking.id, updateFields);
+      }
+
+      console.log(`[updateSchoolBookingInfo] Successfully updated ${bookings.length} booking(s)`);
+    } catch (error) {
+      console.error('[updateSchoolBookingInfo] Error updating school booking info:', error);
+      // Don't throw - allow teacher update to succeed even if booking update fails
+      // This ensures teachers can always update their portal info
+    }
+  }
+
   // =============================================================================
   // SONG CRUD OPERATIONS
   // =============================================================================
@@ -261,18 +388,47 @@ class TeacherService {
    * Get songs for a class
    */
   async getSongsByClassId(classId: string): Promise<Song[]> {
-    try {
-      const records = await this.base(SONGS_TABLE)
-        .select({
-          filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
-          sort: [{ field: 'order', direction: 'asc' }],
-        })
-        .all();
+    if (this.useNormalizedTables()) {
+      // NEW: Use linked record field (class_link)
+      try {
+        // First, find the Classes record by class_id field
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
 
-      return records.map((record) => this.transformSongRecord(record));
-    } catch (error) {
-      console.error('Error getting songs by class ID:', error);
-      return [];
+        if (classRecords.length === 0) return [];
+
+        const classRecordId = classRecords[0].id;
+
+        // Query Songs table by linked record (class_link)
+        const records = await this.base(SONGS_TABLE)
+          .select({
+            filterByFormula: `{${SONGS_LINKED_FIELD_IDS.class_link}} = '${classRecordId}'`,
+            sort: [{ field: 'order', direction: 'asc' }],
+          })
+          .all();
+
+        return records.map((record) => this.transformSongRecord(record));
+      } catch (error) {
+        console.error('Error getting songs by class ID (normalized):', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Use text field (class_id)
+      try {
+        const records = await this.base(SONGS_TABLE)
+          .select({
+            filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
+            sort: [{ field: 'order', direction: 'asc' }],
+          })
+          .all();
+
+        return records.map((record) => this.transformSongRecord(record));
+      } catch (error) {
+        console.error('Error getting songs by class ID:', error);
+        return [];
+      }
     }
   }
 
@@ -280,21 +436,53 @@ class TeacherService {
    * Get songs for an event (all classes)
    */
   async getSongsByEventId(eventId: string): Promise<Song[]> {
-    try {
-      const records = await this.base(SONGS_TABLE)
-        .select({
-          filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
-          sort: [
-            { field: 'class_id', direction: 'asc' },
-            { field: 'order', direction: 'asc' },
-          ],
-        })
-        .all();
+    if (this.useNormalizedTables()) {
+      // NEW: Use linked record field (event_link)
+      try {
+        // First, find the Events record by event_id field
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
 
-      return records.map((record) => this.transformSongRecord(record));
-    } catch (error) {
-      console.error('Error getting songs by event ID:', error);
-      return [];
+        if (eventRecords.length === 0) return [];
+
+        const eventRecordId = eventRecords[0].id;
+
+        // Query Songs table by linked record (event_link)
+        const records = await this.base(SONGS_TABLE)
+          .select({
+            filterByFormula: `{${SONGS_LINKED_FIELD_IDS.event_link}} = '${eventRecordId}'`,
+            sort: [
+              { field: 'class_id', direction: 'asc' },
+              { field: 'order', direction: 'asc' },
+            ],
+          })
+          .all();
+
+        return records.map((record) => this.transformSongRecord(record));
+      } catch (error) {
+        console.error('Error getting songs by event ID (normalized):', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Use text field (event_id)
+      try {
+        const records = await this.base(SONGS_TABLE)
+          .select({
+            filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
+            sort: [
+              { field: 'class_id', direction: 'asc' },
+              { field: 'order', direction: 'asc' },
+            ],
+          })
+          .all();
+
+        return records.map((record) => this.transformSongRecord(record));
+      } catch (error) {
+        console.error('Error getting songs by event ID:', error);
+        return [];
+      }
     }
   }
 
@@ -331,7 +519,7 @@ class TeacherService {
         order = existingSongs.length + 1;
       }
 
-      const record = await this.base(SONGS_TABLE).create({
+      const fields: any = {
         class_id: data.classId,
         event_id: data.eventId,
         title: data.title,
@@ -340,7 +528,32 @@ class TeacherService {
         order: order,
         created_by: data.createdBy,
         created_at: new Date().toISOString(),
-      });
+      };
+
+      // If using normalized tables, also populate linked record fields
+      if (this.useNormalizedTables()) {
+        // Find Classes record by class_id
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (classRecords.length > 0) {
+          fields[SONGS_LINKED_FIELD_IDS.class_link] = [classRecords[0].id];
+        }
+
+        // Find Events record by event_id
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (eventRecords.length > 0) {
+          fields[SONGS_LINKED_FIELD_IDS.event_link] = [eventRecords[0].id];
+        }
+      }
+
+      const record = await this.base(SONGS_TABLE).create(fields);
 
       return this.transformSongRecord(record);
     } catch (error) {
@@ -417,18 +630,47 @@ class TeacherService {
    * Get audio files for a class
    */
   async getAudioFilesByClassId(classId: string): Promise<AudioFile[]> {
-    try {
-      const records = await this.base(AUDIO_FILES_TABLE)
-        .select({
-          filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
-          sort: [{ field: 'uploaded_at', direction: 'desc' }],
-        })
-        .all();
+    if (this.useNormalizedTables()) {
+      // NEW: Use linked record field (class_link)
+      try {
+        // First, find the Classes record by class_id field
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
 
-      return records.map((record) => this.transformAudioFileRecord(record));
-    } catch (error) {
-      console.error('Error getting audio files by class ID:', error);
-      return [];
+        if (classRecords.length === 0) return [];
+
+        const classRecordId = classRecords[0].id;
+
+        // Query AudioFiles table by linked record (class_link)
+        const records = await this.base(AUDIO_FILES_TABLE)
+          .select({
+            filterByFormula: `{${AUDIO_FILES_LINKED_FIELD_IDS.class_link}} = '${classRecordId}'`,
+            sort: [{ field: 'uploaded_at', direction: 'desc' }],
+          })
+          .all();
+
+        return records.map((record) => this.transformAudioFileRecord(record));
+      } catch (error) {
+        console.error('Error getting audio files by class ID (normalized):', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Use text field (class_id)
+      try {
+        const records = await this.base(AUDIO_FILES_TABLE)
+          .select({
+            filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
+            sort: [{ field: 'uploaded_at', direction: 'desc' }],
+          })
+          .all();
+
+        return records.map((record) => this.transformAudioFileRecord(record));
+      } catch (error) {
+        console.error('Error getting audio files by class ID:', error);
+        return [];
+      }
     }
   }
 
@@ -436,18 +678,47 @@ class TeacherService {
    * Get audio files for an event
    */
   async getAudioFilesByEventId(eventId: string): Promise<AudioFile[]> {
-    try {
-      const records = await this.base(AUDIO_FILES_TABLE)
-        .select({
-          filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
-          sort: [{ field: 'uploaded_at', direction: 'desc' }],
-        })
-        .all();
+    if (this.useNormalizedTables()) {
+      // NEW: Use linked record field (event_link)
+      try {
+        // First, find the Events record by event_id field
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
 
-      return records.map((record) => this.transformAudioFileRecord(record));
-    } catch (error) {
-      console.error('Error getting audio files by event ID:', error);
-      return [];
+        if (eventRecords.length === 0) return [];
+
+        const eventRecordId = eventRecords[0].id;
+
+        // Query AudioFiles table by linked record (event_link)
+        const records = await this.base(AUDIO_FILES_TABLE)
+          .select({
+            filterByFormula: `{${AUDIO_FILES_LINKED_FIELD_IDS.event_link}} = '${eventRecordId}'`,
+            sort: [{ field: 'uploaded_at', direction: 'desc' }],
+          })
+          .all();
+
+        return records.map((record) => this.transformAudioFileRecord(record));
+      } catch (error) {
+        console.error('Error getting audio files by event ID (normalized):', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Use text field (event_id)
+      try {
+        const records = await this.base(AUDIO_FILES_TABLE)
+          .select({
+            filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
+            sort: [{ field: 'uploaded_at', direction: 'desc' }],
+          })
+          .all();
+
+        return records.map((record) => this.transformAudioFileRecord(record));
+      } catch (error) {
+        console.error('Error getting audio files by event ID:', error);
+        return [];
+      }
     }
   }
 
@@ -455,18 +726,47 @@ class TeacherService {
    * Get audio files by type for a class
    */
   async getAudioFilesByType(classId: string, type: AudioFileType): Promise<AudioFile[]> {
-    try {
-      const records = await this.base(AUDIO_FILES_TABLE)
-        .select({
-          filterByFormula: `AND({class_id} = '${classId.replace(/'/g, "\\'")}', {type} = '${type}')`,
-          sort: [{ field: 'uploaded_at', direction: 'desc' }],
-        })
-        .all();
+    if (this.useNormalizedTables()) {
+      // NEW: Use linked record field (class_link) + type filter
+      try {
+        // First, find the Classes record by class_id field
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
 
-      return records.map((record) => this.transformAudioFileRecord(record));
-    } catch (error) {
-      console.error('Error getting audio files by type:', error);
-      return [];
+        if (classRecords.length === 0) return [];
+
+        const classRecordId = classRecords[0].id;
+
+        // Query AudioFiles table by linked record (class_link) and type
+        const records = await this.base(AUDIO_FILES_TABLE)
+          .select({
+            filterByFormula: `AND({${AUDIO_FILES_LINKED_FIELD_IDS.class_link}} = '${classRecordId}', {type} = '${type}')`,
+            sort: [{ field: 'uploaded_at', direction: 'desc' }],
+          })
+          .all();
+
+        return records.map((record) => this.transformAudioFileRecord(record));
+      } catch (error) {
+        console.error('Error getting audio files by type (normalized):', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Use text field (class_id) + type filter
+      try {
+        const records = await this.base(AUDIO_FILES_TABLE)
+          .select({
+            filterByFormula: `AND({class_id} = '${classId.replace(/'/g, "\\'")}', {type} = '${type}')`,
+            sort: [{ field: 'uploaded_at', direction: 'desc' }],
+          })
+          .all();
+
+        return records.map((record) => this.transformAudioFileRecord(record));
+      } catch (error) {
+        console.error('Error getting audio files by type:', error);
+        return [];
+      }
     }
   }
 
@@ -486,7 +786,7 @@ class TeacherService {
     status?: AudioFileStatus;
   }): Promise<AudioFile> {
     try {
-      const record = await this.base(AUDIO_FILES_TABLE).create({
+      const fields: any = {
         class_id: data.classId,
         event_id: data.eventId,
         song_id: data.songId,
@@ -498,7 +798,38 @@ class TeacherService {
         duration_seconds: data.durationSeconds,
         file_size_bytes: data.fileSizeBytes,
         status: data.status || 'pending',
-      });
+      };
+
+      // If using normalized tables, also populate linked record fields
+      if (this.useNormalizedTables()) {
+        // Find Classes record by class_id
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (classRecords.length > 0) {
+          fields[AUDIO_FILES_LINKED_FIELD_IDS.class_link] = [classRecords[0].id];
+        }
+
+        // Find Events record by event_id
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (eventRecords.length > 0) {
+          fields[AUDIO_FILES_LINKED_FIELD_IDS.event_link] = [eventRecords[0].id];
+        }
+
+        // If songId provided, find Song record and link
+        if (data.songId) {
+          // songId is the Airtable record ID, so we can link directly
+          fields[AUDIO_FILES_LINKED_FIELD_IDS.song_link] = [data.songId];
+        }
+      }
+
+      const record = await this.base(AUDIO_FILES_TABLE).create(fields);
 
       return this.transformAudioFileRecord(record);
     } catch (error) {
@@ -564,6 +895,193 @@ class TeacherService {
     } catch (error) {
       console.error('Error deleting audio file:', error);
       throw new Error(`Failed to delete audio file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // =============================================================================
+  // SONG-LEVEL AUDIO OPERATIONS
+  // =============================================================================
+
+  /**
+   * Get audio files for a specific song
+   * Optionally filter by type (raw or final)
+   */
+  async getAudioFilesBySongId(songId: string, type?: 'raw' | 'final'): Promise<AudioFile[]> {
+    try {
+      let filterFormula = `{song_id} = '${songId.replace(/'/g, "\\'")}'`;
+
+      if (type) {
+        filterFormula = `AND({song_id} = '${songId.replace(/'/g, "\\'")}', {type} = '${type}')`;
+      }
+
+      const records = await this.base(AUDIO_FILES_TABLE)
+        .select({
+          filterByFormula: filterFormula,
+          sort: [{ field: 'uploaded_at', direction: 'desc' }],
+        })
+        .all();
+
+      return records.map((record) => this.transformAudioFileRecord(record));
+    } catch (error) {
+      console.error('Error getting audio files by song ID:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all songs for an event with their associated audio files
+   * Used by staff and engineer portals to show upload/download status
+   */
+  async getSongsWithAudioStatus(eventId: string): Promise<SongWithAudio[]> {
+    if (this.useNormalizedTables()) {
+      // NEW: Use linked record field (event_link) for audio files
+      try {
+        // Get all songs for this event (already uses dual-read)
+        const songs = await this.getSongsByEventId(eventId);
+
+        // Find the Events record by event_id field
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (eventRecords.length === 0) {
+          // No event found, return songs with empty audio
+          return songs.map((song) => ({
+            ...song,
+            rawAudioFiles: [],
+            finalAudioFiles: [],
+          }));
+        }
+
+        const eventRecordId = eventRecords[0].id;
+
+        // Get all audio files for this event that have a songId using event_link
+        const audioFiles = await this.base(AUDIO_FILES_TABLE)
+          .select({
+            filterByFormula: `AND({${AUDIO_FILES_LINKED_FIELD_IDS.event_link}} = '${eventRecordId}', {song_id} != '')`,
+            sort: [{ field: 'uploaded_at', direction: 'desc' }],
+          })
+          .all();
+
+        const audioFileRecords = audioFiles.map((record) => this.transformAudioFileRecord(record));
+
+        // Map songs to SongWithAudio by adding their audio files
+        const songsWithAudio: SongWithAudio[] = songs.map((song) => {
+          const songAudioFiles = audioFileRecords.filter((af) => af.songId === song.id);
+
+          return {
+            ...song,
+            rawAudioFiles: songAudioFiles.filter((af) => af.type === 'raw'),
+            finalAudioFiles: songAudioFiles.filter((af) => af.type === 'final'),
+          };
+        });
+
+        return songsWithAudio;
+      } catch (error) {
+        console.error('Error getting songs with audio status (normalized):', error);
+        return [];
+      }
+    } else {
+      // LEGACY: Use text field (event_id)
+      try {
+        // Get all songs for this event
+        const songs = await this.getSongsByEventId(eventId);
+
+        // Get all audio files for this event that have a songId
+        const audioFiles = await this.base(AUDIO_FILES_TABLE)
+          .select({
+            filterByFormula: `AND({event_id} = '${eventId.replace(/'/g, "\\'")}', {song_id} != '')`,
+            sort: [{ field: 'uploaded_at', direction: 'desc' }],
+          })
+          .all();
+
+        const audioFileRecords = audioFiles.map((record) => this.transformAudioFileRecord(record));
+
+        // Map songs to SongWithAudio by adding their audio files
+        const songsWithAudio: SongWithAudio[] = songs.map((song) => {
+          const songAudioFiles = audioFileRecords.filter((af) => af.songId === song.id);
+
+          return {
+            ...song,
+            rawAudioFiles: songAudioFiles.filter((af) => af.type === 'raw'),
+            finalAudioFiles: songAudioFiles.filter((af) => af.type === 'final'),
+          };
+        });
+
+        return songsWithAudio;
+      } catch (error) {
+        console.error('Error getting songs with audio status:', error);
+        return [];
+      }
+    }
+  }
+
+  /**
+   * Create audio file record for a song
+   * This is called after a file is uploaded to R2 to track it in Airtable
+   */
+  async createSongAudioFile(data: {
+    songId: string;
+    classId: string;
+    eventId: string;
+    type: 'raw' | 'final';
+    r2Key: string;
+    filename: string;
+    uploadedBy: string;
+    durationSeconds?: number;
+    fileSizeBytes?: number;
+    status?: AudioFileStatus;
+  }): Promise<AudioFile> {
+    try {
+      const fields: any = {
+        song_id: data.songId,
+        class_id: data.classId,
+        event_id: data.eventId,
+        type: data.type,
+        r2_key: data.r2Key,
+        filename: data.filename,
+        uploaded_by: data.uploadedBy,
+        uploaded_at: new Date().toISOString(),
+        duration_seconds: data.durationSeconds,
+        file_size_bytes: data.fileSizeBytes,
+        status: data.status || 'ready',
+      };
+
+      // If using normalized tables, also populate linked record fields
+      if (this.useNormalizedTables()) {
+        // Find Classes record by class_id
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (classRecords.length > 0) {
+          fields[AUDIO_FILES_LINKED_FIELD_IDS.class_link] = [classRecords[0].id];
+        }
+
+        // Find Events record by event_id
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}'}`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (eventRecords.length > 0) {
+          fields[AUDIO_FILES_LINKED_FIELD_IDS.event_link] = [eventRecords[0].id];
+        }
+
+        // Link to song (songId is the Airtable record ID, so we can link directly)
+        if (data.songId) {
+          fields[AUDIO_FILES_LINKED_FIELD_IDS.song_link] = [data.songId];
+        }
+      }
+
+      const record = await this.base(AUDIO_FILES_TABLE).create(fields);
+
+      return this.transformAudioFileRecord(record);
+    } catch (error) {
+      console.error('Error creating song audio file record:', error);
+      throw new Error(`Failed to create song audio file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -804,17 +1322,65 @@ class TeacherService {
           });
         }
 
-        // Determine event status
+        // Determine event status - Use date-only comparison to avoid timezone issues
         const eventDate = new Date(eventData.eventDate);
         const now = new Date();
+
+        // Normalize both dates to start of day in local timezone
+        // This strips time component and avoids UTC conversion issues
+        const eventDateOnly = new Date(
+          eventDate.getFullYear(),
+          eventDate.getMonth(),
+          eventDate.getDate()
+        );
+        const nowDateOnly = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
+
         let status: 'upcoming' | 'in-progress' | 'completed';
-        if (eventDate > now) {
+        if (eventDateOnly > nowDateOnly) {
           status = 'upcoming';
-        } else if (eventDate.toDateString() === now.toDateString()) {
+        } else if (eventDateOnly.getTime() === nowDateOnly.getTime()) {
           status = 'in-progress';
         } else {
           status = 'completed';
         }
+
+        // Calculate progress metrics
+        const classesCount = eventData.classes.size;
+        const songsCount = songs.length;
+
+        // Check if school logo is uploaded
+        let hasLogo = false;
+        try {
+          const einrichtung = await airtableService.getEinrichtungForTeacher(teacherEmail, eventData.schoolName);
+          hasLogo = !!(einrichtung?.logoUrl);
+        } catch (error) {
+          console.error('Error checking logo status:', error);
+        }
+
+        // Count registrations for this event
+        const eventRecords = records.filter(
+          (r) => (r.fields.booking_id || r.fields[AIRTABLE_FIELD_IDS.booking_id]) === eventId
+        );
+        const registrationsCount = eventRecords.length;
+
+        // Calculate total expected children (sum of total_children from all classes)
+        const totalChildrenExpected = Array.from(eventData.classes.values()).reduce(
+          (sum, classData) => sum + (classData.numChildren || 0),
+          0
+        );
+
+        // Calculate days and weeks until event
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const daysUntilEvent = Math.floor((eventDate.getTime() - now.getTime()) / msPerDay);
+        const weeksUntilEvent = Math.round(daysUntilEvent / 7);
+
+        // Expected songs: default to 1 song per class (can be configured later)
+        const SONGS_PER_CLASS = 1;
+        const expectedSongs = classesCount * SONGS_PER_CLASS;
 
         events.push({
           eventId: eventData.eventId,
@@ -823,6 +1389,17 @@ class TeacherService {
           eventType: eventData.eventType,
           classes: classViews,
           status,
+          progress: {
+            classesCount,
+            expectedClasses: undefined, // TODO: Get from booking config when available
+            songsCount,
+            expectedSongs,
+            hasLogo,
+            registrationsCount,
+            totalChildrenExpected: totalChildrenExpected > 0 ? totalChildrenExpected : undefined,
+            daysUntilEvent,
+            weeksUntilEvent,
+          },
         });
       }
 
@@ -848,6 +1425,25 @@ class TeacherService {
 // Export singleton instance getter
 export function getTeacherService(): TeacherService {
   return TeacherService.getInstance();
+}
+
+// Export standalone function for updating teacher school info
+export async function updateTeacherSchoolInfo(
+  teacherEmail: string,
+  data: { address?: string; phone?: string }
+): Promise<void> {
+  const service = TeacherService.getInstance();
+  return service.updateTeacherSchoolInfo(teacherEmail, data);
+}
+
+// Export standalone function for updating school booking info
+// This ensures admin view stays in sync with teacher portal updates
+export async function updateSchoolBookingInfo(
+  teacherEmail: string,
+  data: { address?: string; phone?: string }
+): Promise<void> {
+  const service = TeacherService.getInstance();
+  return service.updateSchoolBookingInfo(teacherEmail, data);
 }
 
 export default TeacherService;

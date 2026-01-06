@@ -1,0 +1,22 @@
+{
+  "events": {
+    "10598325": "recT6sCR1WVoE9zBN",
+    "32049823": "rec8TDng1UgHRqpLQ",
+    "123814122": "recx8XJl7i19hiKJ1",
+    "1248712394": "recSG7hk7Bmppo1GR",
+    "TEST-EVENT-001": "recuHhoGaPYKMC0k9",
+    "evt_test_school_minimusiker_20261220_d32140": "recpcsrfOEJjKRNe3"
+  },
+  "classes": {
+    "TEST-CLASS-001": "recrwOTvwXcd7Akqn",
+    "cls_test_school_20261220_yeartestclasste_7rd3ga": "rectx9GepqEiYytSo",
+    "cls_test_school_20261220_yeartestclasste_75e84a": "recMOtNH9EoaOmEV4"
+  },
+  "parents": {
+    "admin@minimusiker.de": "recqwG8NHzTP2luT0",
+    "till@minimusiker.de": "recfaU2i19yxVqqae",
+    "james.oliver@guesstimate.de": "recXrQcLG68J9KEIK",
+    "jamesfrenchvocals@gmail.com": "recfsqymROV3edppx",
+    "imallrytmusic@gmail.com": "rec2ZLSaLCikZGF2G"
+  }
+}

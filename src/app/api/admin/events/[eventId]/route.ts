@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import airtableService from '@/lib/services/airtableService';
 import { SchoolEventDetail } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
+import { getTeacherService } from '@/lib/services/teacherService';
 
 export async function GET(
   request: NextRequest,
@@ -66,6 +67,30 @@ export async function GET(
         },
         { status: 404 }
       );
+    }
+
+    // Enhance classes with songs data
+    if (eventDetail.classes && eventDetail.classes.length > 0) {
+      const teacherService = getTeacherService();
+      const allSongs = await teacherService.getSongsByEventId(eventId);
+
+      // Group songs by classId
+      const songsByClass = allSongs.reduce((acc, song) => {
+        if (!acc[song.classId]) {
+          acc[song.classId] = [];
+        }
+        acc[song.classId].push(song);
+        return acc;
+      }, {} as Record<string, typeof allSongs>);
+
+      // Add songs to each class
+      eventDetail = {
+        ...eventDetail,
+        classes: eventDetail.classes.map((cls) => ({
+          ...cls,
+          songs: songsByClass[cls.classId] || [],
+        })),
+      };
     }
 
     return NextResponse.json({

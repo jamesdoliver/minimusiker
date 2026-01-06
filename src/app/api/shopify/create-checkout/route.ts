@@ -7,6 +7,32 @@ interface CheckoutRequest {
   customAttributes?: CheckoutCustomAttributes;
 }
 
+/**
+ * POST /api/shopify/create-checkout
+ *
+ * Creates a Shopify cart and returns the checkout URL.
+ * Uses the modern Cart API (2025) instead of the legacy Checkout API.
+ *
+ * Request body:
+ * {
+ *   lineItems: [{ variantId: string, quantity: number }],
+ *   customAttributes?: {
+ *     parentId: string,
+ *     parentEmail: string,
+ *     eventId?: string,
+ *     schoolName?: string
+ *   }
+ * }
+ *
+ * Response:
+ * {
+ *   cartId: string,
+ *   checkoutUrl: string,
+ *   totalQuantity: number,
+ *   totalAmount: number,
+ *   currency: string
+ * }
+ */
 export async function POST(request: NextRequest) {
   try {
     const { lineItems, customAttributes } = (await request.json()) as CheckoutRequest;
@@ -39,37 +65,51 @@ export async function POST(request: NextRequest) {
 
     if (!isShopifyEnabled) {
       // Return mock checkout URL for development
-      const mockCheckoutId = `mock_checkout_${Date.now()}`;
-      console.log('Mock checkout created:', {
-        checkoutId: mockCheckoutId,
+      const mockCartId = `mock_cart_${Date.now()}`;
+      console.log('[create-checkout] Mock cart created:', {
+        cartId: mockCartId,
         lineItems,
         customAttributes,
       });
 
       return NextResponse.json({
-        checkoutId: mockCheckoutId,
-        checkoutUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout/mock/${mockCheckoutId}`,
-        webUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout/mock/${mockCheckoutId}`,
-        message: 'Shopify integration is disabled. This is a mock checkout.',
+        cartId: mockCartId,
+        checkoutUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout/mock/${mockCartId}`,
+        totalQuantity: lineItems.reduce((sum, item) => sum + item.quantity, 0),
+        totalAmount: 0,
+        currency: 'EUR',
+        // Legacy fields for backward compatibility
+        checkoutId: mockCartId,
+        webUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout/mock/${mockCartId}`,
+        message: 'Shopify integration is disabled. This is a mock cart.',
       });
     }
 
-    // Create real Shopify checkout
-    const checkout = await shopifyService.createCheckout(lineItems, customAttributes);
+    // Create real Shopify cart using modern Cart API
+    const cart = await shopifyService.createCartFromCheckoutItems(lineItems, customAttributes);
 
-    console.log('Shopify checkout created:', {
-      checkoutId: checkout.checkoutId,
+    console.log('[create-checkout] Shopify cart created:', {
+      cartId: cart.cartId,
       itemCount: lineItems.length,
+      totalQuantity: cart.totalQuantity,
+      totalAmount: cart.totalAmount,
+      currency: cart.currency,
       parentId: customAttributes?.parentId,
+      eventId: customAttributes?.eventId,
     });
 
     return NextResponse.json({
-      checkoutId: checkout.checkoutId,
-      checkoutUrl: checkout.checkoutUrl,
-      webUrl: checkout.webUrl,
+      cartId: cart.cartId,
+      checkoutUrl: cart.checkoutUrl,
+      totalQuantity: cart.totalQuantity,
+      totalAmount: cart.totalAmount,
+      currency: cart.currency,
+      // Legacy fields for backward compatibility
+      checkoutId: cart.cartId,
+      webUrl: cart.checkoutUrl,
     });
   } catch (error) {
-    console.error('Error creating checkout:', error);
+    console.error('[create-checkout] Error creating cart:', error);
 
     return NextResponse.json(
       {

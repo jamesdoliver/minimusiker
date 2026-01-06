@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse } from '@/lib/types';
 import { getR2Service } from '@/lib/services/r2Service';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

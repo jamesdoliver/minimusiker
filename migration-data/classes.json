@@ -1,0 +1,26 @@
+[
+  {
+    "class_id": "TEST-CLASS-001",
+    "event_id": "TEST-EVENT-001",
+    "class_name": "Year 3",
+    "main_teacher": "Test Teacher",
+    "total_children": 35,
+    "legacy_booking_id": "TEST-EVENT-001"
+  },
+  {
+    "class_id": "cls_test_school_20261220_yeartestclasste_7rd3ga",
+    "event_id": "1248712394",
+    "class_name": "Year Test Class Test",
+    "main_teacher": "Mr Gian Kohler",
+    "total_children": 0,
+    "legacy_booking_id": "1248712394"
+  },
+  {
+    "class_id": "cls_test_school_20261220_yeartestclasste_75e84a",
+    "event_id": "evt_test_school_minimusiker_20261220_d32140",
+    "class_name": "Year Test Class Test",
+    "main_teacher": "Test Teacher",
+    "total_children": 0,
+    "legacy_booking_id": "evt_test_school_minimusiker_20261220_d32140"
+  }
+]

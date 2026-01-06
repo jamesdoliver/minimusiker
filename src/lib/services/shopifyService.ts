@@ -1,20 +1,33 @@
 /**
  * Shopify Storefront API Service
- * Handles all communication with Shopify for product data and checkout creation
+ * Handles all communication with Shopify for product data and cart/checkout creation
+ *
+ * Updated to use Cart API (2025) instead of legacy Checkout API
  */
 
 import { Product, ProductVariant } from '../types/airtable';
-import { CheckoutLineItem, CheckoutCustomAttributes, ShopifyCheckout } from '../types/shop';
+import {
+  CheckoutLineItem,
+  CheckoutCustomAttributes,
+  ShopifyCheckout,
+  CartLineInput,
+  MiniMusikerCartAttributes,
+  CartCreateResult,
+  ShopifyCart,
+} from '../types/shop';
 
 class ShopifyService {
   private storefrontUrl: string;
   private storefrontAccessToken: string;
   private storeDomain: string;
+  private readonly apiVersion: string;
 
   constructor() {
-    this.storeDomain = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN || '';
-    this.storefrontAccessToken = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN || '';
-    this.storefrontUrl = `https://${this.storeDomain}/api/2024-01/graphql.json`;
+    // Support both naming conventions
+    this.storeDomain = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN || process.env.SHOPIFY_STORE_DOMAIN || '';
+    this.storefrontAccessToken = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_ACCESS_TOKEN || process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || '';
+    this.apiVersion = process.env.SHOPIFY_API_VERSION || '2025-01';
+    this.storefrontUrl = `https://${this.storeDomain}/api/${this.apiVersion}/graphql.json`;
   }
 
   /**
@@ -226,6 +239,7 @@ class ShopifyService {
 
   /**
    * Creates a Shopify checkout with line items and custom attributes
+   * @deprecated Use createCart() instead - this uses the legacy Checkout API
    */
   async createCheckout(
     lineItems: CheckoutLineItem[],
@@ -300,6 +314,286 @@ class ShopifyService {
       checkoutUrl: data.checkoutCreate.checkout.webUrl,
       webUrl: data.checkoutCreate.checkout.webUrl,
     };
+  }
+
+  // ======================================================================
+  // Cart API Methods (Modern Shopify API - 2025)
+  // ======================================================================
+
+  /**
+   * Creates a Shopify cart with line items and custom attributes
+   * This is the modern replacement for createCheckout()
+   */
+  async createCart(
+    lineItems: CartLineInput[],
+    attributes?: MiniMusikerCartAttributes
+  ): Promise<CartCreateResult> {
+    const mutation = `
+      mutation CartCreate($input: CartInput!) {
+        cartCreate(input: $input) {
+          cart {
+            id
+            checkoutUrl
+            totalQuantity
+            cost {
+              totalAmount {
+                amount
+                currencyCode
+              }
+              subtotalAmount {
+                amount
+                currencyCode
+              }
+            }
+            lines(first: 100) {
+              edges {
+                node {
+                  id
+                  quantity
+                  merchandise {
+                    ... on ProductVariant {
+                      id
+                      title
+                      product {
+                        title
+                      }
+                      price {
+                        amount
+                        currencyCode
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            attributes {
+              key
+              value
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    // Build cart input
+    const cartInput: {
+      lines: Array<{ merchandiseId: string; quantity: number }>;
+      attributes?: Array<{ key: string; value: string }>;
+      buyerIdentity?: { email: string };
+    } = {
+      lines: lineItems.map((item) => ({
+        merchandiseId: item.merchandiseId,
+        quantity: item.quantity,
+      })),
+    };
+
+    // Add custom attributes if provided
+    if (attributes) {
+      cartInput.attributes = Object.entries(attributes)
+        .filter(([_, value]) => value !== undefined && value !== null)
+        .map(([key, value]) => ({
+          key,
+          value: String(value),
+        }));
+
+      // Set buyer identity with email for better order tracking
+      if (attributes.parentEmail) {
+        cartInput.buyerIdentity = {
+          email: attributes.parentEmail,
+        };
+      }
+    }
+
+    const data = await this.query<{
+      cartCreate: {
+        cart: ShopifyCart | null;
+        userErrors: Array<{
+          field: string[];
+          message: string;
+        }>;
+      };
+    }>(mutation, { input: cartInput });
+
+    // Check for errors
+    if (data.cartCreate.userErrors.length > 0) {
+      const errors = data.cartCreate.userErrors;
+      console.error('Shopify cart creation errors:', errors);
+      throw new Error(`Cart error: ${errors[0].message}`);
+    }
+
+    if (!data.cartCreate.cart) {
+      throw new Error('Cart creation failed: No cart returned');
+    }
+
+    const cart = data.cartCreate.cart;
+
+    return {
+      cartId: cart.id,
+      checkoutUrl: cart.checkoutUrl,
+      totalQuantity: cart.totalQuantity,
+      totalAmount: parseFloat(cart.cost.totalAmount.amount),
+      currency: cart.cost.totalAmount.currencyCode,
+    };
+  }
+
+  /**
+   * Get an existing cart by ID
+   */
+  async getCart(cartId: string): Promise<ShopifyCart | null> {
+    const query = `
+      query GetCart($cartId: ID!) {
+        cart(id: $cartId) {
+          id
+          checkoutUrl
+          totalQuantity
+          cost {
+            totalAmount {
+              amount
+              currencyCode
+            }
+            subtotalAmount {
+              amount
+              currencyCode
+            }
+          }
+          lines(first: 100) {
+            edges {
+              node {
+                id
+                quantity
+                merchandise {
+                  ... on ProductVariant {
+                    id
+                    title
+                    product {
+                      title
+                    }
+                    price {
+                      amount
+                      currencyCode
+                    }
+                  }
+                }
+              }
+            }
+          }
+          attributes {
+            key
+            value
+          }
+          buyerIdentity {
+            email
+          }
+        }
+      }
+    `;
+
+    const data = await this.query<{
+      cart: ShopifyCart | null;
+    }>(query, { cartId });
+
+    return data.cart;
+  }
+
+  /**
+   * Add lines to an existing cart
+   */
+  async addCartLines(
+    cartId: string,
+    lines: CartLineInput[]
+  ): Promise<CartCreateResult> {
+    const mutation = `
+      mutation CartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
+        cartLinesAdd(cartId: $cartId, lines: $lines) {
+          cart {
+            id
+            checkoutUrl
+            totalQuantity
+            cost {
+              totalAmount {
+                amount
+                currencyCode
+              }
+              subtotalAmount {
+                amount
+                currencyCode
+              }
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const data = await this.query<{
+      cartLinesAdd: {
+        cart: ShopifyCart | null;
+        userErrors: Array<{
+          field: string[];
+          message: string;
+        }>;
+      };
+    }>(mutation, {
+      cartId,
+      lines: lines.map((item) => ({
+        merchandiseId: item.merchandiseId,
+        quantity: item.quantity,
+      })),
+    });
+
+    if (data.cartLinesAdd.userErrors.length > 0) {
+      const errors = data.cartLinesAdd.userErrors;
+      console.error('Shopify cart lines add errors:', errors);
+      throw new Error(`Cart error: ${errors[0].message}`);
+    }
+
+    if (!data.cartLinesAdd.cart) {
+      throw new Error('Cart update failed: No cart returned');
+    }
+
+    const cart = data.cartLinesAdd.cart;
+
+    return {
+      cartId: cart.id,
+      checkoutUrl: cart.checkoutUrl,
+      totalQuantity: cart.totalQuantity,
+      totalAmount: parseFloat(cart.cost.totalAmount.amount),
+      currency: cart.cost.totalAmount.currencyCode,
+    };
+  }
+
+  /**
+   * Convenience method: Create cart from CheckoutLineItem format
+   * This provides backward compatibility with the old checkout flow
+   */
+  async createCartFromCheckoutItems(
+    lineItems: CheckoutLineItem[],
+    customAttributes?: CheckoutCustomAttributes
+  ): Promise<CartCreateResult> {
+    // Convert CheckoutLineItem to CartLineInput
+    const cartLines: CartLineInput[] = lineItems.map((item) => ({
+      merchandiseId: item.variantId,
+      quantity: item.quantity,
+    }));
+
+    // Convert CheckoutCustomAttributes to MiniMusikerCartAttributes
+    const cartAttributes: MiniMusikerCartAttributes | undefined = customAttributes
+      ? {
+          parentId: customAttributes.parentId,
+          parentEmail: customAttributes.parentEmail,
+          eventId: customAttributes.eventId,
+          schoolName: customAttributes.schoolName,
+        }
+      : undefined;
+
+    return this.createCart(cartLines, cartAttributes);
   }
 
   /**

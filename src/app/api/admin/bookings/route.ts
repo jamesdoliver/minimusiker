@@ -3,6 +3,8 @@ import airtableService from '@/lib/services/airtableService';
 import { SchoolBooking } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
+export const dynamic = 'force-dynamic';
+
 // Extended booking data for display
 export interface BookingWithDetails {
   id: string;

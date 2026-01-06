@@ -23,6 +23,12 @@ interface EventDetailWithBooking extends SchoolEventDetail {
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EventBadge from '@/components/admin/EventBadge';
 import StatsPill from '@/components/admin/StatsPill';
+// Shared modals for class/song management
+import AddClassModal from '@/components/shared/class-management/AddClassModal';
+import AddSongModal from '@/components/shared/class-management/AddSongModal';
+import EditClassModal from '@/components/shared/class-management/EditClassModal';
+import EditSongModal from '@/components/shared/class-management/EditSongModal';
+import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfirmModal';
 
 function formatDate(dateString: string): string {
   if (!dateString) return 'No date';
@@ -51,6 +57,39 @@ export default function EventDetailPage() {
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
+
+  // Class/Song management state
+  const [showAddClass, setShowAddClass] = useState(false);
+  const [showEditClass, setShowEditClass] = useState(false);
+  const [showAddSong, setShowAddSong] = useState(false);
+  const [showEditSong, setShowEditSong] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Selected items for editing/deleting
+  const [selectedClass, setSelectedClass] = useState<{
+    id: string;
+    name: string;
+    numChildren?: number;
+  } | null>(null);
+
+  const [selectedSong, setSelectedSong] = useState<{
+    id: string;
+    title: string;
+    artist?: string;
+    notes?: string;
+  } | null>(null);
+
+  // Track which classes are expanded to show songs
+  const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set());
+
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'class' | 'song';
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const eventId = params.eventId as string;
 
@@ -143,6 +182,96 @@ export default function EventDetailPage() {
       });
     } finally {
       setIsAssigning(false);
+    }
+  };
+
+  // Class management handlers
+  const handleAddClass = () => {
+    setShowAddClass(true);
+  };
+
+  const handleEditClass = (cls: any) => {
+    setSelectedClass({
+      id: cls.classId,
+      name: cls.className,
+      numChildren: cls.totalChildren,
+    });
+    setShowEditClass(true);
+  };
+
+  const handleDeleteClass = (cls: any) => {
+    setDeleteTarget({
+      type: 'class',
+      id: cls.classId,
+      name: cls.className,
+    });
+    setShowDeleteConfirm(true);
+  };
+
+  // Song management handlers
+  const handleAddSong = (classId: string) => {
+    setSelectedClass({ id: classId, name: '', numChildren: 0 });
+    setShowAddSong(true);
+  };
+
+  const handleEditSong = (song: any) => {
+    setSelectedSong({
+      id: song.id,
+      title: song.title,
+      artist: song.artist,
+      notes: song.notes,
+    });
+    setShowEditSong(true);
+  };
+
+  const handleDeleteSong = (song: any) => {
+    setDeleteTarget({
+      type: 'song',
+      id: song.id,
+      name: song.title,
+    });
+    setShowDeleteConfirm(true);
+  };
+
+  // Toggle class expansion
+  const toggleClassExpanded = (classId: string) => {
+    setExpandedClasses((prev) => {
+      const next = new Set(prev);
+      if (next.has(classId)) {
+        next.delete(classId);
+      } else {
+        next.add(classId);
+      }
+      return next;
+    });
+  };
+
+  // Confirm delete (class or song)
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    try {
+      const endpoint =
+        deleteTarget.type === 'class'
+          ? `/api/admin/classes/${deleteTarget.id}`
+          : `/api/admin/songs/${deleteTarget.id}`;
+
+      const response = await fetch(endpoint, { method: 'DELETE' });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete');
+      }
+
+      toast.success(`${deleteTarget.type === 'class' ? 'Class' : 'Song'} deleted successfully`);
+      setShowDeleteConfirm(false);
+      setDeleteTarget(null);
+      fetchEventDetail(); // Refetch to update UI
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -354,86 +483,295 @@ export default function EventDetailPage() {
 
       {/* Classes Section */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Classes</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">Classes & Songs</h2>
+          <button
+            onClick={handleAddClass}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Class
+          </button>
+        </div>
 
         {event.classes.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-            <div className="text-3xl mb-3">📚</div>
-            <p className="text-gray-600">No classes have been added to this event yet.</p>
-            <p className="text-sm text-gray-500 mt-2">Classes will appear here once the teacher adds them.</p>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+            <div className="text-4xl mb-4">📚</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Classes Yet</h3>
+            <p className="text-gray-600 mb-4">
+              Add a class to start managing songs for this event.
+            </p>
+            <button
+              onClick={handleAddClass}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add First Class
+            </button>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Class
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Teacher
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Children
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Registered
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Progress
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {event.classes.map((cls) => (
-                  <tr key={cls.classId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{cls.className}</div>
-                      <div className="text-xs text-gray-400 font-mono">{cls.classId}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                      {cls.mainTeacher || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-gray-900">
-                      {cls.totalChildren}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          cls.registeredParents === 0
-                            ? 'bg-gray-100 text-gray-600'
-                            : 'bg-green-100 text-green-800'
-                        }`}
-                      >
-                        {cls.registeredParents} {cls.registeredParents === 1 ? 'parent' : 'parents'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
+          <div className="space-y-4">
+            {event.classes.map((cls: any) => {
+              const isExpanded = expandedClasses.has(cls.classId);
+              const songs = cls.songs || [];
+
+              return (
+                <div
+                  key={cls.classId}
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group"
+                >
+                  {/* Class Header - Clickable to expand */}
+                  <button
+                    onClick={() => toggleClassExpanded(cls.classId)}
+                    className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      {/* Class Info */}
+                      <div className="text-left">
+                        <div className="font-medium text-gray-900">{cls.className}</div>
+                        <div className="text-sm text-gray-500">
+                          {cls.totalChildren} children • {songs.length} {songs.length === 1 ? 'song' : 'songs'}
+                        </div>
+                      </div>
+
+                      {/* Registration Progress */}
+                      <div className="flex items-center gap-2 ml-auto mr-4">
                         <div className="w-24 bg-gray-200 rounded-full h-2">
                           <div
-                            className={`h-2 rounded-full transition-all duration-300 ${
+                            className={`h-2 rounded-full transition-all ${
                               cls.registrationRate >= 75
                                 ? 'bg-green-500'
                                 : cls.registrationRate >= 50
-                                ? 'bg-[#94B8B3]'
-                                : cls.registrationRate >= 25
-                                ? 'bg-yellow-500'
-                                : 'bg-gray-400'
+                                ? 'bg-blue-500'
+                                : 'bg-yellow-500'
                             }`}
                             style={{ width: `${Math.min(cls.registrationRate, 100)}%` }}
                           />
                         </div>
                         <span className="text-sm text-gray-600 w-10">{cls.registrationRate}%</span>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+
+                    {/* Expand/Collapse Icon & Actions */}
+                    <div className="flex items-center gap-2">
+                      {/* Action buttons (visible on hover) */}
+                      <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClass(cls);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Edit class"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClass(cls);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Delete class"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <svg
+                        className={`w-5 h-5 text-gray-400 transition-transform ${
+                          isExpanded ? 'rotate-180' : ''
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+
+                  {/* Expanded Content - Songs List */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 px-5 py-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-medium text-gray-700">Songs</h4>
+                        <button
+                          onClick={() => handleAddSong(cls.classId)}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Add Song
+                        </button>
+                      </div>
+
+                      {songs.length === 0 ? (
+                        <div className="text-center py-6 text-gray-500">
+                          <svg
+                            className="w-8 h-8 mx-auto mb-2 text-gray-300"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                            />
+                          </svg>
+                          <p className="text-sm">No songs added yet</p>
+                          <button
+                            onClick={() => handleAddSong(cls.classId)}
+                            className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+                          >
+                            Add First Song
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {songs.map((song: any) => (
+                            <div
+                              key={song.id}
+                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-gray-900 truncate">{song.title}</div>
+                                {song.artist && (
+                                  <div className="text-sm text-gray-500 truncate">{song.artist}</div>
+                                )}
+                                {song.notes && (
+                                  <div className="text-xs text-gray-400 mt-1 truncate">{song.notes}</div>
+                                )}
+                              </div>
+
+                              {/* Song actions */}
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleEditSong(song)}
+                                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  title="Edit song"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSong(song)}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Delete song"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      {showAddClass && (
+        <AddClassModal
+          eventId={eventId}
+          onClose={() => setShowAddClass(false)}
+          onSuccess={() => {
+            setShowAddClass(false);
+            fetchEventDetail();
+          }}
+          apiBasePath="/api/admin"
+        />
+      )}
+
+      {showEditClass && selectedClass && (
+        <EditClassModal
+          classId={selectedClass.id}
+          className={selectedClass.name}
+          numChildren={selectedClass.numChildren}
+          onClose={() => {
+            setShowEditClass(false);
+            setSelectedClass(null);
+          }}
+          onSuccess={() => {
+            setShowEditClass(false);
+            setSelectedClass(null);
+            fetchEventDetail();
+          }}
+          apiBasePath="/api/admin"
+        />
+      )}
+
+      {showAddSong && selectedClass && (
+        <AddSongModal
+          classId={selectedClass.id}
+          eventId={eventId}
+          onClose={() => {
+            setShowAddSong(false);
+            setSelectedClass(null);
+          }}
+          onSuccess={() => {
+            setShowAddSong(false);
+            setSelectedClass(null);
+            fetchEventDetail();
+          }}
+          apiBasePath="/api/admin"
+        />
+      )}
+
+      {showEditSong && selectedSong && (
+        <EditSongModal
+          songId={selectedSong.id}
+          title={selectedSong.title}
+          artist={selectedSong.artist}
+          notes={selectedSong.notes}
+          onClose={() => {
+            setShowEditSong(false);
+            setSelectedSong(null);
+          }}
+          onSuccess={() => {
+            setShowEditSong(false);
+            setSelectedSong(null);
+            fetchEventDetail();
+          }}
+          apiBasePath="/api/admin"
+        />
+      )}
+
+      {showDeleteConfirm && deleteTarget && (
+        <DeleteConfirmModal
+          title={`Delete ${deleteTarget.type === 'class' ? 'Class' : 'Song'}?`}
+          message={`Are you sure you want to delete "${deleteTarget.name}"? This action cannot be undone.${
+            deleteTarget.type === 'class'
+              ? ' Note: You cannot delete a class that has songs or registered children.'
+              : ''
+          }`}
+          onConfirm={confirmDelete}
+          onCancel={() => {
+            setShowDeleteConfirm(false);
+            setDeleteTarget(null);
+          }}
+          isDeleting={isDeleting}
+        />
+      )}
     </div>
   );
 }

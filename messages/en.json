@@ -1,0 +1,115 @@
+{
+  "common": {
+    "shop": "Shop",
+    "signOut": "Sign Out",
+    "loading": "Loading...",
+    "error": "Error"
+  },
+  "header": {
+    "minimusiker": "MiniMusiker",
+    "parentPortal": "Parent Portal",
+    "welcome": "Welcome, {firstName}!"
+  },
+  "childSelector": {
+    "viewingFor": "Viewing for:"
+  },
+  "schoolBanner": {
+    "class": "Class: {className}",
+    "recordingFor": "Recording for: {childName}"
+  },
+  "recordingPreview": {
+    "title": "School Recording Preview",
+    "previewDescription": "This is a 30-second preview of {childName} performance. Purchase the bundle below to unlock the full recording!",
+    "previewDescriptionSchool": "This is a 30-second preview of your school's performance. Purchase the bundle below to unlock the full recording!",
+    "availableSoon": "Recording will be available after the event"
+  },
+  "productSelector": {
+    "title": "Complete Your Order",
+    "subtitle": "Capture the memories from {schoolName}",
+    "chooseAudio": "Choose Your Audio",
+    "required": "(Required)",
+    "addClothing": "Add Clothing",
+    "optional": "(Optional)",
+    "discountBanner": "Save 10% when you add clothing to your order!",
+    "comboHint": "10% off with audio!",
+    "addButton": "Add",
+    "addedItems": "Added Items:",
+    "size": "Size:",
+    "tshirtLabel": "T-Shirt:",
+    "hoodieLabel": "Hoodie:"
+  },
+  "audio": {
+    "minicard": "Minicard",
+    "minicardDescription": "Digital audio card with QR code",
+    "cd": "CD",
+    "cdDescription": "Physical CD with album artwork",
+    "bundle": "Minicard + CD",
+    "bundleDescription": "Both formats included",
+    "bundleLabel": "Minicard + CD Bundle",
+    "save": "Save €{amount}"
+  },
+  "clothing": {
+    "tshirt": "T-Shirt",
+    "tshirtDescription": "Premium cotton event t-shirt",
+    "hoodie": "Hoodie",
+    "hoodieDescription": "Cozy hooded sweatshirt",
+    "bundle": "T-Shirt + Hoodie",
+    "bundleDescription": "Both items included",
+    "bundleLabel": "T-Shirt + Hoodie Bundle",
+    "save": "Save €{amount}"
+  },
+  "orderSummary": {
+    "title": "Order Summary",
+    "selectItems": "Select items above to build your order",
+    "subtotal": "Subtotal",
+    "comboDiscount": "Combo Discount ({percent}%)",
+    "total": "Total",
+    "processing": "Processing...",
+    "checkout": "Checkout - €{total}",
+    "selectAudio": "Select audio to continue",
+    "secure": "Secure",
+    "fastDelivery": "Fast Delivery"
+  },
+  "shop": {
+    "header": {
+      "breadcrumbPortal": "Parent Portal",
+      "breadcrumbShop": "Shop",
+      "title": "MiniMusiker Shop",
+      "subtitle": "Exclusive merchandise for our music families"
+    },
+    "catalog": {
+      "categoryAll": "All Products",
+      "categoryApparel": "Apparel",
+      "categoryAccessories": "Accessories",
+      "categoryDigital": "Digital",
+      "errorLoading": "Error loading products",
+      "noProducts": "No Products Available",
+      "noProductsSubtext": "Check back soon for new merchandise!",
+      "noProductsInCategory": "No products in this category",
+      "showingCount": "Showing {count} of {total} products"
+    },
+    "productCard": {
+      "sale": "SALE",
+      "outOfStock": "Out of Stock",
+      "size": "Size",
+      "quantity": "Quantity",
+      "adding": "Adding...",
+      "addToCart": "Add to Cart"
+    },
+    "cart": {
+      "title": "Your Cart ({count})",
+      "empty": "Your cart is empty",
+      "continueShopping": "Continue Shopping",
+      "remove": "Remove",
+      "subtotal": "Subtotal",
+      "shippingInfo": "Shipping and taxes calculated at checkout",
+      "processing": "Processing...",
+      "checkout": "Proceed to Checkout"
+    },
+    "featured": {
+      "title": "Shop Our Merchandise",
+      "viewAll": "View All",
+      "viewOptions": "View Options"
+    }
+  }
+}

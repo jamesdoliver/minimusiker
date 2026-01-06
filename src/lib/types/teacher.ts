@@ -24,6 +24,10 @@ export const TEACHERS_FIELD_IDS = {
   events: 'fldJeROezAUX6zfA7', // Text field for event IDs (booking_ids)
   created_at: 'fldmnLMTKXgQFLh1W', // When teacher was created
   linked_bookings: 'fldxukHyKQ4KEBDWv', // Linked records to bookings
+  // New fields for portal revamp
+  region: 'fldVHy77JMhWpfxKy', // Region for representative assignment
+  school_address: 'fldY8gUK35GlE7IAz', // School physical address
+  school_phone: 'fld9bssBb8WJWxQYV', // School contact phone
 } as const;
 
 export const SONGS_FIELD_IDS = {
@@ -70,6 +74,11 @@ export interface Teacher {
   tokenExpiresAt?: string; // Token expiration (ISO datetime)
   eventIds?: string[]; // Array of booking_ids they manage
   createdAt: string; // When teacher was created
+  // New fields for portal revamp
+  region?: string; // Region for representative assignment
+  schoolAddress?: string; // School physical address (editable by teacher)
+  schoolPhone?: string; // School contact phone (editable by teacher)
+  // Note: schoolEmail uses the teacher's email field initially
 }
 
 /**
@@ -115,6 +124,15 @@ export interface AudioFile {
   durationSeconds?: number; // Audio duration
   fileSizeBytes?: number; // File size
   status: AudioFileStatus; // pending | processing | ready | error
+}
+
+/**
+ * Song with associated audio files
+ * Used for staff and engineer portals to show upload/download status
+ */
+export interface SongWithAudio extends Song {
+  rawAudioFiles: AudioFile[]; // Raw audio files uploaded by staff
+  finalAudioFiles: AudioFile[]; // Final audio files uploaded by engineer
 }
 
 // =============================================================================
@@ -178,6 +196,18 @@ export interface TeacherEventView {
   eventType: string;
   classes: TeacherClassView[];
   status: 'upcoming' | 'in-progress' | 'completed';
+  // Progress tracking fields (for dashboard)
+  progress?: {
+    classesCount: number; // Number of classes created
+    expectedClasses?: number; // Expected number of classes (from booking config)
+    songsCount: number; // Total songs added across all classes
+    expectedSongs?: number; // Expected songs (classes × songs_per_class, default 2)
+    hasLogo: boolean; // Whether school logo is uploaded
+    registrationsCount: number; // Number of parent registrations
+    totalChildrenExpected?: number; // Total expected children (from booking or sum of class totals)
+    daysUntilEvent: number; // Days until event (negative if past)
+    weeksUntilEvent: number; // Weeks until event (rounded)
+  };
 }
 
 /**

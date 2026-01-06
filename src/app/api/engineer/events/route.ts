@@ -4,6 +4,8 @@ import airtableService from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { EngineerEventSummary, EngineerMixingStatus } from '@/lib/types/engineer';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/engineer/events
  * Get all events assigned to the authenticated engineer

@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { useCart } from '@/lib/contexts/CartContext';
 import { useCheckout } from '@/lib/hooks/useCheckout';
 import { formatPrice } from '@/lib/utils';
@@ -12,6 +13,7 @@ interface CartDrawerProps {
 }
 
 export default function CartDrawer({ parentId, parentEmail }: CartDrawerProps) {
+  const t = useTranslations('shop.cart');
   const { cart, removeItem, updateQuantity, isCartOpen, setIsCartOpen } = useCart();
   const { checkout, isCheckingOut, error: checkoutError } = useCheckout();
 
@@ -57,7 +59,7 @@ export default function CartDrawer({ parentId, parentEmail }: CartDrawerProps) {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="font-heading text-xl text-minimusik-heading">
-            Your Cart ({cart.itemCount})
+            {t('title', { count: cart.itemCount })}
           </h2>
           <button
             onClick={() => setIsCartOpen(false)}
@@ -96,12 +98,12 @@ export default function CartDrawer({ parentId, parentEmail }: CartDrawerProps) {
                   d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                 />
               </svg>
-              <p className="text-gray-500 mb-4">Your cart is empty</p>
+              <p className="text-gray-500 mb-4">{t('empty')}</p>
               <button
                 onClick={() => setIsCartOpen(false)}
                 className="text-sage-600 hover:text-sage-700 font-medium"
               >
-                Continue Shopping
+                {t('continueShopping')}
               </button>
             </div>
           ) : (
@@ -183,7 +185,7 @@ export default function CartDrawer({ parentId, parentEmail }: CartDrawerProps) {
                           onClick={() => removeItem(item.variant.id)}
                           className="ml-auto text-red-500 hover:text-red-600 text-sm"
                         >
-                          Remove
+                          {t('remove')}
                         </button>
                       </div>
                     </div>
@@ -199,14 +201,14 @@ export default function CartDrawer({ parentId, parentEmail }: CartDrawerProps) {
           <div className="border-t p-4 space-y-4">
             {/* Subtotal */}
             <div className="flex justify-between items-center">
-              <span className="font-medium text-gray-700">Subtotal</span>
+              <span className="font-medium text-gray-700">{t('subtotal')}</span>
               <span className="font-bold text-xl text-minimusik-heading">
                 {formatPrice(cart.subtotal * 100)}
               </span>
             </div>
 
             <p className="text-xs text-gray-500">
-              Shipping and taxes calculated at checkout
+              {t('shippingInfo')}
             </p>
 
             {/* Checkout Error */}
@@ -240,10 +242,10 @@ export default function CartDrawer({ parentId, parentEmail }: CartDrawerProps) {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Processing...
+                  {t('processing')}
                 </span>
               ) : (
-                'Proceed to Checkout'
+                t('checkout')
               )}
             </button>
 
@@ -252,7 +254,7 @@ export default function CartDrawer({ parentId, parentEmail }: CartDrawerProps) {
               onClick={() => setIsCartOpen(false)}
               className="w-full py-2 text-sage-600 hover:text-sage-700 font-medium text-sm"
             >
-              Continue Shopping
+              {t('continueShopping')}
             </button>
           </div>
         )}

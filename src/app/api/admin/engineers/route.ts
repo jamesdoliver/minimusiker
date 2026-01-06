@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import airtableService from '@/lib/services/airtableService';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/engineers
  * Get all staff members with Engineer role

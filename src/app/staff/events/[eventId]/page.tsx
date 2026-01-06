@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { SchoolEventDetail, EventClassDetail } from '@/lib/types/airtable';
-import { AudioFile } from '@/lib/types/teacher';
+import { SongWithAudio, Song } from '@/lib/types/teacher';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EventBadge from '@/components/admin/EventBadge';
 import StatsPill from '@/components/admin/StatsPill';
+import SongAudioRow from '@/components/shared/audio-management/SongAudioRow';
+import BatchUploadModal from '@/components/shared/audio-management/BatchUploadModal';
 
 function formatDate(dateString: string): string {
   if (!dateString) return 'No date';
@@ -24,257 +26,152 @@ function formatDate(dateString: string): string {
   }
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-interface AudioFileWithUrl extends AudioFile {
-  signedUrl?: string | null;
-}
-
-interface ClassUploadCardProps {
+interface ClassSongUploadCardProps {
   cls: EventClassDetail;
   eventId: string;
-  audioFiles: AudioFileWithUrl[];
-  onUploadComplete: () => void;
+  onRefresh: () => void;
 }
 
-function ClassUploadCard({ cls, eventId, audioFiles, onUploadComplete }: ClassUploadCardProps) {
+function ClassSongUploadCard({ cls, eventId, onRefresh }: ClassSongUploadCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [songs, setSongs] = useState<SongWithAudio[]>([]);
+  const [isLoadingSongs, setIsLoadingSongs] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
 
-  const classAudioFiles = audioFiles.filter((f) => f.classId === cls.classId && f.type === 'raw');
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setIsUploading(true);
-    setUploadError(null);
-    setUploadProgress(0);
-
+  const fetchSongs = useCallback(async () => {
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setUploadProgress(Math.round(((i) / files.length) * 100));
+      setIsLoadingSongs(true);
+      const response = await fetch(
+        `/api/staff/events/${encodeURIComponent(eventId)}/classes/${encodeURIComponent(cls.classId)}/songs`
+      );
 
-        // Get presigned URL
-        const presignResponse = await fetch(`/api/staff/events/${encodeURIComponent(eventId)}/upload-raw`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            classId: cls.classId,
-            filename: file.name,
-            contentType: file.type || 'audio/mpeg',
-          }),
-        });
-
-        if (!presignResponse.ok) {
-          const data = await presignResponse.json();
-          throw new Error(data.error || 'Failed to get upload URL');
-        }
-
-        const { uploadUrl, r2Key } = await presignResponse.json();
-
-        // Upload file directly to R2
-        const uploadResponse = await fetch(uploadUrl, {
-          method: 'PUT',
-          body: file,
-          headers: {
-            'Content-Type': file.type || 'audio/mpeg',
-          },
-        });
-
-        if (!uploadResponse.ok) {
-          throw new Error('Failed to upload file to storage');
-        }
-
-        // Confirm upload and create record
-        const confirmResponse = await fetch(`/api/staff/events/${encodeURIComponent(eventId)}/upload-raw`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            classId: cls.classId,
-            r2Key,
-            filename: file.name,
-            fileSizeBytes: file.size,
-          }),
-        });
-
-        if (!confirmResponse.ok) {
-          const data = await confirmResponse.json();
-          throw new Error(data.error || 'Failed to confirm upload');
-        }
-
-        setUploadProgress(Math.round(((i + 1) / files.length) * 100));
+      if (response.ok) {
+        const data = await response.json();
+        setSongs(data.songs || []);
       }
-
-      onUploadComplete();
-    } catch (err) {
-      console.error('Upload error:', err);
-      setUploadError(err instanceof Error ? err.message : 'Upload failed');
+    } catch (error) {
+      console.error('Error fetching songs:', error);
     } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
-      // Reset file input
-      e.target.value = '';
+      setIsLoadingSongs(false);
     }
+  }, [eventId, cls.classId]);
+
+  useEffect(() => {
+    if (isExpanded) {
+      fetchSongs();
+    }
+  }, [isExpanded, fetchSongs]);
+
+  const handleUploadComplete = () => {
+    fetchSongs();
+    onRefresh();
   };
 
+  const totalRawFiles = songs.reduce((sum, song) => sum + song.rawAudioFiles.length, 0);
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      {/* Class Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-[#94B8B3]/20 flex items-center justify-center">
-            <svg className="w-5 h-5 text-[#5a8a82]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
+    <>
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Class Header */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-[#94B8B3]/20 flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#5a8a82]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                />
+              </svg>
+            </div>
+            <div className="text-left">
+              <h3 className="font-semibold text-gray-900">{cls.className}</h3>
+              <p className="text-sm text-gray-500">
+                {cls.totalChildren} children · {songs.length} songs · {totalRawFiles} raw files
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {totalRawFiles > 0 && (
+              <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
+                {totalRawFiles} files
+              </span>
+            )}
+            <svg
+              className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </div>
-          <div className="text-left">
-            <h3 className="font-semibold text-gray-900">{cls.className}</h3>
-            <p className="text-sm text-gray-500">
-              {cls.totalChildren} children · {classAudioFiles.length} raw files uploaded
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {classAudioFiles.length > 0 && (
-            <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
-              {classAudioFiles.length} files
-            </span>
-          )}
-          <svg
-            className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </button>
+        </button>
 
-      {/* Expanded Content */}
-      {isExpanded && (
-        <div className="border-t border-gray-100 px-5 py-4">
-          {/* Upload Section */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Upload Raw Audio Files
-            </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-[#5a8a82] transition-colors">
-              {isUploading ? (
-                <div>
-                  <LoadingSpinner size="md" />
-                  <p className="mt-2 text-sm text-gray-600">Uploading... {uploadProgress}%</p>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div
-                      className="bg-[#5a8a82] h-2 rounded-full transition-all"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <svg
-                    className="mx-auto h-10 w-10 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                  <p className="mt-2 text-sm text-gray-600">
-                    Drop audio files here or click to browse
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Supports MP3, WAV, M4A (max 500MB per file)
-                  </p>
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    multiple
-                    onChange={handleFileSelect}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    style={{ position: 'relative' }}
-                  />
-                </>
-              )}
+        {/* Expanded Content */}
+        {isExpanded && (
+          <div className="border-t border-gray-100 px-5 py-4">
+            {/* Batch Upload Button */}
+            <div className="mb-4 flex justify-end">
+              <button
+                onClick={() => setShowBatchModal(true)}
+                disabled={songs.length === 0}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  songs.length === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                📦 Batch Upload (ZIP)
+              </button>
             </div>
-            {uploadError && (
-              <p className="mt-2 text-sm text-red-600">{uploadError}</p>
-            )}
-          </div>
 
-          {/* Uploaded Files List */}
-          {classAudioFiles.length > 0 && (
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Uploaded Files</h4>
-              <div className="space-y-2">
-                {classAudioFiles.map((file) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <svg
-                        className="w-5 h-5 text-[#5a8a82]"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
-                        />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{file.filename}</p>
-                        <p className="text-xs text-gray-500">
-                          {file.fileSizeBytes ? formatFileSize(file.fileSizeBytes) : 'Unknown size'}
-                          {' · '}
-                          {new Date(file.uploadedAt).toLocaleDateString('en-GB')}
-                        </p>
-                      </div>
-                    </div>
-                    {file.signedUrl && (
-                      <a
-                        href={file.signedUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[#5a8a82] hover:text-[#4a7a72] text-sm font-medium"
-                      >
-                        Download
-                      </a>
-                    )}
-                  </div>
+            {/* Songs List */}
+            {isLoadingSongs ? (
+              <div className="py-8 text-center">
+                <LoadingSpinner size="md" />
+                <p className="mt-2 text-sm text-gray-500">Loading songs...</p>
+              </div>
+            ) : songs.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-gray-500">
+                  No songs added to this class yet. Songs must be added by the teacher or admin.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-0">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">
+                  Upload Raw Audio Per Song:
+                </h4>
+                {songs.map((song) => (
+                  <SongAudioRow
+                    key={song.id}
+                    song={song}
+                    eventId={eventId}
+                    variant="staff"
+                    onUploadComplete={handleUploadComplete}
+                  />
                 ))}
               </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Batch Upload Modal */}
+      <BatchUploadModal
+        isOpen={showBatchModal}
+        onClose={() => setShowBatchModal(false)}
+        eventId={eventId}
+        classId={cls.classId}
+        songs={songs}
+        onUploadComplete={handleUploadComplete}
+      />
+    </>
   );
 }
 
@@ -282,9 +179,9 @@ export default function StaffEventDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [event, setEvent] = useState<SchoolEventDetail | null>(null);
-  const [audioFiles, setAudioFiles] = useState<AudioFileWithUrl[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const eventId = params.eventId as string;
 
@@ -313,24 +210,15 @@ export default function StaffEventDetailPage() {
     }
   }, [eventId, router]);
 
-  const fetchAudioFiles = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/staff/events/${encodeURIComponent(eventId)}/audio-files`);
-      if (response.ok) {
-        const data = await response.json();
-        setAudioFiles(data.audioFiles || []);
-      }
-    } catch (err) {
-      console.error('Error fetching audio files:', err);
-    }
-  }, [eventId]);
-
   useEffect(() => {
     if (eventId) {
       fetchEventDetail();
-      fetchAudioFiles();
     }
-  }, [eventId, fetchEventDetail, fetchAudioFiles]);
+  }, [eventId, fetchEventDetail]);
+
+  const handleRefresh = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
 
   if (isLoading) {
     return (
@@ -496,12 +384,12 @@ export default function StaffEventDetailPage() {
           )}
         </div>
 
-        {/* Audio Upload Section */}
+        {/* Song-Level Audio Upload Section */}
         <div>
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
             Raw Audio Upload
             <span className="ml-2 text-sm font-normal text-gray-500">
-              (Upload recordings per class)
+              (Upload recordings per song)
             </span>
           </h2>
 
@@ -513,12 +401,11 @@ export default function StaffEventDetailPage() {
           ) : (
             <div className="space-y-4">
               {event.classes.map((cls) => (
-                <ClassUploadCard
-                  key={cls.classId}
+                <ClassSongUploadCard
+                  key={`${cls.classId}-${refreshKey}`}
                   cls={cls}
                   eventId={event.eventId}
-                  audioFiles={audioFiles}
-                  onUploadComplete={fetchAudioFiles}
+                  onRefresh={handleRefresh}
                 />
               ))}
             </div>

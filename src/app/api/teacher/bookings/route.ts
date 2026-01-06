@@ -3,6 +3,8 @@ import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import airtableService from '@/lib/services/airtableService';
 import { SchoolBooking } from '@/lib/types/airtable';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Response type for teacher bookings
  */

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateMockOrders, StockOrder } from '@/lib/types/stock';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
+export const dynamic = 'force-dynamic';
+
 // In-memory storage for development (will be replaced with Airtable/Flyeralarm integration)
 let ordersCache: StockOrder[] | null = null;
 

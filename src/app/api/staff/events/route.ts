@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
 import airtableService from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Verify staff session

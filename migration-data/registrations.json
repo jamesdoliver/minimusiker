@@ -1,0 +1,20 @@
+[
+  {
+    "event_id": "TEST-EVENT-001",
+    "class_id": "TEST-CLASS-001",
+    "parent_id": "",
+    "parent_email": "admin@minimusiker.de",
+    "registered_child": "",
+    "registered_complete": false,
+    "legacy_record_id": "recJKdyl3A85g4w1H"
+  },
+  {
+    "event_id": "1248712394",
+    "class_id": "cls_test_school_20261220_yeartestclasste_7rd3ga",
+    "parent_id": "P5",
+    "parent_email": "till@minimusiker.de",
+    "registered_child": "",
+    "registered_complete": false,
+    "legacy_record_id": "recMwKNQl7KvUqIwM"
+  }
+]

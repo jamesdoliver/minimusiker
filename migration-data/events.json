@@ -1,0 +1,56 @@
+[
+  {
+    "event_id": "TEST-EVENT-001",
+    "school_name": "Test School",
+    "event_date": "2024-03-20",
+    "event_type": "Minimusiker",
+    "assigned_staff": [
+      "recEL3Oge2gwN7C8C"
+    ],
+    "legacy_booking_id": "TEST-EVENT-001"
+  },
+  {
+    "event_id": "1248712394",
+    "school_name": "Test School 2",
+    "event_date": "2026-02-20",
+    "event_type": "Minimusiker",
+    "assigned_staff": [
+      "recjPeX4fb4u2KBMp"
+    ],
+    "legacy_booking_id": "1248712394"
+  },
+  {
+    "event_id": "evt_test_school_minimusiker_20261220_d32140",
+    "school_name": "Test School",
+    "event_date": "2026-12-20",
+    "event_type": "Minimusiker",
+    "assigned_staff": [
+      "recjPeX4fb4u2KBMp"
+    ],
+    "legacy_booking_id": "evt_test_school_minimusiker_20261220_d32140"
+  },
+  {
+    "event_id": "10598325",
+    "school_name": "Calder High School",
+    "event_date": "2025-11-20",
+    "event_type": "Minimusiker",
+    "legacy_booking_id": "10598325"
+  },
+  {
+    "event_id": "32049823",
+    "school_name": "Cragg Vale School",
+    "event_date": "2026-01-13",
+    "event_type": "Minimusiker",
+    "assigned_staff": [
+      "recCxtle9PWtuOvLr"
+    ],
+    "legacy_booking_id": "32049823"
+  },
+  {
+    "event_id": "123814122",
+    "school_name": "School Of Hard Knocks",
+    "event_date": "2025-09-25",
+    "event_type": "Minimusiker",
+    "legacy_booking_id": "123814122"
+  }
+]

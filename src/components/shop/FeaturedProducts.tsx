@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { Product } from '@/lib/types/airtable';
 import { useCart } from '@/lib/contexts/CartContext';
 import { formatPrice } from '@/lib/utils';
@@ -12,6 +13,8 @@ interface FeaturedProductsProps {
 }
 
 export default function FeaturedProducts({ products, maxItems = 3 }: FeaturedProductsProps) {
+  const t = useTranslations('shop.featured');
+  const tCard = useTranslations('shop.productCard');
   const { addItem } = useCart();
 
   // Take only the first maxItems products
@@ -23,13 +26,13 @@ export default function FeaturedProducts({ products, maxItems = 3 }: FeaturedPro
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="font-heading text-2xl text-minimusik-heading">
-          Shop Our Merchandise
+          {t('title')}
         </h2>
         <Link
           href="/parent-portal/shop"
           className="text-sage-600 hover:text-sage-700 font-medium text-sm flex items-center gap-1"
         >
-          View All
+          {t('viewAll')}
           <svg
             className="w-4 h-4"
             fill="none"
@@ -92,7 +95,7 @@ export default function FeaturedProducts({ products, maxItems = 3 }: FeaturedPro
                 {/* Discount Badge */}
                 {hasDiscount && (
                   <div className="absolute top-2 left-2 bg-minimusik-accent text-white text-xs font-bold px-2 py-0.5 rounded">
-                    SALE
+                    {tCard('sale')}
                   </div>
                 )}
               </div>
@@ -119,14 +122,14 @@ export default function FeaturedProducts({ products, maxItems = 3 }: FeaturedPro
                     onClick={() => addItem(product, variant, 1)}
                     className="mt-3 w-full py-2 bg-sage-500 text-white text-sm font-medium rounded hover:bg-sage-600 transition-colors"
                   >
-                    Add to Cart
+                    {tCard('addToCart')}
                   </button>
                 ) : (
                   <Link
                     href="/parent-portal/shop"
                     className="mt-3 block w-full py-2 border border-sage-500 text-sage-600 text-sm font-medium rounded text-center hover:bg-sage-50 transition-colors"
                   >
-                    View Options
+                    {t('viewOptions')}
                   </Link>
                 )}
               </div>

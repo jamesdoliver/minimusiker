@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateMockInventory, StockItem } from '@/lib/types/stock';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
+export const dynamic = 'force-dynamic';
+
 // In-memory storage for development (will be replaced with Airtable)
 let inventoryCache: StockItem[] | null = null;
 

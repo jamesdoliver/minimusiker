@@ -48,11 +48,102 @@ export interface CheckoutCustomAttributes {
   schoolName?: string;
 }
 
-// Shopify checkout response
+// Shopify checkout response (legacy - kept for backward compatibility)
 export interface ShopifyCheckout {
   checkoutId: string;
   checkoutUrl: string;
   webUrl: string;
+}
+
+// ======================================================================
+// Cart API Types (Modern Shopify API - 2025)
+// ======================================================================
+
+// Cart line item for creating/updating cart
+export interface CartLineInput {
+  merchandiseId: string; // Product variant ID
+  quantity: number;
+}
+
+// Cart attribute (custom data attached to cart/order)
+export interface CartAttribute {
+  key: string;
+  value: string;
+}
+
+// Buyer identity for cart
+export interface CartBuyerIdentity {
+  email?: string;
+  phone?: string;
+  countryCode?: string;
+}
+
+// Cart creation input
+export interface CartCreateInput {
+  lines: CartLineInput[];
+  attributes?: CartAttribute[];
+  buyerIdentity?: CartBuyerIdentity;
+}
+
+// Custom attributes for MiniMusiker orders
+export interface MiniMusikerCartAttributes {
+  parentId: string;
+  parentEmail: string;
+  eventId?: string;
+  bookingId?: string;
+  schoolName?: string;
+}
+
+// Cart line item from API response
+export interface ShopifyCartLine {
+  id: string;
+  quantity: number;
+  merchandise: {
+    id: string;
+    title: string;
+    product: {
+      title: string;
+    };
+    price: {
+      amount: string;
+      currencyCode: string;
+    };
+  };
+}
+
+// Cart response from Shopify
+export interface ShopifyCart {
+  id: string;
+  checkoutUrl: string;
+  totalQuantity: number;
+  cost: {
+    totalAmount: {
+      amount: string;
+      currencyCode: string;
+    };
+    subtotalAmount: {
+      amount: string;
+      currencyCode: string;
+    };
+  };
+  lines: {
+    edges: Array<{
+      node: ShopifyCartLine;
+    }>;
+  };
+  attributes: CartAttribute[];
+  buyerIdentity?: {
+    email?: string;
+  };
+}
+
+// Result of cart creation
+export interface CartCreateResult {
+  cartId: string;
+  checkoutUrl: string;
+  totalQuantity: number;
+  totalAmount: number;
+  currency: string;
 }
 
 // Filter and sort options for product catalog

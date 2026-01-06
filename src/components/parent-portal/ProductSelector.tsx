@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { ParentSessionChild } from '@/types/airtable';
 import { CLOTHING_SIZES, ClothingSize } from '@/lib/types/stock';
 
@@ -129,23 +130,24 @@ interface AudioCardProps {
 
 function AudioCard({ type, selected, onSelect }: AudioCardProps) {
   if (!type) return null;
+  const t = useTranslations('audio');
 
   const config = {
     minicard: {
-      title: 'Minicard',
-      description: 'Digital audio card with QR code',
+      title: t('minicard'),
+      description: t('minicardDescription'),
       icon: '💳',
       price: PRICES.audio.minicard,
     },
     cd: {
-      title: 'CD',
-      description: 'Physical CD with album artwork',
+      title: t('cd'),
+      description: t('cdDescription'),
       icon: '💿',
       price: PRICES.audio.cd,
     },
     bundle: {
-      title: 'Minicard + CD',
-      description: 'Both formats included',
+      title: t('bundle'),
+      description: t('bundleDescription'),
       icon: '🎁',
       price: PRICES.audio.bundle,
       savings: AUDIO_BUNDLE_SAVINGS,
@@ -166,7 +168,7 @@ function AudioCard({ type, selected, onSelect }: AudioCardProps) {
       {/* Savings Badge */}
       {savings && (
         <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-          Save €{savings.toFixed(0)}
+          {t('save', { amount: savings.toFixed(0) })}
         </div>
       )}
 
@@ -205,14 +207,16 @@ interface AudioSectionProps {
 }
 
 function AudioSection({ selected, onSelect }: AudioSectionProps) {
+  const t = useTranslations('productSelector');
+
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-4">
         <span className="flex items-center justify-center w-7 h-7 bg-sage-600 text-white text-sm font-bold rounded-full">
           1
         </span>
-        <h3 className="text-lg font-bold text-gray-900">Choose Your Audio</h3>
-        <span className="text-xs text-red-500 font-medium">(Required)</span>
+        <h3 className="text-lg font-bold text-gray-900">{t('chooseAudio')}</h3>
+        <span className="text-xs text-red-500 font-medium">{t('required')}</span>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
@@ -235,29 +239,31 @@ interface ClothingCardProps {
 }
 
 function ClothingCard({ type, onAdd, hasComboDiscount }: ClothingCardProps) {
+  const t = useTranslations('clothing');
+  const tProduct = useTranslations('productSelector');
   const [tshirtSize, setTshirtSize] = useState<ClothingSize>('128');
   const [hoodieSize, setHoodieSize] = useState<ClothingSize>('128');
 
   const config = {
     tshirt: {
-      title: 'T-Shirt',
-      description: 'Premium cotton event t-shirt',
+      title: t('tshirt'),
+      description: t('tshirtDescription'),
       icon: '👕',
       price: PRICES.clothing.tshirt,
       showTshirtSize: true,
       showHoodieSize: false,
     },
     hoodie: {
-      title: 'Hoodie',
-      description: 'Cozy hooded sweatshirt',
+      title: t('hoodie'),
+      description: t('hoodieDescription'),
       icon: '🧥',
       price: PRICES.clothing.hoodie,
       showTshirtSize: false,
       showHoodieSize: true,
     },
     bundle: {
-      title: 'T-Shirt + Hoodie',
-      description: 'Both items included',
+      title: t('bundle'),
+      description: t('bundleDescription'),
       icon: '🎁',
       price: PRICES.clothing.bundle,
       savings: CLOTHING_BUNDLE_SAVINGS,
@@ -277,7 +283,7 @@ function ClothingCard({ type, onAdd, hasComboDiscount }: ClothingCardProps) {
       {/* Savings Badge */}
       {savings && (
         <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-          Save €{savings.toFixed(0)}
+          {t('save', { amount: savings.toFixed(0) })}
         </div>
       )}
 
@@ -292,14 +298,14 @@ function ClothingCard({ type, onAdd, hasComboDiscount }: ClothingCardProps) {
           <SizeSelector
             value={tshirtSize}
             onChange={setTshirtSize}
-            label={showHoodieSize ? 'T-Shirt:' : undefined}
+            label={showHoodieSize ? tProduct('tshirtLabel') : undefined}
           />
         )}
         {showHoodieSize && (
           <SizeSelector
             value={hoodieSize}
             onChange={setHoodieSize}
-            label={showTshirtSize ? 'Hoodie:' : undefined}
+            label={showTshirtSize ? tProduct('hoodieLabel') : undefined}
           />
         )}
       </div>
@@ -312,13 +318,13 @@ function ClothingCard({ type, onAdd, hasComboDiscount }: ClothingCardProps) {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
         </svg>
-        Add
+        {tProduct('addButton')}
       </button>
 
       {/* Combo Discount Hint */}
       {hasComboDiscount && (
         <p className="text-xs text-sage-600 font-medium mt-2 text-center">
-          10% off with audio!
+          {tProduct('comboHint')}
         </p>
       )}
     </div>
@@ -338,14 +344,21 @@ interface ClothingSectionProps {
 }
 
 function ClothingSection({ clothing, onAdd, onRemove, onUpdateQuantity, hasAudioSelected }: ClothingSectionProps) {
+  const t = useTranslations('productSelector');
+  const tClothing = useTranslations('clothing');
+
+  const getItemLabel = (type: ClothingType) => {
+    return type === 'tshirt' ? tClothing('tshirt') : type === 'hoodie' ? tClothing('hoodie') : tClothing('bundleLabel');
+  };
+
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-2">
         <span className="flex items-center justify-center w-7 h-7 bg-sage-600 text-white text-sm font-bold rounded-full">
           2
         </span>
-        <h3 className="text-lg font-bold text-gray-900">Add Clothing</h3>
-        <span className="text-xs text-gray-500 font-medium">(Optional)</span>
+        <h3 className="text-lg font-bold text-gray-900">{t('addClothing')}</h3>
+        <span className="text-xs text-gray-500 font-medium">{t('optional')}</span>
       </div>
 
       {/* Discount Banner */}
@@ -353,7 +366,7 @@ function ClothingSection({ clothing, onAdd, onRemove, onUpdateQuantity, hasAudio
         <div className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg">
           <p className="text-sm text-amber-800 font-medium flex items-center gap-2">
             <span className="text-lg">🎉</span>
-            Save 10% when you add clothing to your order!
+            {t('discountBanner')}
           </p>
         </div>
       )}
@@ -367,7 +380,7 @@ function ClothingSection({ clothing, onAdd, onRemove, onUpdateQuantity, hasAudio
       {/* Added Items List */}
       {clothing.length > 0 && (
         <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-sm font-medium text-gray-700 mb-2">Added Items:</p>
+          <p className="text-sm font-medium text-gray-700 mb-2">{t('addedItems')}</p>
           <div className="space-y-2">
             {clothing.map((item) => (
               <div key={item.id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-gray-200">
@@ -377,14 +390,14 @@ function ClothingSection({ clothing, onAdd, onRemove, onUpdateQuantity, hasAudio
                   </span>
                   <div>
                     <p className="text-sm font-medium text-gray-900">
-                      {item.type === 'tshirt' ? 'T-Shirt' : item.type === 'hoodie' ? 'Hoodie' : 'T-Shirt + Hoodie'}
+                      {getItemLabel(item.type)}
                     </p>
                     <p className="text-xs text-gray-500">
                       {item.type === 'bundle'
-                        ? `T-Shirt: ${item.tshirtSize}cm, Hoodie: ${item.hoodieSize}cm`
+                        ? `${t('tshirtLabel')} ${item.tshirtSize}cm, ${t('hoodieLabel')} ${item.hoodieSize}cm`
                         : item.type === 'tshirt'
-                        ? `Size: ${item.tshirtSize}cm`
-                        : `Size: ${item.hoodieSize}cm`}
+                        ? `${t('size')} ${item.tshirtSize}cm`
+                        : `${t('size')} ${item.hoodieSize}cm`}
                     </p>
                   </div>
                 </div>
@@ -430,16 +443,20 @@ interface OrderSummaryProps {
 }
 
 function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSummaryProps) {
+  const t = useTranslations('orderSummary');
+  const tAudio = useTranslations('audio');
+  const tClothing = useTranslations('clothing');
+
   const audioLabels = {
-    minicard: 'Minicard',
-    cd: 'CD',
-    bundle: 'Minicard + CD Bundle',
+    minicard: tAudio('minicard'),
+    cd: tAudio('cd'),
+    bundle: tAudio('bundleLabel'),
   };
 
   const clothingLabels = {
-    tshirt: 'T-Shirt',
-    hoodie: 'Hoodie',
-    bundle: 'T-Shirt + Hoodie Bundle',
+    tshirt: tClothing('tshirt'),
+    hoodie: tClothing('hoodie'),
+    bundle: tClothing('bundleLabel'),
   };
 
   const hasItems = selection.audio !== null || selection.clothing.length > 0;
@@ -451,11 +468,11 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
         <svg className="w-5 h-5 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
-        Order Summary
+        {t('title')}
       </h3>
 
       {!hasItems ? (
-        <p className="text-sm text-gray-500 text-center py-4">Select items above to build your order</p>
+        <p className="text-sm text-gray-500 text-center py-4">{t('selectItems')}</p>
       ) : (
         <div className="space-y-2">
           {/* Audio Line Item */}
@@ -489,7 +506,7 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
           {/* Divider */}
           <div className="border-t border-gray-200 pt-2 mt-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Subtotal</span>
+              <span className="text-gray-600">{t('subtotal')}</span>
               <span className="text-gray-900">€{totals.subtotal.toFixed(2)}</span>
             </div>
 
@@ -498,7 +515,7 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
               <div className="flex justify-between text-sm text-sage-600">
                 <span className="flex items-center gap-1">
                   <span className="text-xs">🎉</span>
-                  Combo Discount ({totals.discountPercent}%)
+                  {t('comboDiscount', { percent: totals.discountPercent })}
                 </span>
                 <span>-€{totals.discount.toFixed(2)}</span>
               </div>
@@ -506,7 +523,7 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
 
             {/* Total */}
             <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
-              <span className="text-lg font-bold text-gray-900">Total</span>
+              <span className="text-lg font-bold text-gray-900">{t('total')}</span>
               <span className="text-2xl font-bold text-sage-700">€{totals.total.toFixed(2)}</span>
             </div>
           </div>
@@ -529,17 +546,17 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
-            Processing...
+            {t('processing')}
           </>
         ) : canCheckout ? (
           <>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>
-            Checkout - €{totals.total.toFixed(2)}
+            {t('checkout', { total: totals.total.toFixed(2) })}
           </>
         ) : (
-          'Select audio to continue'
+          t('selectAudio')
         )}
       </button>
 
@@ -549,14 +566,14 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
           <svg className="w-4 h-4 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
           </svg>
-          Secure
+          {t('secure')}
         </span>
         <span className="flex items-center gap-1">
           <svg className="w-4 h-4 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
             <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
             <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
           </svg>
-          Fast Delivery
+          {t('fastDelivery')}
         </span>
       </div>
     </div>
@@ -574,6 +591,7 @@ export default function ProductSelector({
   children = [],
   onCheckout,
 }: ProductSelectorProps) {
+  const t = useTranslations('productSelector');
   const [selection, setSelection] = useState<ProductSelection>({
     audio: null,
     clothing: [],
@@ -660,10 +678,10 @@ export default function ProductSelector({
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <span className="text-2xl">🎵</span>
-          Complete Your Order
+          {t('title')}
         </h2>
         <p className="text-gray-600 mt-1">
-          Capture the memories from {schoolName}
+          {t('subtitle', { schoolName })}
         </p>
       </div>
 
