@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Grandstander, Rubik, Amaranth } from 'next/font/google';
+import { Grandstander, Rubik, Amaranth, Playfair_Display } from 'next/font/google';
 import { Toaster } from 'sonner';
 import './globals.css';
 
@@ -22,6 +22,14 @@ const amaranth = Amaranth({
   subsets: ['latin'],
   weight: ['700'],
   variable: '--font-amaranth',
+  display: 'swap',
+});
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  style: ['italic'],
+  weight: ['400', '600'],
+  variable: '--font-playfair',
   display: 'swap',
 });
 
@@ -57,7 +65,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${rubik.variable} ${grandstander.variable} ${amaranth.variable} ${rubik.className}`}>
+      <body className={`${rubik.variable} ${grandstander.variable} ${amaranth.variable} ${playfair.variable} ${rubik.className}`}>
         <div className="min-h-screen bg-background">
           {children}
         </div>

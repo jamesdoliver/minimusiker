@@ -58,6 +58,15 @@ const config: Config = {
           accent: '#FE4980',    // Bright pink for emphasis
           body: '#000000',      // Black body text
         },
+        // Teacher Portal v2 Design Tokens
+        mm: {
+          'primary-dark': '#1e3a4c',  // Header, hero background
+          'accent': '#d85a6a',        // Buttons, coral sections
+          'bg-light': '#f7f7f7',      // Page background
+          'bg-muted': '#e8e8e8',      // Contact section
+          'success': '#4caf50',       // Checkmarks
+          'warning': '#f5a623',       // Alert icons
+        },
         sage: {
           50: '#F7FAF9',   // Lightest sage
           100: '#EBF3F1',  // Very light sage
@@ -92,6 +101,7 @@ const config: Config = {
         sans: ['var(--font-rubik)', 'system-ui', 'sans-serif'],
         heading: ['var(--font-grandstander)', 'sans-serif'],
         button: ['var(--font-amaranth)', 'sans-serif'],
+        playfair: ['var(--font-playfair)', 'Georgia', 'serif'],
       },
       keyframes: {
         'accordion-down': {
