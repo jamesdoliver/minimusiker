@@ -4171,6 +4171,142 @@ class AirtableService {
       throw new Error(`Failed to clear logo: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
+  // ========================================
+  // Event Creation from Booking
+  // ========================================
+
+  /**
+   * Create an Event record from a SchoolBooking
+   * Called by SimplyBook webhook after creating SchoolBookings record
+   *
+   * @param eventId - Generated event_id (e.g., evt_school_minimusiker_20260115_abc123)
+   * @param schoolBookingRecordId - Airtable record ID of the SchoolBookings record
+   * @param schoolName - School name from booking
+   * @param eventDate - Event date (ISO string)
+   * @param staffId - Optional staff ID to assign
+   * @returns Created Event record
+   */
+  async createEventFromBooking(
+    eventId: string,
+    schoolBookingRecordId: string,
+    schoolName: string,
+    eventDate: string,
+    staffId?: string
+  ): Promise<Event> {
+    this.ensureNormalizedTablesInitialized();
+
+    try {
+      // Check if event already exists (idempotency)
+      const existingRecords = await this.base(EVENTS_TABLE_ID).select({
+        filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = "${eventId}"`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (existingRecords.length > 0) {
+        console.log(`Event ${eventId} already exists, returning existing record`);
+        return this.transformEventRecord(existingRecords[0]);
+      }
+
+      // Create the Event record
+      const eventFields: Record<string, any> = {
+        [EVENTS_FIELD_IDS.event_id]: eventId,
+        [EVENTS_FIELD_IDS.school_name]: schoolName,
+        [EVENTS_FIELD_IDS.event_date]: eventDate,
+        [EVENTS_FIELD_IDS.event_type]: 'concert', // Default type, can be updated later
+        [EVENTS_FIELD_IDS.simplybook_booking]: [schoolBookingRecordId],
+        [EVENTS_FIELD_IDS.created_at]: new Date().toISOString(),
+      };
+
+      // Add staff assignment if provided
+      if (staffId) {
+        eventFields[EVENTS_FIELD_IDS.assigned_staff] = [staffId];
+      }
+
+      const record = await this.base(EVENTS_TABLE_ID).create(eventFields);
+      console.log(`Created Event record: ${record.id} with event_id: ${eventId}`);
+
+      return this.transformEventRecord(record);
+    } catch (error) {
+      console.error('Error creating Event from booking:', error);
+      throw new Error(`Failed to create Event: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get an Event by its event_id
+   */
+  async getEventByEventId(eventId: string): Promise<Event | null> {
+    try {
+      const records = await this.base(EVENTS_TABLE_ID).select({
+        filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = "${eventId}"`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (records.length === 0) {
+        return null;
+      }
+
+      return this.transformEventRecord(records[0]);
+    } catch (error) {
+      console.error('Error fetching Event by event_id:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get logo URL for an Einrichtung (school)
+   * Returns the logo_url field if it exists
+   */
+  async getEinrichtungLogoUrl(einrichtungId: string): Promise<string | null> {
+    try {
+      const record = await this.base(EINRICHTUNGEN_TABLE_ID).find(einrichtungId);
+      const logoUrl = record.get(EINRICHTUNGEN_FIELD_IDS.logo_url) as string | undefined;
+      return logoUrl || null;
+    } catch (error) {
+      console.error('Error fetching Einrichtung logo URL:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get direct access to the Airtable base
+   * Used by taskService for direct table operations
+   */
+  getBase(): Airtable.Base {
+    return this.base;
+  }
+
+  /**
+   * Get an Event by its Airtable record ID
+   */
+  async getEventById(recordId: string): Promise<Event | null> {
+    try {
+      const record = await this.base(EVENTS_TABLE_ID).find(recordId);
+      return this.transformEventRecord(record);
+    } catch (error) {
+      console.error('Error fetching Event by record ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Transform an Airtable Event record to our Event type
+   */
+  private transformEventRecord(record: Airtable.Record<FieldSet>): Event {
+    return {
+      id: record.id,
+      event_id: record.get(EVENTS_FIELD_IDS.event_id) as string || '',
+      school_name: record.get(EVENTS_FIELD_IDS.school_name) as string || '',
+      event_date: record.get(EVENTS_FIELD_IDS.event_date) as string || '',
+      event_type: (record.get(EVENTS_FIELD_IDS.event_type) as Event['event_type']) || 'concert',
+      assigned_staff: record.get(EVENTS_FIELD_IDS.assigned_staff) as string[] | undefined,
+      assigned_engineer: record.get(EVENTS_FIELD_IDS.assigned_engineer) as string[] | undefined,
+      created_at: record.get(EVENTS_FIELD_IDS.created_at) as string || '',
+      legacy_booking_id: record.get(EVENTS_FIELD_IDS.legacy_booking_id) as string | undefined,
+      simplybook_booking: record.get(EVENTS_FIELD_IDS.simplybook_booking) as string[] | undefined,
+    };
+  }
 }
 
 // Lazy getter to prevent build-time instantiation

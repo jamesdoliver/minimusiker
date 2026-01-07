@@ -607,6 +607,10 @@ export interface Event {
   created_at: string;
   legacy_booking_id?: string;           // Original booking_id from parent_journey_table
   simplybook_booking?: string[];        // Linked record IDs → SchoolBookings
+  // R2 Storage fields (populated after printable generation)
+  r2_event_folder?: string;             // R2 path: events/{event_id}/
+  printables_generated?: boolean;       // Flag indicating printables have been generated
+  printables_generated_at?: string;     // ISO timestamp of last generation
 }
 
 /**
@@ -717,3 +721,46 @@ export interface CreateShopifyOrderInput {
   payment_status: 'pending' | 'paid' | 'refunded' | 'voided';
   digital_delivered?: boolean;
 }
+
+// ======================================================================
+// TASKS TABLE - Manual task management for admin portal
+// ======================================================================
+
+export const TASKS_TABLE_ID = 'tblf59JyawJjgDqPJ';
+
+export const TASKS_FIELD_IDS = {
+  task_id: 'fldYwXmqYLHXmCd1B',              // Autonumber primary field
+  template_id: 'fldVXRwHmCbmRwAoe',          // Single line text - reference to hardcoded template
+  event_id: 'fldsyDbcBy1yzjbdI',             // Linked record → Events
+  task_type: 'fld1BhaWmhl0opQBU',            // Single select: paper_order, clothing_order, etc.
+  task_name: 'fldKx1kQZX571SlUG',            // Single line text
+  description: 'fldOBfsp7Ahso72rJ',          // Long text
+  completion_type: 'fldLgArrpofS6dlHk',      // Single select: monetary, checkbox, submit_only
+  timeline_offset: 'flddNjbhxVtoKvzeE',      // Number (days)
+  deadline: 'fld3KdpL5s6HKYm6t',             // Date
+  status: 'fldTlA0kywaIji0BL',               // Single select: pending, completed
+  completed_at: 'fldMPIc4fgagb9YTx',         // Date
+  completed_by: 'fldF1iEru5pHcNupv',         // Single line text (admin email)
+  completion_data: 'fldHeL68HQXjcHGQk',      // Long text (JSON)
+  go_id: 'fld4zyH5ApLKQNq5V',                 // Linked record → GuesstimateOrders
+  order_ids: 'fldqilVgYKVAQsTpr',            // Long text (comma-separated)
+  parent_task_id: 'fldN73QVTWRGYbaVJ',       // Linked record → Tasks (for shipping tasks)
+  created_at: 'fldt32Ff4DXY8ax47',           // Date
+} as const;
+
+// ======================================================================
+// GUESSTIMATE ORDERS TABLE - Internal supplier order tracking (go_id)
+// ======================================================================
+
+export const GUESSTIMATE_ORDERS_TABLE_ID = 'tblvNKyWN47i4blkr';
+
+export const GUESSTIMATE_ORDERS_FIELD_IDS = {
+  go_id: 'fld9vRXqlbfMD1jdN',                // Autonumber primary field (GO-0001)
+  event_id: 'fldGNOCRcZmcCj7oe',             // Linked record → Events
+  order_ids: 'fldNTkJTH919G9UE7',            // Long text (comma-separated Shopify order IDs)
+  order_date: 'fld36vRN0TZTnp5fO',           // Date
+  order_amount: 'fldF8YMv8SoHjZMiN',         // Number (Currency EUR)
+  contains: 'fldue3s3KdcR5ho6L',             // Long text (JSON)
+  date_completed: 'fldjkx4tuq21ni7Xf',       // Date
+  created_at: 'fldNyOb6nXRoJ7CsX',           // Date
+} as const;

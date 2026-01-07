@@ -9,6 +9,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: '📊' },
   { name: 'Bookings', href: '/admin/bookings', icon: '📋' },
+  { name: 'Tasks', href: '/admin/tasks', icon: '✅' },
   { name: 'Upload', href: '/admin/upload', icon: '📤' },
   { name: 'Analytics', href: '/admin/analytics', icon: '📈' },
   { name: 'Stock', href: '/admin/stock', icon: '📦' },
