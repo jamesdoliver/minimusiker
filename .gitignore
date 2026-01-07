@@ -80,3 +80,6 @@ Thumbs.db
 
 # Playwright MCP local files
 .playwright-mcp/
+
+# Git worktrees
+.worktrees/
