@@ -16,7 +16,7 @@ export function MusicianIntroSection({
   return (
     <section className="bg-mm-accent text-white py-12 md:py-16">
       <div className="max-w-[1100px] mx-auto px-6">
-        <h2 className="text-2xl md:text-3xl font-bold text-center mb-10">
+        <h2 className="text-2xl md:text-3xl font-bold text-center mb-10 text-white">
           Am Minimusikertag komme ICH zu euch!
         </h2>
 
