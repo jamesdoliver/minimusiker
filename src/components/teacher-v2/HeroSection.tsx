@@ -29,7 +29,7 @@ export function HeroSection({ firstName, schoolInfo, onEditInfo }: HeroSectionPr
         <div className="grid md:grid-cols-2 gap-8 items-start">
           {/* Left: Welcome text */}
           <div>
-            <h1 className="font-playfair italic text-3xl md:text-4xl mb-4">
+            <h1 className="font-bold text-3xl md:text-4xl mb-4">
               Willkommen, {firstName}
             </h1>
             <p className="text-white/80 text-base leading-relaxed">
