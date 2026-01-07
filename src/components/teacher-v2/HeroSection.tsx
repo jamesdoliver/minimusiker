@@ -15,7 +15,7 @@ interface HeroSectionProps {
 
 export function HeroSection({ firstName, schoolInfo, onEditInfo }: HeroSectionProps) {
   return (
-    <section className="bg-mm-primary-dark text-white py-12 md:py-16 relative overflow-hidden">
+    <section className="bg-mm-accent text-white py-12 md:py-16 relative overflow-hidden">
       {/* Decorative dots pattern - top right */}
       <div className="absolute top-8 right-8 opacity-20 hidden md:block">
         <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
