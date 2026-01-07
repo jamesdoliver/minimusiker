@@ -14,6 +14,7 @@ import PendingBookingsModal from '@/components/teacher/PendingBookingsModal';
 import {
   TopNav,
   HeroSection,
+  SchoolInfoCard,
   ProjectSection,
   MusicianIntroSection,
   ContactSection,
@@ -203,16 +204,20 @@ export default function TeacherDashboard() {
       {/* Main content */}
       <main>
         {/* Hero Section */}
-        <HeroSection
-          firstName={firstName}
-          schoolInfo={{
-            schoolName: teacherInfo?.schoolName || '',
-            address: teacherInfo?.schoolAddress,
-            email: teacherInfo?.email || '',
-            phone: teacherInfo?.schoolPhone,
-          }}
-          onEditInfo={() => setIsEditModalOpen(true)}
-        />
+        <HeroSection firstName={firstName} />
+
+        {/* School Info Card Section */}
+        <section className="bg-mm-bg-light py-8">
+          <div className="max-w-[1100px] mx-auto px-6">
+            <SchoolInfoCard
+              schoolName={teacherInfo?.schoolName || ''}
+              address={teacherInfo?.schoolAddress}
+              email={teacherInfo?.email || ''}
+              phone={teacherInfo?.schoolPhone}
+              onEdit={() => setIsEditModalOpen(true)}
+            />
+          </div>
+        </section>
 
         {/* Project Section */}
         <ProjectSection
