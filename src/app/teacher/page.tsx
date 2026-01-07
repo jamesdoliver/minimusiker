@@ -56,10 +56,14 @@ export default function TeacherDashboard() {
   // Edit school info modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // School logo state
+  const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
+
   useEffect(() => {
     checkAuthAndFetchData();
     fetchRepresentative();
     fetchTips();
+    fetchSchoolLogo();
   }, []);
 
   const checkAuthAndFetchData = async () => {
@@ -130,6 +134,18 @@ export default function TeacherDashboard() {
       console.error('Error fetching tips:', err);
     } finally {
       setIsTipsLoading(false);
+    }
+  };
+
+  const fetchSchoolLogo = async () => {
+    try {
+      const response = await fetch('/api/teacher/school/logo');
+      const data = await response.json();
+      if (response.ok && data.logoUrl) {
+        setSchoolLogoUrl(data.logoUrl);
+      }
+    } catch (err) {
+      console.error('Error fetching school logo:', err);
     }
   };
 
@@ -214,7 +230,9 @@ export default function TeacherDashboard() {
               address={teacherInfo?.schoolAddress}
               email={teacherInfo?.email || ''}
               phone={teacherInfo?.schoolPhone}
+              logoUrl={schoolLogoUrl || undefined}
               onEdit={() => setIsEditModalOpen(true)}
+              onLogoUpload={(url) => setSchoolLogoUrl(url)}
             />
           </div>
         </section>
