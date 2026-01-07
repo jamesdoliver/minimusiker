@@ -16,10 +16,6 @@ export function MusicianIntroSection({
   return (
     <section className="bg-mm-accent text-white py-12 md:py-16">
       <div className="max-w-[1100px] mx-auto px-6">
-        <h2 className="text-2xl md:text-3xl font-bold text-center mb-10 text-white">
-          Am Minimusikertag komme ICH zu euch!
-        </h2>
-
         {/* Loading State */}
         {isLoading && (
           <div className="flex items-center justify-center py-12">
@@ -46,28 +42,31 @@ export function MusicianIntroSection({
           </div>
         )}
 
-        {/* Representative Display */}
+        {/* Representative Display - 2-column grid with photo centered vertically */}
         {!isLoading && representative && (
-          <div className="flex flex-col md:flex-row items-center gap-8 max-w-3xl mx-auto">
-            {/* Circular photo */}
-            <div className="flex-shrink-0">
+          <div className="grid md:grid-cols-[auto_1fr] gap-8 max-w-3xl mx-auto items-center">
+            {/* Left: Circular photo - vertically centered */}
+            <div className="flex justify-center">
               {representative.profilePhotoUrl ? (
                 <img
                   src={representative.profilePhotoUrl}
                   alt={representative.name}
-                  className="w-32 h-32 rounded-full object-cover border-4 border-white"
+                  className="w-48 h-48 rounded-full object-cover border-4 border-white"
                 />
               ) : (
-                <div className="w-32 h-32 rounded-full bg-white/20 flex items-center justify-center border-4 border-white">
-                  <span className="text-white text-4xl font-bold">
+                <div className="w-48 h-48 rounded-full bg-white/20 flex items-center justify-center border-4 border-white">
+                  <span className="text-white text-5xl font-bold">
                     {representative.name.charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Bio text */}
+            {/* Right: Heading + Bio + Contact */}
             <div className="text-center md:text-left">
+              <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white">
+                Am Minimusikertag komme ICH zu euch!
+              </h2>
               <p className="text-white/90 leading-relaxed mb-4 whitespace-pre-wrap">
                 {representative.bio}
               </p>
@@ -83,14 +82,24 @@ export function MusicianIntroSection({
 
         {/* Fallback for no representative */}
         {!isLoading && !representative && (
-          <div className="flex flex-col items-center text-center py-8">
-            <div className="w-32 h-32 rounded-full bg-white/20 flex items-center justify-center mb-4 border-4 border-white">
-              <span className="text-white text-4xl font-bold">M</span>
+          <div className="grid md:grid-cols-[auto_1fr] gap-8 max-w-3xl mx-auto items-center">
+            {/* Left: Placeholder photo */}
+            <div className="flex justify-center">
+              <div className="w-48 h-48 rounded-full bg-white/20 flex items-center justify-center border-4 border-white">
+                <span className="text-white text-5xl font-bold">M</span>
+              </div>
             </div>
-            <p className="text-white/90 text-sm max-w-md">
-              Wir freuen uns darauf, Sie bei Ihrem Minimusikertag zu besuchen!
-              Bei Fragen können Sie sich jederzeit an uns wenden.
-            </p>
+
+            {/* Right: Heading + Fallback text */}
+            <div className="text-center md:text-left">
+              <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white">
+                Am Minimusikertag komme ICH zu euch!
+              </h2>
+              <p className="text-white/90 leading-relaxed">
+                Wir freuen uns darauf, Sie bei Ihrem Minimusikertag zu besuchen!
+                Bei Fragen können Sie sich jederzeit an uns wenden.
+              </p>
+            </div>
           </div>
         )}
       </div>
