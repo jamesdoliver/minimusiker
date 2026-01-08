@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EventAnalyticsTable from '@/components/admin/analytics/EventAnalyticsTable';
 import ExportButtons from '@/components/admin/analytics/ExportButtons';
@@ -10,7 +10,7 @@ import {
   calculateFixedTotal,
   calculateVariableTotal,
   generateFillerVariableCosts,
-  generateFillerRevenue,
+  generateFillerRevenueBreakdown,
   determineEventStatus,
 } from '@/lib/types/analytics';
 import { SchoolEventSummary } from '@/lib/types/airtable';
@@ -19,10 +19,11 @@ import { SchoolEventSummary } from '@/lib/types/airtable';
 function transformToAnalyticsRow(event: SchoolEventSummary): EventAnalyticsRow {
   // Generate filler data (will be replaced with real data from Shopify/Stock DB later)
   const variableCosts = generateFillerVariableCosts();
+  const revenueBreakdown = generateFillerRevenueBreakdown();
   const fixedTotal = calculateFixedTotal(DEFAULT_FIXED_COSTS);
   const variableTotal = calculateVariableTotal(variableCosts);
-  const totalCost = fixedTotal + variableTotal;
-  const revenue = generateFillerRevenue();
+  const manualTotal = 0; // Manual costs will be fetched when row expands
+  const totalCost = fixedTotal + variableTotal + manualTotal;
 
   // Calculate registration percentage
   const registeredChildren = event.totalParents; // Using parents as proxy for registered children
@@ -33,26 +34,29 @@ function transformToAnalyticsRow(event: SchoolEventSummary): EventAnalyticsRow {
   const status = determineEventStatus(event.eventDate);
 
   // Calculate AOV (Average Order Value)
-  const aov = registeredChildren > 0 ? revenue / registeredChildren : 0;
+  const aov = registeredChildren > 0 ? revenueBreakdown.totalRevenue / registeredChildren : 0;
 
   return {
     eventId: event.eventId,
     eventName: `${event.schoolName} - ${event.eventDate}`,
     schoolName: event.schoolName,
     eventDate: event.eventDate,
-    totalRevenue: revenue,
+    totalRevenue: revenueBreakdown.totalRevenue,
     aov,
     incurredCost: totalCost,
-    profit: revenue - totalCost,
+    profit: revenueBreakdown.totalRevenue - totalCost,
     status,
     registrationPercent,
     totalChildren,
     registeredChildren,
+    revenue: revenueBreakdown,
     costs: {
       fixed: { ...DEFAULT_FIXED_COSTS },
       variable: variableCosts,
+      manual: [], // Manual costs will be fetched when row expands
       fixedTotal,
       variableTotal,
+      manualTotal,
       totalCost,
     },
   };
@@ -62,8 +66,15 @@ export default function AdminAnalytics() {
   const [events, setEvents] = useState<SchoolEventSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    // Increment refresh key to force re-fetch of data
+    setRefreshKey((prev) => prev + 1);
     fetchEvents();
   }, []);
 
@@ -84,9 +95,10 @@ export default function AdminAnalytics() {
   };
 
   // Transform events to analytics rows (memoized to keep filler data stable)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const analyticsData = useMemo(() => {
     return events.map(transformToAnalyticsRow);
-  }, [events]);
+  }, [events, refreshKey]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -217,7 +229,7 @@ export default function AdminAnalytics() {
       </div>
 
       {/* Main Table */}
-      <EventAnalyticsTable data={analyticsData} />
+      <EventAnalyticsTable data={analyticsData} onRefresh={handleRefresh} />
 
       {/* Print Styles */}
       <style jsx global>{`

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, Fragment } from 'react';
+import { useState, Fragment, useCallback } from 'react';
 import { EventAnalyticsRow } from '@/lib/types/analytics';
 import StatusBadge from './StatusBadge';
-import EventCostBreakdown from './EventCostBreakdown';
+import EventBreakdown from './EventBreakdown';
 
 interface EventAnalyticsTableProps {
   data: EventAnalyticsRow[];
+  onRefresh?: () => void;
 }
 
 function formatCurrency(amount: number): string {
@@ -38,8 +39,13 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
   );
 }
 
-export default function EventAnalyticsTable({ data }: EventAnalyticsTableProps) {
+export default function EventAnalyticsTable({ data, onRefresh }: EventAnalyticsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const handleManualCostChange = useCallback(() => {
+    // Trigger parent refresh to update totals
+    onRefresh?.();
+  }, [onRefresh]);
 
   const toggleRow = (eventId: string) => {
     setExpandedRows((prev) => {
@@ -155,9 +161,14 @@ export default function EventAnalyticsTable({ data }: EventAnalyticsTableProps) 
                       <td colSpan={8} className="p-0">
                         <div
                           className="overflow-hidden transition-all duration-300 ease-in-out"
-                          style={{ maxHeight: isExpanded ? '500px' : '0' }}
+                          style={{ maxHeight: isExpanded ? '1000px' : '0' }}
                         >
-                          <EventCostBreakdown costs={row.costs} />
+                          <EventBreakdown
+                            eventId={row.eventId}
+                            revenue={row.revenue}
+                            costs={row.costs}
+                            onManualCostChange={handleManualCostChange}
+                          />
                         </div>
                       </td>
                     </tr>

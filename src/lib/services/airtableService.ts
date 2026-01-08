@@ -33,7 +33,10 @@ import {
   PARENTS_FIELD_IDS,
   REGISTRATIONS_TABLE_ID,
   REGISTRATIONS_FIELD_IDS,
+  EVENT_MANUAL_COSTS_TABLE_ID,
+  EVENT_MANUAL_COSTS_FIELD_IDS,
 } from '@/lib/types/airtable';
+import { ManualCost } from '@/lib/types/analytics';
 
 // Single table name in Airtable
 export const TABLE_NAME = 'parent_journey_table';
@@ -4305,6 +4308,83 @@ class AirtableService {
       created_at: record.get(EVENTS_FIELD_IDS.created_at) as string || '',
       legacy_booking_id: record.get(EVENTS_FIELD_IDS.legacy_booking_id) as string | undefined,
       simplybook_booking: record.get(EVENTS_FIELD_IDS.simplybook_booking) as string[] | undefined,
+    };
+  }
+
+  // ======================================================================
+  // EVENT MANUAL COSTS METHODS
+  // ======================================================================
+
+  /**
+   * Get all manual costs for an event
+   */
+  async getManualCostsForEvent(eventId: string): Promise<ManualCost[]> {
+    try {
+      const records = await this.base(EVENT_MANUAL_COSTS_TABLE_ID)
+        .select({
+          filterByFormula: `SEARCH('${eventId}', ARRAYJOIN({${EVENT_MANUAL_COSTS_FIELD_IDS.event_id}}))`,
+        })
+        .all();
+
+      return records.map((record) => this.transformManualCostRecord(record));
+    } catch (error) {
+      console.error('Error fetching manual costs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Create a new manual cost entry
+   */
+  async createManualCost(
+    eventId: string,
+    costName: string,
+    amount: number
+  ): Promise<ManualCost> {
+    const record = await this.base(EVENT_MANUAL_COSTS_TABLE_ID).create({
+      [EVENT_MANUAL_COSTS_FIELD_IDS.event_id]: [eventId],
+      [EVENT_MANUAL_COSTS_FIELD_IDS.cost_name]: costName,
+      [EVENT_MANUAL_COSTS_FIELD_IDS.amount]: amount,
+    } as Partial<FieldSet>);
+
+    return this.transformManualCostRecord(record);
+  }
+
+  /**
+   * Update an existing manual cost entry
+   */
+  async updateManualCost(
+    costId: string,
+    costName: string,
+    amount: number
+  ): Promise<ManualCost> {
+    const record = await this.base(EVENT_MANUAL_COSTS_TABLE_ID).update(costId, {
+      [EVENT_MANUAL_COSTS_FIELD_IDS.cost_name]: costName,
+      [EVENT_MANUAL_COSTS_FIELD_IDS.amount]: amount,
+    } as Partial<FieldSet>);
+
+    return this.transformManualCostRecord(record);
+  }
+
+  /**
+   * Delete a manual cost entry
+   */
+  async deleteManualCost(costId: string): Promise<void> {
+    await this.base(EVENT_MANUAL_COSTS_TABLE_ID).destroy(costId);
+  }
+
+  /**
+   * Transform an Airtable Manual Cost record to our ManualCost type
+   */
+  private transformManualCostRecord(record: Airtable.Record<FieldSet>): ManualCost {
+    const eventIds = record.get(EVENT_MANUAL_COSTS_FIELD_IDS.event_id) as string[] | undefined;
+    return {
+      id: record.id,
+      eventId: eventIds?.[0] || '',
+      costName: (record.get(EVENT_MANUAL_COSTS_FIELD_IDS.cost_name) as string) || '',
+      amount: (record.get(EVENT_MANUAL_COSTS_FIELD_IDS.amount) as number) || 0,
+      createdAt: (record.get(EVENT_MANUAL_COSTS_FIELD_IDS.created_at) as string) || '',
+      updatedAt: (record.get(EVENT_MANUAL_COSTS_FIELD_IDS.updated_at) as string) || '',
     };
   }
 }

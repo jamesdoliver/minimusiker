@@ -764,3 +764,21 @@ export const GUESSTIMATE_ORDERS_FIELD_IDS = {
   date_completed: 'fldjkx4tuq21ni7Xf',       // Date
   created_at: 'fldNyOb6nXRoJ7CsX',           // Date
 } as const;
+
+// ======================================================================
+// EVENT MANUAL COSTS TABLE - Manual cost entries for Analytics
+// ======================================================================
+
+export const EVENT_MANUAL_COSTS_TABLE_ID = 'tblXnNvWlUFZrJpXa';
+
+export const EVENT_MANUAL_COSTS_FIELD_IDS = {
+  cost_name: 'fldJnFRQa18HcZoue',             // Single line text (Primary)
+  event_id: 'fldthq8q1yWSG8bJR',              // Linked record → Events
+  amount: 'fldRsfIVJz96h9TRa',                // Number (Currency EUR)
+  created_at: 'fldOurLdL7eVIe4ZO',            // Date (Formula)
+  updated_at: 'fldnc246NP2N32rzI',            // Date (Formula)
+  cost_type: 'fldH0FLMSnrioAn74',             // Single select (optional)
+  entered_by: 'fldwOD5duml2UFozS',            // Single line text (optional)
+  description: 'fldy3azQdpvujHaUr',           // Long text (optional)
+  is_verified: 'fldFMq9Io39WPQwdc',           // Checkbox (optional)
+} as const;
