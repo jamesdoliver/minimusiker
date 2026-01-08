@@ -1,51 +1,96 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { ResourceCard } from './ResourceCard';
 
-interface Resource {
-  id: string;
-  title: string;
-  thumbnail: string;
-  type: 'pdf' | 'video';
-  href: string;
+interface TeacherResource {
+  resourceKey: string;
+  pdfUrl: string;
+  displayTitle: string;
 }
 
-interface ResourcesSectionProps {
-  resources?: Resource[];
-}
-
-const defaultResources: Resource[] = [
+// Static resource configuration with images
+// resource1, resource2, resource3 = PDFs from Airtable
+// resource4 = Video (static, links to future training section)
+const RESOURCE_CONFIG = [
   {
-    id: '1',
-    title: 'Liedvorschläge',
-    thumbnail: '',
-    type: 'pdf',
-    href: '#',
+    key: 'resource1',
+    thumbnail: '/images/teacher_portal_resources/Teacher-portal_MATERIAL_1.png',
+    type: 'pdf' as const,
+    fallbackTitle: 'Liedvorschläge',
   },
   {
-    id: '2',
-    title: 'Was singen wir?',
-    thumbnail: '',
-    type: 'pdf',
-    href: '#',
+    key: 'resource2',
+    thumbnail: '/images/teacher_portal_resources/Teacher-portal_MATERIAL_2.png',
+    type: 'pdf' as const,
+    fallbackTitle: 'Was singen wir?',
   },
   {
-    id: '3',
-    title: 'Singen mit Kindern',
-    thumbnail: '',
-    type: 'pdf',
-    href: '#',
+    key: 'resource3',
+    thumbnail: '/images/teacher_portal_resources/Teacher-portal_MATERIAL_3.png',
+    type: 'pdf' as const,
+    fallbackTitle: 'Singen mit Kindern',
   },
   {
-    id: '4',
-    title: 'Warm Up',
-    thumbnail: '',
-    type: 'video',
-    href: '#',
+    key: 'resource4',
+    thumbnail: '/images/teacher_portal_resources/Teacher-portal_MATERIAL_4.png',
+    type: 'video' as const,
+    fallbackTitle: 'Warm Up',
+    staticHref: '#', // Will link to training video section in future
   },
 ];
 
-export function ResourcesSection({ resources = defaultResources }: ResourcesSectionProps) {
+export function ResourcesSection() {
+  const [airtableResources, setAirtableResources] = useState<TeacherResource[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchResources();
+  }, []);
+
+  const fetchResources = async () => {
+    try {
+      const response = await fetch('/api/teacher/resources');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setAirtableResources(data.resources || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Build resources by merging Airtable data with static config
+  const resources = RESOURCE_CONFIG.map((config) => {
+    // For video (resource4), use static config
+    if (config.type === 'video') {
+      return {
+        id: config.key,
+        title: config.fallbackTitle,
+        thumbnail: config.thumbnail,
+        type: config.type,
+        href: config.staticHref || '#',
+      };
+    }
+
+    // For PDFs, find matching Airtable resource
+    const airtableResource = airtableResources.find(
+      (r) => r.resourceKey === config.key
+    );
+
+    return {
+      id: config.key,
+      title: airtableResource?.displayTitle || config.fallbackTitle,
+      thumbnail: config.thumbnail,
+      type: config.type,
+      href: airtableResource?.pdfUrl || '#',
+    };
+  });
+
   return (
     <section className="bg-white py-12 md:py-16">
       <div className="max-w-[1100px] mx-auto px-6">
@@ -54,9 +99,13 @@ export function ResourcesSection({ resources = defaultResources }: ResourcesSect
         </h2>
 
         <p className="text-gray-600 leading-relaxed mb-8 max-w-3xl">
-          Hier findest du hilfreiche Materialien zur Vorbereitung auf den
-          Minimusikertag. Lade dir Liedvorschläge herunter oder schaue dir
-          unser Warm-Up-Video an.
+          In den Wochen vor dem Minimusikertag unterstützen wir euch mit Material
+          und ihr könnt mit unseren Liedvorschlägen euer Repertoire erweitern.
+          Holt euch Inspiration, welches Lied von welcher Klassenstufe gut zu
+          singen ist und macht in eurer internen Liederliste einen vorläufigen
+          Plan. Mit den 5 Tipps zum Singen kannst du auch deinem Kollegium die
+          Vorbereitung leichter machen und ein kurzes Warm-Up stimmt euch bereits
+          aufs Singen ein.
         </p>
 
         {/* Resource grid */}
@@ -68,6 +117,7 @@ export function ResourcesSection({ resources = defaultResources }: ResourcesSect
               thumbnail={resource.thumbnail}
               type={resource.type}
               href={resource.href}
+              isLoading={isLoading && resource.type === 'pdf'}
             />
           ))}
         </div>

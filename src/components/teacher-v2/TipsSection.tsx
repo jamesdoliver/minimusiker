@@ -1,14 +1,42 @@
 'use client';
 
 import { TipAccordionItem } from './TipAccordionItem';
-import type { PreparationTip } from '@/lib/types/preparation-tips';
 
-interface TipsSectionProps {
-  tips: PreparationTip[];
-  isLoading: boolean;
-}
+// Hardcoded preparation tips for all teacher portals
+const PREPARATION_TIPS = [
+  {
+    id: '1',
+    title: 'Weniger ist mehr',
+    content:
+      'Achtet bei eurer Liedauswahl darauf, dass Textsicherheit und Sangesfreude nicht darunter leiden, dass das Lied mit dreiundzwölfzig Strophen daherkommt. Ihr kennt das bei Liedern wie „Die Affen rasen…" oder „Meine Oma fährt…" - die ersten Strophen klappen super und dann wird der Gesang immer vorsichtiger und leiser. Bei der Aufnahme können wir uns darauf verständigen, wieviele Strophen ihr singen wollt und auch richtig gut klappen.',
+  },
+  {
+    id: '2',
+    title: 'Vorbild',
+    content:
+      'Sei dir deiner Rolle als musikalisches Vorbild bewusst. Stehst du vor den Kindern und flüsterst den Liedtext mit, ist das im ersten Moment vielleicht gut gemeint, einige Kinder werden das aber zum Anlass nehmen, ebenfalls zu flüstern. Bei der Aufnahme können wir dich so platzieren, dass du hinter den Mikrofonen - aber den Kindern zugewandt - stehst. So hört man wenig von deinem Gesang auf der Aufnahme und du kannst mit großer Freude mitsingen.',
+  },
+  {
+    id: '3',
+    title: 'Song vs. Playback',
+    content:
+      'Übt die Songs zunächst ruhig in der Version mit Gesang. So lernen und verinnerlichen die Kinde den Text gut. Für die Aufnahme werden wir aber immer die Playbackversion verwenden, denn unser Gesang soll ja nun nicht mit über die Mikrofone aufgenommen werden. Wenn der Gesang aber plötzlich fehlt, werden Einsätze und Strophenanfänge umso wichtiger. Übt die daher besonders.',
+  },
+  {
+    id: '4',
+    title: 'Texthilfen',
+    content:
+      'Gerade für jüngere Kinder sind bildhafte Texthilfen ein echter Gamechanger. Das können kleine Illustrationen oder Piktogramme/Emojis (z.B. Hund/Katze) sein und schon ist klar, wie die erste Strophe beim „Lied über mich" beginnt. Du kannst auch mit Gesten oder Bewegungen eine Hilfestellung geben und beim Lied „Ich lieb den Frühling" in der zweiten Strophe ein „Eis schlecken" vormachen.',
+  },
+  {
+    id: '5',
+    title: 'Zusätzliches Material',
+    content:
+      'Wenn dich die musikalische Kreativität packt, findet du bei uns weiterführendes Material zu vielen Liedern, die den Einsatz von Boomwhackern, Glockenspielen oder eine Begleitung mit Bodypercussion erklären. Unsere Materialpakete und Songpakete sind hier schnelle Ideengeber für die Vorbereitung der Lieder in deinem Musikunterricht.',
+  },
+];
 
-export function TipsSection({ tips, isLoading }: TipsSectionProps) {
+export function TipsSection() {
   return (
     <section className="bg-white py-12 md:py-16">
       <div className="max-w-[1100px] mx-auto px-6">
@@ -16,76 +44,16 @@ export function TipsSection({ tips, isLoading }: TipsSectionProps) {
           Tipps für die Vorbereitung
         </h2>
 
-        <div className="grid md:grid-cols-2 gap-12 items-start">
-          {/* Left: Accordion */}
-          <div>
-            {/* Loading State */}
-            {isLoading && (
-              <div className="flex items-center justify-center py-12">
-                <svg
-                  className="animate-spin h-8 w-8 text-mm-accent"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-              </div>
-            )}
-
-            {/* Empty State */}
-            {!isLoading && tips.length === 0 && (
-              <p className="text-gray-500 text-center py-12">
-                Keine Tipps verfügbar
-              </p>
-            )}
-
-            {/* Tips List */}
-            {!isLoading && tips.length > 0 && (
-              <div className="space-y-0">
-                {tips.map((tip, index) => (
-                  <TipAccordionItem
-                    key={tip.id}
-                    title={tip.title}
-                    content={tip.content}
-                    defaultOpen={index === 0}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Right: Decorative image */}
-          <div className="hidden md:block">
-            <div className="w-full max-w-sm ml-auto h-64 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">
-              {/* Placeholder for tips illustration */}
-              <svg
-                className="w-24 h-24"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                />
-              </svg>
-            </div>
-          </div>
+        {/* Full-width accordion */}
+        <div className="space-y-0">
+          {PREPARATION_TIPS.map((tip, index) => (
+            <TipAccordionItem
+              key={tip.id}
+              title={tip.title}
+              content={tip.content}
+              defaultOpen={index === 0}
+            />
+          ))}
         </div>
       </div>
     </section>

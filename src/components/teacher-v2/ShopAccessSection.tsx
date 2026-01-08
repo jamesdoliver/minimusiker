@@ -17,8 +17,11 @@ export function ShopAccessSection({
         </h2>
 
         <p className="text-gray-600 leading-relaxed mb-8 max-w-3xl">
-          Mit diesem Code erhalten Sie Zugriff auf alle Songs und Playbacks für
-          Ihren Minimusikertag. Geben Sie den Code einfach im Shop ein.
+          Habt ihr Lieder ausgewählt, die ihr am Minimusikertag singen wollt,
+          habt ihr die Möglichkeit mit unseren Songs und Playbacks zu üben. Im
+          Shop findet ihr über 150 Lieder und mit dem Code ladet ihr euch die
+          gewünschte Anzahl gratis herunter. Vorteil: zu diesen Versionen können
+          wir auch die Aufnahme machen.
         </p>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">

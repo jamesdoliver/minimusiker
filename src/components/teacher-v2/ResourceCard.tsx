@@ -5,9 +5,12 @@ interface ResourceCardProps {
   thumbnail: string;
   type: 'pdf' | 'video';
   href: string;
+  isLoading?: boolean;
 }
 
-export function ResourceCard({ title, thumbnail, type, href }: ResourceCardProps) {
+export function ResourceCard({ title, thumbnail, type, href, isLoading = false }: ResourceCardProps) {
+  const isDisabled = href === '#' || isLoading;
+
   return (
     <div className="flex flex-col">
       {/* Thumbnail */}
@@ -60,14 +63,22 @@ export function ResourceCard({ title, thumbnail, type, href }: ResourceCardProps
       </div>
 
       {/* Button */}
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="px-4 py-2 bg-mm-accent text-white text-sm font-medium rounded-lg text-center hover:bg-mm-accent/90 transition-colors"
-      >
-        {type === 'pdf' ? 'PDF downloaden' : 'Video ansehen'}
-      </a>
+      {isDisabled ? (
+        <span
+          className="px-4 py-2 bg-gray-300 text-gray-500 text-sm font-medium rounded-lg text-center cursor-not-allowed"
+        >
+          {isLoading ? 'Laden...' : (type === 'pdf' ? 'PDF downloaden' : 'Video ansehen')}
+        </span>
+      ) : (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-4 py-2 bg-mm-accent text-white text-sm font-medium rounded-lg text-center hover:bg-mm-accent/90 transition-colors"
+        >
+          {type === 'pdf' ? 'PDF downloaden' : 'Video ansehen'}
+        </a>
+      )}
     </div>
   );
 }

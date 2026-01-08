@@ -37,6 +37,11 @@ import {
   EVENT_MANUAL_COSTS_FIELD_IDS,
 } from '@/lib/types/airtable';
 import { ManualCost } from '@/lib/types/analytics';
+import {
+  TeacherResource,
+  TEACHER_RESOURCES_TABLE_ID,
+  TEACHER_RESOURCES_FIELD_IDS,
+} from '@/lib/types/teacher-resources';
 
 // Single table name in Airtable
 export const TABLE_NAME = 'parent_journey_table';
@@ -4411,6 +4416,65 @@ class AirtableService {
       createdAt: (record.get(EVENT_MANUAL_COSTS_FIELD_IDS.created_at) as string) || '',
       updatedAt: (record.get(EVENT_MANUAL_COSTS_FIELD_IDS.updated_at) as string) || '',
     };
+  }
+
+  // ==========================================================================
+  // TEACHER RESOURCES METHODS
+  // ==========================================================================
+
+  /**
+   * Fetch all teacher resources from Airtable
+   * Returns resources with Dropbox URLs for PDF downloads
+   */
+  async getTeacherResources(): Promise<TeacherResource[]> {
+    try {
+      const records = await this.base(TEACHER_RESOURCES_TABLE_ID)
+        .select({
+          fields: [
+            TEACHER_RESOURCES_FIELD_IDS.resource_key,
+            TEACHER_RESOURCES_FIELD_IDS.pdf_url,
+            TEACHER_RESOURCES_FIELD_IDS.display_title,
+          ],
+        })
+        .all();
+
+      return records.map((record) => ({
+        id: record.id,
+        resourceKey: (record.get(TEACHER_RESOURCES_FIELD_IDS.resource_key) as string) || '',
+        pdfUrl: (record.get(TEACHER_RESOURCES_FIELD_IDS.pdf_url) as string) || '',
+        displayTitle: (record.get(TEACHER_RESOURCES_FIELD_IDS.display_title) as string) || '',
+      }));
+    } catch (error) {
+      console.error('Error fetching teacher resources:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch a single teacher resource by key
+   */
+  async getTeacherResourceByKey(resourceKey: string): Promise<TeacherResource | null> {
+    try {
+      const records = await this.base(TEACHER_RESOURCES_TABLE_ID)
+        .select({
+          filterByFormula: `{${TEACHER_RESOURCES_FIELD_IDS.resource_key}} = '${resourceKey}'`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (records.length === 0) return null;
+
+      const record = records[0];
+      return {
+        id: record.id,
+        resourceKey: (record.get(TEACHER_RESOURCES_FIELD_IDS.resource_key) as string) || '',
+        pdfUrl: (record.get(TEACHER_RESOURCES_FIELD_IDS.pdf_url) as string) || '',
+        displayTitle: (record.get(TEACHER_RESOURCES_FIELD_IDS.display_title) as string) || '',
+      };
+    } catch (error) {
+      console.error('Error fetching teacher resource by key:', error);
+      return null;
+    }
   }
 }
 

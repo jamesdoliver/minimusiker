@@ -1,13 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
+import ConfirmPrintablesModal from './ConfirmPrintablesModal';
 
 interface BookingDetailsBreakdownProps {
   booking: BookingWithDetails;
 }
 
 export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreakdownProps) {
+  const [showPrintablesModal, setShowPrintablesModal] = useState(false);
+
   return (
     <div className="bg-gray-50 px-8 py-6 border-t border-gray-200">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -98,7 +102,16 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
       </div>
 
       {/* Actions Row */}
-      <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end">
+      <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end gap-3">
+        <button
+          onClick={() => setShowPrintablesModal(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[#F4A261] text-white rounded-lg hover:bg-[#E07B3A] transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Confirm Printables
+        </button>
         <Link
           href={`/admin/events/${booking.code}`}
           className="inline-flex items-center gap-2 px-4 py-2 bg-[#94B8B3] text-white rounded-lg hover:bg-[#7da39e] transition-colors"
@@ -110,6 +123,13 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
           View Event Details
         </Link>
       </div>
+
+      {/* Confirm Printables Modal */}
+      <ConfirmPrintablesModal
+        isOpen={showPrintablesModal}
+        onClose={() => setShowPrintablesModal(false)}
+        booking={booking}
+      />
     </div>
   );
 }

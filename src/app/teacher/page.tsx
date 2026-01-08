@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { TeacherEventView, Teacher } from '@/lib/types/teacher';
 import type { MinimusikanRepresentative } from '@/lib/types/airtable';
-import type { PreparationTip } from '@/lib/types/preparation-tips';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { EditSchoolInfoModal } from '@/components/teacher/EditSchoolInfoModal';
 import { RepresentativeContactModal } from '@/components/teacher/RepresentativeContactModal';
@@ -49,10 +48,6 @@ export default function TeacherDashboard() {
   const [isRepLoading, setIsRepLoading] = useState(true);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
-  // Tips state
-  const [tips, setTips] = useState<PreparationTip[]>([]);
-  const [isTipsLoading, setIsTipsLoading] = useState(true);
-
   // Edit school info modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -62,7 +57,6 @@ export default function TeacherDashboard() {
   useEffect(() => {
     checkAuthAndFetchData();
     fetchRepresentative();
-    fetchTips();
     fetchSchoolLogo();
   }, []);
 
@@ -120,20 +114,6 @@ export default function TeacherDashboard() {
       console.error('Error fetching representative:', err);
     } finally {
       setIsRepLoading(false);
-    }
-  };
-
-  const fetchTips = async () => {
-    try {
-      const response = await fetch('/api/teacher/tips');
-      const data = await response.json();
-      if (response.ok) {
-        setTips(data.tips || []);
-      }
-    } catch (err) {
-      console.error('Error fetching tips:', err);
-    } finally {
-      setIsTipsLoading(false);
     }
   };
 
@@ -264,7 +244,7 @@ export default function TeacherDashboard() {
         <ShopAccessSection />
 
         {/* Tips Section */}
-        <TipsSection tips={tips} isLoading={isTipsLoading} />
+        <TipsSection />
       </main>
 
       {/* Edit School Info Modal */}
