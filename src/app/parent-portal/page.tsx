@@ -116,6 +116,22 @@ function ParentPortalContent() {
     }
   }, []);
 
+  // Calculate derived values unconditionally (for hooks - must be before early returns)
+  const children = session?.children || [];
+  const selectedChild = children[selectedChildIndex] || null;
+  const eventId = selectedChild?.bookingId || portalData?.parentJourney?.booking_id || session?.bookingId || '';
+  const classId = selectedChild?.classId || portalData?.parentJourney?.class_id || '';
+
+  // Fetch audio status when class or event changes (MUST be before early returns)
+  useEffect(() => {
+    if (!session) return; // Guard inside hook
+    if (eventId && classId) {
+      fetchAudioStatus(eventId, classId);
+    } else {
+      setAudioStatus(null);
+    }
+  }, [session, eventId, classId, fetchAudioStatus]);
+
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/parent-logout', {
@@ -157,29 +173,13 @@ function ParentPortalContent() {
     return null; // Will redirect
   }
 
-  // Use data from session and portal data
-  // Support multi-child: use selected child's data if available
-  const children = session?.children || [];
+  // Use data from session and portal data (children, selectedChild, eventId, classId already calculated above)
   const hasMultipleChildren = children.length > 1;
-  const selectedChild = children[selectedChildIndex] || null;
-
   const schoolName = selectedChild?.schoolName || session?.schoolName || portalData?.parentJourney?.school_name || 'Springfield Elementary School';
   const schoolColor = '#94B8B3'; // Default sage color
   const eventType = selectedChild?.eventType || session?.eventType || portalData?.parentJourney?.event_type || 'Spring Concert';
   const eventDate = selectedChild?.bookingDate || session?.bookingDate || portalData?.parentJourney?.booking_date || '2024-12-15';
-  const classId = selectedChild?.classId || portalData?.parentJourney?.class_id;
   const className = selectedChild?.class || portalData?.parentJourney?.class || '';
-  const eventId = selectedChild?.bookingId || portalData?.parentJourney?.booking_id || session?.bookingId || '';
-
-  // Fetch audio status when class or event changes
-  useEffect(() => {
-    if (eventId && classId) {
-      fetchAudioStatus(eventId, classId);
-    } else {
-      // No class selected, reset audio status
-      setAudioStatus(null);
-    }
-  }, [eventId, classId, fetchAudioStatus]);
 
   return (
     <div className="min-h-screen bg-gray-50">
