@@ -4334,6 +4334,25 @@ class AirtableService {
   }
 
   /**
+   * Look up Events table record ID from booking_id
+   * Checks both event_id and legacy_booking_id fields
+   */
+  async getEventsRecordIdByBookingId(bookingId: string): Promise<string | null> {
+    try {
+      const records = await this.base(EVENTS_TABLE_ID)
+        .select({
+          filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${bookingId}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${bookingId}')`,
+          maxRecords: 1,
+        })
+        .firstPage();
+      return records[0]?.id || null;
+    } catch (error) {
+      console.error('Error looking up Events record:', error);
+      return null;
+    }
+  }
+
+  /**
    * Create a new manual cost entry
    */
   async createManualCost(
@@ -4341,8 +4360,14 @@ class AirtableService {
     costName: string,
     amount: number
   ): Promise<ManualCost> {
+    // Resolve booking_id to Events record ID for linked record field
+    const eventsRecordId = await this.getEventsRecordIdByBookingId(eventId);
+    if (!eventsRecordId) {
+      throw new Error(`Event not found: ${eventId}`);
+    }
+
     const record = await this.base(EVENT_MANUAL_COSTS_TABLE_ID).create({
-      [EVENT_MANUAL_COSTS_FIELD_IDS.event_id]: [eventId],
+      [EVENT_MANUAL_COSTS_FIELD_IDS.event_id]: [eventsRecordId],
       [EVENT_MANUAL_COSTS_FIELD_IDS.cost_name]: costName,
       [EVENT_MANUAL_COSTS_FIELD_IDS.amount]: amount,
     } as Partial<FieldSet>);
