@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 
 interface PreviewPlayerProps {
@@ -9,29 +9,123 @@ interface PreviewPlayerProps {
   className?: string;
   previewKey?: string;
   isLocked: boolean;
+  /** Direct audio URL (when provided, bypasses URL generation) */
+  audioUrl?: string;
+  /** Preview time limit in seconds (default: 10) */
+  previewLimit?: number;
+  /** Fade out duration in seconds (default: 1) */
+  fadeOutDuration?: number;
+  /** Title to display */
+  title?: string;
+  /** Preview badge text */
+  previewBadge?: string;
+  /** Preview limit message */
+  previewMessage?: string;
 }
 
-export default function PreviewPlayer({ eventId, classId, className, previewKey, isLocked }: PreviewPlayerProps) {
+export default function PreviewPlayer({
+  eventId,
+  classId,
+  className,
+  previewKey,
+  isLocked,
+  audioUrl: directAudioUrl,
+  previewLimit = 10,
+  fadeOutDuration = 1,
+  title,
+  previewBadge = 'Preview Only',
+  previewMessage,
+}: PreviewPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFadingOut, setIsFadingOut] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const fadeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Build URL with optional classId and className parameters for class-specific recordings
-  // Prefer classId over className for better reliability
-  const audioUrl = previewKey
-    ? `/api/r2/generate-preview-url?eventId=${eventId}${classId ? `&classId=${encodeURIComponent(classId)}` : ''}${className ? `&className=${encodeURIComponent(className)}` : ''}`
-    : null;
+  // Use direct URL if provided, otherwise build URL from parameters
+  const audioUrl = directAudioUrl
+    ? directAudioUrl
+    : previewKey
+      ? `/api/r2/generate-preview-url?eventId=${eventId}${classId ? `&classId=${encodeURIComponent(classId)}` : ''}${className ? `&className=${encodeURIComponent(className)}` : ''}`
+      : null;
+
+  // Calculate the effective max time (either preview limit or full duration)
+  const effectiveMaxTime = isLocked ? Math.min(previewLimit, duration || previewLimit) : duration;
+
+  // Cleanup fade interval on unmount
+  useEffect(() => {
+    return () => {
+      if (fadeIntervalRef.current) {
+        clearInterval(fadeIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Handle fade out effect
+  const startFadeOut = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || isFadingOut) return;
+
+    setIsFadingOut(true);
+    const startVolume = audio.volume;
+    const fadeSteps = 20; // 20 steps over fadeOutDuration
+    const stepDuration = (fadeOutDuration * 1000) / fadeSteps;
+    const volumeStep = startVolume / fadeSteps;
+    let currentStep = 0;
+
+    fadeIntervalRef.current = setInterval(() => {
+      currentStep++;
+      const newVolume = Math.max(0, startVolume - (volumeStep * currentStep));
+      audio.volume = newVolume;
+
+      if (currentStep >= fadeSteps) {
+        if (fadeIntervalRef.current) {
+          clearInterval(fadeIntervalRef.current);
+          fadeIntervalRef.current = null;
+        }
+        audio.pause();
+        audio.volume = 1; // Reset volume for next play
+        setIsPlaying(false);
+        setIsFadingOut(false);
+      }
+    }, stepDuration);
+  }, [fadeOutDuration, isFadingOut]);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateTime = () => {
+      const time = audio.currentTime;
+      setCurrentTime(time);
+
+      // Check if we should start fade out (when approaching preview limit)
+      if (isLocked && time >= previewLimit - fadeOutDuration && time < previewLimit && !isFadingOut) {
+        startFadeOut();
+      }
+
+      // Hard stop at preview limit (safety check)
+      if (isLocked && time >= previewLimit) {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = 1;
+        setIsPlaying(false);
+        setIsFadingOut(false);
+        if (fadeIntervalRef.current) {
+          clearInterval(fadeIntervalRef.current);
+          fadeIntervalRef.current = null;
+        }
+      }
+    };
+
     const updateDuration = () => setDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setIsFadingOut(false);
+    };
     const handleError = () => {
       setError('Failed to load audio');
       setIsPlaying(false);
@@ -55,14 +149,25 @@ export default function PreviewPlayer({ eventId, classId, className, previewKey,
       audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('waiting', handleWaiting);
     };
-  }, []);
+  }, [isLocked, previewLimit, fadeOutDuration, isFadingOut, startFadeOut]);
 
   const togglePlayPause = () => {
     if (!audioRef.current) return;
 
     if (isPlaying) {
       audioRef.current.pause();
+      // Cancel any ongoing fade
+      if (fadeIntervalRef.current) {
+        clearInterval(fadeIntervalRef.current);
+        fadeIntervalRef.current = null;
+      }
+      audioRef.current.volume = 1;
+      setIsFadingOut(false);
     } else {
+      // Reset to beginning if at or past the limit
+      if (isLocked && audioRef.current.currentTime >= previewLimit) {
+        audioRef.current.currentTime = 0;
+      }
       audioRef.current.play().catch((err) => {
         console.error('Playback error:', err);
         setError('Unable to play audio');
@@ -73,9 +178,11 @@ export default function PreviewPlayer({ eventId, classId, className, previewKey,
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
+    // Limit seeking to preview limit when locked
+    const limitedTime = isLocked ? Math.min(time, previewLimit - 0.5) : time;
     if (audioRef.current) {
-      audioRef.current.currentTime = time;
-      setCurrentTime(time);
+      audioRef.current.currentTime = limitedTime;
+      setCurrentTime(limitedTime);
     }
   };
 
@@ -86,7 +193,10 @@ export default function PreviewPlayer({ eventId, classId, className, previewKey,
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (!previewKey) {
+  // Calculate progress bar percentage for the preview limit marker
+  const previewLimitPercentage = duration > 0 ? (previewLimit / duration) * 100 : 100;
+
+  if (!previewKey && !directAudioUrl) {
     return (
       <div className="bg-gray-100 rounded-lg p-8 text-center">
         <p className="text-gray-600">Preview will be available after the event</p>
@@ -100,11 +210,11 @@ export default function PreviewPlayer({ eventId, classId, className, previewKey,
         {/* Title */}
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">
-            {isLocked ? 'Preview Recording' : 'Full Recording'}
+            {title || (isLocked ? 'Audiovorschau' : 'Full Recording')}
           </h3>
           {isLocked && (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-              Preview Only
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-sage-100 text-sage-800">
+              {previewBadge}
             </span>
           )}
         </div>
@@ -126,7 +236,7 @@ export default function PreviewPlayer({ eventId, classId, className, previewKey,
                 'w-12 h-12 rounded-full flex items-center justify-center transition-colors',
                 isLoading || error
                   ? 'bg-gray-200 cursor-not-allowed'
-                  : 'bg-primary hover:bg-primary/90 text-white',
+                  : 'bg-sage-600 hover:bg-sage-700 text-white',
               )}
             >
               {isLoading ? (
@@ -143,28 +253,44 @@ export default function PreviewPlayer({ eventId, classId, className, previewKey,
             </button>
 
             <div className="flex-1 space-y-1">
-              <input
-                type="range"
-                min="0"
-                max={duration || 100}
-                value={currentTime}
-                onChange={handleSeek}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                disabled={!audioUrl || isLoading}
-              />
+              {/* Progress bar container with limit marker */}
+              <div className="relative">
+                <input
+                  type="range"
+                  min="0"
+                  max={duration || 100}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                  disabled={!audioUrl || isLoading}
+                />
+                {/* Preview limit marker */}
+                {isLocked && duration > 0 && previewLimit < duration && (
+                  <div
+                    className="absolute top-0 w-0.5 h-2 bg-sage-400 pointer-events-none"
+                    style={{ left: `${previewLimitPercentage}%` }}
+                    title={`Preview ends at ${formatTime(previewLimit)}`}
+                  />
+                )}
+              </div>
               <div className="flex justify-between text-xs text-gray-500">
                 <span>{formatTime(currentTime)}</span>
-                <span>{formatTime(duration)}</span>
+                <span>
+                  {isLocked && duration > previewLimit
+                    ? `${formatTime(previewLimit)} / ${formatTime(duration)}`
+                    : formatTime(duration)
+                  }
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Unlock Message */}
+        {/* Preview Message */}
         {isLocked && (
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <p className="text-sm text-blue-800">
-              🎵 This is a 30-second preview. Purchase the full recording to enjoy the complete performance!
+          <div className="bg-sage-50 border border-sage-200 rounded-md p-4">
+            <p className="text-sm text-sage-800">
+              {previewMessage || `🎵 This is a ${previewLimit}-second preview. Purchase the full recording to enjoy the complete performance!`}
             </p>
           </div>
         )}
@@ -185,7 +311,7 @@ export default function PreviewPlayer({ eventId, classId, className, previewKey,
           appearance: none;
           width: 16px;
           height: 16px;
-          background: #3b82f6;
+          background: #94B8B3;
           border-radius: 50%;
           cursor: pointer;
         }
@@ -193,7 +319,7 @@ export default function PreviewPlayer({ eventId, classId, className, previewKey,
         .slider::-moz-range-thumb {
           width: 16px;
           height: 16px;
-          background: #3b82f6;
+          background: #94B8B3;
           border-radius: 50%;
           cursor: pointer;
           border: none;

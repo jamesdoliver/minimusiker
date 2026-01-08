@@ -6,6 +6,10 @@ import {
   SCHOOL_BOOKINGS_FIELD_IDS,
 } from '@/lib/types/airtable';
 import { getEmailService } from '@/lib/services/emailService';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { getR2Service } from '@/lib/services/r2Service';
+import { getPrintableService } from '@/lib/services/printableService';
+import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import Airtable from 'airtable';
 
 // Initialize Airtable
@@ -107,6 +111,89 @@ export async function POST(request: Request) {
 
     console.log('Created SchoolBooking record:', record.id);
 
+    // ========================================
+    // Phase 3: Auto-create Events record & generate printables
+    // ========================================
+    let eventRecord = null;
+    let printablesResult = null;
+
+    try {
+      const airtableService = getAirtableService();
+      const r2Service = getR2Service();
+      const printableService = getPrintableService();
+
+      // Generate deterministic event_id
+      const eventId = generateEventId(
+        mappedData.schoolName,
+        'MiniMusiker', // Default event type
+        booking.start_date
+      );
+      console.log('Generated event_id:', eventId);
+
+      // Create Events record linked to SchoolBookings
+      eventRecord = await airtableService.createEventFromBooking(
+        eventId,
+        record.id, // SchoolBookings record ID
+        mappedData.schoolName,
+        booking.start_date,
+        staffId || undefined
+      );
+      console.log('Created Event record:', eventRecord.id, 'event_id:', eventId);
+
+      // Initialize R2 event folder structure
+      const initResult = await r2Service.initializeEventStructure(eventId);
+      if (initResult.success) {
+        console.log('Initialized R2 event structure for:', eventId);
+      } else {
+        console.warn('Failed to initialize R2 structure:', initResult.error);
+      }
+
+      // Try to get school logo from Einrichtung if linked
+      let logoBuffer: Buffer | undefined;
+      if (einrichtungId) {
+        try {
+          const logoUrl = await airtableService.getEinrichtungLogoUrl(einrichtungId);
+          if (logoUrl) {
+            // Fetch the logo image
+            const logoResponse = await fetch(logoUrl);
+            if (logoResponse.ok) {
+              const arrayBuffer = await logoResponse.arrayBuffer();
+              logoBuffer = Buffer.from(arrayBuffer);
+
+              // Upload logo to event folder
+              const logoUpload = await r2Service.uploadEventLogo(eventId, logoBuffer, 'png');
+              if (logoUpload.success) {
+                console.log('Copied school logo to event folder');
+              }
+            }
+          }
+        } catch (logoError) {
+          console.warn('Could not fetch/copy school logo:', logoError);
+        }
+      }
+
+      // Generate printables (non-blocking - log errors but don't fail webhook)
+      try {
+        printablesResult = await printableService.generateAllPrintables(
+          eventId,
+          mappedData.schoolName,
+          booking.start_date,
+          logoBuffer
+        );
+
+        if (printablesResult.success) {
+          console.log('Generated all printables for event:', eventId);
+        } else {
+          console.warn('Some printables failed:', printablesResult.errors);
+        }
+      } catch (printError) {
+        console.warn('Printable generation failed (templates may not be uploaded):', printError);
+      }
+    } catch (eventError) {
+      // Log but don't fail the webhook - SchoolBookings was created successfully
+      console.error('Error creating Event record or generating printables:', eventError);
+    }
+
     // Send email notification to assigned staff
     if (staffId) {
       try {
@@ -151,6 +238,12 @@ export async function POST(request: Request) {
       schoolName: mappedData.schoolName,
       estimatedChildren: mappedData.numberOfChildren,
       costCategory: mappedData.costCategory,
+      // Event creation status
+      eventCreated: !!eventRecord,
+      eventRecordId: eventRecord?.id,
+      eventId: eventRecord?.event_id,
+      printablesGenerated: printablesResult?.success ?? false,
+      printablesErrors: printablesResult?.errors ?? [],
     });
   } catch (error) {
     console.error('SimplyBook webhook error:', error);

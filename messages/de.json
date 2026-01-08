@@ -18,9 +18,12 @@
     "recordingFor": "Aufnahme für: {childName}"
   },
   "recordingPreview": {
-    "title": "Schulaufnahme-Vorschau",
-    "previewDescription": "Dies ist eine 30-sekündige Vorschau der Aufführung von {childName}. Kaufen Sie das Paket unten, um die vollständige Aufnahme freizuschalten!",
-    "previewDescriptionSchool": "Dies ist eine 30-sekündige Vorschau der Aufführung Ihrer Schule. Kaufen Sie das Paket unten, um die vollständige Aufnahme freizuschalten!",
+    "title": "Audiovorschau",
+    "previewBadge": "Vorschau",
+    "previewMessage": "Dies ist eine 10-sekündige Vorschau. Kaufen Sie das Paket unten, um die vollständige Aufnahme freizuschalten!",
+    "previewDescription": "Dies ist eine 10-sekündige Vorschau der Aufführung von {childName}. Kaufen Sie das Paket unten, um die vollständige Aufnahme freizuschalten!",
+    "previewDescriptionSchool": "Dies ist eine 10-sekündige Vorschau der Aufführung Ihrer Schule. Kaufen Sie das Paket unten, um die vollständige Aufnahme freizuschalten!",
+    "comingSoon": "Die Aufnahme wird nach der Veranstaltung verfügbar sein",
     "availableSoon": "Die Aufnahme wird nach der Veranstaltung verfügbar sein"
   },
   "productSelector": {

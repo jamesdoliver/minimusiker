@@ -1,18 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import LanguageSelector from '@/components/shared/LanguageSelector';
 import PreviewPlayer from '@/components/landing/PreviewPlayer';
+import AudioComingSoon from '@/components/parent-portal/AudioComingSoon';
 import ProductSelector from '@/components/parent-portal/ProductSelector';
 import PersonalizedTshirtPromo from '@/components/parent-portal/PersonalizedTshirtPromo';
 import { CartProvider } from '@/lib/contexts/CartContext';
 import { FeaturedProducts, CartSummary, CartDrawer } from '@/components/shop';
 import { useProducts } from '@/lib/hooks/useProducts';
 import { ParentSession, ParentPortalData } from '@/lib/types';
+
+// Audio status response type
+interface AudioStatus {
+  hasAudio: boolean;
+  audioUrl?: string;
+  schoolLogoUrl?: string;
+}
 
 // Inner component that uses hooks
 function ParentPortalContent() {
@@ -27,6 +35,8 @@ function ParentPortalContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
+  const [audioStatus, setAudioStatus] = useState<AudioStatus | null>(null);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
   // Fetch shop products
   const { products: shopProducts } = useProducts({
@@ -79,6 +89,32 @@ function ParentPortalContent() {
       setIsLoading(false);
     }
   };
+
+  // Fetch audio status for the current class
+  const fetchAudioStatus = useCallback(async (eventId: string, classId: string, schoolId?: string) => {
+    setIsLoadingAudio(true);
+    try {
+      const params = new URLSearchParams({ eventId, classId });
+      if (schoolId) params.append('schoolId', schoolId);
+
+      const response = await fetch(`/api/r2/class-audio-status?${params}`, {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setAudioStatus(data.data);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching audio status:', err);
+      // On error, default to no audio (show coming soon)
+      setAudioStatus({ hasAudio: false });
+    } finally {
+      setIsLoadingAudio(false);
+    }
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -133,7 +169,17 @@ function ParentPortalContent() {
   const eventDate = selectedChild?.bookingDate || session?.bookingDate || portalData?.parentJourney?.booking_date || '2024-12-15';
   const classId = selectedChild?.classId || portalData?.parentJourney?.class_id;
   const className = selectedChild?.class || portalData?.parentJourney?.class || '';
-  const hasRecording = !!classId; // Show player if we have a class_id
+  const eventId = selectedChild?.bookingId || portalData?.parentJourney?.booking_id || session?.bookingId || '';
+
+  // Fetch audio status when class or event changes
+  useEffect(() => {
+    if (eventId && classId) {
+      fetchAudioStatus(eventId, classId);
+    } else {
+      // No class selected, reset audio status
+      setAudioStatus(null);
+    }
+  }, [eventId, classId, fetchAudioStatus]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -261,14 +307,23 @@ function ParentPortalContent() {
                 {tPreview('title')}
               </h3>
 
-              {hasRecording ? (
+              {isLoadingAudio ? (
+                <div className="flex items-center justify-center py-12">
+                  <LoadingSpinner size="md" />
+                </div>
+              ) : audioStatus?.hasAudio && audioStatus.audioUrl ? (
                 <div>
                   <PreviewPlayer
-                    eventId={selectedChild?.bookingId || portalData?.parentJourney?.booking_id || session?.bookingId || 'demo'}
+                    eventId={eventId || 'demo'}
                     classId={classId}
                     className={className}
-                    previewKey="preview.mp3"
+                    audioUrl={audioStatus.audioUrl}
                     isLocked={true}
+                    previewLimit={10}
+                    fadeOutDuration={1}
+                    title={tPreview('title')}
+                    previewBadge={tPreview('previewBadge')}
+                    previewMessage={tPreview('previewMessage')}
                   />
                   <div className="mt-4 p-4 bg-sage-50 border border-sage-200 rounded-lg">
                     <p className="text-sm text-sage-800">
@@ -280,16 +335,11 @@ function ParentPortalContent() {
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-600">
-                    {tPreview('availableSoon')}
-                  </p>
-                </div>
+                <AudioComingSoon
+                  schoolLogoUrl={audioStatus?.schoolLogoUrl}
+                  message={tPreview('comingSoon')}
+                  title={tPreview('title')}
+                />
               )}
             </div>
 

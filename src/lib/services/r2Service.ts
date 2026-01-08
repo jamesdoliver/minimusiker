@@ -4,8 +4,123 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
+  CopyObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+// ========================================
+// Path Constants for New R2 Structure
+// ========================================
+
+/**
+ * New R2 bucket structure (minimusiker-assets):
+ *
+ * minimusiker-assets/
+ * ├── templates/                              # Base templates (uploaded once by admin)
+ * │   ├── flyer1-template.pdf
+ * │   ├── flyer2-template.pdf
+ * │   ├── flyer3-template.pdf
+ * │   ├── poster-template.pdf
+ * │   ├── tshirt-print-template.pdf
+ * │   ├── hoodie-print-template.pdf
+ * │   ├── minicard-template.pdf
+ * │   ├── cd-jacket-template.pdf
+ * │   ├── mock-tshirt-template.pdf
+ * │   └── mock-hoodie-template.pdf
+ * │
+ * └── events/
+ *     └── {event_id}/
+ *         ├── logo/
+ *         │   └── logo.png
+ *         ├── printables/
+ *         │   ├── logo/
+ *         │   │   └── logo.png
+ *         │   ├── flyers/
+ *         │   │   ├── flyer1.pdf
+ *         │   │   ├── flyer2.pdf
+ *         │   │   └── flyer3.pdf
+ *         │   ├── poster.pdf
+ *         │   ├── tshirt-print.pdf
+ *         │   ├── hoodie-print.pdf
+ *         │   ├── minicards/
+ *         │   │   └── minicard.pdf
+ *         │   └── cd-jacket/
+ *         │       └── cd-jacket.pdf
+ *         ├── mockups/
+ *         │   ├── mock-tshirt.pdf
+ *         │   └── mock-hoodie.pdf
+ *         └── classes/
+ *             └── {class_id}/
+ *                 ├── raw/
+ *                 └── final/
+ */
+
+export const R2_PATHS = {
+  // Template paths
+  TEMPLATES: 'templates',
+
+  // Event-level paths
+  EVENTS: 'events',
+
+  // Sub-paths within an event
+  EVENT_LOGO: (eventId: string) => `events/${eventId}/logo`,
+  EVENT_PRINTABLES: (eventId: string) => `events/${eventId}/printables`,
+  EVENT_PRINTABLES_LOGO: (eventId: string) => `events/${eventId}/printables/logo`,
+  EVENT_PRINTABLES_FLYERS: (eventId: string) => `events/${eventId}/printables/flyers`,
+  EVENT_PRINTABLES_MINICARDS: (eventId: string) => `events/${eventId}/printables/minicards`,
+  EVENT_PRINTABLES_CD_JACKET: (eventId: string) => `events/${eventId}/printables/cd-jacket`,
+  EVENT_MOCKUPS: (eventId: string) => `events/${eventId}/mockups`,
+  EVENT_CLASSES: (eventId: string) => `events/${eventId}/classes`,
+
+  // Class-level paths
+  CLASS_RAW: (eventId: string, classId: string) => `events/${eventId}/classes/${classId}/raw`,
+  CLASS_FINAL: (eventId: string, classId: string) => `events/${eventId}/classes/${classId}/final`,
+} as const;
+
+// Printable types that can be generated
+export type PrintableType =
+  | 'flyer1' | 'flyer2' | 'flyer3'
+  | 'poster'
+  | 'tshirt-print' | 'hoodie-print'
+  | 'minicard' | 'cd-jacket';
+
+// Mockup types that can be generated
+export type MockupType = 'mock-tshirt' | 'mock-hoodie';
+
+// All template types (printables + mockups)
+export type TemplateType = PrintableType | MockupType;
+
+// Template filenames mapping
+export const TEMPLATE_FILENAMES: Record<TemplateType, string> = {
+  'flyer1': 'flyer1-template.pdf',
+  'flyer2': 'flyer2-template.pdf',
+  'flyer3': 'flyer3-template.pdf',
+  'poster': 'poster-template.pdf',
+  'tshirt-print': 'tshirt-print-template.pdf',
+  'hoodie-print': 'hoodie-print-template.pdf',
+  'minicard': 'minicard-template.pdf',
+  'cd-jacket': 'cd-jacket-template.pdf',
+  'mock-tshirt': 'mock-tshirt-template.pdf',
+  'mock-hoodie': 'mock-hoodie-template.pdf',
+};
+
+// Generated printable filenames (output)
+export const PRINTABLE_FILENAMES: Record<PrintableType, string> = {
+  'flyer1': 'flyer1.pdf',
+  'flyer2': 'flyer2.pdf',
+  'flyer3': 'flyer3.pdf',
+  'poster': 'poster.pdf',
+  'tshirt-print': 'tshirt-print.pdf',
+  'hoodie-print': 'hoodie-print.pdf',
+  'minicard': 'minicard.pdf',
+  'cd-jacket': 'cd-jacket.pdf',
+};
+
+// Generated mockup filenames (output)
+export const MOCKUP_FILENAMES: Record<MockupType, string> = {
+  'mock-tshirt': 'mock-tshirt.pdf',
+  'mock-hoodie': 'mock-hoodie.pdf',
+};
 
 interface UploadResult {
   success: boolean;
@@ -23,6 +138,7 @@ interface FileMetadata {
 class R2Service {
   private client: S3Client;
   private bucketName: string;
+  private assetsBucketName: string;
 
   constructor() {
     const endpoint = process.env.R2_ENDPOINT;
@@ -34,6 +150,9 @@ class R2Service {
       throw new Error('R2 configuration is incomplete. Please check environment variables.');
     }
 
+    // New assets bucket - falls back to main bucket if not configured
+    const assetsBucketName = process.env.R2_ASSETS_BUCKET_NAME || bucketName;
+
     this.client = new S3Client({
       region: 'auto',
       endpoint: endpoint,
@@ -44,6 +163,15 @@ class R2Service {
     });
 
     this.bucketName = bucketName;
+    this.assetsBucketName = assetsBucketName;
+  }
+
+  /**
+   * Get the assets bucket name (minimusiker-assets)
+   * Used for templates, printables, mockups, and event structure
+   */
+  getAssetsBucketName(): string {
+    return this.assetsBucketName;
   }
 
   /**
@@ -701,6 +829,709 @@ class R2Service {
     }
 
     return deleted;
+  }
+
+  // ========================================
+  // NEW: Event Structure & Asset Methods
+  // (For minimusiker-assets bucket)
+  // ========================================
+
+  /**
+   * Initialize the folder structure for a new event in the assets bucket.
+   * This creates the event folder and copies the school logo if provided.
+   *
+   * Structure created:
+   * events/{eventId}/
+   *   ├── logo/logo.{ext}           (if logoSourceKey provided)
+   *   └── printables/logo/logo.{ext} (copy for easy reference)
+   *
+   * Note: Other folders (printables/flyers, mockups, classes) are created
+   * implicitly when files are uploaded to them.
+   *
+   * @param eventId - The event_id for the new event
+   * @param logoSourceKey - Optional: R2 key of existing logo to copy (e.g., logos/{einrichtungId}/logo.png)
+   * @returns Object with success status and created paths
+   */
+  async initializeEventStructure(
+    eventId: string,
+    logoSourceKey?: string
+  ): Promise<{
+    success: boolean;
+    eventPath: string;
+    logoPath?: string;
+    printablesLogoPath?: string;
+    error?: string;
+  }> {
+    const eventPath = `${R2_PATHS.EVENTS}/${eventId}`;
+
+    try {
+      // If a logo source is provided, copy it to the event folder
+      if (logoSourceKey) {
+        // Determine the extension from the source key
+        const ext = logoSourceKey.split('.').pop()?.toLowerCase() || 'png';
+
+        // Copy to event logo folder
+        const logoPath = `${R2_PATHS.EVENT_LOGO(eventId)}/logo.${ext}`;
+        const logoSuccess = await this.copyFileInAssetsBucket(logoSourceKey, logoPath);
+
+        if (!logoSuccess) {
+          console.warn(`Failed to copy logo to ${logoPath}, continuing without logo`);
+        }
+
+        // Also copy to printables/logo for easy reference during generation
+        const printablesLogoPath = `${R2_PATHS.EVENT_PRINTABLES_LOGO(eventId)}/logo.${ext}`;
+        const printablesLogoSuccess = await this.copyFileInAssetsBucket(logoSourceKey, printablesLogoPath);
+
+        if (!printablesLogoSuccess) {
+          console.warn(`Failed to copy logo to ${printablesLogoPath}`);
+        }
+
+        return {
+          success: true,
+          eventPath,
+          logoPath: logoSuccess ? logoPath : undefined,
+          printablesLogoPath: printablesLogoSuccess ? printablesLogoPath : undefined,
+        };
+      }
+
+      // No logo to copy, just return success (folders created implicitly on upload)
+      return {
+        success: true,
+        eventPath,
+      };
+    } catch (error) {
+      console.error('Error initializing event structure:', error);
+      return {
+        success: false,
+        eventPath,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Copy a file within the assets bucket
+   * Used for copying logos to event folders
+   */
+  private async copyFileInAssetsBucket(sourceKey: string, destKey: string): Promise<boolean> {
+    try {
+      // First check if source exists
+      const sourceExists = await this.fileExistsInAssetsBucket(sourceKey);
+      if (!sourceExists) {
+        console.error(`Source file does not exist: ${sourceKey}`);
+        return false;
+      }
+
+      const command = new CopyObjectCommand({
+        Bucket: this.assetsBucketName,
+        CopySource: `${this.assetsBucketName}/${sourceKey}`,
+        Key: destKey,
+      });
+
+      await this.client.send(command);
+      return true;
+    } catch (error) {
+      console.error(`Error copying file from ${sourceKey} to ${destKey}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if a file exists in the assets bucket
+   */
+  async fileExistsInAssetsBucket(key: string): Promise<boolean> {
+    try {
+      const command = new HeadObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+      });
+      await this.client.send(command);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Upload a logo directly to an event's folder (from buffer)
+   * Used when uploading a new logo specifically for an event
+   */
+  async uploadEventLogo(
+    eventId: string,
+    buffer: Buffer,
+    contentType: string,
+    extension: string = 'png'
+  ): Promise<UploadResult> {
+    const logoPath = `${R2_PATHS.EVENT_LOGO(eventId)}/logo.${extension}`;
+    const printablesLogoPath = `${R2_PATHS.EVENT_PRINTABLES_LOGO(eventId)}/logo.${extension}`;
+
+    try {
+      // Upload to event logo folder
+      const logoCommand = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: logoPath,
+        Body: buffer,
+        ContentType: contentType,
+        Metadata: {
+          eventId,
+          type: 'logo',
+          uploadDate: new Date().toISOString(),
+        },
+      });
+      await this.client.send(logoCommand);
+
+      // Also upload to printables/logo
+      const printablesLogoCommand = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: printablesLogoPath,
+        Body: buffer,
+        ContentType: contentType,
+        Metadata: {
+          eventId,
+          type: 'logo',
+          uploadDate: new Date().toISOString(),
+        },
+      });
+      await this.client.send(printablesLogoCommand);
+
+      return {
+        success: true,
+        key: logoPath,
+      };
+    } catch (error) {
+      console.error('Error uploading event logo:', error);
+      return {
+        success: false,
+        key: logoPath,
+        error: error instanceof Error ? error.message : 'Unknown upload error',
+      };
+    }
+  }
+
+  // ========================================
+  // Template Methods
+  // ========================================
+
+  /**
+   * Upload a base template to the templates folder
+   * Templates are stored at templates/{templateName}-template.pdf
+   *
+   * @param templateType - The type of template (e.g., 'flyer1', 'poster', 'mock-tshirt')
+   * @param buffer - The PDF file buffer
+   */
+  async uploadTemplate(
+    templateType: TemplateType,
+    buffer: Buffer
+  ): Promise<UploadResult> {
+    const filename = TEMPLATE_FILENAMES[templateType];
+    const key = `${R2_PATHS.TEMPLATES}/${filename}`;
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: 'application/pdf',
+        Metadata: {
+          templateType,
+          uploadDate: new Date().toISOString(),
+        },
+      });
+
+      await this.client.send(command);
+
+      return {
+        success: true,
+        key,
+      };
+    } catch (error) {
+      console.error(`Error uploading template ${templateType}:`, error);
+      return {
+        success: false,
+        key,
+        error: error instanceof Error ? error.message : 'Unknown upload error',
+      };
+    }
+  }
+
+  /**
+   * Get a template file as a Buffer
+   * Used by printableService to fetch base templates for generation
+   *
+   * @param templateType - The type of template to fetch
+   * @returns Buffer of the template PDF, or null if not found
+   */
+  async getTemplate(templateType: TemplateType): Promise<Buffer | null> {
+    const filename = TEMPLATE_FILENAMES[templateType];
+    const key = `${R2_PATHS.TEMPLATES}/${filename}`;
+
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+      });
+
+      const response = await this.client.send(command);
+
+      if (!response.Body) {
+        return null;
+      }
+
+      // Convert stream to buffer
+      const chunks: Uint8Array[] = [];
+      const stream = response.Body as AsyncIterable<Uint8Array>;
+
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      return Buffer.concat(chunks);
+    } catch (error) {
+      console.error(`Error fetching template ${templateType}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if a template exists
+   */
+  async templateExists(templateType: TemplateType): Promise<boolean> {
+    const filename = TEMPLATE_FILENAMES[templateType];
+    const key = `${R2_PATHS.TEMPLATES}/${filename}`;
+    return this.fileExistsInAssetsBucket(key);
+  }
+
+  /**
+   * Get the status of all templates (which ones exist)
+   * Useful for admin panel to show template upload status
+   */
+  async getTemplatesStatus(): Promise<Record<TemplateType, boolean>> {
+    const allTypes: TemplateType[] = [
+      'flyer1', 'flyer2', 'flyer3',
+      'poster',
+      'tshirt-print', 'hoodie-print',
+      'minicard', 'cd-jacket',
+      'mock-tshirt', 'mock-hoodie',
+    ];
+
+    const status: Record<string, boolean> = {};
+
+    for (const type of allTypes) {
+      status[type] = await this.templateExists(type);
+    }
+
+    return status as Record<TemplateType, boolean>;
+  }
+
+  // ========================================
+  // Printable Methods
+  // ========================================
+
+  /**
+   * Upload a generated printable PDF to an event's printables folder
+   *
+   * @param eventId - The event ID
+   * @param printableType - The type of printable
+   * @param buffer - The generated PDF buffer
+   */
+  async uploadPrintable(
+    eventId: string,
+    printableType: PrintableType,
+    buffer: Buffer
+  ): Promise<UploadResult> {
+    // Determine the correct path based on printable type
+    let key: string;
+
+    if (printableType.startsWith('flyer')) {
+      // Flyers go in the flyers subfolder
+      key = `${R2_PATHS.EVENT_PRINTABLES_FLYERS(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
+    } else if (printableType === 'minicard') {
+      // Minicards go in the minicards subfolder
+      key = `${R2_PATHS.EVENT_PRINTABLES_MINICARDS(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
+    } else if (printableType === 'cd-jacket') {
+      // CD jacket goes in the cd-jacket subfolder
+      key = `${R2_PATHS.EVENT_PRINTABLES_CD_JACKET(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
+    } else {
+      // poster, tshirt-print, hoodie-print go directly in printables
+      key = `${R2_PATHS.EVENT_PRINTABLES(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
+    }
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: 'application/pdf',
+        Metadata: {
+          eventId,
+          printableType,
+          generatedAt: new Date().toISOString(),
+        },
+      });
+
+      await this.client.send(command);
+
+      return {
+        success: true,
+        key,
+      };
+    } catch (error) {
+      console.error(`Error uploading printable ${printableType} for event ${eventId}:`, error);
+      return {
+        success: false,
+        key,
+        error: error instanceof Error ? error.message : 'Unknown upload error',
+      };
+    }
+  }
+
+  /**
+   * Get a signed URL for a printable
+   */
+  async getPrintableUrl(
+    eventId: string,
+    printableType: PrintableType,
+    expiresIn: number = 3600
+  ): Promise<string | null> {
+    let key: string;
+
+    if (printableType.startsWith('flyer')) {
+      key = `${R2_PATHS.EVENT_PRINTABLES_FLYERS(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
+    } else if (printableType === 'minicard') {
+      key = `${R2_PATHS.EVENT_PRINTABLES_MINICARDS(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
+    } else if (printableType === 'cd-jacket') {
+      key = `${R2_PATHS.EVENT_PRINTABLES_CD_JACKET(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
+    } else {
+      key = `${R2_PATHS.EVENT_PRINTABLES(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
+    }
+
+    if (await this.fileExistsInAssetsBucket(key)) {
+      return this.generateSignedUrlForAssetsBucket(key, expiresIn);
+    }
+
+    return null;
+  }
+
+  /**
+   * Get all printable URLs for an event
+   */
+  async getAllPrintableUrls(
+    eventId: string,
+    expiresIn: number = 3600
+  ): Promise<Record<PrintableType, string | null>> {
+    const printableTypes: PrintableType[] = [
+      'flyer1', 'flyer2', 'flyer3',
+      'poster',
+      'tshirt-print', 'hoodie-print',
+      'minicard', 'cd-jacket',
+    ];
+
+    const urls: Record<string, string | null> = {};
+
+    for (const type of printableTypes) {
+      urls[type] = await this.getPrintableUrl(eventId, type, expiresIn);
+    }
+
+    return urls as Record<PrintableType, string | null>;
+  }
+
+  // ========================================
+  // Mockup Methods
+  // ========================================
+
+  /**
+   * Upload a generated mockup PDF to an event's mockups folder
+   *
+   * @param eventId - The event ID
+   * @param mockupType - The type of mockup (mock-tshirt or mock-hoodie)
+   * @param buffer - The generated PDF buffer
+   */
+  async uploadMockup(
+    eventId: string,
+    mockupType: MockupType,
+    buffer: Buffer
+  ): Promise<UploadResult> {
+    const key = `${R2_PATHS.EVENT_MOCKUPS(eventId)}/${MOCKUP_FILENAMES[mockupType]}`;
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: 'application/pdf',
+        Metadata: {
+          eventId,
+          mockupType,
+          generatedAt: new Date().toISOString(),
+        },
+      });
+
+      await this.client.send(command);
+
+      return {
+        success: true,
+        key,
+      };
+    } catch (error) {
+      console.error(`Error uploading mockup ${mockupType} for event ${eventId}:`, error);
+      return {
+        success: false,
+        key,
+        error: error instanceof Error ? error.message : 'Unknown upload error',
+      };
+    }
+  }
+
+  /**
+   * Get a signed URL for a mockup
+   */
+  async getMockupUrl(
+    eventId: string,
+    mockupType: MockupType,
+    expiresIn: number = 3600
+  ): Promise<string | null> {
+    const key = `${R2_PATHS.EVENT_MOCKUPS(eventId)}/${MOCKUP_FILENAMES[mockupType]}`;
+
+    if (await this.fileExistsInAssetsBucket(key)) {
+      return this.generateSignedUrlForAssetsBucket(key, expiresIn);
+    }
+
+    return null;
+  }
+
+  /**
+   * Get all mockup URLs for an event
+   */
+  async getAllMockupUrls(
+    eventId: string,
+    expiresIn: number = 3600
+  ): Promise<Record<MockupType, string | null>> {
+    const mockupTypes: MockupType[] = ['mock-tshirt', 'mock-hoodie'];
+
+    const urls: Record<string, string | null> = {};
+
+    for (const type of mockupTypes) {
+      urls[type] = await this.getMockupUrl(eventId, type, expiresIn);
+    }
+
+    return urls as Record<MockupType, string | null>;
+  }
+
+  // ========================================
+  // Class Audio Methods (New Structure)
+  // ========================================
+
+  /**
+   * Upload raw audio for a class in the new event structure
+   * Path: events/{eventId}/classes/{classId}/raw/{timestamp}_{filename}
+   */
+  async uploadClassRawAudio(
+    eventId: string,
+    classId: string,
+    buffer: Buffer,
+    originalFilename: string,
+    contentType: string = 'audio/mpeg',
+    uploadedBy?: string
+  ): Promise<UploadResult> {
+    const timestamp = Date.now();
+    const sanitizedFilename = originalFilename
+      .toLowerCase()
+      .replace(/[^a-z0-9.-]/g, '_')
+      .substring(0, 50);
+    const key = `${R2_PATHS.CLASS_RAW(eventId, classId)}/${timestamp}_${sanitizedFilename}`;
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        Metadata: {
+          eventId,
+          classId,
+          type: 'raw',
+          originalFilename,
+          uploadDate: new Date().toISOString(),
+          ...(uploadedBy && { uploadedBy }),
+        },
+      });
+
+      await this.client.send(command);
+
+      return {
+        success: true,
+        key,
+      };
+    } catch (error) {
+      console.error('Error uploading class raw audio:', error);
+      return {
+        success: false,
+        key,
+        error: error instanceof Error ? error.message : 'Unknown upload error',
+      };
+    }
+  }
+
+  /**
+   * Upload final mixed audio for a class in the new event structure
+   * Path: events/{eventId}/classes/{classId}/final/final.mp3
+   */
+  async uploadClassFinalAudio(
+    eventId: string,
+    classId: string,
+    buffer: Buffer,
+    contentType: string = 'audio/mpeg',
+    uploadedBy?: string
+  ): Promise<UploadResult> {
+    const key = `${R2_PATHS.CLASS_FINAL(eventId, classId)}/final.mp3`;
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        Metadata: {
+          eventId,
+          classId,
+          type: 'final',
+          uploadDate: new Date().toISOString(),
+          ...(uploadedBy && { uploadedBy }),
+        },
+      });
+
+      await this.client.send(command);
+
+      return {
+        success: true,
+        key,
+      };
+    } catch (error) {
+      console.error('Error uploading class final audio:', error);
+      return {
+        success: false,
+        key,
+        error: error instanceof Error ? error.message : 'Unknown upload error',
+      };
+    }
+  }
+
+  /**
+   * Generate presigned URL for uploading raw audio to class folder
+   */
+  async generateClassRawAudioUploadUrl(
+    eventId: string,
+    classId: string,
+    filename: string,
+    contentType: string = 'audio/mpeg'
+  ): Promise<{ uploadUrl: string; key: string }> {
+    const timestamp = Date.now();
+    const sanitizedFilename = filename
+      .toLowerCase()
+      .replace(/[^a-z0-9.-]/g, '_')
+      .substring(0, 50);
+    const key = `${R2_PATHS.CLASS_RAW(eventId, classId)}/${timestamp}_${sanitizedFilename}`;
+
+    const command = new PutObjectCommand({
+      Bucket: this.assetsBucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: 3600 });
+
+    return {
+      uploadUrl,
+      key,
+    };
+  }
+
+  /**
+   * Generate presigned URL for uploading final audio to class folder
+   */
+  async generateClassFinalAudioUploadUrl(
+    eventId: string,
+    classId: string,
+    contentType: string = 'audio/mpeg'
+  ): Promise<{ uploadUrl: string; key: string }> {
+    const key = `${R2_PATHS.CLASS_FINAL(eventId, classId)}/final.mp3`;
+
+    const command = new PutObjectCommand({
+      Bucket: this.assetsBucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: 3600 });
+
+    return {
+      uploadUrl,
+      key,
+    };
+  }
+
+  // ========================================
+  // Helper Methods for Assets Bucket
+  // ========================================
+
+  /**
+   * Generate a signed URL for the assets bucket
+   */
+  async generateSignedUrlForAssetsBucket(key: string, expiresIn: number = 3600): Promise<string> {
+    const command = new GetObjectCommand({
+      Bucket: this.assetsBucketName,
+      Key: key,
+    });
+
+    return getSignedUrl(this.client, command, { expiresIn });
+  }
+
+  /**
+   * Delete a file from the assets bucket
+   */
+  async deleteFileFromAssetsBucket(key: string): Promise<boolean> {
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+      });
+
+      await this.client.send(command);
+      return true;
+    } catch (error) {
+      console.error('Error deleting from assets bucket:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get file buffer from assets bucket
+   */
+  async getFileBufferFromAssetsBucket(key: string): Promise<Buffer | null> {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+      });
+
+      const response = await this.client.send(command);
+
+      if (!response.Body) {
+        return null;
+      }
+
+      const chunks: Uint8Array[] = [];
+      const stream = response.Body as AsyncIterable<Uint8Array>;
+
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      return Buffer.concat(chunks);
+    } catch (error) {
+      console.error('Error getting file buffer from assets bucket:', error);
+      return null;
+    }
   }
 }
 

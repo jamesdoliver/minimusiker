@@ -18,9 +18,12 @@
     "recordingFor": "Recording for: {childName}"
   },
   "recordingPreview": {
-    "title": "School Recording Preview",
-    "previewDescription": "This is a 30-second preview of {childName} performance. Purchase the bundle below to unlock the full recording!",
-    "previewDescriptionSchool": "This is a 30-second preview of your school's performance. Purchase the bundle below to unlock the full recording!",
+    "title": "Audio Preview",
+    "previewBadge": "Preview",
+    "previewMessage": "This is a 10-second preview. Purchase the bundle below to unlock the full recording!",
+    "previewDescription": "This is a 10-second preview of {childName} performance. Purchase the bundle below to unlock the full recording!",
+    "previewDescriptionSchool": "This is a 10-second preview of your school's performance. Purchase the bundle below to unlock the full recording!",
+    "comingSoon": "The recording will be available after the event",
     "availableSoon": "Recording will be available after the event"
   },
   "productSelector": {
