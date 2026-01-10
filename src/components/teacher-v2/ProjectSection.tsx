@@ -2,6 +2,7 @@
 
 import { ProjectTabs } from './ProjectTabs';
 import { ProjectCard } from './ProjectCard';
+import WeeklyVideosTrigger from './WeeklyVideosTrigger';
 import type { TeacherEventView } from '@/lib/types/teacher';
 
 type FilterType = 'all' | 'upcoming' | 'completed';
@@ -131,10 +132,18 @@ export function ProjectSection({
             )}
           </div>
 
-          {/* Right: Empty state / calendar placeholder */}
-          <div className="hidden md:flex items-center justify-center text-gray-400 text-sm">
-            {filteredEvents.length <= 1 && (
-              <span>keine weiteren Projekttage</span>
+          {/* Right: Weekly Videos Section */}
+          <div className="hidden md:block">
+            {currentEvent && (
+              <WeeklyVideosTrigger
+                eventDate={currentEvent.eventDate}
+                eventId={currentEvent.eventId}
+              />
+            )}
+            {!currentEvent && filteredEvents.length <= 1 && (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                keine weiteren Projekttage
+              </div>
             )}
           </div>
         </div>
