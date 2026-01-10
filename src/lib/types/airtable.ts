@@ -35,7 +35,7 @@ export const PERSONEN_FIELD_IDS = {
   teams_regionen: 'fldsd73JGjVM7BpYW',
   // New fields for teacher portal representative cards
   bio: 'fldTKYnqcGgBZrKK9', // Long text - Personal introduction shown to teachers
-  profile_photo: 'fldcSWJFKy1DW8pXA', // Attachment - Profile photo for representative card
+  profile_photo: 'fldcSWJFKy1DW8pXA', // URL - Profile photo for representative card (Dropbox)
 } as const;
 
 // SchoolBookings table (SimplyBook integration)

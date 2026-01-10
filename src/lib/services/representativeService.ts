@@ -9,7 +9,6 @@ import {
   PERSONEN_FIELD_IDS,
   ROLLEN_IDS,
   MinimusikanRepresentative,
-  AirtableAttachment,
 } from '../types/airtable';
 import { TEACHERS_TABLE_ID, TEACHERS_FIELD_IDS } from '../types/teacher';
 
@@ -89,12 +88,8 @@ export async function getTeacherRepresentative(
       const email = fields[PERSONEN_FIELD_IDS.email] as string | undefined;
       const telefon = fields[PERSONEN_FIELD_IDS.telefon] as string | undefined;
       const bio = fields[PERSONEN_FIELD_IDS.bio] as string | undefined;
-      const profilePhotoAttachments = fields[PERSONEN_FIELD_IDS.profile_photo] as AirtableAttachment[] | undefined;
-
-      // Get first profile photo URL if available
-      const profilePhotoUrl = profilePhotoAttachments && profilePhotoAttachments.length > 0
-        ? profilePhotoAttachments[0].url
-        : undefined;
+      // Get profile photo URL (now stored as URL field, not attachment)
+      const profilePhotoUrl = fields[PERSONEN_FIELD_IDS.profile_photo] as string | undefined;
 
       // Skip if missing required fields
       if (!name || !email) {
