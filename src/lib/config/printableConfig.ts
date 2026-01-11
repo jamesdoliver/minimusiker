@@ -44,6 +44,13 @@ export interface ImagePlacement {
   fit?: 'contain' | 'cover' | 'stretch';  // How to fit the image
 }
 
+// QR code placement configuration
+export interface QrCodePlacement {
+  x: number;           // X coordinate from left edge
+  y: number;           // Y coordinate from bottom edge
+  size: number;        // QR code size (width and height)
+}
+
 // Configuration for a single printable template
 export interface PrintableTemplateConfig {
   schoolName: TextPlacement;
@@ -307,3 +314,48 @@ export function getMockupConfig(type: MockupType): MockupTemplateConfig {
 export function printableRequiresLogo(type: PrintableType): boolean {
   return type === 'minicard' || type === 'cd-jacket';
 }
+
+/**
+ * Check if a printable type supports QR code embedding
+ */
+export function printableSupportsQrCode(type: PrintableType): boolean {
+  return type === 'flyer1' || type === 'flyer2' || type === 'flyer3' || type === 'poster';
+}
+
+/**
+ * QR Code Placement Configurations
+ *
+ * These define where QR codes should be placed on printables that support them.
+ * QR codes link to the short URL for easy parent registration (e.g., minimusiker.app/e/1562)
+ *
+ * IMPORTANT: These are placeholder values. Update after receiving actual templates.
+ */
+export const QR_CODE_CONFIGS: Partial<Record<PrintableType, QrCodePlacement>> = {
+  // Flyer 1 - QR code in bottom right corner
+  flyer1: {
+    x: 480,    // Near right edge of A4
+    y: 50,     // Near bottom edge
+    size: 80,  // 80 points = ~28mm
+  },
+
+  // Flyer 2 - QR code in bottom right corner
+  flyer2: {
+    x: 480,
+    y: 50,
+    size: 80,
+  },
+
+  // Flyer 3 - QR code in bottom right corner
+  flyer3: {
+    x: 480,
+    y: 50,
+    size: 80,
+  },
+
+  // Poster - Larger QR code for easier scanning
+  poster: {
+    x: 460,
+    y: 50,
+    size: 100,  // Larger for poster
+  },
+};

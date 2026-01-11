@@ -4263,6 +4263,28 @@ class AirtableService {
   }
 
   /**
+   * Get an Event by its access_code (short URL code)
+   * Used for short URL routing: minimusiker.app/1562 → Event
+   */
+  async getEventByAccessCode(accessCode: number): Promise<Event | null> {
+    try {
+      const records = await this.base(EVENTS_TABLE_ID).select({
+        filterByFormula: `{${EVENTS_FIELD_IDS.access_code}} = ${accessCode}`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (records.length === 0) {
+        return null;
+      }
+
+      return this.transformEventRecord(records[0]);
+    } catch (error) {
+      console.error('Error fetching Event by access_code:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get logo URL for an Einrichtung (school)
    * Returns the logo_url field if it exists
    */
@@ -4313,6 +4335,7 @@ class AirtableService {
       created_at: record.get(EVENTS_FIELD_IDS.created_at) as string || '',
       legacy_booking_id: record.get(EVENTS_FIELD_IDS.legacy_booking_id) as string | undefined,
       simplybook_booking: record.get(EVENTS_FIELD_IDS.simplybook_booking) as string[] | undefined,
+      access_code: record.get(EVENTS_FIELD_IDS.access_code) as number | undefined,
     };
   }
 

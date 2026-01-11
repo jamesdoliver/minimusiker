@@ -98,27 +98,38 @@ export default function ConfirmPrintablesModal({
     setGenerationError(null);
 
     try {
-      // TODO: Implement actual PDF generation API call
-      // const response = await fetch('/api/admin/printables/generate', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     bookingId: booking.id,
-      //     eventId: booking.code,
-      //     items: PRINTABLE_ITEMS.map(item => ({
-      //       type: item.type,
-      //       ...itemTextData[item.type],
-      //     })),
-      //   }),
-      // });
+      // Call the printables generation API
+      const response = await fetch('/api/admin/printables/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: booking.code,
+          schoolName: booking.schoolName,
+          eventDate: booking.bookingDate,
+          // Access code will be fetched from Airtable if available
+          items: PRINTABLE_ITEMS.map(item => ({
+            type: item.type,
+            ...itemTextData[item.type],
+          })),
+        }),
+      });
 
-      // Simulate API call for now
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to generate printables');
+      }
+
+      const result = await response.json();
+
+      if (!result.success && result.errors?.length > 0) {
+        // Partial success - show warnings but still close
+        console.warn('Some printables failed:', result.errors);
+      }
 
       // Close modal on success
       onClose();
     } catch (error) {
-      setGenerationError('Failed to generate printables. Please try again.');
+      setGenerationError(error instanceof Error ? error.message : 'Failed to generate printables. Please try again.');
       console.error('Generation error:', error);
     } finally {
       setIsGenerating(false);
