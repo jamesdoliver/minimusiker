@@ -4,6 +4,8 @@
  */
 
 import Airtable from 'airtable';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   PERSONEN_TABLE_ID,
   PERSONEN_FIELD_IDS,
@@ -18,6 +20,18 @@ Airtable.configure({
 });
 
 const base = Airtable.base(process.env.AIRTABLE_BASE_ID!);
+
+// Configure R2/S3 client for signed URLs
+const s3Client = new S3Client({
+  region: 'auto',
+  endpoint: process.env.R2_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+  },
+});
+
+const ASSETS_BUCKET = process.env.R2_ASSETS_BUCKET_NAME || 'minimusiker-assets';
 
 /**
  * Get the assigned Minimusiker representative for a teacher
@@ -88,8 +102,22 @@ export async function getTeacherRepresentative(
       const email = fields[PERSONEN_FIELD_IDS.email] as string | undefined;
       const telefon = fields[PERSONEN_FIELD_IDS.telefon] as string | undefined;
       const bio = fields[PERSONEN_FIELD_IDS.bio] as string | undefined;
-      // Get profile photo URL (now stored as URL field, not attachment)
-      const profilePhotoUrl = fields[PERSONEN_FIELD_IDS.profile_photo] as string | undefined;
+
+      // Get profile photo R2 key and generate signed URL
+      const profilePhotoKey = fields[PERSONEN_FIELD_IDS.profile_photo] as string | undefined;
+      let profilePhotoUrl: string | undefined;
+
+      if (profilePhotoKey) {
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: ASSETS_BUCKET,
+            Key: profilePhotoKey,
+          });
+          profilePhotoUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 3600 });
+        } catch (err) {
+          console.warn(`Failed to generate signed URL for ${profilePhotoKey}:`, err);
+        }
+      }
 
       // Skip if missing required fields
       if (!name || !email) {
