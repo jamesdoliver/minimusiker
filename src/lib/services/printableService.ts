@@ -16,6 +16,7 @@
  */
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import QRCode from 'qrcode';
 import {
   getR2Service,
   type PrintableType,
@@ -26,10 +27,13 @@ import {
 import {
   PRINTABLE_CONFIGS,
   MOCKUP_CONFIGS,
+  QR_CODE_CONFIGS,
   formatGermanDate,
   printableRequiresLogo,
+  printableSupportsQrCode,
   type TextPlacement,
   type ImagePlacement,
+  type QrCodePlacement,
 } from '../config/printableConfig';
 
 // Result type for generation operations
@@ -58,37 +62,50 @@ class PrintableService {
    * @param schoolName - The school name to display
    * @param eventDate - The event date (ISO string)
    * @param logoBuffer - Optional logo image buffer for minicard/cd-jacket
+   * @param qrCodeUrl - Optional URL for QR code (e.g., https://minimusiker.app/e/1562)
    */
   async generateAllPrintables(
     eventId: string,
     schoolName: string,
     eventDate: string,
-    logoBuffer?: Buffer
+    logoBuffer?: Buffer,
+    qrCodeUrl?: string
   ): Promise<BatchGenerationResult> {
     const results: GenerationResult[] = [];
     const errors: string[] = [];
 
-    // Generate all flyers
-    const flyerResults = await this.generateFlyers(eventId, schoolName, eventDate);
+    // Generate QR code buffer if URL is provided
+    let qrCodeBuffer: Buffer | undefined;
+    if (qrCodeUrl) {
+      try {
+        qrCodeBuffer = await this.generateQrCodeBuffer(qrCodeUrl);
+      } catch (error) {
+        console.warn('Failed to generate QR code:', error);
+        // Continue without QR code
+      }
+    }
+
+    // Generate all flyers (with QR code if available)
+    const flyerResults = await this.generateFlyers(eventId, schoolName, eventDate, qrCodeBuffer);
     results.push(...flyerResults);
 
-    // Generate poster
-    const posterResult = await this.generatePrintable(eventId, 'poster', schoolName, eventDate);
+    // Generate poster (with QR code if available)
+    const posterResult = await this.generatePrintable(eventId, 'poster', schoolName, eventDate, qrCodeBuffer);
     results.push(posterResult);
 
-    // Generate t-shirt print
+    // Generate t-shirt print (no QR code)
     const tshirtResult = await this.generatePrintable(eventId, 'tshirt-print', schoolName, eventDate);
     results.push(tshirtResult);
 
-    // Generate hoodie print
+    // Generate hoodie print (no QR code)
     const hoodieResult = await this.generatePrintable(eventId, 'hoodie-print', schoolName, eventDate);
     results.push(hoodieResult);
 
-    // Generate minicard (requires logo)
+    // Generate minicard (requires logo, no QR code)
     const minicardResult = await this.generateMinicard(eventId, schoolName, eventDate, logoBuffer);
     results.push(minicardResult);
 
-    // Generate CD jacket (requires logo)
+    // Generate CD jacket (requires logo, no QR code)
     const cdJacketResult = await this.generateCdJacket(eventId, schoolName, eventDate, logoBuffer);
     results.push(cdJacketResult);
 
@@ -112,18 +129,38 @@ class PrintableService {
   }
 
   /**
+   * Generate a QR code as a PNG buffer
+   */
+  private async generateQrCodeBuffer(url: string): Promise<Buffer> {
+    const qrCodeDataUrl = await QRCode.toDataURL(url, {
+      width: 400,  // High resolution for print
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF',
+      },
+    });
+
+    // Convert data URL to buffer
+    const base64Data = qrCodeDataUrl.replace(/^data:image\/png;base64,/, '');
+    return Buffer.from(base64Data, 'base64');
+  }
+
+  /**
    * Generate all three flyer variants
    */
   async generateFlyers(
     eventId: string,
     schoolName: string,
-    eventDate: string
+    eventDate: string,
+    qrCodeBuffer?: Buffer
   ): Promise<GenerationResult[]> {
     const flyerTypes: PrintableType[] = ['flyer1', 'flyer2', 'flyer3'];
     const results: GenerationResult[] = [];
 
     for (const type of flyerTypes) {
-      const result = await this.generatePrintable(eventId, type, schoolName, eventDate);
+      const result = await this.generatePrintable(eventId, type, schoolName, eventDate, qrCodeBuffer);
       results.push(result);
     }
 
@@ -137,7 +174,8 @@ class PrintableService {
     eventId: string,
     type: PrintableType,
     schoolName: string,
-    eventDate: string
+    eventDate: string,
+    qrCodeBuffer?: Buffer
   ): Promise<GenerationResult> {
     try {
       // Check if this type requires a logo
@@ -167,6 +205,11 @@ class PrintableService {
       await this.addTextToPdf(pdfDoc, schoolName, config.schoolName);
       await this.addTextToPdf(pdfDoc, formatGermanDate(eventDate), config.eventDate);
 
+      // Add QR code if provided and this type supports it
+      if (qrCodeBuffer && printableSupportsQrCode(type)) {
+        await this.addQrCodeToPdf(pdfDoc, qrCodeBuffer, type);
+      }
+
       // Save the modified PDF
       const pdfBytes = await pdfDoc.save();
       const buffer = Buffer.from(pdfBytes);
@@ -194,6 +237,46 @@ class PrintableService {
         type,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
+    }
+  }
+
+  /**
+   * Add a QR code to a PDF document
+   */
+  private async addQrCodeToPdf(
+    pdfDoc: PDFDocument,
+    qrCodeBuffer: Buffer,
+    type: PrintableType
+  ): Promise<void> {
+    const qrConfig = QR_CODE_CONFIGS[type];
+    if (!qrConfig) {
+      console.warn(`No QR code config for type: ${type}`);
+      return;
+    }
+
+    try {
+      // Embed the QR code image
+      const qrImage = await pdfDoc.embedPng(qrCodeBuffer);
+
+      // Get the first page
+      const pages = pdfDoc.getPages();
+      if (pages.length === 0) {
+        console.warn('PDF has no pages');
+        return;
+      }
+
+      const page = pages[0];
+
+      // Draw the QR code
+      page.drawImage(qrImage, {
+        x: qrConfig.x,
+        y: qrConfig.y,
+        width: qrConfig.size,
+        height: qrConfig.size,
+      });
+    } catch (error) {
+      console.error('Error adding QR code to PDF:', error);
+      // Don't throw - continue without QR code
     }
   }
 

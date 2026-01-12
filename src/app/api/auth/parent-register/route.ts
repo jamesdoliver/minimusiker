@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getEmailService } from '@/lib/services/emailService';
 import { ParentSession } from '@/lib/types/airtable';
 import {
   RegistrationRequest,
@@ -222,7 +223,20 @@ export async function POST(request: NextRequest) {
       expiresIn: PARENT_SESSION_DURATION,
     });
 
-    // Step 7: Return success with session
+    // Step 7: Send welcome email (fire and forget - don't block registration)
+    try {
+      await getEmailService().sendParentWelcome(sanitizedData.parentEmail, {
+        parentName: sanitizedData.parentFirstName,
+        childName: sanitizedData.children.map(c => c.childName).join(', '),
+        schoolName: eventDetails.schoolName,
+      });
+      console.log('[parent-register] Welcome email sent to:', sanitizedData.parentEmail);
+    } catch (emailError) {
+      // Log but don't fail registration if email fails
+      console.error('[parent-register] Failed to send welcome email:', emailError);
+    }
+
+    // Step 8: Return success with session
     const response = NextResponse.json<RegistrationResponse>(
       {
         success: true,

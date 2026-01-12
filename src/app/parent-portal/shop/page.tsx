@@ -10,18 +10,34 @@ import CartSummary from '@/components/shop/CartSummary';
 import CartDrawer from '@/components/shop/CartDrawer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
+// Child type from session
+interface SessionChild {
+  childName: string;
+  eventId?: string;
+  classId?: string;
+  bookingId?: string;
+  class?: string;
+  schoolName?: string;
+}
+
 // Inner component that uses hooks
 function ShopContent() {
   const router = useRouter();
   const [parentId, setParentId] = useState<string>('');
   const [parentEmail, setParentEmail] = useState<string>('');
-  const [eventId, setEventId] = useState<string>('');
-  const [classId, setClassId] = useState<string>('');
+  const [children, setChildren] = useState<SessionChild[]>([]);
+  const [selectedChildIndex, setSelectedChildIndex] = useState(0);
   const [isVerifying, setIsVerifying] = useState(true);
 
   const { products, isLoading, error } = useProducts({
     tagFilter: 'minimusiker-shop',
   });
+
+  // Derive eventId and classId from selected child
+  const selectedChild = children[selectedChildIndex] || null;
+  const eventId = selectedChild?.eventId || selectedChild?.bookingId || '';
+  const classId = selectedChild?.classId || '';
+  const hasMultipleChildren = children.length > 1;
 
   // Verify parent session
   useEffect(() => {
@@ -37,10 +53,9 @@ function ShopContent() {
         if (data.session) {
           setParentId(data.session.parentId || '');
           setParentEmail(data.session.email || '');
-          // Extract eventId and classId from first child for checkout
+          // Store all children for selection
           if (data.session.children?.length > 0) {
-            setEventId(data.session.children[0].eventId || '');
-            setClassId(data.session.children[0].classId || '');
+            setChildren(data.session.children);
           }
         }
       } catch (error) {
@@ -65,6 +80,35 @@ function ShopContent() {
   return (
     <div className="min-h-screen bg-cream-50">
       <ShopHeader />
+
+      {/* Child Selector - Only show if multiple children */}
+      {hasMultipleChildren && (
+        <div className="bg-white border-b shadow-sm">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center space-x-2 overflow-x-auto">
+              <span className="text-sm font-medium text-gray-700 whitespace-nowrap mr-2">
+                Shopping for:
+              </span>
+              {children.map((child, index) => (
+                <button
+                  key={child.bookingId || index}
+                  onClick={() => setSelectedChildIndex(index)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                    selectedChildIndex === index
+                      ? 'bg-[#F4A261] text-white border-2 border-[#E07B3A]'
+                      : 'bg-gray-100 text-gray-700 border-2 border-transparent hover:bg-gray-200'
+                  }`}
+                >
+                  {child.childName}
+                  {child.class && (
+                    <span className="ml-2 text-xs opacity-75">({child.class})</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="container mx-auto px-4 py-8">
         <ProductCatalog

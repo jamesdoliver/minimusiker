@@ -110,24 +110,33 @@ export async function GET(
 
     const eventId = decodeURIComponent(params.eventId);
 
-    // Get event detail which includes assigned engineer info
-    const eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
-    if (!eventDetail) {
+    // Get event from Events table (includes assigned_engineer)
+    const event = await getAirtableService().getEventByEventId(eventId);
+    if (!event) {
       return NextResponse.json(
         { error: 'Event not found' },
         { status: 404 }
       );
     }
 
-    // Note: We need to add assigned_engineer info to SchoolEventDetail
-    // For now, we'll query directly
-    // TODO: Update getSchoolEventDetail to include assigned_engineer
+    // If there's an assigned engineer, get their details
+    let assignedEngineer: { id: string; name: string } | null = null;
+    if (event.assigned_engineer && event.assigned_engineer.length > 0) {
+      const engineerId = event.assigned_engineer[0];
+      const engineers = await getAirtableService().getEngineerStaff();
+      const engineer = engineers.find((e) => e.id === engineerId);
+      if (engineer) {
+        assignedEngineer = {
+          id: engineerId,
+          name: engineer.name,
+        };
+      }
+    }
 
     return NextResponse.json({
       success: true,
       eventId,
-      // assignedEngineer will be added when we update the data model
-      assignedEngineer: null,
+      assignedEngineer,
     });
   } catch (error) {
     console.error('Error getting assigned engineer:', error);

@@ -31,16 +31,16 @@ export async function POST(request: Request) {
       company: payload.company,
     });
 
-    // Only process 'create' notifications for now
-    // TODO: Handle 'change' and 'cancel' notifications
-    if (payload.notification_type !== 'create') {
-      console.log(`Ignoring ${payload.notification_type} notification`);
-      return NextResponse.json({
-        status: 'ignored',
-        reason: `Notification type '${payload.notification_type}' not processed`,
-      });
+    // Route to appropriate handler based on notification type
+    if (payload.notification_type === 'change') {
+      return handleBookingChange(payload);
     }
 
+    if (payload.notification_type === 'cancel') {
+      return handleBookingCancel(payload);
+    }
+
+    // Handle 'create' notification
     // Check if booking already exists (idempotency)
     const existingRecords = await airtable
       .table(SCHOOL_BOOKINGS_TABLE_ID)
@@ -267,4 +267,137 @@ export async function GET() {
     service: 'SimplyBook webhook',
     timestamp: new Date().toISOString(),
   });
+}
+
+/**
+ * Handle booking change notifications from SimplyBook
+ * Updates the existing SchoolBooking record with new details
+ */
+async function handleBookingChange(payload: SimplybookWebhookPayload) {
+  console.log('[SimplyBook] Processing change notification for booking:', payload.booking_id);
+
+  try {
+    // Find existing booking record
+    const existingRecords = await airtable
+      .table(SCHOOL_BOOKINGS_TABLE_ID)
+      .select({
+        filterByFormula: `{${SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id}} = "${payload.booking_id}"`,
+        maxRecords: 1,
+      })
+      .firstPage();
+
+    if (existingRecords.length === 0) {
+      console.warn('[SimplyBook] Booking not found for change notification:', payload.booking_id);
+      return NextResponse.json({
+        status: 'skipped',
+        reason: 'Booking not found - may have been created before sync',
+      });
+    }
+
+    const existingRecord = existingRecords[0];
+
+    // Fetch updated booking details from SimplyBook API
+    const booking = await simplybookService.getBookingDetails(payload.booking_id);
+    const mappedData = simplybookService.mapIntakeFields(booking);
+
+    console.log('[SimplyBook] Updating booking with new details:', {
+      id: payload.booking_id,
+      start_date: booking.start_date,
+      schoolName: mappedData.schoolName,
+    });
+
+    // Update the record with new details
+    await airtable.table(SCHOOL_BOOKINGS_TABLE_ID).update(existingRecord.id, {
+      [SCHOOL_BOOKINGS_FIELD_IDS.school_name]: mappedData.schoolName || '',
+      [SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name]: mappedData.contactPerson,
+      [SCHOOL_BOOKINGS_FIELD_IDS.school_contact_email]: mappedData.contactEmail,
+      [SCHOOL_BOOKINGS_FIELD_IDS.school_phone]: mappedData.phone || '',
+      [SCHOOL_BOOKINGS_FIELD_IDS.school_address]: mappedData.address || '',
+      [SCHOOL_BOOKINGS_FIELD_IDS.school_postal_code]: mappedData.postalCode || '',
+      [SCHOOL_BOOKINGS_FIELD_IDS.region]: mappedData.region || '',
+      [SCHOOL_BOOKINGS_FIELD_IDS.city]: mappedData.city || mappedData.region || '',
+      [SCHOOL_BOOKINGS_FIELD_IDS.estimated_children]: mappedData.numberOfChildren,
+      [SCHOOL_BOOKINGS_FIELD_IDS.school_size_category]: mappedData.costCategory,
+      [SCHOOL_BOOKINGS_FIELD_IDS.start_date]: booking.start_date,
+      [SCHOOL_BOOKINGS_FIELD_IDS.end_date]: booking.end_date,
+      [SCHOOL_BOOKINGS_FIELD_IDS.start_time]: booking.start_time,
+      [SCHOOL_BOOKINGS_FIELD_IDS.end_time]: booking.end_time,
+    });
+
+    console.log('[SimplyBook] Updated booking record:', existingRecord.id);
+
+    return NextResponse.json({
+      status: 'updated',
+      recordId: existingRecord.id,
+      bookingId: payload.booking_id,
+      changes: {
+        start_date: booking.start_date,
+        schoolName: mappedData.schoolName,
+        estimatedChildren: mappedData.numberOfChildren,
+      },
+    });
+  } catch (error) {
+    console.error('[SimplyBook] Error handling booking change:', error);
+    return NextResponse.json(
+      {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Handle booking cancel notifications from SimplyBook
+ * Marks the booking as cancelled in Airtable
+ */
+async function handleBookingCancel(payload: SimplybookWebhookPayload) {
+  console.log('[SimplyBook] Processing cancel notification for booking:', payload.booking_id);
+
+  try {
+    // Find existing booking record
+    const existingRecords = await airtable
+      .table(SCHOOL_BOOKINGS_TABLE_ID)
+      .select({
+        filterByFormula: `{${SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id}} = "${payload.booking_id}"`,
+        maxRecords: 1,
+      })
+      .firstPage();
+
+    if (existingRecords.length === 0) {
+      console.warn('[SimplyBook] Booking not found for cancel notification:', payload.booking_id);
+      return NextResponse.json({
+        status: 'skipped',
+        reason: 'Booking not found - may have been created before sync',
+      });
+    }
+
+    const existingRecord = existingRecords[0];
+
+    // Update status to cancelled
+    await airtable.table(SCHOOL_BOOKINGS_TABLE_ID).update(existingRecord.id, {
+      [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status]: 'cancelled',
+    });
+
+    console.log('[SimplyBook] Marked booking as cancelled:', existingRecord.id);
+
+    // Note: Events linked to this SchoolBooking via simplybook_booking field will still
+    // show this booking, and staff can see the cancelled status through that link
+
+    return NextResponse.json({
+      status: 'cancelled',
+      recordId: existingRecord.id,
+      bookingId: payload.booking_id,
+    });
+  } catch (error) {
+    console.error('[SimplyBook] Error handling booking cancel:', error);
+    return NextResponse.json(
+      {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
 }

@@ -505,6 +505,7 @@ export const EVENTS_FIELD_IDS = {
   created_at: 'fldnOuSFihr3HrJkF',
   legacy_booking_id: 'fldYrZSh7tdkwuWp4',  // Original booking_id from parent_journey_table
   simplybook_booking: 'fldK7vyxLd9MxgmES',  // Linked record → SchoolBookings
+  access_code: 'fldACCESSCODE_PLACEHOLDER',  // Autonumber field for short URLs (e.g., 1562)
 } as const;
 
 // Classes Table - 1 row per class
@@ -607,6 +608,7 @@ export interface Event {
   created_at: string;
   legacy_booking_id?: string;           // Original booking_id from parent_journey_table
   simplybook_booking?: string[];        // Linked record IDs → SchoolBookings
+  access_code?: number;                 // Autonumber for short URLs (e.g., 1562 → minimusiker.app/1562)
   // R2 Storage fields (populated after printable generation)
   r2_event_folder?: string;             // R2 path: events/{event_id}/
   printables_generated?: boolean;       // Flag indicating printables have been generated

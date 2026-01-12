@@ -37,6 +37,8 @@ function ParentPortalContent() {
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
   const [audioStatus, setAudioStatus] = useState<AudioStatus | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [hasDigitalAccess, setHasDigitalAccess] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Fetch shop products
   const { products: shopProducts } = useProducts({
@@ -131,6 +133,62 @@ function ParentPortalContent() {
       setAudioStatus(null);
     }
   }, [session, eventId, classId, fetchAudioStatus]);
+
+  // Check digital access when event changes
+  const checkDigitalAccess = useCallback(async (evId: string) => {
+    try {
+      const response = await fetch('/api/parent/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ eventId: evId, checkOnly: true }),
+      });
+      // If we get a 200, they have access; 403 means no access
+      setHasDigitalAccess(response.ok);
+    } catch (err) {
+      console.error('Error checking digital access:', err);
+      setHasDigitalAccess(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!session || !eventId) return;
+    checkDigitalAccess(eventId);
+  }, [session, eventId, checkDigitalAccess]);
+
+  // Handle download button click
+  const handleDownload = async () => {
+    if (!eventId) return;
+
+    setIsDownloading(true);
+    try {
+      const response = await fetch('/api/parent/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          eventId,
+          classId,
+          className: selectedChild?.class,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get download link');
+      }
+
+      const data = await response.json();
+      if (data.downloadUrl) {
+        // Open download in new tab
+        window.open(data.downloadUrl, '_blank');
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Failed to download. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -333,6 +391,37 @@ function ParentPortalContent() {
                       }
                     </p>
                   </div>
+
+                  {/* Download Button - Shows when parent has purchased digital access */}
+                  {hasDigitalAccess && (
+                    <div className="mt-4">
+                      <button
+                        onClick={handleDownload}
+                        disabled={isDownloading}
+                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isDownloading ? (
+                          <>
+                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Preparing Download...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download Full Recording
+                          </>
+                        )}
+                      </button>
+                      <p className="mt-2 text-xs text-center text-gray-500">
+                        Your purchase includes the full high-quality recording
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <AudioComingSoon
@@ -371,7 +460,7 @@ function ParentPortalContent() {
 
       {/* Cart Components */}
       <CartSummary />
-      <CartDrawer parentId={session.parentId} parentEmail={session.email} />
+      <CartDrawer parentId={session.parentId} parentEmail={session.email} eventId={eventId} classId={classId} />
     </div>
   );
 }
