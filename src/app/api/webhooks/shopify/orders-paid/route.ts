@@ -53,9 +53,17 @@ export async function POST(request: NextRequest) {
       currency: order.currency,
     });
 
-    // Check for duplicate processing using X-Shopify-Event-Id
-    const eventId = request.headers.get('X-Shopify-Event-Id');
-    // TODO: Implement idempotency check against stored event IDs
+    // Idempotency check: see if this order already exists in Airtable
+    const shopifyEventId = request.headers.get('X-Shopify-Event-Id');
+    const existingOrder = await checkOrderExists(order.admin_graphql_api_id);
+    if (existingOrder) {
+      console.log('[orders-paid] Order already exists, skipping:', {
+        orderId: order.id,
+        orderNumber: order.name,
+        shopifyEventId,
+      });
+      return webhookSuccess();
+    }
 
     // Extract custom attributes
     const attributes = extractCustomAttributes(order.note_attributes);
@@ -146,6 +154,30 @@ export async function POST(request: NextRequest) {
     // Return 200 to prevent Shopify from retrying for parsing errors
     // Only return 4xx/5xx if we want Shopify to retry
     return webhookSuccess();
+  }
+}
+
+/**
+ * Check if an order already exists in Airtable (idempotency check)
+ */
+async function checkOrderExists(orderId: string): Promise<boolean> {
+  const Airtable = require('airtable');
+  const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
+    .base(process.env.AIRTABLE_BASE_ID!);
+
+  try {
+    const records = await base(ORDERS_TABLE_ID)
+      .select({
+        filterByFormula: `{${ORDERS_FIELD_IDS.order_id}} = "${orderId}"`,
+        maxRecords: 1,
+      })
+      .firstPage();
+
+    return records.length > 0;
+  } catch (error) {
+    console.error('[orders-paid] Error checking for existing order:', error);
+    // Return false to allow order creation attempt on error
+    return false;
   }
 }
 
