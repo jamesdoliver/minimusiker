@@ -1299,6 +1299,11 @@ class TeacherService {
       const events: TeacherEventView[] = [];
 
       for (const [eventId, eventData] of eventMap) {
+        // Lookup SchoolBooking to get the current date (source of truth)
+        // This ensures date changes by admin are reflected immediately
+        const schoolBooking = await getAirtableService().getSchoolBookingBySimplybookId(eventId);
+        const actualEventDate = schoolBooking?.startDate || eventData.eventDate;
+
         // Get songs and audio files for this event
         const songs = await this.getSongsByEventId(eventId);
         const audioFiles = await this.getAudioFilesByEventId(eventId);
@@ -1323,7 +1328,7 @@ class TeacherService {
         }
 
         // Determine event status - Use date-only comparison to avoid timezone issues
-        const eventDate = new Date(eventData.eventDate);
+        const eventDate = new Date(actualEventDate);
         const now = new Date();
 
         // Normalize both dates to start of day in local timezone
@@ -1385,7 +1390,7 @@ class TeacherService {
         events.push({
           eventId: eventData.eventId,
           schoolName: eventData.schoolName,
-          eventDate: eventData.eventDate,
+          eventDate: actualEventDate,
           eventType: eventData.eventType,
           classes: classViews,
           status,
