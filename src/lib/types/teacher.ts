@@ -196,6 +196,7 @@ export interface TeacherEventView {
   eventType: string;
   classes: TeacherClassView[];
   status: 'upcoming' | 'in-progress' | 'completed';
+  simplybookHash?: string; // Used as discount code for teacher shop
   // Progress tracking fields (for dashboard)
   progress?: {
     classesCount: number; // Number of classes created

@@ -1394,6 +1394,7 @@ class TeacherService {
           eventType: eventData.eventType,
           classes: classViews,
           status,
+          simplybookHash: schoolBooking?.simplybookHash,
           progress: {
             classesCount,
             expectedClasses: undefined, // TODO: Get from booking config when available

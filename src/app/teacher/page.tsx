@@ -152,6 +152,12 @@ export default function TeacherDashboard() {
     return events.filter((e) => e.status === 'completed');
   }, [events, activeFilter]);
 
+  // Get discount code from first upcoming event's simplybook hash
+  const discountCode = useMemo(() => {
+    const upcomingEvent = events.find((e) => e.status === 'upcoming' || e.status === 'in-progress');
+    return upcomingEvent?.simplybookHash;
+  }, [events]);
+
   // Reset index when filter changes
   useEffect(() => {
     setCurrentEventIndex(0);
@@ -241,7 +247,7 @@ export default function TeacherDashboard() {
         <ResourcesSection />
 
         {/* Shop Access Section */}
-        <ShopAccessSection />
+        <ShopAccessSection discountCode={discountCode} />
 
         {/* Tips Section */}
         <TipsSection />
