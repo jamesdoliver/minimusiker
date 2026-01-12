@@ -49,6 +49,13 @@ export interface QrCodePlacement {
   x: number;           // X coordinate from left edge
   y: number;           // Y coordinate from bottom edge
   size: number;        // QR code size (width and height)
+  urlText?: {          // Optional URL text below QR code (for parents who can't scan)
+    x: number;
+    y: number;
+    fontSize: number;
+    color?: { r: number; g: number; b: number };
+    align?: 'left' | 'center' | 'right';
+  };
 }
 
 // Configuration for a single printable template
@@ -336,6 +343,13 @@ export const QR_CODE_CONFIGS: Partial<Record<PrintableType, QrCodePlacement>> = 
     x: 480,    // Near right edge of A4
     y: 50,     // Near bottom edge
     size: 80,  // 80 points = ~28mm
+    urlText: {
+      x: 520,  // Center under QR (480 + 40)
+      y: 35,   // Below QR code
+      fontSize: 8,
+      color: { r: 0, g: 0, b: 0 },
+      align: 'center',
+    },
   },
 
   // Flyer 2 - QR code in bottom right corner
@@ -343,6 +357,13 @@ export const QR_CODE_CONFIGS: Partial<Record<PrintableType, QrCodePlacement>> = 
     x: 480,
     y: 50,
     size: 80,
+    urlText: {
+      x: 520,
+      y: 35,
+      fontSize: 8,
+      color: { r: 0, g: 0, b: 0 },
+      align: 'center',
+    },
   },
 
   // Flyer 3 - QR code in bottom right corner
@@ -350,6 +371,13 @@ export const QR_CODE_CONFIGS: Partial<Record<PrintableType, QrCodePlacement>> = 
     x: 480,
     y: 50,
     size: 80,
+    urlText: {
+      x: 520,
+      y: 35,
+      fontSize: 8,
+      color: { r: 0, g: 0, b: 0 },
+      align: 'center',
+    },
   },
 
   // Poster - Larger QR code for easier scanning
@@ -357,5 +385,12 @@ export const QR_CODE_CONFIGS: Partial<Record<PrintableType, QrCodePlacement>> = 
     x: 460,
     y: 50,
     size: 100,  // Larger for poster
+    urlText: {
+      x: 510,  // Center under QR (460 + 50)
+      y: 32,   // Below QR code
+      fontSize: 10,  // Slightly larger for poster
+      color: { r: 0, g: 0, b: 0 },
+      align: 'center',
+    },
   },
 };

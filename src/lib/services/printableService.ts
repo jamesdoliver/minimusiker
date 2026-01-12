@@ -86,11 +86,11 @@ class PrintableService {
     }
 
     // Generate all flyers (with QR code if available)
-    const flyerResults = await this.generateFlyers(eventId, schoolName, eventDate, qrCodeBuffer);
+    const flyerResults = await this.generateFlyers(eventId, schoolName, eventDate, qrCodeBuffer, qrCodeUrl);
     results.push(...flyerResults);
 
     // Generate poster (with QR code if available)
-    const posterResult = await this.generatePrintable(eventId, 'poster', schoolName, eventDate, qrCodeBuffer);
+    const posterResult = await this.generatePrintable(eventId, 'poster', schoolName, eventDate, qrCodeBuffer, qrCodeUrl);
     results.push(posterResult);
 
     // Generate t-shirt print (no QR code)
@@ -154,13 +154,14 @@ class PrintableService {
     eventId: string,
     schoolName: string,
     eventDate: string,
-    qrCodeBuffer?: Buffer
+    qrCodeBuffer?: Buffer,
+    qrCodeUrl?: string
   ): Promise<GenerationResult[]> {
     const flyerTypes: PrintableType[] = ['flyer1', 'flyer2', 'flyer3'];
     const results: GenerationResult[] = [];
 
     for (const type of flyerTypes) {
-      const result = await this.generatePrintable(eventId, type, schoolName, eventDate, qrCodeBuffer);
+      const result = await this.generatePrintable(eventId, type, schoolName, eventDate, qrCodeBuffer, qrCodeUrl);
       results.push(result);
     }
 
@@ -175,7 +176,8 @@ class PrintableService {
     type: PrintableType,
     schoolName: string,
     eventDate: string,
-    qrCodeBuffer?: Buffer
+    qrCodeBuffer?: Buffer,
+    qrCodeUrl?: string
   ): Promise<GenerationResult> {
     try {
       // Check if this type requires a logo
@@ -207,7 +209,7 @@ class PrintableService {
 
       // Add QR code if provided and this type supports it
       if (qrCodeBuffer && printableSupportsQrCode(type)) {
-        await this.addQrCodeToPdf(pdfDoc, qrCodeBuffer, type);
+        await this.addQrCodeToPdf(pdfDoc, qrCodeBuffer, type, qrCodeUrl);
       }
 
       // Save the modified PDF
@@ -242,11 +244,13 @@ class PrintableService {
 
   /**
    * Add a QR code to a PDF document
+   * Also adds URL text below the QR code if configured (for parents who can't scan)
    */
   private async addQrCodeToPdf(
     pdfDoc: PDFDocument,
     qrCodeBuffer: Buffer,
-    type: PrintableType
+    type: PrintableType,
+    qrCodeUrl?: string
   ): Promise<void> {
     const qrConfig = QR_CODE_CONFIGS[type];
     if (!qrConfig) {
@@ -274,6 +278,18 @@ class PrintableService {
         width: qrConfig.size,
         height: qrConfig.size,
       });
+
+      // Add URL text below QR code if configured (for parents who can't scan)
+      if (qrConfig.urlText && qrCodeUrl) {
+        const shortUrl = qrCodeUrl.replace('https://', '');  // "minimusiker.app/e/1562"
+        await this.addTextToPdf(pdfDoc, shortUrl, {
+          x: qrConfig.urlText.x,
+          y: qrConfig.urlText.y,
+          fontSize: qrConfig.urlText.fontSize,
+          color: qrConfig.urlText.color,
+          align: qrConfig.urlText.align || 'center',
+        });
+      }
     } catch (error) {
       console.error('Error adding QR code to PDF:', error);
       // Don't throw - continue without QR code

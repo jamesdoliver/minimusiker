@@ -23,6 +23,8 @@ export interface BookingWithDetails {
   startTime?: string;
   endTime?: string;
   eventName?: string;
+  accessCode?: number;         // From linked Event
+  shortUrl?: string;           // Computed: "minimusiker.app/e/{accessCode}"
 }
 
 /**
@@ -70,23 +72,44 @@ export async function GET(request: NextRequest) {
     const statusFilter = searchParams.get('status') as 'confirmed' | 'pending' | 'cancelled' | null;
 
     // Fetch future bookings from Airtable
-    const airtableBookings = await getAirtableService().getFutureBookings();
+    const airtableService = getAirtableService();
+    const airtableBookings = await airtableService.getFutureBookings();
 
-    // Transform to API format
-    let bookings: BookingWithDetails[] = airtableBookings.map(transformToBookingWithDetails);
+    // Transform to API format and fetch access codes
+    const bookingsWithAccessCodes: BookingWithDetails[] = await Promise.all(
+      airtableBookings.map(async (booking) => {
+        const baseBooking = transformToBookingWithDetails(booking);
+
+        // Fetch the linked Event to get access_code
+        try {
+          const event = await airtableService.getEventBySchoolBookingId(booking.id);
+          if (event?.access_code) {
+            return {
+              ...baseBooking,
+              accessCode: event.access_code,
+              shortUrl: `minimusiker.app/e/${event.access_code}`,
+            };
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch Event for booking ${booking.id}:`, error);
+        }
+
+        return baseBooking;
+      })
+    );
 
     // Apply status filter if provided
+    let bookings = bookingsWithAccessCodes;
     if (statusFilter) {
       bookings = bookings.filter((b) => b.status === statusFilter);
     }
 
     // Calculate stats from all bookings (before filter)
-    const allBookings = airtableBookings.map(transformToBookingWithDetails);
     const stats = {
-      total: allBookings.length,
-      confirmed: allBookings.filter((b) => b.status === 'confirmed').length,
-      pending: allBookings.filter((b) => b.status === 'pending').length,
-      cancelled: allBookings.filter((b) => b.status === 'cancelled').length,
+      total: bookingsWithAccessCodes.length,
+      confirmed: bookingsWithAccessCodes.filter((b) => b.status === 'confirmed').length,
+      pending: bookingsWithAccessCodes.filter((b) => b.status === 'pending').length,
+      cancelled: bookingsWithAccessCodes.filter((b) => b.status === 'cancelled').length,
     };
 
     return NextResponse.json({

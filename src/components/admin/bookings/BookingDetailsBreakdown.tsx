@@ -97,6 +97,26 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
               <label className="text-xs text-gray-500 uppercase tracking-wide">Size Category</label>
               <p className="text-sm text-gray-900">{booking.costCategory || '-'}</p>
             </div>
+            {/* Short URL for Parent Registration */}
+            {booking.shortUrl && (
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">Parent Registration Link</label>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-mono text-blue-600">{booking.shortUrl}</p>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`https://${booking.shortUrl}`);
+                    }}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    title="Copy link"
+                  >
+                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

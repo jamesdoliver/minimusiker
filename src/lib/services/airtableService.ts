@@ -4351,6 +4351,29 @@ class AirtableService {
   }
 
   /**
+   * Get an Event by its linked SchoolBooking record ID
+   * Used to get access_code for a booking
+   */
+  async getEventBySchoolBookingId(schoolBookingRecordId: string): Promise<Event | null> {
+    try {
+      // Query Events where simplybook_booking contains this SchoolBooking record ID
+      const records = await this.base(EVENTS_TABLE_ID).select({
+        filterByFormula: `FIND("${schoolBookingRecordId}", ARRAYJOIN({simplybook_booking}))`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (records.length === 0) {
+        return null;
+      }
+
+      return this.transformEventRecord(records[0]);
+    } catch (error) {
+      console.error('Error fetching Event by SchoolBooking ID:', error);
+      return null;
+    }
+  }
+
+  /**
    * Transform an Airtable Event record to our Event type
    */
   private transformEventRecord(record: Airtable.Record<FieldSet>): Event {
