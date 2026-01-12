@@ -505,7 +505,7 @@ export const EVENTS_FIELD_IDS = {
   created_at: 'fldnOuSFihr3HrJkF',
   legacy_booking_id: 'fldYrZSh7tdkwuWp4',  // Original booking_id from parent_journey_table
   simplybook_booking: 'fldK7vyxLd9MxgmES',  // Linked record → SchoolBookings
-  access_code: 'fldACCESSCODE_PLACEHOLDER',  // Autonumber field for short URLs (e.g., 1562)
+  access_code: 'flduhYSy17fsa6n3x',  // Autonumber field for short URLs (e.g., 1562)
 } as const;
 
 // Classes Table - 1 row per class
