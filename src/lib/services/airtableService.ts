@@ -4246,8 +4246,9 @@ class AirtableService {
    */
   async getEventByEventId(eventId: string): Promise<Event | null> {
     try {
+      // Note: Airtable formulas use field names, not field IDs
       const records = await this.base(EVENTS_TABLE_ID).select({
-        filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = "${eventId}"`,
+        filterByFormula: `{event_id} = "${eventId}"`,
         maxRecords: 1,
       }).firstPage();
 
@@ -4255,7 +4256,21 @@ class AirtableService {
         return null;
       }
 
-      return this.transformEventRecord(records[0]);
+      // Use field names directly (Airtable SDK returns data by field name, not ID)
+      const record = records[0];
+      return {
+        id: record.id,
+        event_id: record.get('event_id') as string || '',
+        school_name: record.get('school_name') as string || '',
+        event_date: record.get('event_date') as string || '',
+        event_type: (record.get('event_type') as Event['event_type']) || 'concert',
+        assigned_staff: record.get('assigned_staff') as string[] | undefined,
+        assigned_engineer: record.get('assigned_engineer') as string[] | undefined,
+        created_at: record.get('created_at') as string || '',
+        legacy_booking_id: record.get('legacy_booking_id') as string | undefined,
+        simplybook_booking: record.get('simplybook_booking') as string[] | undefined,
+        access_code: record.get('access_code') as number | undefined,
+      };
     } catch (error) {
       console.error('Error fetching Event by event_id:', error);
       return null;
@@ -4268,8 +4283,9 @@ class AirtableService {
    */
   async getEventByAccessCode(accessCode: number): Promise<Event | null> {
     try {
+      // Note: Airtable formulas use field names, not field IDs
       const records = await this.base(EVENTS_TABLE_ID).select({
-        filterByFormula: `{${EVENTS_FIELD_IDS.access_code}} = ${accessCode}`,
+        filterByFormula: `{access_code} = ${accessCode}`,
         maxRecords: 1,
       }).firstPage();
 
@@ -4277,7 +4293,21 @@ class AirtableService {
         return null;
       }
 
-      return this.transformEventRecord(records[0]);
+      // Use field names directly (Airtable SDK returns data by field name, not ID)
+      const record = records[0];
+      return {
+        id: record.id,
+        event_id: record.get('event_id') as string || '',
+        school_name: record.get('school_name') as string || '',
+        event_date: record.get('event_date') as string || '',
+        event_type: (record.get('event_type') as Event['event_type']) || 'concert',
+        assigned_staff: record.get('assigned_staff') as string[] | undefined,
+        assigned_engineer: record.get('assigned_engineer') as string[] | undefined,
+        created_at: record.get('created_at') as string || '',
+        legacy_booking_id: record.get('legacy_booking_id') as string | undefined,
+        simplybook_booking: record.get('simplybook_booking') as string[] | undefined,
+        access_code: record.get('access_code') as number | undefined,
+      };
     } catch (error) {
       console.error('Error fetching Event by access_code:', error);
       return null;
