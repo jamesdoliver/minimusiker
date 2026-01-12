@@ -9,7 +9,7 @@ Before deploying, ensure you have:
 1. **Vercel Account**: Sign up at [vercel.com](https://vercel.com)
 2. **GitHub Repository**: Code pushed to GitHub
 3. **Production Credentials**: All API keys and tokens for production
-4. **Domain Name** (optional): Custom domain for your application
+4. **Domain Name**: Custom domain (production: minimusiker.app)
 
 ## Step 1: Prepare Your Application
 
@@ -19,7 +19,7 @@ Ensure all required environment variables are documented:
 
 ```bash
 # Required
-NEXT_PUBLIC_APP_URL=https://yourdomain.com
+NEXT_PUBLIC_APP_URL=https://minimusiker.app
 AIRTABLE_API_KEY=your_production_api_key
 AIRTABLE_BASE_ID=your_production_base_id
 JWT_SECRET=generate_secure_random_string

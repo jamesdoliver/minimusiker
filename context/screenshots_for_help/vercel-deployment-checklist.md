@@ -22,7 +22,7 @@ Go to: **Project Settings → Environment Variables**
 ### Required - Core Application
 | Variable | Value | Notes |
 |----------|-------|-------|
-| `NEXT_PUBLIC_APP_URL` | `https://your-project.vercel.app` | Update after first deploy |
+| `NEXT_PUBLIC_APP_URL` | `https://minimusiker.app` | Production domain |
 | `NODE_ENV` | `production` | |
 
 ### Required - Airtable
@@ -82,12 +82,11 @@ Go to: **Project Settings → Environment Variables**
 ### 3. Initial Deployment
 - [ ] Click "Deploy" in Vercel
 - [ ] Wait for build to complete
-- [ ] Note your production URL (e.g., `https://minimusiker.vercel.app`)
+- [ ] Production URL: `https://minimusiker.app`
 
-### 4. Update NEXT_PUBLIC_APP_URL
-- [ ] Go back to Environment Variables
-- [ ] Update `NEXT_PUBLIC_APP_URL` to your actual Vercel URL
-- [ ] Redeploy (Deployments → ... → Redeploy)
+### 4. Verify NEXT_PUBLIC_APP_URL
+- [ ] Confirm `NEXT_PUBLIC_APP_URL` is set to `https://minimusiker.app`
+- [ ] If not set, add it and redeploy (Deployments → ... → Redeploy)
 
 ---
 
@@ -97,7 +96,7 @@ Go to: **Project Settings → Environment Variables**
 - [ ] Log into SimplyBook admin dashboard
 - [ ] Go to **Custom Features** → **API** or **Webhooks**
 - [ ] Add new webhook notification
-- [ ] Set URL to: `https://your-project.vercel.app/api/simplybook/webhook`
+- [ ] Set URL to: `https://minimusiker.app/api/simplybook/webhook`
 - [ ] Enable notifications for: `create` (booking created)
 - [ ] Save configuration
 
@@ -132,7 +131,7 @@ Go to: **Project Settings → Environment Variables**
 ### Webhook Not Working
 - Verify URL is correct in SimplyBook
 - Check Vercel function logs for errors
-- Test webhook endpoint: `curl https://your-domain.vercel.app/api/simplybook/webhook`
+- Test webhook endpoint: `curl https://minimusiker.app/api/simplybook/webhook`
 
 ### Auth Issues
 - Verify JWT secrets are set and match between sessions
