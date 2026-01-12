@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import type { TeacherEventView } from '@/lib/types/teacher';
 
@@ -9,6 +10,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ event }: ProjectCardProps) {
   const { eventId, eventDate, progress } = event;
+  const [showDateChangeModal, setShowDateChangeModal] = useState(false);
 
   const formattedDate = formatGermanDate(eventDate);
   const timeUntilEvent = progress?.daysUntilEvent
@@ -35,6 +37,12 @@ export function ProjectCard({ event }: ProjectCardProps) {
           </svg>
         </div>
         <span className="text-xl font-bold">{formattedDate}</span>
+        <button
+          onClick={() => setShowDateChangeModal(true)}
+          className="text-white/70 text-xs hover:text-white hover:underline ml-auto"
+        >
+          Datum ändern
+        </button>
       </div>
 
       {/* Body */}
@@ -103,6 +111,30 @@ export function ProjectCard({ event }: ProjectCardProps) {
           </svg>
         </Link>
       </div>
+
+      {/* Date Change Contact Modal */}
+      {showDateChangeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Datum ändern</h3>
+            <p className="text-gray-600 mb-4">
+              Um das Datum Ihres Events zu ändern, kontaktieren Sie uns bitte:
+            </p>
+            <a
+              href="tel:02513966054"
+              className="text-xl font-bold text-mm-accent hover:underline block mb-4"
+            >
+              0251 3966054
+            </a>
+            <button
+              onClick={() => setShowDateChangeModal(false)}
+              className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Schließen
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
