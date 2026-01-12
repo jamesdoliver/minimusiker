@@ -11,6 +11,8 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import {
   ORDERS_TABLE_ID,
   ORDERS_FIELD_IDS,
+  PARENTS_TABLE_ID,
+  PARENTS_FIELD_IDS,
   ShopifyOrderLineItem,
 } from '@/lib/types/airtable';
 
@@ -162,21 +164,66 @@ async function createOrderInAirtable(orderData: Record<string, unknown>): Promis
 
 /**
  * Grant digital access to a parent
+ *
+ * This function:
+ * 1. Looks up the parent's Airtable record ID
+ * 2. Updates the order with parent link and marks digital_delivered = true
+ * 3. The parent portal will check this flag to show download buttons
  */
 async function grantDigitalAccess(parentId: string, order: ShopifyWebhookOrder): Promise<void> {
-  // TODO: Implement digital access granting
-  // This could involve:
-  // 1. Updating the parent record with digital_access = true
-  // 2. Sending an email with download links
-  // 3. Creating a download token in the database
+  const Airtable = require('airtable');
+  const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
+    .base(process.env.AIRTABLE_BASE_ID!);
 
-  console.log('[orders-paid] Digital access would be granted to:', {
-    parentId,
-    orderNumber: order.name,
-    email: order.email,
-  });
+  try {
+    // 1. Look up parent record by parent_id field
+    const parentRecords = await base(PARENTS_TABLE_ID)
+      .select({
+        filterByFormula: `{${PARENTS_FIELD_IDS.parent_id}} = "${parentId}"`,
+        maxRecords: 1,
+      })
+      .firstPage();
 
-  // For now, just log - full implementation in digitalDeliveryService
+    if (parentRecords.length === 0) {
+      console.warn('[orders-paid] Parent not found:', parentId);
+      // Don't throw - order still processed, just can't link
+      return;
+    }
+
+    const parentRecordId = parentRecords[0].id;
+    console.log('[orders-paid] Found parent record:', parentRecordId);
+
+    // 2. Find the order record we just created and update it
+    const orderRecords = await base(ORDERS_TABLE_ID)
+      .select({
+        filterByFormula: `{${ORDERS_FIELD_IDS.order_id}} = "${order.admin_graphql_api_id}"`,
+        maxRecords: 1,
+      })
+      .firstPage();
+
+    if (orderRecords.length > 0) {
+      // Update order with parent link and mark digital as delivered
+      await base(ORDERS_TABLE_ID).update(orderRecords[0].id, {
+        [ORDERS_FIELD_IDS.parent_id]: [parentRecordId],
+        [ORDERS_FIELD_IDS.digital_delivered]: true,
+        [ORDERS_FIELD_IDS.updated_at]: new Date().toISOString(),
+      });
+
+      console.log('[orders-paid] Order updated with digital access:', {
+        orderId: order.name,
+        parentId: parentId,
+        parentRecordId: parentRecordId,
+      });
+    }
+
+    // 3. TODO: Send email notification about digital content availability
+    // This could be implemented using the emailService
+    // await sendDigitalAccessEmail(order.email, parentId, order.name);
+
+  } catch (error) {
+    console.error('[orders-paid] Error granting digital access:', error);
+    throw error; // Re-throw to be caught by caller
+  }
 }
 
 /**
