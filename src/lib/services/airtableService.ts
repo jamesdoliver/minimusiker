@@ -3876,8 +3876,21 @@ class AirtableService {
    */
   async getSchoolBookingById(bookingId: string): Promise<SchoolBooking | null> {
     try {
-      const record = await this.base(SCHOOL_BOOKINGS_TABLE_ID).find(bookingId);
-      return this.transformSchoolBookingRecord(record);
+      // Use select with RECORD_ID() filter to get field IDs in response
+      // .find() doesn't support returnFieldsByFieldId, which causes field mapping issues
+      const records = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${bookingId}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        return null;
+      }
+
+      return this.transformSchoolBookingRecord(records[0]);
     } catch (error) {
       console.error('Error fetching school booking by ID:', error);
       return null;
