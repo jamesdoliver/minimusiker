@@ -29,7 +29,7 @@ export default function FeaturedProducts({ products, maxItems = 3 }: FeaturedPro
           {t('title')}
         </h2>
         <Link
-          href="/parent-portal/shop"
+          href="/familie/shop"
           className="text-sage-600 hover:text-sage-700 font-medium text-sm flex items-center gap-1"
         >
           {t('viewAll')}
@@ -126,7 +126,7 @@ export default function FeaturedProducts({ products, maxItems = 3 }: FeaturedPro
                   </button>
                 ) : (
                   <Link
-                    href="/parent-portal/shop"
+                    href="/familie/shop"
                     className="mt-3 block w-full py-2 border border-sage-500 text-sage-600 text-sm font-medium rounded text-center hover:bg-sage-50 transition-colors"
                   >
                     {t('viewOptions')}

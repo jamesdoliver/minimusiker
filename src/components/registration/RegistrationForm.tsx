@@ -159,7 +159,7 @@ export default function RegistrationForm({
 
       // Success! Redirect to parent portal (session cookie is set by API)
       setTimeout(() => {
-        router.push(result.data.redirectUrl || '/parent-portal');
+        router.push(result.data.redirectUrl || '/familie');
       }, 1500);
     } catch (err) {
       console.error('Registration error:', err);

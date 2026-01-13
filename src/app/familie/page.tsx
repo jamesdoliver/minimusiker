@@ -58,7 +58,7 @@ function ParentPortalContent() {
 
       if (!sessionResponse.ok) {
         // Redirect to login if not authenticated
-        router.push('/parent-login');
+        router.push('/familie-login');
         return;
       }
 
@@ -196,7 +196,7 @@ function ParentPortalContent() {
         method: 'POST',
         credentials: 'include',
       });
-      router.push('/parent-login');
+      router.push('/familie-login');
     } catch (err) {
       console.error('Logout error:', err);
     }
@@ -260,7 +260,7 @@ function ParentPortalContent() {
             <div className="flex items-center space-x-4">
               {/* Shop Link */}
               <Link
-                href="/parent-portal/shop"
+                href="/familie/shop"
                 className="flex items-center gap-1 text-sm text-sage-600 hover:text-sage-700 font-medium"
               >
                 <svg

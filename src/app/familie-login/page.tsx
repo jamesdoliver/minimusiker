@@ -34,7 +34,7 @@ export default function ParentLoginPage() {
 
         // Redirect to parent portal after brief delay
         setTimeout(() => {
-          router.push('/parent-portal');
+          router.push('/familie');
         }, 1500);
       } else {
         // Check if this is a "not found" error suggesting registration

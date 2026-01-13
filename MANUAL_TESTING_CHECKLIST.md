@@ -8,7 +8,7 @@
 ## 1. Default Language Behavior
 
 ### Main Portal
-- [ ] Navigate to `/parent-login`
+- [ ] Navigate to `/familie-login`
 - [ ] Log in with valid parent credentials
 - [ ] Verify page loads with **German** as default language
 - [ ] Check browser localStorage shows `NEXT_LOCALE = "de"`
@@ -19,7 +19,7 @@
   - [ ] ProductSelector title: "Vervollständigen Sie Ihre Bestellung"
 
 ### Shop Page
-- [ ] Navigate to `/parent-portal/shop`
+- [ ] Navigate to `/familie/shop`
 - [ ] Verify German text appears:
   - [ ] Header: "MiniMusiker Shop"
   - [ ] Subtitle: "Exklusive Merchandise für unsere Musikfamilien"
@@ -97,7 +97,7 @@
 ### Session Persistence
 - [ ] Set language to English
 - [ ] Close browser tab
-- [ ] Reopen and navigate to `/parent-portal`
+- [ ] Reopen and navigate to `/familie`
 - [ ] Login again
 - [ ] Verify English is remembered (localStorage persists)
 

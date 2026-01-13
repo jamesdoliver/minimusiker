@@ -14,7 +14,7 @@ export default function ShopHeader() {
       <div className="container mx-auto px-4 py-6">
         {/* Breadcrumbs */}
         <nav className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-          <Link href="/parent-portal" className="hover:text-sage-600">
+          <Link href="/familie" className="hover:text-sage-600">
             {t('breadcrumbPortal')}
           </Link>
           <svg

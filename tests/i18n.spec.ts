@@ -8,8 +8,8 @@ import { test, expect } from '@playwright/test';
  */
 
 // Test configuration
-const PARENT_PORTAL_URL = '/parent-portal';
-const SHOP_URL = '/parent-portal/shop';
+const PARENT_PORTAL_URL = '/familie';
+const SHOP_URL = '/familie/shop';
 
 test.describe('Parent Portal Internationalization', () => {
 
@@ -288,7 +288,7 @@ test.describe('Parent Portal Internationalization', () => {
       await page.waitForLoadState('networkidle');
 
       // Take screenshot of German version
-      await expect(page).toHaveScreenshot('parent-portal-german.png', {
+      await expect(page).toHaveScreenshot('familie-german.png', {
         fullPage: false,
         maxDiffPixels: 100,
       });
@@ -304,7 +304,7 @@ test.describe('Parent Portal Internationalization', () => {
       await page.waitForLoadState('networkidle');
 
       // Take screenshot of English version
-      await expect(page).toHaveScreenshot('parent-portal-english.png', {
+      await expect(page).toHaveScreenshot('familie-english.png', {
         fullPage: false,
         maxDiffPixels: 100,
       });

@@ -209,7 +209,7 @@ export async function PUT(
               schoolName: eventDetail.schoolName,
               className,
               eventDate: eventDetail.eventDate,
-              portalUrl: `${APP_URL}/parent-portal`,
+              portalUrl: `${APP_URL}/familie`,
             }
           );
 

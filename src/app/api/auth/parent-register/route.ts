@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           session: sessionData,
-          redirectUrl: '/parent-portal',
+          redirectUrl: '/familie',
         },
         message: "You're already registered! Logging you in...",
       });
@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           session: sessionData,
-          redirectUrl: '/parent-portal',
+          redirectUrl: '/familie',
         },
         message: 'Registration successful! Welcome to MiniMusiker.',
       },

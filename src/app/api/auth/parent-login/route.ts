@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
         hasMultipleChildren: children.length > 1,
         hasMultipleEvents,
         otherEvents, // Include if parent has multiple events
-        redirectUrl: '/parent-portal',
+        redirectUrl: '/familie',
       },
       message: `Welcome back, ${parentJourney.parent_first_name}!`,
     });

@@ -82,6 +82,22 @@ const nextConfig = {
         destination: '/paedagogen/:path*',
         permanent: true,
       },
+      // Parent portal URL rename: /parent-portal -> /familie
+      {
+        source: '/parent-portal',
+        destination: '/familie',
+        permanent: true,
+      },
+      {
+        source: '/parent-login',
+        destination: '/familie-login',
+        permanent: true,
+      },
+      {
+        source: '/parent-portal/:path*',
+        destination: '/familie/:path*',
+        permanent: true,
+      },
     ];
   },
 };

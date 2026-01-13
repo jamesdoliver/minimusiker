@@ -16,7 +16,7 @@ The component appears in the parent portal below the audio recording preview. It
 |------|---------|
 | `/src/components/parent-portal/PersonalizedTshirtPromo.tsx` | Main React component |
 | `/public/images/tshirt-mockup.svg` | Placeholder mockup image (replace with actual) |
-| `/src/app/parent-portal/page.tsx` | Parent portal page (component integrated here) |
+| `/src/app/familie/page.tsx` | Parent portal page (component integrated here) |
 
 ## Configuration
 
