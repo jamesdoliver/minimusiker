@@ -4396,8 +4396,9 @@ class AirtableService {
       });
 
       // Find the Event that has this booking ID in its simplybook_booking array
+      // Note: record.get() uses field NAMES, not field IDs
       const matchingRecord = allRecords.find(record => {
-        const bookings = record.get(EVENTS_FIELD_IDS.simplybook_booking) as string[] | undefined;
+        const bookings = record.get('simplybook_booking') as string[] | undefined;
         return bookings && bookings.includes(schoolBookingRecordId);
       });
 
@@ -4414,20 +4415,21 @@ class AirtableService {
 
   /**
    * Transform an Airtable Event record to our Event type
+   * Note: record.get() uses field NAMES, not field IDs
    */
   private transformEventRecord(record: Airtable.Record<FieldSet>): Event {
     return {
       id: record.id,
-      event_id: record.get(EVENTS_FIELD_IDS.event_id) as string || '',
-      school_name: record.get(EVENTS_FIELD_IDS.school_name) as string || '',
-      event_date: record.get(EVENTS_FIELD_IDS.event_date) as string || '',
-      event_type: (record.get(EVENTS_FIELD_IDS.event_type) as Event['event_type']) || 'concert',
-      assigned_staff: record.get(EVENTS_FIELD_IDS.assigned_staff) as string[] | undefined,
-      assigned_engineer: record.get(EVENTS_FIELD_IDS.assigned_engineer) as string[] | undefined,
-      created_at: record.get(EVENTS_FIELD_IDS.created_at) as string || '',
-      legacy_booking_id: record.get(EVENTS_FIELD_IDS.legacy_booking_id) as string | undefined,
-      simplybook_booking: record.get(EVENTS_FIELD_IDS.simplybook_booking) as string[] | undefined,
-      access_code: record.get(EVENTS_FIELD_IDS.access_code) as number | undefined,
+      event_id: record.get('event_id') as string || '',
+      school_name: record.get('school_name') as string || '',
+      event_date: record.get('event_date') as string || '',
+      event_type: (record.get('event_type') as Event['event_type']) || 'concert',
+      assigned_staff: record.get('assigned_staff') as string[] | undefined,
+      assigned_engineer: record.get('assigned_engineer') as string[] | undefined,
+      created_at: record.get('created_at') as string || '',
+      legacy_booking_id: record.get('legacy_booking_id') as string | undefined,
+      simplybook_booking: record.get('simplybook_booking') as string[] | undefined,
+      access_code: record.get('access_code') as number | undefined,
     };
   }
 
