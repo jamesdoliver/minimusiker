@@ -1,19 +1,28 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
+import dynamic from 'next/dynamic';
 import { PrintableItemType } from '@/lib/config/printableTextConfig';
 
-// Dynamically import pdfjs-dist only on client side
-let pdfjsLib: typeof import('pdfjs-dist') | null = null;
-
-async function getPdfjs() {
-  if (!pdfjsLib && typeof window !== 'undefined') {
-    pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+// Dynamically import the PDF rendering component with no SSR
+// This is required because pdfjs-dist uses browser APIs that don't work during SSR
+const PdfCanvasInner = dynamic(
+  () => import('./PdfCanvasInner'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center bg-gray-100 rounded-lg" style={{ minHeight: '300px' }}>
+        <div className="flex flex-col items-center gap-3">
+          <svg className="w-8 h-8 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          <span className="text-sm text-gray-500">Loading PDF viewer...</span>
+        </div>
+      </div>
+    )
   }
-  return pdfjsLib;
-}
+);
 
 interface PdfCanvasProps {
   templateType: PrintableItemType;
@@ -26,14 +35,14 @@ interface CanvasState {
   loading: boolean;
   error: string | null;
   exists: boolean;
-  dimensions: { width: number; height: number; scale: number } | null;
+  pdfUrl: string | null;
 }
 
 /**
- * PdfCanvas - Renders a PDF template from R2 storage to a canvas
+ * PdfCanvas - Renders a PDF template from R2 storage using react-pdf
  *
- * Fetches the template PDF via signed URL and renders the first page
- * using PDF.js. Returns the rendered dimensions for coordinate transformations.
+ * Fetches the template PDF via signed URL and renders the first page.
+ * Returns the rendered dimensions for coordinate transformations.
  */
 export default function PdfCanvas({
   templateType,
@@ -41,119 +50,75 @@ export default function PdfCanvas({
   onError,
   className = '',
 }: PdfCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(500);
   const [state, setState] = useState<CanvasState>({
     loading: true,
     error: null,
     exists: false,
-    dimensions: null,
+    pdfUrl: null,
   });
 
-  const fetchAndRenderPdf = useCallback(async () => {
-    setState({ loading: true, error: null, exists: false, dimensions: null });
-
-    try {
-      // Get pdfjs dynamically (client-side only)
-      const pdfjs = await getPdfjs();
-      if (!pdfjs) {
-        throw new Error('PDF.js failed to load');
+  // Measure container width
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth || 500);
       }
+    };
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
 
-      // Fetch the signed URL for the template
-      const response = await fetch(`/api/admin/templates/${templateType}/preview-url`);
-      const data = await response.json();
+  // Fetch signed URL on mount or template change
+  useEffect(() => {
+    const fetchPdfUrl = async () => {
+      setState({ loading: true, error: null, exists: false, pdfUrl: null });
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to get template URL');
-      }
+      try {
+        const response = await fetch(`/api/admin/templates/${templateType}/preview-url`);
+        const data = await response.json();
 
-      if (!data.exists || !data.url) {
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to get template URL');
+        }
+
+        if (!data.exists || !data.url) {
+          setState({
+            loading: false,
+            error: null,
+            exists: false,
+            pdfUrl: null,
+          });
+          return;
+        }
+
         setState({
           loading: false,
           error: null,
-          exists: false,
-          dimensions: null,
+          exists: true,
+          pdfUrl: data.url,
         });
-        return;
-      }
-
-      // Fetch and render the PDF
-      const pdfDoc = await pdfjs.getDocument(data.url).promise;
-      const page = await pdfDoc.getPage(1);
-
-      // Get the container width to calculate scale
-      const containerWidth = containerRef.current?.clientWidth || 500;
-
-      // Get the viewport at scale 1 to know the PDF dimensions
-      const viewport1 = page.getViewport({ scale: 1 });
-      const pdfWidth = viewport1.width;
-      const pdfHeight = viewport1.height;
-
-      // Calculate scale to fit within container while maintaining aspect ratio
-      const scale = containerWidth / pdfWidth;
-      const viewport = page.getViewport({ scale });
-
-      // Set canvas dimensions
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-
-      // Render the PDF page to canvas
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        throw new Error('Could not get canvas context');
-      }
-
-      await page.render({
-        canvasContext: ctx,
-        viewport: viewport,
-        canvas: canvas,
-      }).promise;
-
-      const dimensions = {
-        width: viewport.width,
-        height: viewport.height,
-        scale: scale,
-      };
-
-      setState({
-        loading: false,
-        error: null,
-        exists: true,
-        dimensions,
-      });
-
-      onLoad?.(dimensions);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error loading PDF';
-      setState({
-        loading: false,
-        error: errorMsg,
-        exists: false,
-        dimensions: null,
-      });
-      onError?.(errorMsg);
-    }
-  }, [templateType, onLoad, onError]);
-
-  useEffect(() => {
-    fetchAndRenderPdf();
-  }, [fetchAndRenderPdf]);
-
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (state.exists && !state.loading) {
-        fetchAndRenderPdf();
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error loading PDF';
+        setState({
+          loading: false,
+          error: errorMsg,
+          exists: false,
+          pdfUrl: null,
+        });
+        onError?.(errorMsg);
       }
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [state.exists, state.loading, fetchAndRenderPdf]);
+    fetchPdfUrl();
+  }, [templateType, onError]);
+
+  const handleInnerError = useCallback((errorMsg: string) => {
+    setState(prev => ({ ...prev, error: errorMsg }));
+    onError?.(errorMsg);
+  }, [onError]);
 
   if (state.loading) {
     return (
@@ -251,14 +216,11 @@ export default function PdfCanvas({
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
-      <canvas
-        ref={canvasRef}
-        className="rounded-lg shadow-md"
-        style={{
-          display: 'block',
-          width: '100%',
-          height: 'auto',
-        }}
+      <PdfCanvasInner
+        pdfUrl={state.pdfUrl!}
+        containerWidth={containerWidth}
+        onLoad={onLoad}
+        onError={handleInnerError}
       />
     </div>
   );
