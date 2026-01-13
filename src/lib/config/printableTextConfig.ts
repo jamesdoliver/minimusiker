@@ -3,6 +3,10 @@
  * Defines text and QR code positioning defaults for each printable item type
  *
  * Phase 3: Interactive editor with draggable/resizable elements
+ * Phase 4: Multiple text elements with per-element styling
+ *
+ * NOTE: Editor state stores CSS coordinates during editing.
+ * Conversion to PDF coordinates happens only at generation time.
  */
 
 export type PrintableItemType =
@@ -18,9 +22,34 @@ export type PrintableItemType =
   | 'minicard'
   | 'cd-jacket';
 
+export type TextElementType = 'headline' | 'subline' | 'calendar' | 'custom';
+
+/**
+ * A single text element in the editor
+ * All position/size values are in CSS pixels during editing
+ */
+export interface TextElement {
+  id: string;           // Unique ID for React keys
+  type: TextElementType;
+  text: string;
+  position: { x: number; y: number };   // CSS pixels
+  size: { width: number; height: number }; // CSS pixels
+  fontSize: number;     // CSS pixels
+  color: string;        // Hex color e.g. "#f7f6f6"
+}
+
+/**
+ * Style preset for a text element type
+ */
+export interface TextElementStyle {
+  fontSize: number;  // Default font size (will be scaled to CSS)
+  color: string;     // Hex color
+}
+
 /**
  * Default position and size for a text block (single block with line breaks)
  * All values in PDF points (1 point = 1/72 inch)
+ * Used for backwards compatibility and initial defaults
  */
 export interface TextBlockDefaults {
   x: number;       // X position from left
@@ -66,9 +95,26 @@ export interface PrintableTextConfig {
 /**
  * Editor state for a single printable item
  * This is what gets passed to the generation API
+ *
+ * All position/size values are in CSS pixels during editing.
+ * The canvasScale is stored to enable conversion to PDF at generation time.
  */
 export interface PrintableEditorState {
-  text: string;  // School name with optional line breaks
+  textElements: TextElement[];  // Array of text elements (can be empty)
+  qrPosition?: {
+    x: number;      // CSS pixels
+    y: number;      // CSS pixels
+    size: number;   // CSS pixels
+  };
+  canvasScale?: number;  // Scale factor used during editing (CSS pixels per PDF point)
+}
+
+/**
+ * Legacy editor state for backwards compatibility
+ * @deprecated Use PrintableEditorState with textElements array
+ */
+export interface LegacyEditorState {
+  text: string;
   textPosition: {
     x: number;
     y: number;
@@ -88,6 +134,92 @@ const DEFAULT_TEXT_COLOR = { r: 0, g: 0, b: 0 };
 
 // Text color matching mockups (dark teal)
 const TEAL_TEXT_COLOR = { r: 0.24, g: 0.48, b: 0.48 }; // #3D7A7A
+
+/**
+ * Text element style presets per template type
+ * When admin adds a new text element, these defaults are applied
+ */
+export const TEXT_ELEMENT_STYLES: Record<PrintableItemType, Record<TextElementType, TextElementStyle>> = {
+  // Flyers use Fredoka font
+  flyer1: {
+    headline: { fontSize: 35, color: '#f7f6f6' },
+    subline: { fontSize: 18, color: '#b93656' },
+    calendar: { fontSize: 18, color: '#252014' },
+    custom: { fontSize: 18, color: '#000000' },
+  },
+  'flyer1-back': {
+    headline: { fontSize: 20, color: '#000000' },
+    subline: { fontSize: 14, color: '#000000' },
+    calendar: { fontSize: 14, color: '#000000' },
+    custom: { fontSize: 14, color: '#000000' },
+  },
+  flyer2: {
+    headline: { fontSize: 35, color: '#f7f6f6' },
+    subline: { fontSize: 18, color: '#b93656' },
+    calendar: { fontSize: 18, color: '#252014' },
+    custom: { fontSize: 18, color: '#000000' },
+  },
+  'flyer2-back': {
+    headline: { fontSize: 20, color: '#000000' },
+    subline: { fontSize: 14, color: '#000000' },
+    calendar: { fontSize: 14, color: '#000000' },
+    custom: { fontSize: 14, color: '#000000' },
+  },
+  flyer3: {
+    headline: { fontSize: 35, color: '#f7f6f6' },
+    subline: { fontSize: 18, color: '#b93656' },
+    calendar: { fontSize: 18, color: '#252014' },
+    custom: { fontSize: 18, color: '#000000' },
+  },
+  'flyer3-back': {
+    headline: { fontSize: 22, color: '#000000' },
+    subline: { fontSize: 14, color: '#000000' },
+    calendar: { fontSize: 14, color: '#000000' },
+    custom: { fontSize: 14, color: '#000000' },
+  },
+  // T-Shirt and Hoodie use Springwood font with teal color
+  tshirt: {
+    headline: { fontSize: 36, color: '#3D7A7A' },
+    subline: { fontSize: 24, color: '#3D7A7A' },
+    calendar: { fontSize: 20, color: '#3D7A7A' },
+    custom: { fontSize: 24, color: '#3D7A7A' },
+  },
+  hoodie: {
+    headline: { fontSize: 36, color: '#3D7A7A' },
+    subline: { fontSize: 24, color: '#3D7A7A' },
+    calendar: { fontSize: 20, color: '#3D7A7A' },
+    custom: { fontSize: 24, color: '#3D7A7A' },
+  },
+  // Button, Minicard, CD Jacket use Fredoka with black
+  button: {
+    headline: { fontSize: 10, color: '#000000' },
+    subline: { fontSize: 8, color: '#000000' },
+    calendar: { fontSize: 8, color: '#000000' },
+    custom: { fontSize: 8, color: '#000000' },
+  },
+  minicard: {
+    headline: { fontSize: 16, color: '#000000' },
+    subline: { fontSize: 12, color: '#000000' },
+    calendar: { fontSize: 12, color: '#000000' },
+    custom: { fontSize: 12, color: '#000000' },
+  },
+  'cd-jacket': {
+    headline: { fontSize: 14, color: '#000000' },
+    subline: { fontSize: 10, color: '#000000' },
+    calendar: { fontSize: 10, color: '#000000' },
+    custom: { fontSize: 10, color: '#000000' },
+  },
+};
+
+/**
+ * Get the font family for a template type
+ */
+export function getFontFamilyForType(type: PrintableItemType): string {
+  if (type === 'tshirt' || type === 'hoodie') {
+    return 'Springwood Display, cursive';
+  }
+  return 'Fredoka, sans-serif';
+}
 
 /**
  * Printable configurations with supplier-specified dimensions
@@ -295,39 +427,119 @@ export function getPrintableItemTypes(): PrintableItemType[] {
 export const TOTAL_PRINTABLE_ITEMS = PRINTABLE_ITEMS.length;
 
 /**
- * Initialize editor state from config defaults for a given item type
+ * Generate a unique ID for text elements
+ */
+export function generateTextElementId(): string {
+  return `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Create a new text element with default styling for the given type
+ * Position values are in CSS pixels
+ */
+export function createTextElement(
+  templateType: PrintableItemType,
+  elementType: TextElementType,
+  canvasWidth: number,
+  canvasHeight: number,
+  scale: number = 1
+): TextElement {
+  const styles = TEXT_ELEMENT_STYLES[templateType][elementType];
+
+  // Default position at center-top of canvas
+  const defaultWidth = 200 * scale;
+  const defaultHeight = 60 * scale;
+
+  return {
+    id: generateTextElementId(),
+    type: elementType,
+    text: '',
+    position: {
+      x: (canvasWidth - defaultWidth) / 2,
+      y: canvasHeight * 0.2, // 20% from top
+    },
+    size: {
+      width: defaultWidth,
+      height: defaultHeight,
+    },
+    fontSize: styles.fontSize * scale,
+    color: styles.color,
+  };
+}
+
+/**
+ * Initialize editor state for a given item type
+ * Starts with empty text elements - admin adds them as needed
  */
 export function initializeEditorState(
   type: PrintableItemType,
-  schoolName: string
+  _schoolName: string, // Kept for API compatibility but not used (admin types text)
+  scale: number = 1
 ): PrintableEditorState {
   const config = getPrintableConfig(type);
   if (!config) {
     throw new Error(`Unknown printable type: ${type}`);
   }
 
-  const textDefaults = config.textDefaults || {
-    x: config.pdfDimensions.width / 2 - 100,
-    y: config.pdfDimensions.height / 2,
-    width: 200,
-    height: 80,
-    fontSize: 16,
-  };
-
   const result: PrintableEditorState = {
-    text: schoolName,
-    textPosition: {
-      x: textDefaults.x,
-      y: textDefaults.y,
-      width: textDefaults.width,
-      height: textDefaults.height,
-    },
-    fontSize: textDefaults.fontSize,
+    textElements: [], // Start empty - admin adds text elements
+    canvasScale: scale,
   };
 
+  // For back items with QR codes, set up QR position (in CSS pixels)
   if (config.qrDefaults) {
-    result.qrPosition = { ...config.qrDefaults };
+    result.qrPosition = {
+      x: config.qrDefaults.x * scale,
+      y: (config.pdfDimensions.height - config.qrDefaults.y - config.qrDefaults.size) * scale, // Convert from PDF to CSS Y
+      size: config.qrDefaults.size * scale,
+    };
   }
 
   return result;
+}
+
+/**
+ * Convert hex color to RGB object (0-1 range for PDF)
+ */
+export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) {
+    return { r: 0, g: 0, b: 0 }; // Default to black
+  }
+  return {
+    r: parseInt(result[1], 16) / 255,
+    g: parseInt(result[2], 16) / 255,
+    b: parseInt(result[3], 16) / 255,
+  };
+}
+
+/**
+ * Convert CSS coordinates to PDF coordinates
+ * CSS: origin top-left, Y increases downward
+ * PDF: origin bottom-left, Y increases upward
+ */
+export function cssToPdfPosition(
+  cssX: number,
+  cssY: number,
+  pdfHeight: number,
+  scale: number
+): { x: number; y: number } {
+  return {
+    x: cssX / scale,
+    y: pdfHeight - (cssY / scale), // Flip Y axis
+  };
+}
+
+/**
+ * Convert CSS size to PDF size
+ */
+export function cssToPdfSize(
+  cssWidth: number,
+  cssHeight: number,
+  scale: number
+): { width: number; height: number } {
+  return {
+    width: cssWidth / scale,
+    height: cssHeight / scale,
+  };
 }

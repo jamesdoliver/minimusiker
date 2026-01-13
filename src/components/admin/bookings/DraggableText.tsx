@@ -2,6 +2,7 @@
 
 import { Rnd } from 'react-rnd';
 import { useCallback } from 'react';
+import { TextElementType } from '@/lib/config/printableTextConfig';
 
 interface DraggableTextProps {
   text: string;
@@ -13,14 +14,34 @@ interface DraggableTextProps {
   canvasWidth: number;
   canvasHeight: number;
   color?: string;
+  fontFamily?: string;
+  isSelected?: boolean;
+  elementType?: TextElementType;
+  onSelect?: () => void;
   disabled?: boolean;
 }
+
+// Labels for element types
+const TYPE_LABELS: Record<TextElementType, string> = {
+  headline: 'H',
+  subline: 'S',
+  calendar: 'C',
+  custom: '✎',
+};
+
+const TYPE_COLORS: Record<TextElementType, string> = {
+  headline: 'bg-blue-500',
+  subline: 'bg-green-500',
+  calendar: 'bg-orange-500',
+  custom: 'bg-purple-500',
+};
 
 /**
  * DraggableText - A draggable and resizable text block
  *
  * Uses react-rnd for drag and resize functionality.
  * Displays multi-line text with the specified font size.
+ * All position and size values are CSS pixels - no conversion needed.
  */
 export default function DraggableText({
   text,
@@ -32,10 +53,15 @@ export default function DraggableText({
   canvasWidth,
   canvasHeight,
   color = '#000000',
+  fontFamily = 'inherit',
+  isSelected = false,
+  elementType,
+  onSelect,
   disabled = false,
 }: DraggableTextProps) {
   const handleDragStop = useCallback(
     (_e: unknown, d: { x: number; y: number }) => {
+      // Store CSS values directly - no conversion
       onPositionChange({ x: d.x, y: d.y });
     },
     [onPositionChange]
@@ -47,19 +73,31 @@ export default function DraggableText({
       _direction: unknown,
       ref: HTMLElement,
       _delta: unknown,
-      position: { x: number; y: number }
+      newPosition: { x: number; y: number }
     ) => {
+      // Store CSS values directly - no conversion
       onSizeChange({
         width: ref.offsetWidth,
         height: ref.offsetHeight,
       });
-      onPositionChange(position);
+      onPositionChange(newPosition);
     },
     [onSizeChange, onPositionChange]
   );
 
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onSelect?.();
+    },
+    [onSelect]
+  );
+
   // Split text into lines for display
   const lines = text.split('\n').filter((line) => line.trim() !== '');
+
+  const borderColor = isSelected ? 'border-blue-600' : 'border-blue-400';
+  const borderWidth = isSelected ? 'border-2' : 'border';
 
   return (
     <Rnd
@@ -76,7 +114,7 @@ export default function DraggableText({
       enableResizing={!disabled}
       className={`${disabled ? '' : 'cursor-move'}`}
       style={{
-        zIndex: 10,
+        zIndex: isSelected ? 20 : 10,
       }}
       resizeHandleStyles={{
         bottomRight: {
@@ -110,18 +148,29 @@ export default function DraggableText({
       }}
     >
       <div
+        onClick={handleClick}
         className={`w-full h-full flex flex-col items-center justify-center text-center overflow-hidden rounded ${
           disabled
             ? 'bg-gray-100/50'
-            : 'bg-white/30 border-2 border-dashed border-blue-400 hover:border-blue-600'
+            : `bg-white/30 ${borderWidth} border-dashed ${borderColor} hover:border-blue-600`
         }`}
         style={{
           fontSize: `${fontSize}px`,
           lineHeight: 1.2,
           color: color,
-          fontFamily: 'inherit',
+          fontFamily: fontFamily,
         }}
       >
+        {/* Element type badge */}
+        {elementType && !disabled && (
+          <div
+            className={`absolute -top-2 -left-2 w-5 h-5 ${TYPE_COLORS[elementType]} text-white text-xs font-bold rounded-full flex items-center justify-center shadow`}
+            title={elementType}
+          >
+            {TYPE_LABELS[elementType]}
+          </div>
+        )}
+
         {lines.length > 0 ? (
           lines.map((line, index) => (
             <div key={index} className="whitespace-nowrap">
@@ -129,7 +178,7 @@ export default function DraggableText({
             </div>
           ))
         ) : (
-          <div className="text-gray-400 italic" style={{ fontSize: '14px' }}>
+          <div className="text-gray-400 italic" style={{ fontSize: '14px', fontFamily: 'inherit' }}>
             Enter text...
           </div>
         )}
@@ -138,10 +187,10 @@ export default function DraggableText({
       {/* Resize handles visual indicators */}
       {!disabled && (
         <>
-          <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow" />
-          <div className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow" />
-          <div className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow" />
-          <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow" />
+          <div className={`absolute -bottom-1.5 -right-1.5 w-3 h-3 ${isSelected ? 'bg-blue-600' : 'bg-blue-500'} rounded-full border-2 border-white shadow`} />
+          <div className={`absolute -bottom-1.5 -left-1.5 w-3 h-3 ${isSelected ? 'bg-blue-600' : 'bg-blue-500'} rounded-full border-2 border-white shadow`} />
+          <div className={`absolute -top-1.5 -right-1.5 w-3 h-3 ${isSelected ? 'bg-blue-600' : 'bg-blue-500'} rounded-full border-2 border-white shadow`} />
+          <div className={`absolute -top-1.5 -left-1.5 w-3 h-3 ${isSelected ? 'bg-blue-600' : 'bg-blue-500'} rounded-full border-2 border-white shadow`} />
         </>
       )}
     </Rnd>

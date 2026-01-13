@@ -6,17 +6,26 @@
  * Generates all printables (flyers, buttons, t-shirts, hoodies, minicards, CD jackets)
  * for an event, using custom text/QR positions from the editor.
  *
- * Phase 3: Accepts dynamic positions from the interactive editor.
+ * Phase 4: Accepts multiple text elements with individual styling.
+ * All positions are in CSS pixels and converted to PDF coordinates using canvasScale.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
-import { getPrintableService, PrintableItemConfig } from '@/lib/services/printableService';
+import { getPrintableService, PrintableItemConfig, TextElementConfig } from '@/lib/services/printableService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
-import { PrintableItemType } from '@/lib/config/printableTextConfig';
+import {
+  PrintableItemType,
+  TextElement,
+  getPrintableConfig,
+  cssToPdfPosition,
+  cssToPdfSize,
+  hexToRgb,
+  getFontFamilyForType,
+} from '@/lib/config/printableTextConfig';
 
-// Request body type - Phase 3 with dynamic positions
+// Request body type - Phase 4 with multiple text elements
 interface GeneratePrintablesRequest {
   eventId: string;        // Could be SimplyBook ID or actual event_id
   schoolName: string;
@@ -24,19 +33,13 @@ interface GeneratePrintablesRequest {
   accessCode?: number;    // Optional - auto-fetched if not provided
   items: {
     type: PrintableItemType;
-    text: string;
-    textPosition: {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    };
-    fontSize: number;
+    textElements: TextElement[];  // Array of text elements
     qrPosition?: {
-      x: number;
-      y: number;
-      size: number;
+      x: number;     // CSS pixels
+      y: number;     // CSS pixels
+      size: number;  // CSS pixels
     };
+    canvasScale?: number;  // Scale factor for CSS to PDF conversion
   }[];
 }
 
@@ -116,13 +119,63 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert items to PrintableItemConfig format for the service
-    const itemConfigs: PrintableItemConfig[] = items.map(item => ({
-      type: item.type,
-      text: item.text,
-      textPosition: item.textPosition,
-      fontSize: item.fontSize,
-      qrPosition: item.qrPosition,
-    }));
+    // Transform CSS coordinates to PDF coordinates
+    const itemConfigs: PrintableItemConfig[] = items.map(item => {
+      const printableConfig = getPrintableConfig(item.type);
+      const pdfHeight = printableConfig?.pdfDimensions.height || 1000;
+      const scale = item.canvasScale || 1;
+
+      // Convert text elements from CSS to PDF coordinates
+      const textElementConfigs: TextElementConfig[] = item.textElements.map(element => {
+        // Convert position (CSS top-left origin → PDF bottom-left origin)
+        const pdfPosition = cssToPdfPosition(
+          element.position.x,
+          element.position.y + element.size.height, // Adjust for text box height
+          pdfHeight,
+          scale
+        );
+
+        // Convert size
+        const pdfSize = cssToPdfSize(element.size.width, element.size.height, scale);
+
+        // Convert color from hex to RGB
+        const color = hexToRgb(element.color);
+
+        return {
+          id: element.id,
+          type: element.type,
+          text: element.text,
+          x: pdfPosition.x,
+          y: pdfPosition.y,
+          width: pdfSize.width,
+          height: pdfSize.height,
+          fontSize: element.fontSize / scale, // Convert CSS px to PDF points
+          color,
+        };
+      });
+
+      // Convert QR position from CSS to PDF coordinates
+      let qrPositionPdf: { x: number; y: number; size: number } | undefined;
+      if (item.qrPosition) {
+        const pdfQrPos = cssToPdfPosition(
+          item.qrPosition.x,
+          item.qrPosition.y + item.qrPosition.size, // Adjust for QR height
+          pdfHeight,
+          scale
+        );
+        qrPositionPdf = {
+          x: pdfQrPos.x,
+          y: pdfQrPos.y,
+          size: item.qrPosition.size / scale,
+        };
+      }
+
+      return {
+        type: item.type,
+        textElements: textElementConfigs,
+        qrPosition: qrPositionPdf,
+      };
+    });
 
     // Generate all printables with custom positions
     const result = await printableService.generateAllPrintablesWithConfigs(

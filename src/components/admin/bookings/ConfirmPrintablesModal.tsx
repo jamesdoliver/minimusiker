@@ -18,10 +18,11 @@ interface ConfirmPrintablesModalProps {
 }
 
 // Initialize empty editor states for all items
+// Note: schoolName is passed for API compatibility but not used (admin types text manually)
 function initializeAllItemsEditorState(schoolName: string): Record<PrintableItemType, PrintableEditorState> {
   const result: Record<PrintableItemType, PrintableEditorState> = {} as Record<PrintableItemType, PrintableEditorState>;
   PRINTABLE_ITEMS.forEach((item) => {
-    result[item.type] = initializeEditorState(item.type, schoolName);
+    result[item.type] = initializeEditorState(item.type, schoolName, 1); // Scale will be updated when canvas loads
   });
   return result;
 }
@@ -102,15 +103,14 @@ export default function ConfirmPrintablesModal({
           eventId: booking.code,
           schoolName: booking.schoolName,
           eventDate: booking.bookingDate,
-          // Pass editor states with positions for each item
+          // Pass editor states with text elements and QR positions
           items: PRINTABLE_ITEMS.map(item => {
             const state = itemEditorStates[item.type];
             return {
               type: item.type,
-              text: state.text,
-              textPosition: state.textPosition,
-              fontSize: state.fontSize,
+              textElements: state.textElements, // Array of text elements
               qrPosition: state.qrPosition,
+              canvasScale: state.canvasScale,
             };
           }),
         }),
@@ -192,7 +192,7 @@ export default function ConfirmPrintablesModal({
         </div>
 
         {/* Main content - PrintableEditor */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-auto min-h-0">
           <PrintableEditor
             itemConfig={currentItem}
             schoolName={booking.schoolName}

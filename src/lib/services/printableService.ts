@@ -50,17 +50,23 @@ export interface GenerationResult {
   error?: string;
 }
 
-// Config for each printable item from the editor (Phase 3)
+// Config for a single text element (Phase 4)
+export interface TextElementConfig {
+  id: string;
+  type: 'headline' | 'subline' | 'calendar' | 'custom';
+  text: string;
+  x: number;        // PDF coordinates
+  y: number;        // PDF coordinates
+  width: number;    // PDF points
+  height: number;   // PDF points
+  fontSize: number; // PDF points
+  color: { r: number; g: number; b: number }; // RGB 0-1
+}
+
+// Config for each printable item from the editor (Phase 4)
 export interface PrintableItemConfig {
   type: string;
-  text: string;
-  textPosition: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  fontSize: number;
+  textElements: TextElementConfig[];  // Array of text elements
   qrPosition?: {
     x: number;
     y: number;
@@ -266,14 +272,10 @@ class PrintableService {
             );
           }
         } else {
-          // For front items - add text at custom position
-          await this.addMultilineTextToPdf(
-            pdfDoc,
-            itemConfig.text,
-            itemConfig.textPosition,
-            itemConfig.fontSize,
-            type
-          );
+          // For front items - add all text elements
+          for (const textElement of itemConfig.textElements) {
+            await this.addTextElementToPdf(pdfDoc, textElement, type);
+          }
 
           // Add QR code if this item has one (front items with QR)
           if (qrCodeBuffer && itemConfig.qrPosition) {
@@ -344,6 +346,74 @@ class PrintableService {
       results,
       errors,
     };
+  }
+
+  /**
+   * Add a single text element to PDF (Phase 4)
+   * Used by generateAllPrintablesWithConfigs to render each text element
+   * with its specific styling (position, size, color, font)
+   */
+  private async addTextElementToPdf(
+    pdfDoc: PDFDocument,
+    element: TextElementConfig,
+    printableType: PrintableType
+  ): Promise<void> {
+    // Skip empty text
+    if (!element.text || element.text.trim() === '') {
+      return;
+    }
+
+    const pages = pdfDoc.getPages();
+    if (pages.length === 0) {
+      throw new Error('PDF has no pages');
+    }
+
+    const firstPage = pages[0];
+
+    // Get the appropriate font based on printable type
+    let useFont;
+    if (PRINTABLE_FONTS[printableType]) {
+      try {
+        const fontName = PRINTABLE_FONTS[printableType];
+        const fontData = await this.getCustomFont(fontName);
+        useFont = await pdfDoc.embedFont(fontData);
+      } catch (error) {
+        console.warn(`Failed to load custom font for ${printableType}, using Helvetica:`, error);
+        useFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      }
+    } else {
+      useFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    }
+
+    // Use the element's color (already in RGB 0-1 format)
+    const color = rgb(element.color.r, element.color.g, element.color.b);
+
+    // Split text into lines for multiline support
+    const lines = element.text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) return;
+
+    // Calculate line height based on font size
+    const lineHeight = element.fontSize * 1.2;
+
+    // Calculate starting Y position to center text vertically in the box
+    const totalTextHeight = lines.length * lineHeight;
+    const startY = element.y + element.height / 2 + totalTextHeight / 2 - element.fontSize;
+
+    // Draw each line
+    lines.forEach((line, index) => {
+      const textWidth = useFont.widthOfTextAtSize(line, element.fontSize);
+      // Center each line horizontally within the text box
+      const xPos = element.x + (element.width - textWidth) / 2;
+      const yPos = startY - (index * lineHeight);
+
+      firstPage.drawText(line, {
+        x: xPos,
+        y: yPos,
+        size: element.fontSize,
+        font: useFont,
+        color,
+      });
+    });
   }
 
   /**
