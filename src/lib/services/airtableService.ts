@@ -4366,20 +4366,46 @@ class AirtableService {
   /**
    * Get an Event by its linked SchoolBooking record ID
    * Used to get access_code for a booking
+   *
+   * Note: Airtable formulas can't filter by linked record IDs directly,
+   * so we fetch Events with booking links and filter in JavaScript.
    */
   async getEventBySchoolBookingId(schoolBookingRecordId: string): Promise<Event | null> {
     try {
-      // Query Events where simplybook_booking contains this SchoolBooking record ID
-      const records = await this.base(EVENTS_TABLE_ID).select({
-        filterByFormula: `FIND("${schoolBookingRecordId}", ARRAYJOIN({simplybook_booking}))`,
-        maxRecords: 1,
-      }).firstPage();
+      // Fetch Events that have simplybook_booking linked
+      // Note: ARRAYJOIN on linked records returns display names, not IDs,
+      // so we can't use a formula filter. We must filter in JavaScript.
+      const allRecords: Airtable.Record<FieldSet>[] = [];
 
-      if (records.length === 0) {
+      await this.base(EVENTS_TABLE_ID).select({
+        fields: [
+          EVENTS_FIELD_IDS.event_id,
+          EVENTS_FIELD_IDS.school_name,
+          EVENTS_FIELD_IDS.event_date,
+          EVENTS_FIELD_IDS.event_type,
+          EVENTS_FIELD_IDS.assigned_staff,
+          EVENTS_FIELD_IDS.assigned_engineer,
+          EVENTS_FIELD_IDS.created_at,
+          EVENTS_FIELD_IDS.legacy_booking_id,
+          EVENTS_FIELD_IDS.simplybook_booking,
+          EVENTS_FIELD_IDS.access_code,
+        ],
+      }).eachPage((records, fetchNextPage) => {
+        allRecords.push(...records);
+        fetchNextPage();
+      });
+
+      // Find the Event that has this booking ID in its simplybook_booking array
+      const matchingRecord = allRecords.find(record => {
+        const bookings = record.get(EVENTS_FIELD_IDS.simplybook_booking) as string[] | undefined;
+        return bookings && bookings.includes(schoolBookingRecordId);
+      });
+
+      if (!matchingRecord) {
         return null;
       }
 
-      return this.transformEventRecord(records[0]);
+      return this.transformEventRecord(matchingRecord);
     } catch (error) {
       console.error('Error fetching Event by SchoolBooking ID:', error);
       return null;
