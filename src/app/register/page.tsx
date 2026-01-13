@@ -248,37 +248,37 @@ function RegistrationPageContent() {
   if (error) {
     const errorMessages = {
       missing_params: {
-        title: 'Registration Link Required',
-        message: 'This page requires a registration link from your school.',
-        suggestion: 'Please use the registration link provided by your school.',
+        title: 'Registrierungslink erforderlich',
+        message: 'Diese Seite erfordert einen Registrierungslink von Ihrer Schule.',
+        suggestion: 'Bitte verwenden Sie den von Ihrer Schule bereitgestellten Registrierungslink.',
       },
       invalid_params: {
-        title: 'Invalid Registration Link',
-        message: 'This registration link appears to be invalid or corrupted.',
-        suggestion: 'Please contact your school for the correct registration link.',
+        title: 'Ungültiger Registrierungslink',
+        message: 'Dieser Registrierungslink scheint ungültig oder beschädigt zu sein.',
+        suggestion: 'Bitte kontaktieren Sie Ihre Schule für den korrekten Registrierungslink.',
       },
       event_not_found: {
-        title: 'Event Not Found',
-        message: "We couldn't find this event in our system.",
+        title: 'Veranstaltung nicht gefunden',
+        message: 'Wir konnten diese Veranstaltung nicht in unserem System finden.',
         suggestion:
-          'The event may have been cancelled or removed. Please contact your school for more information.',
+          'Die Veranstaltung wurde möglicherweise abgesagt. Bitte kontaktieren Sie Ihre Schule.',
       },
       no_classes: {
-        title: 'Registration Not Ready',
-        message: 'This event is not yet set up for parent registration.',
+        title: 'Registrierung noch nicht möglich',
+        message: 'Diese Veranstaltung ist noch nicht für die Elternregistrierung eingerichtet.',
         suggestion:
-          'Please check back later or contact your school for more information about when registration will open.',
+          'Bitte schauen Sie später noch einmal vorbei oder kontaktieren Sie Ihre Schule.',
       },
       fetch_error: {
-        title: 'Unable to Load Event',
-        message: 'There was an error loading the event details.',
+        title: 'Fehler beim Laden',
+        message: 'Beim Laden der Veranstaltungsdetails ist ein Fehler aufgetreten.',
         suggestion:
-          'Please try again in a moment, or contact your school if the problem persists.',
+          'Bitte versuchen Sie es später erneut oder kontaktieren Sie Ihre Schule.',
       },
       network_error: {
-        title: 'Connection Error',
-        message: "We're having trouble connecting to our servers.",
-        suggestion: 'Please check your internet connection and try again.',
+        title: 'Verbindungsfehler',
+        message: 'Wir haben Probleme, eine Verbindung zu unseren Servern herzustellen.',
+        suggestion: 'Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.',
       },
     };
 
@@ -311,7 +311,7 @@ function RegistrationPageContent() {
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
             >
-              Try Again
+              Erneut versuchen
             </button>
           )}
         </div>

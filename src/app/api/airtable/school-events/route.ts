@@ -55,9 +55,9 @@ export async function GET(request: NextRequest) {
       // Transform to expected format
       const events = await Promise.all(
         schoolEvents.map(async (event) => {
-          const classes = await airtableService.getEventClasses(event.bookingId);
+          const classes = await airtableService.getEventClasses(event.eventId);
           return {
-            bookingId: event.bookingId,
+            bookingId: event.eventId,
             eventType: event.eventType,
             eventDate: event.eventDate,
             classCount: classes.length,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { SchoolBooking } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
+import { generateEventId } from '@/lib/utils/eventIdentifiers';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,14 +76,30 @@ export async function GET(request: NextRequest) {
     const airtableService = getAirtableService();
     const airtableBookings = await airtableService.getFutureBookings();
 
-    // Transform to API format and fetch access codes
+    // Transform to API format and fetch/create Events with access codes
     const bookingsWithAccessCodes: BookingWithDetails[] = await Promise.all(
       airtableBookings.map(async (booking) => {
         const baseBooking = transformToBookingWithDetails(booking);
 
         // Fetch the linked Event to get access_code
         try {
-          const event = await airtableService.getEventBySchoolBookingId(booking.id);
+          let event = await airtableService.getEventBySchoolBookingId(booking.id);
+
+          // If no Event exists, create one
+          if (!event) {
+            const schoolName = booking.schoolName || booking.schoolContactName || 'Unknown School';
+            const eventDate = booking.startDate || new Date().toISOString().split('T')[0];
+            const eventId = generateEventId(schoolName, 'minimusiker', eventDate);
+
+            console.log(`Creating Event for booking ${booking.id} (${schoolName})`);
+            event = await airtableService.createEventFromBooking(
+              eventId,
+              booking.id,
+              schoolName,
+              eventDate
+            );
+          }
+
           if (event?.access_code) {
             return {
               ...baseBooking,
@@ -91,7 +108,7 @@ export async function GET(request: NextRequest) {
             };
           }
         } catch (error) {
-          console.warn(`Failed to fetch Event for booking ${booking.id}:`, error);
+          console.warn(`Failed to fetch/create Event for booking ${booking.id}:`, error);
         }
 
         return baseBooking;
