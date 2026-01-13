@@ -34,7 +34,7 @@ export function PendingBookingsModal({ bookings, onClose }: PendingBookingsModal
   const handleSetupNow = () => {
     if (bookings.length > 0) {
       const firstBookingId = bookings[0].id;
-      router.push(`/teacher/setup-booking/${firstBookingId}`);
+      router.push(`/paedagogen/setup-booking/${firstBookingId}`);
     }
   };
 

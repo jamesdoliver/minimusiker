@@ -66,6 +66,22 @@ const nextConfig = {
         permanent: false,
         destination: '/admin-login',
       },
+      // Teacher portal URL rename: /teacher -> /paedagogen
+      {
+        source: '/teacher',
+        destination: '/paedagogen',
+        permanent: true,
+      },
+      {
+        source: '/teacher-login',
+        destination: '/paedagogen-login',
+        permanent: true,
+      },
+      {
+        source: '/teacher/:path*',
+        destination: '/paedagogen/:path*',
+        permanent: true,
+      },
     ];
   },
 };

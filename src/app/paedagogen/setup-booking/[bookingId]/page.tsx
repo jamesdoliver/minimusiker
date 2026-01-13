@@ -48,7 +48,7 @@ export default function SetupBookingPage({ params }: { params: { bookingId: stri
       const response = await fetch(`/api/teacher/bookings/${params.bookingId}/setup`);
 
       if (response.status === 401) {
-        router.push('/teacher-login');
+        router.push('/paedagogen-login');
         return;
       }
 
@@ -142,7 +142,7 @@ export default function SetupBookingPage({ params }: { params: { bookingId: stri
 
   const handleFinish = () => {
     if (eventId) {
-      router.push(`/teacher/events/${eventId}`);
+      router.push(`/paedagogen/events/${eventId}`);
     }
   };
 
@@ -200,7 +200,7 @@ export default function SetupBookingPage({ params }: { params: { bookingId: stri
               <p className="text-sm text-gray-500">Buchung konfigurieren</p>
             </div>
             <button
-              onClick={() => router.push('/teacher')}
+              onClick={() => router.push('/paedagogen')}
               className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
               Zurück zum Dashboard

@@ -104,7 +104,7 @@ export function ProjectDetailCard({ event }: ProjectDetailCardProps) {
 
       {/* Action Button */}
       <Link
-        href={`/teacher/events/${eventId}`}
+        href={`/paedagogen/events/${eventId}`}
         className="inline-flex items-center gap-2 px-6 py-3 bg-white text-pink-600 rounded-lg
           hover:bg-pink-50 transition-colors font-medium text-sm shadow-md"
       >

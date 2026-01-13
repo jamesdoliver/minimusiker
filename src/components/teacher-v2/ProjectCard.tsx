@@ -97,7 +97,7 @@ export function ProjectCard({ event }: ProjectCardProps) {
 
         {/* CTA Button */}
         <Link
-          href={`/teacher/events/${eventId}`}
+          href={`/paedagogen/events/${eventId}`}
           className="inline-flex items-center gap-2 px-6 py-3 bg-mm-primary-dark text-white rounded-lg font-medium text-sm hover:bg-mm-primary-dark/90 transition-colors"
         >
           Zur Liederliste

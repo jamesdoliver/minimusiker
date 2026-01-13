@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     const token = await teacherService.generateMagicLinkToken(teacher.id);
 
     // Build magic link URL
-    const magicLinkUrl = `${APP_URL}/teacher-login?token=${token}`;
+    const magicLinkUrl = `${APP_URL}/paedagogen-login?token=${token}`;
 
     // Send email via Brevo
     try {

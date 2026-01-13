@@ -69,7 +69,7 @@ export function PendingBookingsBadge() {
 
   const handleSetupClick = (bookingId: string) => {
     setIsDropdownOpen(false);
-    router.push(`/teacher/setup-booking/${bookingId}`);
+    router.push(`/paedagogen/setup-booking/${bookingId}`);
   };
 
   // Don't render anything if no pending bookings

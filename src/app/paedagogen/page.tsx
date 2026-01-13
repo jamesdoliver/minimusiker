@@ -69,7 +69,7 @@ export default function TeacherDashboard() {
       ]);
 
       if (eventsResponse.status === 401 || teacherResponse.status === 401) {
-        router.push('/teacher-login');
+        router.push('/paedagogen-login');
         return;
       }
 
@@ -132,7 +132,7 @@ export default function TeacherDashboard() {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/teacher-logout', { method: 'POST' });
-      router.push('/teacher-login');
+      router.push('/paedagogen-login');
     } catch (err) {
       console.error('Logout error:', err);
     }

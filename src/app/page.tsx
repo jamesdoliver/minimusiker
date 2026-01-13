@@ -107,7 +107,7 @@ export default function HomePage() {
 
           {/* Teacher Portal */}
           <Link
-            href="/teacher"
+            href="/paedagogen"
             className="group rounded-lg border border-gray-200 bg-white px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-50"
           >
             <div className="flex items-center gap-3 mb-3">

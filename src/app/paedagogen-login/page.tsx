@@ -41,7 +41,7 @@ function TeacherLoginContent() {
       }
 
       // Redirect to teacher dashboard on success
-      router.push('/teacher');
+      router.push('/paedagogen');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed');
       setIsVerifying(false);
@@ -71,7 +71,7 @@ function TeacherLoginContent() {
 
       // Admin bypass - redirect immediately (session already created)
       if (data.adminBypass) {
-        router.push('/teacher');
+        router.push('/paedagogen');
         return;
       }
 
