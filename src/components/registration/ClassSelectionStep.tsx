@@ -8,7 +8,7 @@ interface ClassSelectionStepProps {
   eventDate: string;
   eventType: string;
   onClassSelect: (classId: string, className: string) => void;
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 interface ClassOption {
@@ -144,14 +144,16 @@ export default function ClassSelectionStep({
         </div>
       )}
 
-      <div className="mt-6">
-        <button
-          onClick={onBack}
-          className="text-sm text-gray-600 hover:text-gray-900"
-        >
-          &larr; Back to event selection
-        </button>
-      </div>
+      {onBack && (
+        <div className="mt-6">
+          <button
+            onClick={onBack}
+            className="text-sm text-gray-600 hover:text-gray-900"
+          >
+            &larr; Back to event selection
+          </button>
+        </div>
+      )}
     </div>
   );
 }

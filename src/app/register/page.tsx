@@ -35,6 +35,7 @@ function RegistrationPageContent() {
 
   // Discovery flow state
   const [isDiscoveryMode, setIsDiscoveryMode] = useState(false);
+  const [isQrFlow, setIsQrFlow] = useState(false);
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('school');
   const [discoveryState, setDiscoveryState] = useState<DiscoveryState>({
     schoolName: '',
@@ -47,7 +48,7 @@ function RegistrationPageContent() {
 
   useEffect(() => {
     const validateAndFetchEvent = async () => {
-      // Check if we have URL parameters (direct link flow)
+      // Case 1: Both event and class provided → direct to form
       if (urlEventId && urlClassId) {
         // Validate URL parameters
         if (!isValidEventId(urlEventId) || !isValidClassId(urlClassId)) {
@@ -84,8 +85,73 @@ function RegistrationPageContent() {
         } finally {
           setIsLoading(false);
         }
-      } else {
-        // No URL params - enter discovery mode
+      }
+      // Case 2: Only event provided (QR flow) → smart class handling
+      else if (urlEventId) {
+        setIsQrFlow(true);
+
+        try {
+          // Fetch classes for this event
+          const classResponse = await fetch(
+            `/api/airtable/school-events?bookingId=${encodeURIComponent(urlEventId)}`
+          );
+          const classData = await classResponse.json();
+
+          if (!classData.success) {
+            setError('event_not_found');
+            setIsLoading(false);
+            return;
+          }
+
+          // Event exists but no classes set up yet
+          if (!classData.data?.classes?.length) {
+            setError('no_classes');
+            setIsLoading(false);
+            return;
+          }
+
+          const classes = classData.data.classes;
+
+          // If only 1 class, auto-select and fetch event details
+          if (classes.length === 1) {
+            const singleClass = classes[0];
+            const detailsResponse = await fetch(
+              `/api/airtable/event-details?eventId=${encodeURIComponent(urlEventId)}&classId=${encodeURIComponent(singleClass.classId)}`
+            );
+            const detailsData = await detailsResponse.json();
+
+            if (detailsData.success && detailsData.data) {
+              setEventDetails(detailsData.data);
+              setDiscoveryState((prev) => ({
+                ...prev,
+                classId: singleClass.classId,
+                className: singleClass.className,
+                eventId: urlEventId,
+              }));
+            } else {
+              setError('event_not_found');
+            }
+          } else {
+            // Multiple classes - show class picker only
+            setIsDiscoveryMode(true);
+            setDiscoveryState((prev) => ({
+              ...prev,
+              eventId: urlEventId,
+              schoolName: classData.data.schoolName || '',
+              eventDate: classData.data.eventDate || '',
+              eventType: classData.data.eventType || '',
+            }));
+            setCurrentStep('class');
+          }
+        } catch (err) {
+          console.error('Error fetching classes:', err);
+          setError('network_error');
+        } finally {
+          setIsLoading(false);
+        }
+      }
+      // Case 3: No params → full discovery mode
+      else {
         setIsDiscoveryMode(true);
         setIsLoading(false);
       }
@@ -133,6 +199,11 @@ function RegistrationPageContent() {
   };
 
   const handleBack = () => {
+    // In QR flow, don't allow going back past class selection
+    if (isQrFlow && currentStep === 'class') {
+      return;
+    }
+
     switch (currentStep) {
       case 'event':
         setCurrentStep('school');
@@ -191,6 +262,12 @@ function RegistrationPageContent() {
         message: "We couldn't find this event in our system.",
         suggestion:
           'The event may have been cancelled or removed. Please contact your school for more information.',
+      },
+      no_classes: {
+        title: 'Registration Not Ready',
+        message: 'This event is not yet set up for parent registration.',
+        suggestion:
+          'Please check back later or contact your school for more information about when registration will open.',
       },
       fetch_error: {
         title: 'Unable to Load Event',
@@ -277,7 +354,7 @@ function RegistrationPageContent() {
                 eventDate={discoveryState.eventDate}
                 eventType={discoveryState.eventType}
                 onClassSelect={handleClassSelect}
-                onBack={handleBack}
+                onBack={isQrFlow ? undefined : handleBack}
               />
             )}
           </div>
