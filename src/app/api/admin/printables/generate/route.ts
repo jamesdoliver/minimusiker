@@ -3,30 +3,40 @@
  *
  * POST /api/admin/printables/generate
  *
- * Generates all printables (flyers, posters, etc.) for an event,
- * automatically including QR codes for easy parent registration.
+ * Generates all printables (flyers, buttons, t-shirts, hoodies, minicards, CD jackets)
+ * for an event, using custom text/QR positions from the editor.
  *
- * The API automatically looks up the Event record to get the access_code
- * for QR code generation - no need to pass it from the frontend.
+ * Phase 3: Accepts dynamic positions from the interactive editor.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
-import { getPrintableService } from '@/lib/services/printableService';
+import { getPrintableService, PrintableItemConfig } from '@/lib/services/printableService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
+import { PrintableItemType } from '@/lib/config/printableTextConfig';
 
-// Request body type
+// Request body type - Phase 3 with dynamic positions
 interface GeneratePrintablesRequest {
   eventId: string;        // Could be SimplyBook ID or actual event_id
   schoolName: string;
   eventDate: string;
   accessCode?: number;    // Optional - auto-fetched if not provided
-  items?: {
-    type: string;
-    line1?: string;
-    line2?: string;
-    line3?: string;
+  items: {
+    type: PrintableItemType;
+    text: string;
+    textPosition: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+    fontSize: number;
+    qrPosition?: {
+      x: number;
+      y: number;
+      size: number;
+    };
   }[];
 }
 
@@ -43,13 +53,20 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: GeneratePrintablesRequest = await request.json();
-    const { eventId: passedEventId, schoolName, eventDate } = body;
+    const { eventId: passedEventId, schoolName, eventDate, items } = body;
     let { accessCode } = body;
 
     // Validate required fields
     if (!passedEventId || !schoolName || !eventDate) {
       return NextResponse.json(
         { error: 'Missing required fields: eventId, schoolName, eventDate' },
+        { status: 400 }
+      );
+    }
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json(
+        { error: 'Missing required field: items array' },
         { status: 400 }
       );
     }
@@ -98,11 +115,21 @@ export async function POST(request: NextRequest) {
       console.warn('[printables/generate] No access_code available - printables will be generated WITHOUT QR codes');
     }
 
-    // Generate all printables
-    const result = await printableService.generateAllPrintables(
+    // Convert items to PrintableItemConfig format for the service
+    const itemConfigs: PrintableItemConfig[] = items.map(item => ({
+      type: item.type,
+      text: item.text,
+      textPosition: item.textPosition,
+      fontSize: item.fontSize,
+      qrPosition: item.qrPosition,
+    }));
+
+    // Generate all printables with custom positions
+    const result = await printableService.generateAllPrintablesWithConfigs(
       eventId,
       schoolName,
       eventDate,
+      itemConfigs,
       logoBuffer,
       qrCodeUrl
     );

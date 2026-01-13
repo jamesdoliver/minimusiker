@@ -19,7 +19,7 @@
  * IMPORTANT: These are placeholder values. Update after receiving actual templates from client.
  */
 
-import type { PrintableType, MockupType } from '../services/r2Service';
+import type { PrintableType, MockupType, FontName } from '../services/r2Service';
 
 // Text placement configuration for a single text element
 export interface TextPlacement {
@@ -89,187 +89,252 @@ const DEFAULT_COLOR = { r: 0, g: 0, b: 0 };
 // MiniMusiker brand color (coral/accent)
 const BRAND_COLOR = { r: 0.91, g: 0.45, b: 0.32 }; // #E87452
 
+// Text color matching mockups (dark teal)
+const TEAL_COLOR = { r: 0.24, g: 0.48, b: 0.48 }; // #3D7A7A
+
+// Bleed constant in mm (used for print production)
+export const BLEED_MM = 3;
+
+// Convert mm to PDF points (1 point = 1/72 inch, 1 inch = 25.4mm)
+export const MM_TO_POINTS = 2.834645669;
+
 /**
- * PLACEHOLDER CONFIGURATIONS
+ * Product dimension constants (in mm)
+ * Used for generating correctly-sized printables matching supplier specs
+ */
+export const PRODUCT_DIMENSIONS = {
+  tshirt: { widthMm: 297, heightMm: 420, bleedMm: 3 },      // A3
+  hoodie: { widthMm: 297, heightMm: 420, bleedMm: 3 },      // A3
+  button: { widthMm: 50, heightMm: 50, bleedMm: 0 },        // 12mm bleed built into 50mm
+  flyer1: { widthMm: 210, heightMm: 105, bleedMm: 3 },      // DIN Long landscape
+  flyer2: { widthMm: 210, heightMm: 105, bleedMm: 3 },      // DIN Long landscape
+  flyer3: { widthMm: 148, heightMm: 210, bleedMm: 3 },      // A5 portrait
+  minicard: { widthMm: 210, heightMm: 105, bleedMm: 3 },    // DIN Long landscape
+  'cd-jacket': { widthMm: 120, heightMm: 120, bleedMm: 3 }, // Standard CD size
+} as const;
+
+/**
+ * Font mapping per printable type
+ * - Fredoka: Flyers, Button, Minicard, CD Jacket
+ * - Springwood Display: T-Shirt & Hoodie
+ */
+export const PRINTABLE_FONTS: Record<PrintableType, FontName> = {
+  'flyer1': 'fredoka',
+  'flyer1-back': 'fredoka',
+  'flyer2': 'fredoka',
+  'flyer2-back': 'fredoka',
+  'flyer3': 'fredoka',
+  'flyer3-back': 'fredoka',
+  'button': 'fredoka',
+  'minicard': 'fredoka',
+  'cd-jacket': 'fredoka',
+  'tshirt-print': 'springwood-display',
+  'hoodie-print': 'springwood-display',
+};
+
+/**
+ * PRINTABLE CONFIGURATIONS
  *
- * These values are placeholders and MUST be updated after receiving
- * the actual PDF templates from the client.
+ * Coordinates updated for supplier-specified dimensions:
+ * - T-Shirt/Hoodie: 842 × 1191 pts (297 × 420mm A3)
+ * - Flyer 1 & 2: 595 × 298 pts (210 × 105mm DIN Long landscape)
+ * - Flyer 3: 420 × 595 pts (148 × 210mm A5 portrait)
+ * - Button: 142 × 142 pts (50 × 50mm with 12mm bleed)
+ * - Minicard: 595 × 298 pts (210 × 105mm DIN Long)
+ * - CD Jacket: 340 × 340 pts (120 × 120mm)
  *
- * The coordinates assume a standard A4 page (595 x 842 points)
- * Adjust based on actual template dimensions and design.
+ * Text positions will be calibrated after blank templates are received.
  */
 
 export const PRINTABLE_CONFIGS: Record<PrintableType, PrintableTemplateConfig> = {
-  // Flyer 1 - Marketing flyer variant 1
+  // Flyer 1 - DIN Long landscape (595 × 298 pts = 210 × 105mm)
   flyer1: {
     schoolName: {
-      x: 297.5,  // Center of A4 page
-      y: 700,
-      fontSize: 28,
-      maxWidth: 400,
-      color: BRAND_COLOR,
-      align: 'center',
-    },
-    eventDate: {
-      x: 297.5,
-      y: 660,
-      fontSize: 18,
-      maxWidth: 300,
-      color: DEFAULT_COLOR,
-      align: 'center',
-    },
-  },
-
-  // Flyer 2 - Marketing flyer variant 2
-  flyer2: {
-    schoolName: {
-      x: 297.5,
-      y: 700,
-      fontSize: 28,
-      maxWidth: 400,
-      color: BRAND_COLOR,
-      align: 'center',
-    },
-    eventDate: {
-      x: 297.5,
-      y: 660,
-      fontSize: 18,
-      maxWidth: 300,
-      color: DEFAULT_COLOR,
-      align: 'center',
-    },
-  },
-
-  // Flyer 3 - Marketing flyer variant 3
-  flyer3: {
-    schoolName: {
-      x: 297.5,
-      y: 700,
-      fontSize: 28,
-      maxWidth: 400,
-      color: BRAND_COLOR,
-      align: 'center',
-    },
-    eventDate: {
-      x: 297.5,
-      y: 660,
-      fontSize: 18,
-      maxWidth: 300,
-      color: DEFAULT_COLOR,
-      align: 'center',
-    },
-  },
-
-  // Poster - Event poster
-  poster: {
-    schoolName: {
-      x: 297.5,
-      y: 750,
-      fontSize: 36,
+      x: 298,  // Center of DIN Long
+      y: 250,
+      fontSize: 20,
       maxWidth: 500,
       color: BRAND_COLOR,
       align: 'center',
     },
     eventDate: {
-      x: 297.5,
-      y: 700,
-      fontSize: 24,
+      x: 298,
+      y: 220,
+      fontSize: 14,
       maxWidth: 400,
       color: DEFAULT_COLOR,
       align: 'center',
     },
   },
 
-  // T-Shirt Print - Print-ready file for t-shirts
+  // Flyer 2 - DIN Long landscape (595 × 298 pts = 210 × 105mm)
+  flyer2: {
+    schoolName: {
+      x: 298,
+      y: 250,
+      fontSize: 20,
+      maxWidth: 500,
+      color: BRAND_COLOR,
+      align: 'center',
+    },
+    eventDate: {
+      x: 298,
+      y: 220,
+      fontSize: 14,
+      maxWidth: 400,
+      color: DEFAULT_COLOR,
+      align: 'center',
+    },
+  },
+
+  // Flyer 3 - A5 portrait (420 × 595 pts = 148 × 210mm)
+  flyer3: {
+    schoolName: {
+      x: 210,  // Center of A5
+      y: 550,
+      fontSize: 22,
+      maxWidth: 380,
+      color: BRAND_COLOR,
+      align: 'center',
+    },
+    eventDate: {
+      x: 210,
+      y: 515,
+      fontSize: 16,
+      maxWidth: 300,
+      color: DEFAULT_COLOR,
+      align: 'center',
+    },
+  },
+
+  // Flyer 1 Back - DIN Long landscape (595 × 298 pts) - QR code only, no text
+  'flyer1-back': {
+    schoolName: { x: 0, y: 0, fontSize: 0 },  // Not used - back has QR only
+    eventDate: { x: 0, y: 0, fontSize: 0 },   // Not used - back has QR only
+  },
+
+  // Flyer 2 Back - DIN Long landscape (595 × 298 pts) - QR code only, no text
+  'flyer2-back': {
+    schoolName: { x: 0, y: 0, fontSize: 0 },  // Not used - back has QR only
+    eventDate: { x: 0, y: 0, fontSize: 0 },   // Not used - back has QR only
+  },
+
+  // Flyer 3 Back - A5 portrait (420 × 595 pts) - QR code only, no text
+  'flyer3-back': {
+    schoolName: { x: 0, y: 0, fontSize: 0 },  // Not used - back has QR only
+    eventDate: { x: 0, y: 0, fontSize: 0 },   // Not used - back has QR only
+  },
+
+  // Button - Circular 38mm (142 × 142 pts = 50 × 50mm with 12mm bleed)
+  button: {
+    schoolName: {
+      x: 71,  // Center of button
+      y: 85,
+      fontSize: 10,
+      maxWidth: 90,
+      color: DEFAULT_COLOR,
+      align: 'center',
+    },
+    eventDate: {
+      x: 71,
+      y: 57,
+      fontSize: 8,
+      maxWidth: 80,
+      color: DEFAULT_COLOR,
+      align: 'center',
+    },
+  },
+
+  // T-Shirt Print - A3 (842 × 1191 pts = 297 × 420mm)
   'tshirt-print': {
     schoolName: {
-      x: 297.5,
-      y: 500,
-      fontSize: 24,
-      maxWidth: 350,
-      color: DEFAULT_COLOR,
+      x: 421,  // Center of A3
+      y: 950,  // Upper third, above logo
+      fontSize: 36,
+      maxWidth: 700,
+      color: TEAL_COLOR,
       align: 'center',
     },
     eventDate: {
-      x: 297.5,
-      y: 460,
-      fontSize: 16,
-      maxWidth: 300,
-      color: DEFAULT_COLOR,
+      x: 421,
+      y: 900,
+      fontSize: 24,
+      maxWidth: 500,
+      color: TEAL_COLOR,
       align: 'center',
     },
   },
 
-  // Hoodie Print - Print-ready file for hoodies
+  // Hoodie Print - A3 (842 × 1191 pts = 297 × 420mm)
   'hoodie-print': {
     schoolName: {
-      x: 297.5,
-      y: 500,
-      fontSize: 24,
-      maxWidth: 350,
-      color: DEFAULT_COLOR,
+      x: 421,  // Center of A3
+      y: 950,  // Upper third, above logo
+      fontSize: 36,
+      maxWidth: 700,
+      color: TEAL_COLOR,
       align: 'center',
     },
     eventDate: {
-      x: 297.5,
-      y: 460,
-      fontSize: 16,
-      maxWidth: 300,
-      color: DEFAULT_COLOR,
+      x: 421,
+      y: 900,
+      fontSize: 24,
+      maxWidth: 500,
+      color: TEAL_COLOR,
       align: 'center',
     },
   },
 
-  // Minicard - Product insert card (includes logo)
+  // Minicard - DIN Long landscape (595 × 298 pts = 210 × 105mm)
   minicard: {
     schoolName: {
-      x: 150,
+      x: 298,  // Center
       y: 200,
-      fontSize: 14,
-      maxWidth: 200,
+      fontSize: 16,
+      maxWidth: 450,
       color: DEFAULT_COLOR,
       align: 'center',
     },
     eventDate: {
-      x: 150,
-      y: 180,
+      x: 298,
+      y: 175,
       fontSize: 12,
-      maxWidth: 180,
+      maxWidth: 400,
       color: DEFAULT_COLOR,
       align: 'center',
     },
     logo: {
-      x: 100,
+      x: 248,  // Centered logo
       y: 220,
       width: 100,
-      height: 100,
+      height: 60,
       fit: 'contain',
     },
   },
 
-  // CD Jacket - CD case insert (includes logo)
+  // CD Jacket - Square (340 × 340 pts = 120 × 120mm)
   'cd-jacket': {
     schoolName: {
-      x: 60,
-      y: 100,
-      fontSize: 12,
-      maxWidth: 100,
+      x: 170,  // Center of CD jacket
+      y: 280,
+      fontSize: 14,
+      maxWidth: 280,
       color: DEFAULT_COLOR,
       align: 'center',
     },
     eventDate: {
-      x: 60,
-      y: 85,
-      fontSize: 10,
-      maxWidth: 100,
+      x: 170,
+      y: 258,
+      fontSize: 12,
+      maxWidth: 240,
       color: DEFAULT_COLOR,
       align: 'center',
     },
     logo: {
-      x: 35,
-      y: 110,
-      width: 50,
-      height: 50,
+      x: 120,
+      y: 150,
+      width: 100,
+      height: 100,
       fit: 'contain',
     },
   },
@@ -326,7 +391,15 @@ export function printableRequiresLogo(type: PrintableType): boolean {
  * Check if a printable type supports QR code embedding
  */
 export function printableSupportsQrCode(type: PrintableType): boolean {
-  return type === 'flyer1' || type === 'flyer2' || type === 'flyer3' || type === 'poster';
+  return type === 'flyer1' || type === 'flyer2' || type === 'flyer3'
+    || type === 'flyer1-back' || type === 'flyer2-back' || type === 'flyer3-back';
+}
+
+/**
+ * Check if a printable type is a back side (QR only, no text)
+ */
+export function printableIsBack(type: PrintableType): boolean {
+  return type === 'flyer1-back' || type === 'flyer2-back' || type === 'flyer3-back';
 }
 
 /**
@@ -338,57 +411,85 @@ export function printableSupportsQrCode(type: PrintableType): boolean {
  * IMPORTANT: These are placeholder values. Update after receiving actual templates.
  */
 export const QR_CODE_CONFIGS: Partial<Record<PrintableType, QrCodePlacement>> = {
-  // Flyer 1 - QR code in bottom right corner
+  // Flyer 1 - DIN Long landscape (595 × 298 pts), QR in bottom right
   flyer1: {
-    x: 480,    // Near right edge of A4
-    y: 50,     // Near bottom edge
-    size: 80,  // 80 points = ~28mm
+    x: 490,    // Near right edge of DIN Long (595 wide)
+    y: 30,     // Near bottom edge (298 tall)
+    size: 70,  // 70 points = ~25mm, sized for smaller format
     urlText: {
-      x: 520,  // Center under QR (480 + 40)
-      y: 35,   // Below QR code
-      fontSize: 8,
+      x: 525,  // Center under QR (490 + 35)
+      y: 15,   // Below QR code
+      fontSize: 7,
       color: { r: 0, g: 0, b: 0 },
       align: 'center',
     },
   },
 
-  // Flyer 2 - QR code in bottom right corner
+  // Flyer 2 - DIN Long landscape (595 × 298 pts), QR in bottom right
   flyer2: {
-    x: 480,
-    y: 50,
-    size: 80,
+    x: 490,
+    y: 30,
+    size: 70,
     urlText: {
-      x: 520,
-      y: 35,
-      fontSize: 8,
+      x: 525,
+      y: 15,
+      fontSize: 7,
       color: { r: 0, g: 0, b: 0 },
       align: 'center',
     },
   },
 
-  // Flyer 3 - QR code in bottom right corner
+  // Flyer 3 - A5 portrait (420 × 595 pts), QR in bottom right
   flyer3: {
-    x: 480,
-    y: 50,
-    size: 80,
+    x: 320,    // Near right edge of A5 (420 wide)
+    y: 30,     // Near bottom edge
+    size: 80,  // Slightly larger for A5
     urlText: {
-      x: 520,
-      y: 35,
+      x: 360,  // Center under QR (320 + 40)
+      y: 15,   // Below QR code
       fontSize: 8,
       color: { r: 0, g: 0, b: 0 },
       align: 'center',
     },
   },
 
-  // Poster - Larger QR code for easier scanning
-  poster: {
-    x: 460,
-    y: 50,
-    size: 100,  // Larger for poster
+  // Flyer 1 Back - DIN Long landscape (595 × 298 pts), QR centered
+  'flyer1-back': {
+    x: 262,    // Center of DIN Long (595/2 - 35)
+    y: 114,    // Center of height (298/2 - 35)
+    size: 100, // Larger for back (more prominent)
     urlText: {
-      x: 510,  // Center under QR (460 + 50)
-      y: 32,   // Below QR code
-      fontSize: 10,  // Slightly larger for poster
+      x: 312,  // Center under QR
+      y: 95,   // Below QR code
+      fontSize: 10,
+      color: { r: 0, g: 0, b: 0 },
+      align: 'center',
+    },
+  },
+
+  // Flyer 2 Back - DIN Long landscape (595 × 298 pts), QR centered
+  'flyer2-back': {
+    x: 262,
+    y: 114,
+    size: 100,
+    urlText: {
+      x: 312,
+      y: 95,
+      fontSize: 10,
+      color: { r: 0, g: 0, b: 0 },
+      align: 'center',
+    },
+  },
+
+  // Flyer 3 Back - A5 portrait (420 × 595 pts), QR centered
+  'flyer3-back': {
+    x: 160,    // Center of A5 (420/2 - 50)
+    y: 247,    // Center of height (595/2 - 50)
+    size: 120, // Larger for back
+    urlText: {
+      x: 220,  // Center under QR
+      y: 225,  // Below QR code
+      fontSize: 10,
       color: { r: 0, g: 0, b: 0 },
       align: 'center',
     },

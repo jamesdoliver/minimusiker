@@ -4,13 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
 import {
   PrintableItemType,
-  TextLines,
+  PrintableEditorState,
   PRINTABLE_ITEMS,
   TOTAL_PRINTABLE_ITEMS,
+  initializeEditorState,
 } from '@/lib/config/printableTextConfig';
-import { smartSplitSchoolName } from '@/lib/utils/textSplitter';
-import TextInputPanel from './TextInputPanel';
-import PrintablePreview from './PrintablePreview';
+import PrintableEditor from './PrintableEditor';
 
 interface ConfirmPrintablesModalProps {
   isOpen: boolean;
@@ -18,15 +17,12 @@ interface ConfirmPrintablesModalProps {
   booking: BookingWithDetails;
 }
 
-// Initialize empty text lines for all items
-function initializeAllItemsTextLines(schoolName: string): Record<PrintableItemType, TextLines> {
-  const defaultSplit = smartSplitSchoolName(schoolName);
-
-  const result: Record<PrintableItemType, TextLines> = {} as Record<PrintableItemType, TextLines>;
+// Initialize empty editor states for all items
+function initializeAllItemsEditorState(schoolName: string): Record<PrintableItemType, PrintableEditorState> {
+  const result: Record<PrintableItemType, PrintableEditorState> = {} as Record<PrintableItemType, PrintableEditorState>;
   PRINTABLE_ITEMS.forEach((item) => {
-    result[item.type] = { ...defaultSplit };
+    result[item.type] = initializeEditorState(item.type, schoolName);
   });
-
   return result;
 }
 
@@ -35,12 +31,12 @@ export default function ConfirmPrintablesModal({
   onClose,
   booking,
 }: ConfirmPrintablesModalProps) {
-  // Current step in the wizard (0 to 6 for 7 items)
+  // Current step in the wizard (0 to 10 for 11 items)
   const [currentStep, setCurrentStep] = useState(0);
 
-  // Text data for each item type
-  const [itemTextData, setItemTextData] = useState<Record<PrintableItemType, TextLines>>(() =>
-    initializeAllItemsTextLines(booking.schoolName)
+  // Editor state for each item type
+  const [itemEditorStates, setItemEditorStates] = useState<Record<PrintableItemType, PrintableEditorState>>(() =>
+    initializeAllItemsEditorState(booking.schoolName)
   );
 
   // Track which items have been confirmed
@@ -52,25 +48,25 @@ export default function ConfirmPrintablesModal({
 
   // Current item config
   const currentItem = PRINTABLE_ITEMS[currentStep];
-  const currentTextLines = itemTextData[currentItem.type];
+  const currentEditorState = itemEditorStates[currentItem.type];
 
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setCurrentStep(0);
-      setItemTextData(initializeAllItemsTextLines(booking.schoolName));
+      setItemEditorStates(initializeAllItemsEditorState(booking.schoolName));
       setConfirmedItems(new Set());
       setIsGenerating(false);
       setGenerationError(null);
     }
   }, [isOpen, booking.schoolName]);
 
-  // Update text for current item
-  const updateCurrentItemText = useCallback(
-    (textLines: TextLines) => {
-      setItemTextData((prev) => ({
+  // Update editor state for current item
+  const updateCurrentItemEditorState = useCallback(
+    (state: PrintableEditorState) => {
+      setItemEditorStates((prev) => ({
         ...prev,
-        [currentItem.type]: textLines,
+        [currentItem.type]: state,
       }));
     },
     [currentItem.type]
@@ -98,7 +94,7 @@ export default function ConfirmPrintablesModal({
     setGenerationError(null);
 
     try {
-      // Call the printables generation API
+      // Call the printables generation API with dynamic positions
       const response = await fetch('/api/admin/printables/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -106,11 +102,17 @@ export default function ConfirmPrintablesModal({
           eventId: booking.code,
           schoolName: booking.schoolName,
           eventDate: booking.bookingDate,
-          // Access code will be fetched from Airtable if available
-          items: PRINTABLE_ITEMS.map(item => ({
-            type: item.type,
-            ...itemTextData[item.type],
-          })),
+          // Pass editor states with positions for each item
+          items: PRINTABLE_ITEMS.map(item => {
+            const state = itemEditorStates[item.type];
+            return {
+              type: item.type,
+              text: state.text,
+              textPosition: state.textPosition,
+              fontSize: state.fontSize,
+              qrPosition: state.qrPosition,
+            };
+          }),
         }),
       });
 
@@ -146,7 +148,7 @@ export default function ConfirmPrintablesModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
@@ -189,24 +191,15 @@ export default function ConfirmPrintablesModal({
           </div>
         </div>
 
-        {/* Main content - two panels */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left panel - Text inputs */}
-          <div className="w-1/3 border-r border-gray-200 p-6 overflow-y-auto">
-            <TextInputPanel
-              textLines={currentTextLines}
-              onChange={updateCurrentItemText}
-              itemName={currentItem.name}
-            />
-          </div>
-
-          {/* Right panel - Preview */}
-          <div className="w-2/3 p-6 bg-gray-50 overflow-y-auto flex items-center justify-center">
-            <PrintablePreview
-              itemConfig={currentItem}
-              textLines={currentTextLines}
-            />
-          </div>
+        {/* Main content - PrintableEditor */}
+        <div className="flex-1 overflow-hidden">
+          <PrintableEditor
+            itemConfig={currentItem}
+            schoolName={booking.schoolName}
+            accessCode={booking.accessCode}
+            editorState={currentEditorState}
+            onEditorStateChange={updateCurrentItemEditorState}
+          />
         </div>
 
         {/* Footer with actions */}

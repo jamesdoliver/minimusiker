@@ -18,15 +18,22 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
  * minimusiker-assets/
  * ├── templates/                              # Base templates (uploaded once by admin)
  * │   ├── flyer1-template.pdf
+ * │   ├── flyer1-back-template.pdf           # NEW: Flyer back templates
  * │   ├── flyer2-template.pdf
+ * │   ├── flyer2-back-template.pdf
  * │   ├── flyer3-template.pdf
- * │   ├── poster-template.pdf
+ * │   ├── flyer3-back-template.pdf
+ * │   ├── button-template.pdf
  * │   ├── tshirt-print-template.pdf
  * │   ├── hoodie-print-template.pdf
  * │   ├── minicard-template.pdf
  * │   ├── cd-jacket-template.pdf
  * │   ├── mock-tshirt-template.pdf
  * │   └── mock-hoodie-template.pdf
+ * │
+ * ├── fonts/                                  # NEW: Custom fonts for printables
+ * │   ├── Fredoka-SemiBold.ttf               # For flyers, button, minicard, CD jacket
+ * │   └── SpringwoodDisplay.otf              # For T-shirt & Hoodie
  * │
  * └── events/
  *     └── {event_id}/
@@ -39,7 +46,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
  *         │   │   ├── flyer1.pdf
  *         │   │   ├── flyer2.pdf
  *         │   │   └── flyer3.pdf
- *         │   ├── poster.pdf
+ *         │   ├── button.pdf
  *         │   ├── tshirt-print.pdf
  *         │   ├── hoodie-print.pdf
  *         │   ├── minicards/
@@ -58,6 +65,9 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 export const R2_PATHS = {
   // Template paths
   TEMPLATES: 'templates',
+
+  // Font paths
+  FONTS: 'fonts',
 
   // Event-level paths
   EVENTS: 'events',
@@ -79,8 +89,10 @@ export const R2_PATHS = {
 
 // Printable types that can be generated
 export type PrintableType =
-  | 'flyer1' | 'flyer2' | 'flyer3'
-  | 'poster'
+  | 'flyer1' | 'flyer1-back'
+  | 'flyer2' | 'flyer2-back'
+  | 'flyer3' | 'flyer3-back'
+  | 'button'
   | 'tshirt-print' | 'hoodie-print'
   | 'minicard' | 'cd-jacket';
 
@@ -90,12 +102,24 @@ export type MockupType = 'mock-tshirt' | 'mock-hoodie';
 // All template types (printables + mockups)
 export type TemplateType = PrintableType | MockupType;
 
+// Font types for custom fonts
+export type FontName = 'fredoka' | 'springwood-display';
+
+// Font filenames mapping
+export const FONT_FILENAMES: Record<FontName, string> = {
+  'fredoka': 'Fredoka-SemiBold.ttf',
+  'springwood-display': 'SpringwoodDisplay.otf',
+};
+
 // Template filenames mapping
 export const TEMPLATE_FILENAMES: Record<TemplateType, string> = {
   'flyer1': 'flyer1-template.pdf',
+  'flyer1-back': 'flyer1-back-template.pdf',
   'flyer2': 'flyer2-template.pdf',
+  'flyer2-back': 'flyer2-back-template.pdf',
   'flyer3': 'flyer3-template.pdf',
-  'poster': 'poster-template.pdf',
+  'flyer3-back': 'flyer3-back-template.pdf',
+  'button': 'button-template.pdf',
   'tshirt-print': 'tshirt-print-template.pdf',
   'hoodie-print': 'hoodie-print-template.pdf',
   'minicard': 'minicard-template.pdf',
@@ -107,9 +131,12 @@ export const TEMPLATE_FILENAMES: Record<TemplateType, string> = {
 // Generated printable filenames (output)
 export const PRINTABLE_FILENAMES: Record<PrintableType, string> = {
   'flyer1': 'flyer1.pdf',
+  'flyer1-back': 'flyer1-back.pdf',
   'flyer2': 'flyer2.pdf',
+  'flyer2-back': 'flyer2-back.pdf',
   'flyer3': 'flyer3.pdf',
-  'poster': 'poster.pdf',
+  'flyer3-back': 'flyer3-back.pdf',
+  'button': 'button.pdf',
   'tshirt-print': 'tshirt-print.pdf',
   'hoodie-print': 'hoodie-print.pdf',
   'minicard': 'minicard.pdf',
@@ -1102,13 +1129,39 @@ class R2Service {
   }
 
   /**
+   * Get a signed URL for a template file
+   * Used by the browser to fetch templates for preview rendering
+   *
+   * @param templateType - The type of template to get URL for
+   * @param expiresIn - URL expiry in seconds (default 30 minutes)
+   * @returns Signed URL and template exists flag, or null URL if template doesn't exist
+   */
+  async getTemplateSignedUrl(
+    templateType: TemplateType,
+    expiresIn: number = 1800
+  ): Promise<{ url: string | null; exists: boolean }> {
+    const filename = TEMPLATE_FILENAMES[templateType];
+    const key = `${R2_PATHS.TEMPLATES}/${filename}`;
+
+    const exists = await this.fileExistsInAssetsBucket(key);
+    if (!exists) {
+      return { url: null, exists: false };
+    }
+
+    const url = await this.generateSignedUrlForAssetsBucket(key, expiresIn);
+    return { url, exists: true };
+  }
+
+  /**
    * Get the status of all templates (which ones exist)
    * Useful for admin panel to show template upload status
    */
   async getTemplatesStatus(): Promise<Record<TemplateType, boolean>> {
     const allTypes: TemplateType[] = [
-      'flyer1', 'flyer2', 'flyer3',
-      'poster',
+      'flyer1', 'flyer1-back',
+      'flyer2', 'flyer2-back',
+      'flyer3', 'flyer3-back',
+      'button',
       'tshirt-print', 'hoodie-print',
       'minicard', 'cd-jacket',
       'mock-tshirt', 'mock-hoodie',
@@ -1121,6 +1174,96 @@ class R2Service {
     }
 
     return status as Record<TemplateType, boolean>;
+  }
+
+  // ========================================
+  // Font Methods
+  // ========================================
+
+  /**
+   * Get a custom font file as a Buffer
+   * Used by printableService for embedding custom fonts
+   *
+   * @param fontName - The font name to fetch
+   * @returns Buffer of the font file, or null if not found
+   */
+  async getFont(fontName: FontName): Promise<Buffer | null> {
+    const filename = FONT_FILENAMES[fontName];
+    const key = `${R2_PATHS.FONTS}/${filename}`;
+
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+      });
+
+      const response = await this.client.send(command);
+
+      if (!response.Body) {
+        return null;
+      }
+
+      // Convert stream to buffer
+      const chunks: Uint8Array[] = [];
+      const stream = response.Body as AsyncIterable<Uint8Array>;
+
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      return Buffer.concat(chunks);
+    } catch (error) {
+      console.error(`Error fetching font ${fontName}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Upload a custom font file
+   *
+   * @param fontName - The font name
+   * @param buffer - The font file buffer
+   */
+  async uploadFont(fontName: FontName, buffer: Buffer): Promise<UploadResult> {
+    const filename = FONT_FILENAMES[fontName];
+    const key = `${R2_PATHS.FONTS}/${filename}`;
+
+    // Determine content type based on extension
+    const contentType = filename.endsWith('.otf')
+      ? 'font/otf'
+      : 'font/ttf';
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      });
+
+      await this.client.send(command);
+
+      return {
+        success: true,
+        key,
+      };
+    } catch (error) {
+      console.error(`Error uploading font ${fontName}:`, error);
+      return {
+        success: false,
+        key,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Check if a font exists in R2
+   */
+  async fontExists(fontName: FontName): Promise<boolean> {
+    const filename = FONT_FILENAMES[fontName];
+    const key = `${R2_PATHS.FONTS}/${filename}`;
+    return this.fileExistsInAssetsBucket(key);
   }
 
   // ========================================
@@ -1152,7 +1295,7 @@ class R2Service {
       // CD jacket goes in the cd-jacket subfolder
       key = `${R2_PATHS.EVENT_PRINTABLES_CD_JACKET(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
     } else {
-      // poster, tshirt-print, hoodie-print go directly in printables
+      // button, tshirt-print, hoodie-print go directly in printables
       key = `${R2_PATHS.EVENT_PRINTABLES(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
     }
 
@@ -1202,6 +1345,7 @@ class R2Service {
     } else if (printableType === 'cd-jacket') {
       key = `${R2_PATHS.EVENT_PRINTABLES_CD_JACKET(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
     } else {
+      // button, tshirt-print, hoodie-print go directly in printables
       key = `${R2_PATHS.EVENT_PRINTABLES(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
     }
 
@@ -1221,7 +1365,7 @@ class R2Service {
   ): Promise<Record<PrintableType, string | null>> {
     const printableTypes: PrintableType[] = [
       'flyer1', 'flyer2', 'flyer3',
-      'poster',
+      'button',
       'tshirt-print', 'hoodie-print',
       'minicard', 'cd-jacket',
     ];
