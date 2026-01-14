@@ -442,8 +442,10 @@ function ParentPortalContent() {
         {/* Shopping Section - Full Width */}
         <section className="mb-12">
           <ProductSelector
-            eventId={session.eventId || 'demo'}
+            eventId={eventId}
+            classId={classId}
             parentId={session.parentId}
+            parentEmail={session.email}
             schoolName={schoolName}
             children={children}
           />

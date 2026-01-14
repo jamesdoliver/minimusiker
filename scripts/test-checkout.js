@@ -13,10 +13,10 @@ async function main() {
       { variantId: 'gid://shopify/ProductVariant/53258099720538', quantity: 1 }, // Minicard
     ],
     customAttributes: {
-      parentId: 'test-parent-123',
+      parentId: 'PAR-a1b2c3d4',
       parentEmail: 'test@example.com',
-      eventId: 'evt_test_school_minimusiker_20250115_abc123',
-      classId: 'cls_test_school_20250115_3rdgrade_def456',
+      eventId: 'evt_testschool_minimusiker_20250115_abc123',
+      classId: 'cls_testschool_20250115_3rdgrade_def456',
       schoolName: 'Test School',
     },
   };

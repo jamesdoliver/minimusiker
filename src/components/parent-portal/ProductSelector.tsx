@@ -35,7 +35,9 @@ interface ProductSelection {
 
 interface ProductSelectorProps {
   eventId: string;
+  classId?: string;
   parentId: string;
+  parentEmail?: string;
   schoolName: string;
   children?: ParentSessionChild[];
   onCheckout?: (selection: ProductSelection, total: number) => void;
@@ -343,7 +345,9 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
 
 export default function ProductSelector({
   eventId,
+  classId,
   parentId,
+  parentEmail,
   schoolName,
   children = [],
   onCheckout,
@@ -465,7 +469,9 @@ export default function ProductSelector({
           lineItems,
           customAttributes: {
             parentId,
+            parentEmail,
             eventId,
+            classId,
             schoolName,
           },
         }),
