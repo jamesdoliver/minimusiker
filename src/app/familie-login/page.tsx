@@ -22,7 +22,7 @@ function VideoPlayer() {
 
   if (isPlaying) {
     return (
-      <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden shadow-lg">
+      <div className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden shadow-lg">
         <video
           src={ASSETS.videoSource}
           className="w-full h-full object-cover"
@@ -37,7 +37,7 @@ function VideoPlayer() {
   return (
     <button
       onClick={() => setIsPlaying(true)}
-      className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden shadow-lg group cursor-pointer"
+      className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden shadow-lg group cursor-pointer"
     >
       {/* Thumbnail */}
       <div className="absolute inset-0 bg-gray-200">
@@ -70,7 +70,7 @@ function VideoPlayer() {
 
       {/* Caption */}
       <div className="absolute bottom-4 left-4 bg-sage-500/90 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
-        Hallo ich bin Till
+        Minimusiker
       </div>
     </button>
   );
