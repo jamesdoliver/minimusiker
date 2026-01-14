@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { createTeacherSessionToken } from '@/lib/auth/verifyTeacherSession';
 import { TeacherSession, TEACHER_SESSION_COOKIE, TEACHER_SESSION_EXPIRY_SECONDS } from '@/lib/types/teacher';
-import { getEmailService } from '@/lib/services/emailService';
+import { sendTeacherMagicLinkEmail } from '@/lib/services/resendService';
 
 // Admin bypass email - creates session directly without magic link
 const ADMIN_BYPASS_EMAIL = 'admin@minimusiker.de';
@@ -76,10 +76,9 @@ export async function POST(request: NextRequest) {
     // Build magic link URL
     const magicLinkUrl = `${APP_URL}/paedagogen-login?token=${token}`;
 
-    // Send email via Brevo
+    // Send email via Resend
     try {
-      const emailService = getEmailService();
-      const result = await emailService.sendTeacherMagicLink(
+      const result = await sendTeacherMagicLinkEmail(
         teacher.email,
         teacher.name,
         magicLinkUrl
@@ -88,7 +87,7 @@ export async function POST(request: NextRequest) {
       if (result.success) {
         console.log(`Magic link sent to ${teacher.email}`);
       } else {
-        console.error('Brevo email error:', result.error);
+        console.error('Resend email error:', result.error);
       }
     } catch (emailError) {
       console.error('Email service error:', emailError);
