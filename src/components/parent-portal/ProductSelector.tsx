@@ -12,8 +12,8 @@ import ClothingProductCard from './ClothingProductCard';
 // TYPES
 // ============================================================================
 
-type AudioProductId = 'minicard' | 'cd' | 'tonie' | 'minicard-cd-bundle' | 'minicard-tonie-bundle';
-type ClothingProductId = 'tshirt' | 'hoodie' | 'clothing-bundle';
+type AudioProductId = 'minicard' | 'cd' | 'tonie' | 'minicard-cd-bundle';
+type ClothingProductId = 'tshirt' | 'hoodie';
 
 interface AudioSelection {
   productId: AudioProductId;
@@ -54,42 +54,55 @@ interface AudioProduct {
   savings?: number;
 }
 
+// Shopify variant ID mapping for products
+const SHOPIFY_VARIANT_MAP: Record<string, string> = {
+  // Audio products
+  'minicard': 'gid://shopify/ProductVariant/53258099720538',
+  'cd': 'gid://shopify/ProductVariant/53258098639194',
+  'tonie': 'gid://shopify/ProductVariant/53271523557722',
+  'minicard-cd-bundle': 'gid://shopify/ProductVariant/53327238824282',
+  // T-Shirt sizes (Standard Minimusiker T-Shirt) - match TSHIRT_SIZES from stock.ts
+  'tshirt-98/104 (3-4J)': 'gid://shopify/ProductVariant/53328491512154',
+  'tshirt-110/116 (5-6J)': 'gid://shopify/ProductVariant/53328491544922',
+  'tshirt-122/128 (7-8J)': 'gid://shopify/ProductVariant/53328491577690',
+  'tshirt-134/146 (9-11J)': 'gid://shopify/ProductVariant/53328491610458',
+  'tshirt-152/164 (12-14J)': 'gid://shopify/ProductVariant/53328491643226',
+  // Hoodie sizes (Standard Minimusiker Hoodie) - match HOODIE_SIZES from stock.ts
+  'hoodie-116 (5-6 J)': 'gid://shopify/ProductVariant/53325998948698',
+  'hoodie-128 (7-8 J)': 'gid://shopify/ProductVariant/53325998981466',
+  'hoodie-140 (9-11 J)': 'gid://shopify/ProductVariant/53325999014234',
+  'hoodie-152 (12-13 J)': 'gid://shopify/ProductVariant/53325999047002',
+  'hoodie-164 (14-15 J)': 'gid://shopify/ProductVariant/53325999079770',
+};
+
 const AUDIO_PRODUCTS: AudioProduct[] = [
   {
     id: 'minicard',
     name: 'Minicard',
     description: 'Kompakte Karte mit QR-Code zum Abspielen',
-    price: 14.99,
+    price: 17.00,
     imageEmoji: '💳',
   },
   {
     id: 'cd',
     name: 'CD',
     description: 'Klassische Audio-CD im Jewel Case',
-    price: 19.99,
+    price: 19.00,
     imageEmoji: '💿',
   },
   {
     id: 'tonie',
     name: 'Tonie',
-    description: 'Toniefigur mit eurem Lied',
-    price: 29.99,
+    description: 'Kreativ-Tonie mit Minicard',
+    price: 29.00,
     imageEmoji: '🎵',
   },
   {
     id: 'minicard-cd-bundle',
     name: 'Minicard + CD',
     description: 'Beide Formate zum Sparpreis',
-    price: 29.99,
-    savings: 5,
-    imageEmoji: '🎁',
-  },
-  {
-    id: 'minicard-tonie-bundle',
-    name: 'Minicard + Tonie',
-    description: 'Minicard und Tonie zum Sparpreis',
-    price: 29.99,
-    savings: 15,
+    price: 27.00,
+    savings: 9,
     imageEmoji: '🎁',
   },
 ];
@@ -109,8 +122,8 @@ const CLOTHING_PRODUCTS: ClothingProduct[] = [
   {
     id: 'tshirt',
     name: 'T-Shirt',
-    description: 'Personalisiertes T-Shirt mit eurem Design',
-    price: 19.99,
+    description: 'Minimusiker T-Shirt mit Mini',
+    price: 25.00,
     imageSrc: '/images/products/tshirt.jpeg',
     showTshirtSize: true,
     showHoodieSize: false,
@@ -118,20 +131,10 @@ const CLOTHING_PRODUCTS: ClothingProduct[] = [
   {
     id: 'hoodie',
     name: 'Hoodie',
-    description: 'Kuscheliger Hoodie mit eurem Design',
-    price: 34.99,
+    description: 'Kuscheliger Hoodie mit Minimusiker Design',
+    price: 49.00,
     imageSrc: '/images/products/hoodie.jpeg',
     showTshirtSize: false,
-    showHoodieSize: true,
-  },
-  {
-    id: 'clothing-bundle',
-    name: 'T-Shirt + Hoodie',
-    description: 'Beide Kleidungsstücke zum Sparpreis',
-    price: 49.99,
-    savings: 5,
-    imageSrc: '/images/products/tshirt.jpeg',
-    showTshirtSize: true,
     showHoodieSize: true,
   },
 ];
@@ -423,22 +426,72 @@ export default function ProductSelector({
         return;
       }
 
-      // Default: show confirmation
-      const itemsSummary: string[] = [];
+      // Build line items for Shopify cart
+      const lineItems: Array<{ variantId: string; quantity: number }> = [];
+
+      // Add audio products
       selection.audioProducts.forEach((item) => {
-        const product = getAudioProduct(item.productId);
-        if (product) {
-          itemsSummary.push(`${product.name} x${item.quantity}`);
-        }
-      });
-      selection.clothing.forEach((item) => {
-        const product = getClothingProduct(item.productId);
-        if (product) {
-          itemsSummary.push(`${product.name} x${item.quantity}`);
+        const variantId = SHOPIFY_VARIANT_MAP[item.productId];
+        if (variantId) {
+          lineItems.push({ variantId, quantity: item.quantity });
         }
       });
 
-      alert(`Order submitted!\n\nItems: ${itemsSummary.join(', ')}\nTotal: €${totals.total.toFixed(2)}`);
+      // Add clothing items with size variants
+      selection.clothing.forEach((item) => {
+        if (item.productId === 'tshirt' && item.tshirtSize) {
+          const variantId = SHOPIFY_VARIANT_MAP[`tshirt-${item.tshirtSize}`];
+          if (variantId) {
+            lineItems.push({ variantId, quantity: item.quantity });
+          }
+        } else if (item.productId === 'hoodie' && item.hoodieSize) {
+          const variantId = SHOPIFY_VARIANT_MAP[`hoodie-${item.hoodieSize}`];
+          if (variantId) {
+            lineItems.push({ variantId, quantity: item.quantity });
+          }
+        }
+      });
+
+      if (lineItems.length === 0) {
+        alert('Could not add items to cart. Please try again.');
+        return;
+      }
+
+      // Create Shopify cart via API
+      const response = await fetch('/api/shopify/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lineItems,
+          customAttributes: {
+            parentId,
+            eventId,
+            schoolName,
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Checkout error:', data);
+        alert(`Checkout error: ${data.details || data.error || 'Unknown error'}`);
+        return;
+      }
+
+      // Check if we got a mock checkout (Shopify integration disabled)
+      if (data.message?.includes('mock')) {
+        console.log('Mock checkout created:', data);
+        alert(`Mock order created (Shopify integration disabled).\n\nCart ID: ${data.cartId}`);
+        return;
+      }
+
+      // Redirect to Shopify checkout
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        alert('Could not create checkout. Please try again.');
+      }
     } catch (error) {
       console.error('Checkout error:', error);
       alert('There was an error processing your order. Please try again.');
