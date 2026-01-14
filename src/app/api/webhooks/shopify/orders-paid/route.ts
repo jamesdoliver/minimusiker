@@ -16,6 +16,8 @@ import {
   PARENTS_FIELD_IDS,
   EVENTS_TABLE_ID,
   EVENTS_FIELD_IDS,
+  CLASSES_TABLE_ID,
+  CLASSES_FIELD_IDS,
   ShopifyOrderLineItem,
 } from '@/lib/types/airtable';
 
@@ -98,12 +100,14 @@ export async function POST(request: NextRequest) {
 
     // Look up Event record to get Airtable record ID for linked record
     let eventRecordId: string | null = null;
+    let classRecordId: string | null = null;
+
+    const Airtable = require('airtable');
+    const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
+      .base(process.env.AIRTABLE_BASE_ID!);
+
     if (eventId) {
       try {
-        const Airtable = require('airtable');
-        const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
-          .base(process.env.AIRTABLE_BASE_ID!);
-
         const events = await base(EVENTS_TABLE_ID)
           .select({
             filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = "${eventId}"`,
@@ -122,12 +126,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Look up Class record to get Airtable record ID for linked record
+    if (classId) {
+      try {
+        const classes = await base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = "${classId}"`,
+            maxRecords: 1,
+          })
+          .firstPage();
+
+        if (classes.length > 0) {
+          classRecordId = classes[0].id;
+          console.log('[orders-paid] Found Class record:', classRecordId);
+        } else {
+          console.warn('[orders-paid] Class not found for classId:', classId);
+        }
+      } catch (classError) {
+        console.error('[orders-paid] Error looking up class:', classError);
+      }
+    }
+
     const orderData = {
       [ORDERS_FIELD_IDS.order_id]: order.admin_graphql_api_id,
       [ORDERS_FIELD_IDS.order_number]: order.name,
       [ORDERS_FIELD_IDS.booking_id]: eventId || '',
       [ORDERS_FIELD_IDS.school_name]: attributes.schoolName || attributes.school_name || '',
-      ...(classId ? { [ORDERS_FIELD_IDS.class_id]: [classId] } : {}),
+      ...(classRecordId ? { [ORDERS_FIELD_IDS.class_id]: [classRecordId] } : {}),
       ...(eventRecordId ? { [ORDERS_FIELD_IDS.event_id]: [eventRecordId] } : {}),
       [ORDERS_FIELD_IDS.order_date]: order.created_at,
       [ORDERS_FIELD_IDS.total_amount]: totalAmount,
