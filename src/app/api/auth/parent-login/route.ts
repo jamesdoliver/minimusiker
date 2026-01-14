@@ -76,25 +76,24 @@ export async function POST(request: NextRequest) {
     // Check if parent has multiple events
     const hasMultipleEvents = allParentRecords.length > 1;
 
-    // Generate unique event ID based on school, event type, and date
-    const eventId = generateEventId(
-      parentJourney.school_name,
-      parentJourney.event_type,
-      parentJourney.booking_date
-    );
+    // Use the actual booking_id from the database as the event identifier
+    // This ensures consistency: SimplyBook events use numeric IDs, admin-created events use evt_ format
+    // The webhook will look up Events by this ID in the event_id field
+    const eventId = parentJourney.booking_id;
 
     // Generate school ID for potential future use
     const schoolId = generateSchoolId(parentJourney.school_name);
 
     // Create children array from ALL parent records
+    // Use the actual booking_id and class_id from the database
     const children = allParentRecords.map(record => ({
       childName: record.registered_child,
       bookingId: record.booking_id,
-      classId: record.booking_date && record.class
+      classId: record.class_id || (record.booking_date && record.class
         ? generateClassId(record.school_name, record.booking_date, record.class)
-        : record.class_id || '',
+        : ''),
       class: record.class,
-      eventId: generateEventId(record.school_name, record.event_type, record.booking_date),
+      eventId: record.booking_id, // Use actual booking_id, not generated ID
       schoolName: record.school_name,
       eventType: record.event_type,
       bookingDate: record.booking_date,
@@ -132,7 +131,7 @@ export async function POST(request: NextRequest) {
         .filter(record => record.id !== parentJourney.id) // Exclude current event
         .slice(0, 5) // Limit to 5 other events
         .map(record => ({
-          eventId: generateEventId(record.school_name, record.event_type, record.booking_date),
+          eventId: record.booking_id, // Use actual booking_id
           bookingId: record.booking_id,
           schoolName: record.school_name,
           eventType: record.event_type,

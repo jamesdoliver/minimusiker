@@ -108,9 +108,11 @@ export async function POST(request: NextRequest) {
 
     if (eventId) {
       try {
+        // Look up by event_id OR legacy_booking_id for backward compatibility
+        // SimplyBook events use numeric IDs, admin-created events use evt_ format
         const events = await base(EVENTS_TABLE_ID)
           .select({
-            filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = "${eventId}"`,
+            filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = "${eventId}", {${EVENTS_FIELD_IDS.legacy_booking_id}} = "${eventId}")`,
             maxRecords: 1,
           })
           .firstPage();
@@ -129,9 +131,10 @@ export async function POST(request: NextRequest) {
     // Look up Class record to get Airtable record ID for linked record
     if (classId) {
       try {
+        // Look up by class_id OR legacy_booking_id for backward compatibility
         const classes = await base(CLASSES_TABLE_ID)
           .select({
-            filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = "${classId}"`,
+            filterByFormula: `OR({${CLASSES_FIELD_IDS.class_id}} = "${classId}", {${CLASSES_FIELD_IDS.legacy_booking_id}} = "${classId}")`,
             maxRecords: 1,
           })
           .firstPage();
