@@ -13,6 +13,8 @@ import {
   ORDERS_FIELD_IDS,
   PARENTS_TABLE_ID,
   PARENTS_FIELD_IDS,
+  EVENTS_TABLE_ID,
+  EVENTS_FIELD_IDS,
   ShopifyOrderLineItem,
 } from '@/lib/types/airtable';
 
@@ -89,14 +91,43 @@ export async function POST(request: NextRequest) {
     const totalAmount = parseFloat(order.total_price);
 
     // Prepare order data for Airtable
-    // Note: class_id is a linked record field and expects an array of record IDs
+    // Note: class_id and event_id are linked record fields and expect arrays of record IDs
     const classId = attributes.classId || attributes.class_id;
+    const eventId = attributes.eventId || attributes.event_id || attributes.bookingId || attributes.booking_id;
+
+    // Look up Event record to get Airtable record ID for linked record
+    let eventRecordId: string | null = null;
+    if (eventId) {
+      try {
+        const Airtable = require('airtable');
+        const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
+          .base(process.env.AIRTABLE_BASE_ID!);
+
+        const events = await base(EVENTS_TABLE_ID)
+          .select({
+            filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = "${eventId}"`,
+            maxRecords: 1,
+          })
+          .firstPage();
+
+        if (events.length > 0) {
+          eventRecordId = events[0].id;
+          console.log('[orders-paid] Found Event record:', eventRecordId);
+        } else {
+          console.warn('[orders-paid] Event not found for eventId:', eventId);
+        }
+      } catch (eventError) {
+        console.error('[orders-paid] Error looking up event:', eventError);
+      }
+    }
+
     const orderData = {
       [ORDERS_FIELD_IDS.order_id]: order.admin_graphql_api_id,
       [ORDERS_FIELD_IDS.order_number]: order.name,
-      [ORDERS_FIELD_IDS.booking_id]: attributes.bookingId || attributes.booking_id || '',
+      [ORDERS_FIELD_IDS.booking_id]: eventId || '',
       [ORDERS_FIELD_IDS.school_name]: attributes.schoolName || attributes.school_name || '',
       ...(classId ? { [ORDERS_FIELD_IDS.class_id]: [classId] } : {}),
+      ...(eventRecordId ? { [ORDERS_FIELD_IDS.event_id]: [eventRecordId] } : {}),
       [ORDERS_FIELD_IDS.order_date]: order.created_at,
       [ORDERS_FIELD_IDS.total_amount]: totalAmount,
       [ORDERS_FIELD_IDS.subtotal]: subtotal,
@@ -124,6 +155,25 @@ export async function POST(request: NextRequest) {
     } catch (airtableError) {
       console.error('[orders-paid] Failed to store order in Airtable:', airtableError);
       // Don't fail the webhook - log and continue
+    }
+
+    // Add short tags to Shopify order for easy identification
+    // Extract 6-char hash from eventId/classId (last segment after underscore)
+    const eventHash = eventId?.match(/_([a-f0-9]{6})$/)?.[1];
+    const classHash = classId?.match(/_([a-f0-9]{6})$/)?.[1];
+
+    const tags: string[] = [];
+    if (eventHash) tags.push(`evt-${eventHash}`);
+    if (classHash) tags.push(`cls-${classHash}`);
+
+    if (tags.length > 0) {
+      try {
+        await addOrderTags(order.id, tags);
+        console.log('[orders-paid] Tags added:', tags);
+      } catch (tagError) {
+        console.error('[orders-paid] Failed to add tags:', tagError);
+        // Don't fail the webhook - tags are nice-to-have
+      }
     }
 
     // Check for digital products and grant access
@@ -285,5 +335,36 @@ function mapFinancialStatus(
       return 'voided';
     default:
       return 'pending';
+  }
+}
+
+/**
+ * Add tags to a Shopify order via Admin API
+ * Used to add short eventId/classId hashes for easy identification
+ */
+async function addOrderTags(orderId: number, tags: string[]): Promise<void> {
+  const shopifyDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+
+  if (!shopifyDomain || !accessToken) {
+    console.warn('[orders-paid] Missing Shopify credentials for adding tags');
+    return;
+  }
+
+  const response = await fetch(
+    `https://${shopifyDomain}/admin/api/2024-01/orders/${orderId}.json`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': accessToken,
+      },
+      body: JSON.stringify({ order: { tags: tags.join(', ') } }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to add tags: ${response.status} - ${errorText}`);
   }
 }
