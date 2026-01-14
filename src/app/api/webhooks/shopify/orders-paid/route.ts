@@ -129,21 +129,42 @@ export async function POST(request: NextRequest) {
     }
 
     // Look up Class record to get Airtable record ID for linked record
-    if (classId) {
+    // Try multiple lookup strategies since classId generation may vary
+    if (classId || eventId) {
       try {
-        // Look up by class_id OR legacy_booking_id for backward compatibility
-        const classes = await base(CLASSES_TABLE_ID)
-          .select({
-            filterByFormula: `OR({${CLASSES_FIELD_IDS.class_id}} = "${classId}", {${CLASSES_FIELD_IDS.legacy_booking_id}} = "${classId}")`,
-            maxRecords: 1,
-          })
-          .firstPage();
+        // Strategy 1: Look up by class_id or legacy_booking_id matching classId
+        if (classId) {
+          const classes = await base(CLASSES_TABLE_ID)
+            .select({
+              filterByFormula: `OR({${CLASSES_FIELD_IDS.class_id}} = "${classId}", {${CLASSES_FIELD_IDS.legacy_booking_id}} = "${classId}")`,
+              maxRecords: 1,
+            })
+            .firstPage();
 
-        if (classes.length > 0) {
-          classRecordId = classes[0].id;
-          console.log('[orders-paid] Found Class record:', classRecordId);
-        } else {
-          console.warn('[orders-paid] Class not found for classId:', classId);
+          if (classes.length > 0) {
+            classRecordId = classes[0].id;
+            console.log('[orders-paid] Found Class record by classId:', classRecordId);
+          }
+        }
+
+        // Strategy 2: If not found by classId, try looking up by eventId (booking_id)
+        // Classes may have legacy_booking_id = parent's booking_id
+        if (!classRecordId && eventId) {
+          const classesByEvent = await base(CLASSES_TABLE_ID)
+            .select({
+              filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = "${eventId}"`,
+              maxRecords: 1,
+            })
+            .firstPage();
+
+          if (classesByEvent.length > 0) {
+            classRecordId = classesByEvent[0].id;
+            console.log('[orders-paid] Found Class record by eventId/booking_id:', classRecordId);
+          }
+        }
+
+        if (!classRecordId) {
+          console.warn('[orders-paid] Class not found for classId:', classId, 'or eventId:', eventId);
         }
       } catch (classError) {
         console.error('[orders-paid] Error looking up class:', classError);
