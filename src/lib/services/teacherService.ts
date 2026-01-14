@@ -1,5 +1,6 @@
 import Airtable from 'airtable';
 import crypto from 'crypto';
+import { generateClassId } from '@/lib/utils/eventIdentifiers';
 import {
   Teacher,
   Song,
@@ -1091,7 +1092,7 @@ class TeacherService {
 
   /**
    * Create a new class for an event
-   * Creates a placeholder record in parent_journey_table with the class info
+   * Creates a placeholder record in parent_journey_table and a record in normalized Classes table
    */
   async createClass(data: {
     eventId: string;
@@ -1120,8 +1121,16 @@ class TeacherService {
         bookingDate = (existing.fields.booking_date || existing.fields[AIRTABLE_FIELD_IDS.booking_date] || '') as string;
       }
 
-      // Generate a unique class_id
-      const classId = `${data.eventId}_class_${Date.now()}`;
+      // Generate a consistent class_id using generateClassId() when we have the required data
+      // Falls back to timestamp-based ID for backward compatibility
+      let classId: string;
+      if (schoolName && bookingDate) {
+        classId = generateClassId(schoolName, bookingDate, data.className);
+      } else {
+        // Fallback for cases where school info isn't available
+        classId = `${data.eventId}_class_${Date.now()}`;
+        console.warn('createClass: Missing schoolName or bookingDate, using fallback class_id format');
+      }
 
       // Create a placeholder record for this class
       // This record serves as the class definition (no child registered yet)
@@ -1141,6 +1150,44 @@ class TeacherService {
         [AIRTABLE_FIELD_IDS.parent_telephone]: '',
         [AIRTABLE_FIELD_IDS.parent_id]: '',
       });
+
+      // Also create a record in the normalized Classes table
+      // This ensures orders can link to Class records
+      try {
+        // Look up the Event record to get the Airtable record ID for linking
+        const eventRecords = await this.base(EVENTS_TABLE_ID)
+          .select({
+            filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${data.eventId.replace(/'/g, "\\'")}')`,
+            maxRecords: 1,
+          })
+          .firstPage();
+
+        const eventRecordId = eventRecords.length > 0 ? eventRecords[0].id : null;
+
+        // Create Class record in normalized table
+        const classFields: Airtable.FieldSet = {
+          [CLASSES_FIELD_IDS.class_id]: classId,
+          [CLASSES_FIELD_IDS.class_name]: data.className,
+          [CLASSES_FIELD_IDS.main_teacher]: data.teacherName || '',
+          [CLASSES_FIELD_IDS.legacy_booking_id]: data.eventId,
+        };
+
+        // Only add total_children if it's a positive number
+        if (data.numChildren && data.numChildren > 0) {
+          classFields[CLASSES_FIELD_IDS.total_children] = data.numChildren;
+        }
+
+        // Link to Event if found
+        if (eventRecordId) {
+          classFields[CLASSES_FIELD_IDS.event_id] = [eventRecordId];
+        }
+
+        await this.base(CLASSES_TABLE_ID).create([{ fields: classFields }]);
+        console.log(`Created Class record in normalized table: ${classId}`);
+      } catch (normalizedError) {
+        // Log but don't fail - parent_journey_table record was created successfully
+        console.error('Warning: Failed to create normalized Classes record:', normalizedError);
+      }
 
       // Return the new class view
       return {

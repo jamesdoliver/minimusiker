@@ -4,6 +4,12 @@ import { generateClassId } from '@/lib/utils/eventIdentifiers';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { validateEventCreation, sanitizeString } from '@/lib/utils/validators';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
+import {
+  EVENTS_TABLE_ID,
+  EVENTS_FIELD_IDS,
+  CLASSES_TABLE_ID,
+  CLASSES_FIELD_IDS,
+} from '@/lib/types/airtable';
 
 interface ClassInput {
   className: string;
@@ -175,6 +181,51 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 }
       );
+    }
+
+    // Also create records in normalized tables (Events + Classes)
+    // This ensures orders can link to Event and Class records
+    let eventRecordId: string | null = null;
+
+    try {
+      const Airtable = require('airtable');
+      const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
+        .base(process.env.AIRTABLE_BASE_ID!);
+
+      // Create Event record in normalized Events table
+      const eventRecord = await base(EVENTS_TABLE_ID).create([{
+        fields: {
+          [EVENTS_FIELD_IDS.event_id]: bookingId, // Using bookingId as event_id
+          [EVENTS_FIELD_IDS.school_name]: sanitizedSchoolName,
+          [EVENTS_FIELD_IDS.event_date]: body.eventDate,
+          [EVENTS_FIELD_IDS.legacy_booking_id]: bookingId,
+        },
+      }]);
+
+      eventRecordId = eventRecord[0].id;
+      console.log(`Created Event record in normalized table: ${eventRecordId}`);
+
+      // Create Class records in normalized Classes table (linked to Event)
+      for (const cls of createdClasses) {
+        const classFields: Record<string, unknown> = {
+          [CLASSES_FIELD_IDS.class_id]: cls.classId,
+          [CLASSES_FIELD_IDS.event_id]: [eventRecordId], // Linked record
+          [CLASSES_FIELD_IDS.class_name]: cls.className,
+          [CLASSES_FIELD_IDS.main_teacher]: sanitizedMainTeacher,
+          [CLASSES_FIELD_IDS.other_teachers]: otherTeachersStr || '',
+          [CLASSES_FIELD_IDS.legacy_booking_id]: bookingId,
+        };
+        // Only add total_children if it's a positive number
+        if (cls.totalChildren && cls.totalChildren > 0) {
+          classFields[CLASSES_FIELD_IDS.total_children] = cls.totalChildren;
+        }
+        await base(CLASSES_TABLE_ID).create([{ fields: classFields }]);
+        console.log(`Created Class record in normalized table: ${cls.classId}`);
+      }
+    } catch (normalizedError) {
+      // Log but don't fail - parent_journey_table records were created successfully
+      console.error('Warning: Failed to create normalized table records:', normalizedError);
+      console.log('Legacy parent_journey_table records were created successfully, but normalized tables may need manual backfill.');
     }
 
     // Return success response with generated IDs
