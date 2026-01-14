@@ -121,7 +121,7 @@ function ParentPortalContent() {
   // Calculate derived values unconditionally (for hooks - must be before early returns)
   const children = session?.children || [];
   const selectedChild = children[selectedChildIndex] || null;
-  const eventId = selectedChild?.bookingId || portalData?.parentJourney?.booking_id || session?.bookingId || '';
+  const eventId = selectedChild?.eventId || session?.eventId || '';
   const classId = selectedChild?.classId || portalData?.parentJourney?.class_id || '';
 
   // Fetch audio status when class or event changes (MUST be before early returns)

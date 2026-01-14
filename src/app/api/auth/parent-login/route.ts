@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { ApiResponse, ParentSession } from '@/lib/types';
-import { generateEventId, generateSchoolId } from '@/lib/utils/eventIdentifiers';
+import { generateEventId, generateSchoolId, generateClassId } from '@/lib/utils/eventIdentifiers';
 
 /**
  * Parent Login Route
@@ -90,7 +90,9 @@ export async function POST(request: NextRequest) {
     const children = allParentRecords.map(record => ({
       childName: record.registered_child,
       bookingId: record.booking_id,
-      classId: record.class_id,
+      classId: record.booking_date && record.class
+        ? generateClassId(record.school_name, record.booking_date, record.class)
+        : record.class_id || '',
       class: record.class,
       eventId: generateEventId(record.school_name, record.event_type, record.booking_date),
       schoolName: record.school_name,
