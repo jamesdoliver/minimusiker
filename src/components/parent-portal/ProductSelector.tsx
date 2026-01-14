@@ -2,26 +2,34 @@
 
 import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
+import Image from 'next/image';
 import { ParentSessionChild } from '@/types/airtable';
 import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/stock';
+import AudioProductCard from './AudioProductCard';
+import ClothingProductCard from './ClothingProductCard';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type AudioOption = 'minicard' | 'cd' | 'bundle' | null;
-type ClothingType = 'tshirt' | 'hoodie' | 'bundle';
+type AudioProductId = 'minicard' | 'cd' | 'tonie' | 'minicard-cd-bundle' | 'minicard-tonie-bundle';
+type ClothingProductId = 'tshirt' | 'hoodie' | 'clothing-bundle';
+
+interface AudioSelection {
+  productId: AudioProductId;
+  quantity: number;
+}
 
 interface ClothingItem {
   id: string;
-  type: ClothingType;
+  productId: ClothingProductId;
   quantity: number;
-  tshirtSize: TshirtSize;
-  hoodieSize: HoodieSize;
+  tshirtSize: TshirtSize | null;
+  hoodieSize: HoodieSize | null;
 }
 
 interface ProductSelection {
-  audio: AudioOption;
+  audioProducts: AudioSelection[];
   clothing: ClothingItem[];
 }
 
@@ -34,25 +42,101 @@ interface ProductSelectorProps {
 }
 
 // ============================================================================
-// PRICING (Placeholder prices - to be updated)
+// PRODUCT DEFINITIONS
 // ============================================================================
 
-const PRICES = {
-  audio: {
-    minicard: 14.99,
-    cd: 19.99,
-    bundle: 29.99, // Save €5
-  },
-  clothing: {
-    tshirt: 19.99,
-    hoodie: 34.99,
-    bundle: 49.99, // Save €5
-  },
-  comboDiscountPercent: 10,
-};
+interface AudioProduct {
+  id: AudioProductId;
+  name: string;
+  description: string;
+  price: number;
+  imageEmoji: string;
+  savings?: number;
+}
 
-const AUDIO_BUNDLE_SAVINGS = PRICES.audio.minicard + PRICES.audio.cd - PRICES.audio.bundle;
-const CLOTHING_BUNDLE_SAVINGS = PRICES.clothing.tshirt + PRICES.clothing.hoodie - PRICES.clothing.bundle;
+const AUDIO_PRODUCTS: AudioProduct[] = [
+  {
+    id: 'minicard',
+    name: 'Minicard',
+    description: 'Kompakte Karte mit QR-Code zum Abspielen',
+    price: 14.99,
+    imageEmoji: '💳',
+  },
+  {
+    id: 'cd',
+    name: 'CD',
+    description: 'Klassische Audio-CD im Jewel Case',
+    price: 19.99,
+    imageEmoji: '💿',
+  },
+  {
+    id: 'tonie',
+    name: 'Tonie',
+    description: 'Toniefigur mit eurem Lied',
+    price: 29.99,
+    imageEmoji: '🎵',
+  },
+  {
+    id: 'minicard-cd-bundle',
+    name: 'Minicard + CD',
+    description: 'Beide Formate zum Sparpreis',
+    price: 29.99,
+    savings: 5,
+    imageEmoji: '🎁',
+  },
+  {
+    id: 'minicard-tonie-bundle',
+    name: 'Minicard + Tonie',
+    description: 'Minicard und Tonie zum Sparpreis',
+    price: 29.99,
+    savings: 15,
+    imageEmoji: '🎁',
+  },
+];
+
+interface ClothingProduct {
+  id: ClothingProductId;
+  name: string;
+  description: string;
+  price: number;
+  imageSrc: string;
+  showTshirtSize: boolean;
+  showHoodieSize: boolean;
+  savings?: number;
+}
+
+const CLOTHING_PRODUCTS: ClothingProduct[] = [
+  {
+    id: 'tshirt',
+    name: 'T-Shirt',
+    description: 'Personalisiertes T-Shirt mit eurem Design',
+    price: 19.99,
+    imageSrc: '/images/products/tshirt.jpeg',
+    showTshirtSize: true,
+    showHoodieSize: false,
+  },
+  {
+    id: 'hoodie',
+    name: 'Hoodie',
+    description: 'Kuscheliger Hoodie mit eurem Design',
+    price: 34.99,
+    imageSrc: '/images/products/hoodie.jpeg',
+    showTshirtSize: false,
+    showHoodieSize: true,
+  },
+  {
+    id: 'clothing-bundle',
+    name: 'T-Shirt + Hoodie',
+    description: 'Beide Kleidungsstücke zum Sparpreis',
+    price: 49.99,
+    savings: 5,
+    imageSrc: '/images/products/tshirt.jpeg',
+    showTshirtSize: true,
+    showHoodieSize: true,
+  },
+];
+
+const COMBO_DISCOUNT_PERCENT = 10;
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -62,22 +146,37 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
+function getAudioProduct(id: AudioProductId) {
+  return AUDIO_PRODUCTS.find(p => p.id === id);
+}
+
+function getClothingProduct(id: ClothingProductId) {
+  return CLOTHING_PRODUCTS.find(p => p.id === id);
+}
+
 function calculateTotal(selection: ProductSelection) {
   let subtotal = 0;
 
-  // Audio (required)
-  if (selection.audio) {
-    subtotal += PRICES.audio[selection.audio];
-  }
+  // Audio products (sum all selected with quantities)
+  selection.audioProducts.forEach((item) => {
+    const product = getAudioProduct(item.productId);
+    if (product) {
+      subtotal += product.price * item.quantity;
+    }
+  });
 
-  // Clothing (optional, sum all items)
+  // Clothing (sum all items)
   selection.clothing.forEach((item) => {
-    subtotal += PRICES.clothing[item.type] * item.quantity;
+    const product = getClothingProduct(item.productId);
+    if (product) {
+      subtotal += product.price * item.quantity;
+    }
   });
 
   // Apply combo discount if both audio AND clothing
+  const hasAudio = selection.audioProducts.length > 0;
   const hasClothing = selection.clothing.length > 0;
-  const discountPercent = hasClothing && selection.audio ? PRICES.comboDiscountPercent : 0;
+  const discountPercent = hasAudio && hasClothing ? COMBO_DISCOUNT_PERCENT : 0;
   const discount = subtotal * (discountPercent / 100);
 
   return {
@@ -85,353 +184,8 @@ function calculateTotal(selection: ProductSelection) {
     discount,
     discountPercent,
     total: subtotal - discount,
-    hasComboDiscount: hasClothing && selection.audio !== null,
+    hasComboDiscount: hasAudio && hasClothing,
   };
-}
-
-// ============================================================================
-// SIZE SELECTOR COMPONENT
-// ============================================================================
-
-interface SizeSelectorProps<T extends string> {
-  value: T;
-  onChange: (size: T) => void;
-  sizes: readonly T[];
-  label?: string;
-}
-
-function SizeSelector<T extends string>({ value, onChange, sizes, label }: SizeSelectorProps<T>) {
-  return (
-    <div className="flex items-center gap-2">
-      {label && <span className="text-xs text-gray-500">{label}</span>}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
-      >
-        {sizes.map((size) => (
-          <option key={size} value={size}>
-            {size}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-// ============================================================================
-// AUDIO CARD COMPONENT
-// ============================================================================
-
-interface AudioCardProps {
-  type: AudioOption;
-  selected: boolean;
-  onSelect: () => void;
-}
-
-function AudioCard({ type, selected, onSelect }: AudioCardProps) {
-  if (!type) return null;
-  const t = useTranslations('audio');
-
-  const config = {
-    minicard: {
-      title: t('minicard'),
-      description: t('minicardDescription'),
-      icon: '💳',
-      price: PRICES.audio.minicard,
-    },
-    cd: {
-      title: t('cd'),
-      description: t('cdDescription'),
-      icon: '💿',
-      price: PRICES.audio.cd,
-    },
-    bundle: {
-      title: t('bundle'),
-      description: t('bundleDescription'),
-      icon: '🎁',
-      price: PRICES.audio.bundle,
-      savings: AUDIO_BUNDLE_SAVINGS,
-    },
-  };
-
-  const { title, description, icon, price, savings } = config[type] as typeof config.cd & { savings?: number };
-
-  return (
-    <button
-      onClick={onSelect}
-      className={`relative flex flex-col items-center p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-md ${
-        selected
-          ? 'border-sage-600 bg-sage-50 shadow-md ring-2 ring-sage-200'
-          : 'border-gray-200 bg-white hover:border-sage-300'
-      }`}
-    >
-      {/* Savings Badge */}
-      {savings && (
-        <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-          {t('save', { amount: savings.toFixed(0) })}
-        </div>
-      )}
-
-      {/* Selection Indicator */}
-      <div
-        className={`absolute top-3 left-3 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-          selected ? 'border-sage-600 bg-sage-600' : 'border-gray-300 bg-white'
-        }`}
-      >
-        {selected && (
-          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-              clipRule="evenodd"
-            />
-          </svg>
-        )}
-      </div>
-
-      <span className="text-3xl mb-2">{icon}</span>
-      <h4 className="font-semibold text-gray-900 text-sm">{title}</h4>
-      <p className="text-xs text-gray-500 text-center mt-1">{description}</p>
-      <p className="text-lg font-bold text-gray-900 mt-2">€{price.toFixed(2)}</p>
-    </button>
-  );
-}
-
-// ============================================================================
-// AUDIO SECTION COMPONENT
-// ============================================================================
-
-interface AudioSectionProps {
-  selected: AudioOption;
-  onSelect: (option: AudioOption) => void;
-}
-
-function AudioSection({ selected, onSelect }: AudioSectionProps) {
-  const t = useTranslations('productSelector');
-
-  return (
-    <div className="mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <span className="flex items-center justify-center w-7 h-7 bg-sage-600 text-white text-sm font-bold rounded-full">
-          1
-        </span>
-        <h3 className="text-lg font-bold text-gray-900">{t('chooseAudio')}</h3>
-        <span className="text-xs text-red-500 font-medium">{t('required')}</span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3">
-        <AudioCard type="minicard" selected={selected === 'minicard'} onSelect={() => onSelect('minicard')} />
-        <AudioCard type="cd" selected={selected === 'cd'} onSelect={() => onSelect('cd')} />
-        <AudioCard type="bundle" selected={selected === 'bundle'} onSelect={() => onSelect('bundle')} />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// CLOTHING CARD COMPONENT
-// ============================================================================
-
-interface ClothingCardProps {
-  type: ClothingType;
-  onAdd: (type: ClothingType, tshirtSize: TshirtSize, hoodieSize: HoodieSize) => void;
-  hasComboDiscount: boolean;
-}
-
-function ClothingCard({ type, onAdd, hasComboDiscount }: ClothingCardProps) {
-  const t = useTranslations('clothing');
-  const tProduct = useTranslations('productSelector');
-  const [tshirtSize, setTshirtSize] = useState<TshirtSize>(TSHIRT_SIZES[2]); // Default to middle size '122/128 (7-8J)'
-  const [hoodieSize, setHoodieSize] = useState<HoodieSize>(HOODIE_SIZES[1]); // Default to '128 (7-8 J)'
-
-  const config = {
-    tshirt: {
-      title: t('tshirt'),
-      description: t('tshirtDescription'),
-      icon: '👕',
-      price: PRICES.clothing.tshirt,
-      showTshirtSize: true,
-      showHoodieSize: false,
-    },
-    hoodie: {
-      title: t('hoodie'),
-      description: t('hoodieDescription'),
-      icon: '🧥',
-      price: PRICES.clothing.hoodie,
-      showTshirtSize: false,
-      showHoodieSize: true,
-    },
-    bundle: {
-      title: t('bundle'),
-      description: t('bundleDescription'),
-      icon: '🎁',
-      price: PRICES.clothing.bundle,
-      savings: CLOTHING_BUNDLE_SAVINGS,
-      showTshirtSize: true,
-      showHoodieSize: true,
-    },
-  };
-
-  const { title, description, icon, price, savings, showTshirtSize, showHoodieSize } = config[type] as typeof config.tshirt & { savings?: number };
-
-  const handleAdd = () => {
-    onAdd(type, tshirtSize, hoodieSize);
-  };
-
-  return (
-    <div className="relative flex flex-col items-center p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-sage-300 transition-all duration-200 hover:shadow-md">
-      {/* Savings Badge */}
-      {savings && (
-        <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-          {t('save', { amount: savings.toFixed(0) })}
-        </div>
-      )}
-
-      <span className="text-3xl mb-2">{icon}</span>
-      <h4 className="font-semibold text-gray-900 text-sm">{title}</h4>
-      <p className="text-xs text-gray-500 text-center mt-1">{description}</p>
-      <p className="text-lg font-bold text-gray-900 mt-2">€{price.toFixed(2)}</p>
-
-      {/* Size Selectors */}
-      <div className="flex flex-col gap-2 mt-3 w-full">
-        {showTshirtSize && (
-          <SizeSelector
-            value={tshirtSize}
-            onChange={setTshirtSize}
-            sizes={TSHIRT_SIZES}
-            label={showHoodieSize ? tProduct('tshirtLabel') : undefined}
-          />
-        )}
-        {showHoodieSize && (
-          <SizeSelector
-            value={hoodieSize}
-            onChange={setHoodieSize}
-            sizes={HOODIE_SIZES}
-            label={showTshirtSize ? tProduct('hoodieLabel') : undefined}
-          />
-        )}
-      </div>
-
-      {/* Add Button */}
-      <button
-        onClick={handleAdd}
-        className="mt-3 w-full py-2 px-4 bg-sage-600 text-white text-sm font-semibold rounded-lg hover:bg-sage-700 transition-colors flex items-center justify-center gap-1"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-        {tProduct('addButton')}
-      </button>
-
-      {/* Combo Discount Hint */}
-      {hasComboDiscount && (
-        <p className="text-xs text-sage-600 font-medium mt-2 text-center">
-          {tProduct('comboHint')}
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// CLOTHING SECTION COMPONENT
-// ============================================================================
-
-interface ClothingSectionProps {
-  clothing: ClothingItem[];
-  onAdd: (type: ClothingType, tshirtSize: TshirtSize, hoodieSize: HoodieSize) => void;
-  onRemove: (id: string) => void;
-  onUpdateQuantity: (id: string, quantity: number) => void;
-  hasAudioSelected: boolean;
-}
-
-function ClothingSection({ clothing, onAdd, onRemove, onUpdateQuantity, hasAudioSelected }: ClothingSectionProps) {
-  const t = useTranslations('productSelector');
-  const tClothing = useTranslations('clothing');
-
-  const getItemLabel = (type: ClothingType) => {
-    return type === 'tshirt' ? tClothing('tshirt') : type === 'hoodie' ? tClothing('hoodie') : tClothing('bundleLabel');
-  };
-
-  return (
-    <div className="mb-6">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="flex items-center justify-center w-7 h-7 bg-sage-600 text-white text-sm font-bold rounded-full">
-          2
-        </span>
-        <h3 className="text-lg font-bold text-gray-900">{t('addClothing')}</h3>
-        <span className="text-xs text-gray-500 font-medium">{t('optional')}</span>
-      </div>
-
-      {/* Discount Banner */}
-      {hasAudioSelected && clothing.length === 0 && (
-        <div className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg">
-          <p className="text-sm text-amber-800 font-medium flex items-center gap-2">
-            <span className="text-lg">🎉</span>
-            {t('discountBanner')}
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <ClothingCard type="tshirt" onAdd={onAdd} hasComboDiscount={hasAudioSelected} />
-        <ClothingCard type="hoodie" onAdd={onAdd} hasComboDiscount={hasAudioSelected} />
-        <ClothingCard type="bundle" onAdd={onAdd} hasComboDiscount={hasAudioSelected} />
-      </div>
-
-      {/* Added Items List */}
-      {clothing.length > 0 && (
-        <div className="bg-gray-50 rounded-lg p-3">
-          <p className="text-sm font-medium text-gray-700 mb-2">{t('addedItems')}</p>
-          <div className="space-y-2">
-            {clothing.map((item) => (
-              <div key={item.id} className="flex items-center justify-between bg-white p-2 rounded-lg border border-gray-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">
-                    {item.type === 'tshirt' ? '👕' : item.type === 'hoodie' ? '🧥' : '🎁'}
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {getItemLabel(item.type)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {item.type === 'bundle'
-                        ? `${t('tshirtLabel')} ${item.tshirtSize}, ${t('hoodieLabel')} ${item.hoodieSize}`
-                        : item.type === 'tshirt'
-                        ? `${t('size')} ${item.tshirtSize}`
-                        : `${t('size')} ${item.hoodieSize}`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={item.quantity}
-                    onChange={(e) => onUpdateQuantity(item.id, parseInt(e.target.value))}
-                    className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white"
-                  >
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => onRemove(item.id)}
-                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 // ============================================================================
@@ -447,27 +201,13 @@ interface OrderSummaryProps {
 
 function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSummaryProps) {
   const t = useTranslations('orderSummary');
-  const tAudio = useTranslations('audio');
-  const tClothing = useTranslations('clothing');
 
-  const audioLabels = {
-    minicard: tAudio('minicard'),
-    cd: tAudio('cd'),
-    bundle: tAudio('bundleLabel'),
-  };
-
-  const clothingLabels = {
-    tshirt: tClothing('tshirt'),
-    hoodie: tClothing('hoodie'),
-    bundle: tClothing('bundleLabel'),
-  };
-
-  const hasItems = selection.audio !== null || selection.clothing.length > 0;
-  const canCheckout = selection.audio !== null;
+  const hasItems = selection.audioProducts.length > 0 || selection.clothing.length > 0;
+  const canCheckout = selection.audioProducts.length > 0;
 
   return (
-    <div className="bg-white rounded-xl border-2 border-gray-200 shadow-lg p-4">
-      <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+    <div className="bg-white rounded-xl border-2 border-gray-200 shadow-lg p-6">
+      <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
         <svg className="w-5 h-5 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
@@ -478,33 +218,44 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
         <p className="text-sm text-gray-500 text-center py-4">{t('selectItems')}</p>
       ) : (
         <div className="space-y-2">
-          {/* Audio Line Item */}
-          {selection.audio && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-700">{audioLabels[selection.audio]}</span>
-              <span className="font-medium text-gray-900">€{PRICES.audio[selection.audio].toFixed(2)}</span>
-            </div>
-          )}
+          {/* Audio Line Items */}
+          {selection.audioProducts.map((item) => {
+            const product = getAudioProduct(item.productId);
+            if (!product) return null;
+            return (
+              <div key={item.productId} className="flex justify-between text-sm">
+                <span className="text-gray-700">
+                  {product.name}
+                  {item.quantity > 1 && ` x${item.quantity}`}
+                </span>
+                <span className="font-medium text-gray-900">
+                  €{(product.price * item.quantity).toFixed(2)}
+                </span>
+              </div>
+            );
+          })}
 
           {/* Clothing Line Items */}
-          {selection.clothing.map((item) => (
-            <div key={item.id} className="flex justify-between text-sm">
-              <span className="text-gray-700">
-                {clothingLabels[item.type]}
-                {item.quantity > 1 && ` x${item.quantity}`}
-                <span className="text-xs text-gray-400 ml-1">
-                  ({item.type === 'bundle'
-                    ? `${item.tshirtSize} / ${item.hoodieSize}`
-                    : item.type === 'tshirt'
-                    ? item.tshirtSize
-                    : item.hoodieSize})
+          {selection.clothing.map((item) => {
+            const product = getClothingProduct(item.productId);
+            if (!product) return null;
+            return (
+              <div key={item.id} className="flex justify-between text-sm">
+                <span className="text-gray-700">
+                  {product.name}
+                  {item.quantity > 1 && ` x${item.quantity}`}
+                  <span className="text-xs text-gray-400 ml-1">
+                    ({item.tshirtSize && item.hoodieSize
+                      ? `${item.tshirtSize} / ${item.hoodieSize}`
+                      : item.tshirtSize || item.hoodieSize})
+                  </span>
                 </span>
-              </span>
-              <span className="font-medium text-gray-900">
-                €{(PRICES.clothing[item.type] * item.quantity).toFixed(2)}
-              </span>
-            </div>
-          ))}
+                <span className="font-medium text-gray-900">
+                  €{(product.price * item.quantity).toFixed(2)}
+                </span>
+              </div>
+            );
+          })}
 
           {/* Divider */}
           <div className="border-t border-gray-200 pt-2 mt-2">
@@ -596,27 +347,53 @@ export default function ProductSelector({
 }: ProductSelectorProps) {
   const t = useTranslations('productSelector');
   const [selection, setSelection] = useState<ProductSelection>({
-    audio: null,
+    audioProducts: [],
     clothing: [],
   });
   const [isProcessing, setIsProcessing] = useState(false);
 
   const totals = useMemo(() => calculateTotal(selection), [selection]);
 
-  // Audio selection handler
-  const handleAudioSelect = (option: AudioOption) => {
+  // Audio selection handlers
+  const handleAudioToggle = (productId: string) => {
+    setSelection((prev) => {
+      const exists = prev.audioProducts.find(p => p.productId === productId);
+      if (exists) {
+        // Remove product
+        return {
+          ...prev,
+          audioProducts: prev.audioProducts.filter(p => p.productId !== productId)
+        };
+      } else {
+        // Add product with quantity 1
+        return {
+          ...prev,
+          audioProducts: [...prev.audioProducts, { productId: productId as AudioProductId, quantity: 1 }]
+        };
+      }
+    });
+  };
+
+  const handleAudioQuantityChange = (productId: string, quantity: number) => {
     setSelection((prev) => ({
       ...prev,
-      audio: option,
+      audioProducts: prev.audioProducts.map(p =>
+        p.productId === productId ? { ...p, quantity } : p
+      )
     }));
   };
 
   // Clothing handlers
-  const handleAddClothing = (type: ClothingType, tshirtSize: TshirtSize, hoodieSize: HoodieSize) => {
+  const handleAddClothing = (
+    productId: string,
+    tshirtSize: TshirtSize | null,
+    hoodieSize: HoodieSize | null,
+    quantity: number
+  ) => {
     const newItem: ClothingItem = {
       id: generateId(),
-      type,
-      quantity: 1,
+      productId: productId as ClothingProductId,
+      quantity,
       tshirtSize,
       hoodieSize,
     };
@@ -634,36 +411,31 @@ export default function ProductSelector({
     }));
   };
 
-  const handleUpdateQuantity = (id: string, quantity: number) => {
-    setSelection((prev) => ({
-      ...prev,
-      clothing: prev.clothing.map((item) => (item.id === id ? { ...item, quantity } : item)),
-    }));
-  };
-
   // Checkout handler
   const handleCheckout = async () => {
-    if (!selection.audio) return;
+    if (selection.audioProducts.length === 0) return;
 
     setIsProcessing(true);
 
     try {
-      // If custom checkout handler provided, use it
       if (onCheckout) {
         onCheckout(selection, totals.total);
         return;
       }
 
-      // Default: show confirmation (in production, integrate with Shopify)
-      const itemsSummary = [];
-      if (selection.audio) {
-        itemsSummary.push(
-          selection.audio === 'bundle' ? 'Minicard + CD Bundle' : selection.audio === 'minicard' ? 'Minicard' : 'CD'
-        );
-      }
+      // Default: show confirmation
+      const itemsSummary: string[] = [];
+      selection.audioProducts.forEach((item) => {
+        const product = getAudioProduct(item.productId);
+        if (product) {
+          itemsSummary.push(`${product.name} x${item.quantity}`);
+        }
+      });
       selection.clothing.forEach((item) => {
-        const name = item.type === 'bundle' ? 'T-Shirt + Hoodie' : item.type === 'tshirt' ? 'T-Shirt' : 'Hoodie';
-        itemsSummary.push(`${name} x${item.quantity}`);
+        const product = getClothingProduct(item.productId);
+        if (product) {
+          itemsSummary.push(`${product.name} x${item.quantity}`);
+        }
       });
 
       alert(`Order submitted!\n\nItems: ${itemsSummary.join(', ')}\nTotal: €${totals.total.toFixed(2)}`);
@@ -675,11 +447,22 @@ export default function ProductSelector({
     }
   };
 
+  // Check if audio product is selected
+  const isAudioSelected = (productId: AudioProductId) => {
+    return selection.audioProducts.some(p => p.productId === productId);
+  };
+
+  // Get audio product quantity
+  const getAudioQuantity = (productId: AudioProductId) => {
+    const item = selection.audioProducts.find(p => p.productId === productId);
+    return item?.quantity || 1;
+  };
+
   return (
-    <div className="bg-gradient-to-br from-sage-50 to-cream-100 rounded-xl shadow-xl p-6 border-2 border-sage-200">
+    <div className="bg-gradient-to-br from-sage-50 to-cream-100 rounded-xl shadow-xl p-6 md:p-8 border-2 border-sage-200">
       {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+      <div className="mb-8">
+        <h2 className="text-2xl font-heading font-bold text-gray-900 flex items-center gap-2">
           <span className="text-2xl">🎵</span>
           {t('title')}
         </h2>
@@ -688,23 +471,131 @@ export default function ProductSelector({
         </p>
       </div>
 
-      {/* Audio Section - Required */}
-      <AudioSection selected={selection.audio} onSelect={handleAudioSelect} />
+      {/* Audio Section - Multi-select */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="flex items-center justify-center w-7 h-7 bg-sage-600 text-white text-sm font-bold rounded-full">
+            1
+          </span>
+          <h3 className="text-lg font-bold text-gray-900">{t('chooseAudio')}</h3>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {AUDIO_PRODUCTS.map((product) => (
+            <AudioProductCard
+              key={product.id}
+              productId={product.id}
+              name={product.name}
+              description={product.description}
+              price={product.price}
+              imageEmoji={product.imageEmoji}
+              isSelected={isAudioSelected(product.id)}
+              quantity={getAudioQuantity(product.id)}
+              savings={product.savings}
+              onToggle={handleAudioToggle}
+              onQuantityChange={handleAudioQuantityChange}
+            />
+          ))}
+        </div>
+      </div>
 
       {/* Divider */}
-      <div className="border-t border-sage-200 my-6" />
+      <div className="border-t border-sage-200 my-8" />
 
-      {/* Clothing Section - Optional */}
-      <ClothingSection
-        clothing={selection.clothing}
-        onAdd={handleAddClothing}
-        onRemove={handleRemoveClothing}
-        onUpdateQuantity={handleUpdateQuantity}
-        hasAudioSelected={selection.audio !== null}
-      />
+      {/* Clothing Section */}
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="flex items-center justify-center w-7 h-7 bg-sage-600 text-white text-sm font-bold rounded-full">
+            2
+          </span>
+          <h3 className="text-lg font-bold text-gray-900">{t('addClothing')}</h3>
+          <span className="text-xs text-gray-500 font-medium">{t('optional')}</span>
+        </div>
+
+        {/* Discount Banner */}
+        {selection.audioProducts.length > 0 && selection.clothing.length === 0 && (
+          <div className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-800 font-medium flex items-center gap-2">
+              <span className="text-lg">🎉</span>
+              {t('discountBanner')}
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {CLOTHING_PRODUCTS.map((product) => (
+            <ClothingProductCard
+              key={product.id}
+              productId={product.id}
+              name={product.name}
+              description={product.description}
+              price={product.price}
+              imageSrc={product.imageSrc}
+              savings={product.savings}
+              showTshirtSize={product.showTshirtSize}
+              showHoodieSize={product.showHoodieSize}
+              onAdd={handleAddClothing}
+            />
+          ))}
+        </div>
+
+        {/* Added Clothing Items List */}
+        {selection.clothing.length > 0 && (
+          <div className="mt-6 bg-white rounded-lg p-4 border border-sage-200">
+            <p className="text-sm font-medium text-gray-700 mb-3">{t('addedItems')}</p>
+            <div className="space-y-2">
+              {selection.clothing.map((item) => {
+                const product = getClothingProduct(item.productId);
+                if (!product) return null;
+                return (
+                  <div key={item.id} className="flex items-center justify-between bg-sage-50 p-3 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      {product.imageSrc && (
+                        <div className="relative w-12 h-12 rounded overflow-hidden">
+                          <Image
+                            src={product.imageSrc}
+                            alt={product.name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {product.name} x{item.quantity}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {item.tshirtSize && item.hoodieSize
+                            ? `T-Shirt: ${item.tshirtSize}, Hoodie: ${item.hoodieSize}`
+                            : item.tshirtSize
+                            ? `Größe: ${item.tshirtSize}`
+                            : `Größe: ${item.hoodieSize}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium text-gray-900">
+                        €{(product.price * item.quantity).toFixed(2)}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveClothing(item.id)}
+                        className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Divider */}
-      <div className="border-t border-sage-200 my-6" />
+      <div className="border-t border-sage-200 my-8" />
 
       {/* Order Summary */}
       <OrderSummary

@@ -9,7 +9,7 @@ import LanguageSelector from '@/components/shared/LanguageSelector';
 import PreviewPlayer from '@/components/landing/PreviewPlayer';
 import AudioComingSoon from '@/components/parent-portal/AudioComingSoon';
 import ProductSelector from '@/components/parent-portal/ProductSelector';
-import PersonalizedTshirtPromo from '@/components/parent-portal/PersonalizedTshirtPromo';
+import VideoCard from '@/components/parent-portal/VideoCard';
 import { CartProvider } from '@/lib/contexts/CartContext';
 import { FeaturedProducts, CartSummary, CartDrawer } from '@/components/shop';
 import { useProducts } from '@/lib/hooks/useProducts';
@@ -356,105 +356,104 @@ function ParentPortalContent() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Recording Preview */}
-          <div>
-            <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <img src="/images/minimusiker_logo.jpeg" alt="" className="h-6 w-auto mr-2" />
-                {tPreview('title')}
-              </h3>
+        {/* Media Section - Audio Preview + Video Card side by side */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+          {/* Left - Audio Preview */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+              <img src="/images/minimusiker_logo.jpeg" alt="" className="h-6 w-auto mr-2" />
+              {tPreview('title')}
+            </h3>
 
-              {isLoadingAudio ? (
-                <div className="flex items-center justify-center py-12">
-                  <LoadingSpinner size="md" />
+            {isLoadingAudio ? (
+              <div className="flex items-center justify-center py-12">
+                <LoadingSpinner size="md" />
+              </div>
+            ) : audioStatus?.hasAudio && audioStatus.audioUrl ? (
+              <div>
+                <PreviewPlayer
+                  eventId={eventId || 'demo'}
+                  classId={classId}
+                  className={className}
+                  audioUrl={audioStatus.audioUrl}
+                  isLocked={true}
+                  previewLimit={10}
+                  fadeOutDuration={1}
+                  title={tPreview('title')}
+                  previewBadge={tPreview('previewBadge')}
+                  previewMessage={tPreview('previewMessage')}
+                />
+                <div className="mt-4 p-4 bg-sage-50 border border-sage-200 rounded-lg">
+                  <p className="text-sm text-sage-800">
+                    {selectedChild
+                      ? tPreview('previewDescription', { childName: `${selectedChild.childName}'s` })
+                      : tPreview('previewDescriptionSchool')
+                    }
+                  </p>
                 </div>
-              ) : audioStatus?.hasAudio && audioStatus.audioUrl ? (
-                <div>
-                  <PreviewPlayer
-                    eventId={eventId || 'demo'}
-                    classId={classId}
-                    className={className}
-                    audioUrl={audioStatus.audioUrl}
-                    isLocked={true}
-                    previewLimit={10}
-                    fadeOutDuration={1}
-                    title={tPreview('title')}
-                    previewBadge={tPreview('previewBadge')}
-                    previewMessage={tPreview('previewMessage')}
-                  />
-                  <div className="mt-4 p-4 bg-sage-50 border border-sage-200 rounded-lg">
-                    <p className="text-sm text-sage-800">
-                      {selectedChild
-                        ? tPreview('previewDescription', { childName: `${selectedChild.childName}'s` })
-                        : tPreview('previewDescriptionSchool')
-                      }
+
+                {/* Download Button - Shows when parent has purchased digital access */}
+                {hasDigitalAccess && (
+                  <div className="mt-4">
+                    <button
+                      onClick={handleDownload}
+                      disabled={isDownloading}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isDownloading ? (
+                        <>
+                          <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Preparing Download...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Download Full Recording
+                        </>
+                      )}
+                    </button>
+                    <p className="mt-2 text-xs text-center text-gray-500">
+                      Your purchase includes the full high-quality recording
                     </p>
                   </div>
-
-                  {/* Download Button - Shows when parent has purchased digital access */}
-                  {hasDigitalAccess && (
-                    <div className="mt-4">
-                      <button
-                        onClick={handleDownload}
-                        disabled={isDownloading}
-                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isDownloading ? (
-                          <>
-                            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Preparing Download...
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Download Full Recording
-                          </>
-                        )}
-                      </button>
-                      <p className="mt-2 text-xs text-center text-gray-500">
-                        Your purchase includes the full high-quality recording
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <AudioComingSoon
-                  schoolLogoUrl={audioStatus?.schoolLogoUrl}
-                  message={tPreview('comingSoon')}
-                  title={tPreview('title')}
-                />
-              )}
-            </div>
-
-            {/* Personalized T-Shirt Promo */}
-            <PersonalizedTshirtPromo
-              schoolName={schoolName}
-              eventDate={eventDate}
-            />
+                )}
+              </div>
+            ) : (
+              <AudioComingSoon
+                schoolLogoUrl={audioStatus?.schoolLogoUrl}
+                message={tPreview('comingSoon')}
+                title={tPreview('title')}
+              />
+            )}
           </div>
 
-          {/* Right Column - Product Selector */}
-          <div>
-            <ProductSelector
-              eventId={session.eventId || 'demo'}
-              parentId={session.parentId}
-              schoolName={schoolName}
-              children={children}
-            />
-          </div>
-        </div>
+          {/* Right - Video Card */}
+          <VideoCard
+            title="Unser Video"
+            videoUrl={undefined}
+          />
+        </section>
+
+        {/* Shopping Section - Full Width */}
+        <section className="mb-12">
+          <ProductSelector
+            eventId={session.eventId || 'demo'}
+            parentId={session.parentId}
+            schoolName={schoolName}
+            children={children}
+          />
+        </section>
 
         {/* Featured Products Section */}
         {shopProducts.length > 0 && (
-          <div className="mt-8">
+          <section>
             <FeaturedProducts products={shopProducts} maxItems={3} />
-          </div>
+          </section>
         )}
       </div>
 
