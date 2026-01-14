@@ -8,6 +8,7 @@ import {
   ShopifyWebhookOrder,
 } from '@/lib/utils/shopifyWebhook';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { tokenManager } from '@/lib/services/shopifyTokenManager';
 import {
   ORDERS_TABLE_ID,
   ORDERS_FIELD_IDS,
@@ -340,16 +341,18 @@ function mapFinancialStatus(
 
 /**
  * Add tags to a Shopify order via Admin API
- * Used to add short eventId/classId hashes for easy identification
+ * Uses tokenManager for OAuth 2.0 Client Credentials Grant
  */
 async function addOrderTags(orderId: number, tags: string[]): Promise<void> {
-  const shopifyDomain = process.env.SHOPIFY_SHOP_DOMAIN;
-  const accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+  const shopifyDomain = process.env.SHOPIFY_SHOP_DOMAIN || process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN;
 
-  if (!shopifyDomain || !accessToken) {
-    console.warn('[orders-paid] Missing Shopify credentials for adding tags');
+  if (!shopifyDomain) {
+    console.warn('[orders-paid] Missing Shopify domain for adding tags');
     return;
   }
+
+  // Get access token via OAuth Client Credentials Grant
+  const accessToken = await tokenManager.getAccessToken();
 
   const response = await fetch(
     `https://${shopifyDomain}/admin/api/2024-01/orders/${orderId}.json`,
