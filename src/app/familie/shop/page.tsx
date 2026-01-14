@@ -50,12 +50,12 @@ function ShopContent() {
         }
 
         const data = await response.json();
-        if (data.session) {
-          setParentId(data.session.parentId || '');
-          setParentEmail(data.session.email || '');
+        if (data.success && data.data) {
+          setParentId(data.data.parentId || '');
+          setParentEmail(data.data.email || '');
           // Store all children for selection
-          if (data.session.children?.length > 0) {
-            setChildren(data.session.children);
+          if (data.data.children?.length > 0) {
+            setChildren(data.data.children);
           }
         }
       } catch (error) {
