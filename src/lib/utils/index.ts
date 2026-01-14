@@ -34,8 +34,8 @@ export function formatDate(date: string | Date | undefined | null, options?: Int
 /**
  * Format a price in cents to a currency string
  */
-export function formatPrice(cents: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', {
+export function formatPrice(cents: number, currency = 'EUR') {
+  return new Intl.NumberFormat('de-DE', {
     style: 'currency',
     currency,
   }).format(cents / 100);

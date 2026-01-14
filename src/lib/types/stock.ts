@@ -15,10 +15,32 @@ export type StockItemType = (typeof STOCK_ITEMS)[number];
 // Items that have size variants
 export const SIZED_ITEMS: StockItemType[] = ['T-Shirt', 'Hoodie'];
 
-// Available sizes (in cm) for T-Shirts and Hoodies
+// Available sizes (in cm) for T-Shirts and Hoodies - legacy format for stock management
 export const CLOTHING_SIZES = ['92', '98', '104', '116', '128', '140', '152', '164'] as const;
 
 export type ClothingSize = (typeof CLOTHING_SIZES)[number];
+
+// T-Shirt sizes matching Shopify variants for "T-Shirt (Personalisiert)"
+export const TSHIRT_SIZES = [
+  '98/104 (3-4J)',
+  '110/116 (5-6J)',
+  '122/128 (7-8J)',
+  '134/146 (9-11J)',
+  '152/164 (12-14J)',
+] as const;
+
+export type TshirtSize = (typeof TSHIRT_SIZES)[number];
+
+// Hoodie sizes matching Shopify variants for "Hoodie (Personalisiert)"
+export const HOODIE_SIZES = [
+  '116 (5-6 J)',
+  '128 (7-8 J)',
+  '140 (9-11 J)',
+  '152 (12-13 J)',
+  '164 (14-15 J)',
+] as const;
+
+export type HoodieSize = (typeof HOODIE_SIZES)[number];
 
 // Stock inventory item
 export interface StockItem {

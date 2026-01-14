@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { ParentSessionChild } from '@/types/airtable';
-import { CLOTHING_SIZES, ClothingSize } from '@/lib/types/stock';
+import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/stock';
 
 // ============================================================================
 // TYPES
@@ -16,8 +16,8 @@ interface ClothingItem {
   id: string;
   type: ClothingType;
   quantity: number;
-  tshirtSize: ClothingSize;
-  hoodieSize: ClothingSize;
+  tshirtSize: TshirtSize;
+  hoodieSize: HoodieSize;
 }
 
 interface ProductSelection {
@@ -93,24 +93,25 @@ function calculateTotal(selection: ProductSelection) {
 // SIZE SELECTOR COMPONENT
 // ============================================================================
 
-interface SizeSelectorProps {
-  value: ClothingSize;
-  onChange: (size: ClothingSize) => void;
+interface SizeSelectorProps<T extends string> {
+  value: T;
+  onChange: (size: T) => void;
+  sizes: readonly T[];
   label?: string;
 }
 
-function SizeSelector({ value, onChange, label }: SizeSelectorProps) {
+function SizeSelector<T extends string>({ value, onChange, sizes, label }: SizeSelectorProps<T>) {
   return (
     <div className="flex items-center gap-2">
       {label && <span className="text-xs text-gray-500">{label}</span>}
       <select
         value={value}
-        onChange={(e) => onChange(e.target.value as ClothingSize)}
+        onChange={(e) => onChange(e.target.value as T)}
         className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
       >
-        {CLOTHING_SIZES.map((size) => (
+        {sizes.map((size) => (
           <option key={size} value={size}>
-            {size} cm
+            {size}
           </option>
         ))}
       </select>
@@ -234,15 +235,15 @@ function AudioSection({ selected, onSelect }: AudioSectionProps) {
 
 interface ClothingCardProps {
   type: ClothingType;
-  onAdd: (type: ClothingType, tshirtSize: ClothingSize, hoodieSize: ClothingSize) => void;
+  onAdd: (type: ClothingType, tshirtSize: TshirtSize, hoodieSize: HoodieSize) => void;
   hasComboDiscount: boolean;
 }
 
 function ClothingCard({ type, onAdd, hasComboDiscount }: ClothingCardProps) {
   const t = useTranslations('clothing');
   const tProduct = useTranslations('productSelector');
-  const [tshirtSize, setTshirtSize] = useState<ClothingSize>('128');
-  const [hoodieSize, setHoodieSize] = useState<ClothingSize>('128');
+  const [tshirtSize, setTshirtSize] = useState<TshirtSize>(TSHIRT_SIZES[2]); // Default to middle size '122/128 (7-8J)'
+  const [hoodieSize, setHoodieSize] = useState<HoodieSize>(HOODIE_SIZES[1]); // Default to '128 (7-8 J)'
 
   const config = {
     tshirt: {
@@ -298,6 +299,7 @@ function ClothingCard({ type, onAdd, hasComboDiscount }: ClothingCardProps) {
           <SizeSelector
             value={tshirtSize}
             onChange={setTshirtSize}
+            sizes={TSHIRT_SIZES}
             label={showHoodieSize ? tProduct('tshirtLabel') : undefined}
           />
         )}
@@ -305,6 +307,7 @@ function ClothingCard({ type, onAdd, hasComboDiscount }: ClothingCardProps) {
           <SizeSelector
             value={hoodieSize}
             onChange={setHoodieSize}
+            sizes={HOODIE_SIZES}
             label={showTshirtSize ? tProduct('hoodieLabel') : undefined}
           />
         )}
@@ -337,7 +340,7 @@ function ClothingCard({ type, onAdd, hasComboDiscount }: ClothingCardProps) {
 
 interface ClothingSectionProps {
   clothing: ClothingItem[];
-  onAdd: (type: ClothingType, tshirtSize: ClothingSize, hoodieSize: ClothingSize) => void;
+  onAdd: (type: ClothingType, tshirtSize: TshirtSize, hoodieSize: HoodieSize) => void;
   onRemove: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
   hasAudioSelected: boolean;
@@ -394,10 +397,10 @@ function ClothingSection({ clothing, onAdd, onRemove, onUpdateQuantity, hasAudio
                     </p>
                     <p className="text-xs text-gray-500">
                       {item.type === 'bundle'
-                        ? `${t('tshirtLabel')} ${item.tshirtSize}cm, ${t('hoodieLabel')} ${item.hoodieSize}cm`
+                        ? `${t('tshirtLabel')} ${item.tshirtSize}, ${t('hoodieLabel')} ${item.hoodieSize}`
                         : item.type === 'tshirt'
-                        ? `${t('size')} ${item.tshirtSize}cm`
-                        : `${t('size')} ${item.hoodieSize}cm`}
+                        ? `${t('size')} ${item.tshirtSize}`
+                        : `${t('size')} ${item.hoodieSize}`}
                     </p>
                   </div>
                 </div>
@@ -491,10 +494,10 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
                 {item.quantity > 1 && ` x${item.quantity}`}
                 <span className="text-xs text-gray-400 ml-1">
                   ({item.type === 'bundle'
-                    ? `${item.tshirtSize}/${item.hoodieSize}cm`
+                    ? `${item.tshirtSize} / ${item.hoodieSize}`
                     : item.type === 'tshirt'
-                    ? `${item.tshirtSize}cm`
-                    : `${item.hoodieSize}cm`})
+                    ? item.tshirtSize
+                    : item.hoodieSize})
                 </span>
               </span>
               <span className="font-medium text-gray-900">
@@ -609,7 +612,7 @@ export default function ProductSelector({
   };
 
   // Clothing handlers
-  const handleAddClothing = (type: ClothingType, tshirtSize: ClothingSize, hoodieSize: ClothingSize) => {
+  const handleAddClothing = (type: ClothingType, tshirtSize: TshirtSize, hoodieSize: HoodieSize) => {
     const newItem: ClothingItem = {
       id: generateId(),
       type,

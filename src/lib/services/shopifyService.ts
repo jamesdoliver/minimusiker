@@ -39,7 +39,7 @@ class ShopifyService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Shopify-Storefront-Access-Token': this.storefrontAccessToken,
+          'Shopify-Storefront-Private-Token': this.storefrontAccessToken,
         },
         body: JSON.stringify({
           query,
@@ -112,7 +112,6 @@ class ShopifyService {
                     id
                     title
                     availableForSale
-                    quantityAvailable
                     price {
                       amount
                       currencyCode
@@ -202,7 +201,6 @@ class ShopifyService {
                 id
                 title
                 availableForSale
-                quantityAvailable
                 price {
                   amount
                   currencyCode
@@ -695,7 +693,6 @@ class ShopifyService {
       id: shopifyVariant.id,
       title: shopifyVariant.title,
       availableForSale: shopifyVariant.availableForSale,
-      quantityAvailable: shopifyVariant.quantityAvailable,
       price: {
         amount: shopifyVariant.price.amount,
         currencyCode: shopifyVariant.price.currencyCode,
