@@ -131,6 +131,8 @@ export async function POST(request: NextRequest) {
 
     // Look up Class record to get Airtable record ID for linked record
     // Try multiple lookup strategies since classId generation may vary
+    let classIdValue: string | null = null;  // Store class_id field value for tag generation
+
     if (classId || eventId) {
       try {
         // Strategy 1: Look up by class_id or legacy_booking_id matching classId
@@ -139,12 +141,14 @@ export async function POST(request: NextRequest) {
             .select({
               filterByFormula: `OR({${CLASSES_FIELD_IDS.class_id}} = "${classId}", {${CLASSES_FIELD_IDS.legacy_booking_id}} = "${classId}")`,
               maxRecords: 1,
+              returnFieldsByFieldId: true,
             })
             .firstPage();
 
           if (classes.length > 0) {
             classRecordId = classes[0].id;
-            console.log('[orders-paid] Found Class record by classId:', classRecordId);
+            classIdValue = classes[0].fields[CLASSES_FIELD_IDS.class_id] as string;
+            console.log('[orders-paid] Found Class record by classId:', classRecordId, 'class_id:', classIdValue);
           }
         }
 
@@ -155,12 +159,14 @@ export async function POST(request: NextRequest) {
             .select({
               filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = "${eventId}"`,
               maxRecords: 1,
+              returnFieldsByFieldId: true,
             })
             .firstPage();
 
           if (classesByEvent.length > 0) {
             classRecordId = classesByEvent[0].id;
-            console.log('[orders-paid] Found Class record by eventId/booking_id:', classRecordId);
+            classIdValue = classesByEvent[0].fields[CLASSES_FIELD_IDS.class_id] as string;
+            console.log('[orders-paid] Found Class record by eventId:', classRecordId, 'class_id:', classIdValue);
           }
         }
 
@@ -209,13 +215,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Add short tags to Shopify order for easy identification
-    // Extract 6-char hash from eventId/classId (last segment after underscore)
-    const eventHash = eventId?.match(/_([a-f0-9]{6})$/)?.[1];
-    const classHash = classId?.match(/_([a-f0-9]{6})$/)?.[1];
-
     const tags: string[] = [];
-    if (eventHash) tags.push(`evt-${eventHash}`);
-    if (classHash) tags.push(`cls-${classHash}`);
+
+    // For eventId: use hash suffix if formatted, or last 6 digits if numeric (SimplyBook)
+    if (eventId) {
+      const hashMatch = eventId.match(/_([a-f0-9]{6})$/);
+      if (hashMatch) {
+        tags.push(`evt-${hashMatch[1]}`);
+      } else if (/^\d+$/.test(eventId)) {
+        // Numeric SimplyBook ID - use last 6 digits
+        tags.push(`evt-${eventId.slice(-6)}`);
+      }
+    }
+
+    // For classId: use classIdValue from lookup (handles both attributes and fallback)
+    const effectiveClassId = classId || classIdValue;
+    if (effectiveClassId) {
+      const hashMatch = effectiveClassId.match(/_([a-f0-9]{6})$/);
+      if (hashMatch) {
+        tags.push(`cls-${hashMatch[1]}`);
+      }
+    }
 
     if (tags.length > 0) {
       try {
