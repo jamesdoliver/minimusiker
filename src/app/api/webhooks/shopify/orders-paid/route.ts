@@ -178,11 +178,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Look up Parent record to get Airtable record ID for linked record
+    let parentRecordId: string | null = null;
+    const parentId = attributes.parentId || attributes.parent_id;
+
+    if (parentId) {
+      try {
+        const parents = await base(PARENTS_TABLE_ID)
+          .select({
+            filterByFormula: `{${PARENTS_FIELD_IDS.parent_id}} = "${parentId}"`,
+            maxRecords: 1,
+          })
+          .firstPage();
+
+        if (parents.length > 0) {
+          parentRecordId = parents[0].id;
+          console.log('[orders-paid] Found Parent record:', parentRecordId);
+        } else {
+          console.warn('[orders-paid] Parent not found for parentId:', parentId);
+        }
+      } catch (parentError) {
+        console.error('[orders-paid] Error looking up parent:', parentError);
+      }
+    }
+
     const orderData = {
       [ORDERS_FIELD_IDS.order_id]: order.admin_graphql_api_id,
       [ORDERS_FIELD_IDS.order_number]: order.name,
       [ORDERS_FIELD_IDS.booking_id]: eventId || '',
       [ORDERS_FIELD_IDS.school_name]: attributes.schoolName || attributes.school_name || '',
+      ...(parentRecordId ? { [ORDERS_FIELD_IDS.parent_id]: [parentRecordId] } : {}),
       ...(classRecordId ? { [ORDERS_FIELD_IDS.class_id]: [classRecordId] } : {}),
       ...(eventRecordId ? { [ORDERS_FIELD_IDS.event_id]: [eventRecordId] } : {}),
       [ORDERS_FIELD_IDS.order_date]: order.created_at,
@@ -197,13 +222,6 @@ export async function POST(request: NextRequest) {
       [ORDERS_FIELD_IDS.created_at]: new Date().toISOString(),
       [ORDERS_FIELD_IDS.updated_at]: new Date().toISOString(),
     };
-
-    // Try to link to parent record if parentId is provided
-    if (attributes.parentId || attributes.parent_id) {
-      // Note: Linked records require the record ID, not a custom field value
-      // This would need to be looked up first - for now, we store the reference
-      console.log('[orders-paid] Parent reference:', attributes.parentId || attributes.parent_id);
-    }
 
     // Store order in Airtable
     try {
@@ -235,6 +253,11 @@ export async function POST(request: NextRequest) {
       if (hashMatch) {
         tags.push(`cls-${hashMatch[1]}`);
       }
+    }
+
+    // For parentId: use as-is (P1, P2, P3 format)
+    if (parentId) {
+      tags.push(`par-${parentId}`);
     }
 
     if (tags.length > 0) {
