@@ -6,20 +6,20 @@ import EventAnalyticsTable from '@/components/admin/analytics/EventAnalyticsTabl
 import ExportButtons from '@/components/admin/analytics/ExportButtons';
 import {
   EventAnalyticsRow,
+  EventRevenue,
+  VariableCost,
   DEFAULT_FIXED_COSTS,
   calculateFixedTotal,
   calculateVariableTotal,
-  generateFillerVariableCosts,
-  generateFillerRevenueBreakdown,
   determineEventStatus,
 } from '@/lib/types/analytics';
 import { SchoolEventSummary } from '@/lib/types/airtable';
 
 // Transform API event data to analytics row format
 function transformToAnalyticsRow(event: SchoolEventSummary): EventAnalyticsRow {
-  // Generate filler data (will be replaced with real data from Shopify/Stock DB later)
-  const variableCosts = generateFillerVariableCosts();
-  const revenueBreakdown = generateFillerRevenueBreakdown();
+  // Empty data - will be populated from Shopify/Stock DB when integrated
+  const variableCosts: VariableCost[] = [];
+  const revenueBreakdown: EventRevenue = { products: [], totalRevenue: 0 };
   const fixedTotal = calculateFixedTotal(DEFAULT_FIXED_COSTS);
   const variableTotal = calculateVariableTotal(variableCosts);
   const manualTotal = 0; // Manual costs will be fetched when row expands
@@ -166,7 +166,7 @@ export default function AdminAnalytics() {
           <p className="text-2xl font-bold text-gray-900 mt-1">
             €{summaryStats.totalRevenue.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
           </p>
-          <p className="text-xs text-gray-400 mt-1">Filler data</p>
+          <p className="text-xs text-gray-400 mt-1">From Shopify</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <p className="text-sm font-medium text-gray-500">Avg Order Value</p>

@@ -10,8 +10,6 @@ import {
   StockItem,
   StockOrder,
   StockTab,
-  generateMockInventory,
-  generateMockOrders,
   formatStockCurrency,
 } from '@/lib/types/stock';
 
@@ -28,12 +26,12 @@ export default function AdminStock() {
 
   const fetchData = async () => {
     try {
-      // Use mock data for now (API integration coming later)
-      const mockInventory = generateMockInventory();
-      const mockOrders = generateMockOrders();
+      // Empty data - will be populated from Stock API when integrated
+      const emptyInventory: StockItem[] = [];
+      const emptyOrders: StockOrder[] = [];
 
-      setInventory(mockInventory);
-      setOrders(mockOrders);
+      setInventory(emptyInventory);
+      setOrders(emptyOrders);
     } catch (err) {
       console.error('Error fetching stock data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load stock data');
