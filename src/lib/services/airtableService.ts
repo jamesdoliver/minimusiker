@@ -2805,6 +2805,7 @@ class AirtableService {
     className: string;
     teacherName: string;
     registeredCount: number;
+    isDefault?: boolean;
   }>> {
     if (this.useNormalizedTables()) {
       // Ensure tables are initialized
@@ -2842,6 +2843,7 @@ class AirtableService {
               className: classFields['class_name'] || classFields[CLASSES_FIELD_IDS.class_name] || 'Unknown Class',
               teacherName: classFields['main_teacher'] || classFields[CLASSES_FIELD_IDS.main_teacher] || '',
               registeredCount: realRegistrations.length,
+              isDefault: Boolean(classFields['is_default'] || classFields[CLASSES_FIELD_IDS.is_default]),
             };
           })
         );
@@ -2865,15 +2867,20 @@ class AirtableService {
           className: string;
           teacherName: string;
           registeredCount: number;
+          isDefault: boolean;
         }>();
 
         records.forEach(r => {
           if (r.class_id) {
             if (!classMap.has(r.class_id)) {
+              // Check if this is the default "Alle Kinder" class by name
+              // Legacy table doesn't have is_default field, so we detect by naming convention
+              const isDefaultClass = r.class === 'Alle Kinder';
               classMap.set(r.class_id, {
                 className: r.class || 'Unknown Class',
                 teacherName: r.main_teacher || '',
                 registeredCount: 0,
+                isDefault: isDefaultClass,
               });
             }
             // Only count non-placeholder records
@@ -2891,6 +2898,7 @@ class AirtableService {
             className: data.className,
             teacherName: data.teacherName,
             registeredCount: data.registeredCount,
+            isDefault: data.isDefault,
           }))
           .sort((a, b) => a.className.localeCompare(b.className));
       } catch (error) {

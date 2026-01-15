@@ -520,6 +520,7 @@ export const CLASSES_FIELD_IDS = {
   total_children: 'flddABwj9UilV2OtG',
   created_at: 'fld3q0jZPIAlsx8FD',
   legacy_booking_id: 'fldXGF3yXrHeI4vWn',  // Original booking_id from parent_journey_table
+  is_default: 'fldJouWNH4fudWQl0',      // Auto-created "Alle Kinder" catch-all class
 } as const;
 
 // Parents Table - 1 row per unique parent (deduplicated by email)

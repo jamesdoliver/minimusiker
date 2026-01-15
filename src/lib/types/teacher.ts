@@ -225,6 +225,7 @@ export interface TeacherClassView {
     hasPreview: boolean;
     hasFinal: boolean;
   };
+  isDefault?: boolean;  // Auto-created "Alle Kinder" catch-all class
 }
 
 // =============================================================================

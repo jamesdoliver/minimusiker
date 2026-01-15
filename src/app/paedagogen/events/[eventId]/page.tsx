@@ -382,7 +382,14 @@ function ClassCard({
             </svg>
           </div>
           <div className="text-left">
-            <h3 className="font-semibold text-gray-900">{cls.className}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900">{cls.className}</h3>
+              {cls.isDefault && (
+                <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-medium">
+                  Standard
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500">
               {cls.numChildren ? `${cls.numChildren} Kinder` : 'Keine Kinderanzahl'} ·{' '}
               {cls.songs.length} {cls.songs.length === 1 ? 'Lied' : 'Lieder'}

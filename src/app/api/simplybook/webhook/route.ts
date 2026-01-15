@@ -174,6 +174,30 @@ export async function POST(request: Request) {
 
       // Note: Printables are NOT auto-generated here. Admin will use "Confirm Printables"
       // button to customize text/QR positions before generating.
+
+      // ========================================
+      // Phase 3b: Auto-create default "Alle Kinder" class
+      // This ensures parents can register even if teacher hasn't set up classes yet
+      // ========================================
+      if (eventRecord) {
+        try {
+          const teacherService = getTeacherService();
+          const defaultClass = await teacherService.createDefaultClass({
+            eventId,
+            eventRecordId: eventRecord.id,
+            schoolName: booking.client_name || booking.client || '',
+            bookingDate: mappedData.bookingDate,
+            estimatedChildren: mappedData.numberOfChildren,
+          });
+
+          if (defaultClass) {
+            console.log(`Created default "Alle Kinder" class: ${defaultClass.classId}`);
+          }
+        } catch (defaultClassError) {
+          // Don't fail webhook - event was created successfully
+          console.error('Error creating default class:', defaultClassError);
+        }
+      }
     } catch (eventError) {
       // Log but don't fail the webhook - SchoolBookings was created successfully
       console.error('Error creating Event record:', eventError);

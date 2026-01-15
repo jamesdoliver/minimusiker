@@ -1256,6 +1256,94 @@ class TeacherService {
   }
 
   /**
+   * Create a default "Alle Kinder" catch-all class for an event
+   * Called automatically when SimplyBook webhook creates an event
+   * This ensures parents can always register even if teacher hasn't set up classes
+   */
+  async createDefaultClass(data: {
+    eventId: string;
+    eventRecordId: string;  // Airtable record ID for Events table linking
+    schoolName: string;
+    bookingDate: string;
+    estimatedChildren?: number;
+  }): Promise<TeacherClassView | null> {
+    const DEFAULT_CLASS_NAME = 'Alle Kinder';
+
+    try {
+      // Generate class_id for the catch-all class
+      const classId = generateClassId(data.schoolName, data.bookingDate, DEFAULT_CLASS_NAME);
+
+      // Check if default class already exists (idempotency)
+      const existingRecords = await this.base(CLASSES_TABLE_ID)
+        .select({
+          filterByFormula: `AND({${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}', {${CLASSES_FIELD_IDS.is_default}} = TRUE())`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (existingRecords.length > 0) {
+        console.log(`Default class already exists for event ${data.eventId}, skipping creation`);
+        return null;
+      }
+
+      // Create a placeholder record in parent_journey_table (legacy support)
+      const legacyFields: Record<string, unknown> = {
+        [AIRTABLE_FIELD_IDS.booking_id]: data.eventId,
+        [AIRTABLE_FIELD_IDS.class_id]: classId,
+        [AIRTABLE_FIELD_IDS.class]: DEFAULT_CLASS_NAME,
+        [AIRTABLE_FIELD_IDS.school_name]: data.schoolName,
+        [AIRTABLE_FIELD_IDS.event_type]: 'MiniMusiker',
+        [AIRTABLE_FIELD_IDS.booking_date]: data.bookingDate,
+        [AIRTABLE_FIELD_IDS.parent_email]: '',
+        [AIRTABLE_FIELD_IDS.main_teacher]: '',
+        [AIRTABLE_FIELD_IDS.registered_child]: '',
+        [AIRTABLE_FIELD_IDS.parent_first_name]: '',
+        [AIRTABLE_FIELD_IDS.parent_telephone]: '',
+        [AIRTABLE_FIELD_IDS.parent_id]: '',
+      };
+
+      if (data.estimatedChildren && data.estimatedChildren > 0) {
+        legacyFields[AIRTABLE_FIELD_IDS.total_children] = data.estimatedChildren;
+      }
+
+      await this.base(PARENT_JOURNEY_TABLE).create(legacyFields as Airtable.FieldSet);
+
+      // Create record in normalized Classes table with is_default flag
+      const classFields: Airtable.FieldSet = {
+        [CLASSES_FIELD_IDS.class_id]: classId,
+        [CLASSES_FIELD_IDS.class_name]: DEFAULT_CLASS_NAME,
+        [CLASSES_FIELD_IDS.main_teacher]: '',
+        [CLASSES_FIELD_IDS.legacy_booking_id]: data.eventId,
+        [CLASSES_FIELD_IDS.event_id]: [data.eventRecordId],
+        [CLASSES_FIELD_IDS.is_default]: true,
+      };
+
+      if (data.estimatedChildren && data.estimatedChildren > 0) {
+        classFields[CLASSES_FIELD_IDS.total_children] = data.estimatedChildren;
+      }
+
+      await this.base(CLASSES_TABLE_ID).create([{ fields: classFields }]);
+      console.log(`Created default "Alle Kinder" class: ${classId} for event ${data.eventId}`);
+
+      return {
+        classId,
+        className: DEFAULT_CLASS_NAME,
+        numChildren: data.estimatedChildren,
+        songs: [],
+        audioStatus: {
+          hasRawAudio: false,
+          hasPreview: false,
+          hasFinal: false,
+        },
+        isDefault: true,
+      };
+    } catch (error) {
+      console.error('Error creating default class:', error);
+      return null;
+    }
+  }
+
+  /**
    * Update a class
    */
   async updateClass(
@@ -1305,6 +1393,33 @@ class TeacherService {
 
       if (records.length === 0) {
         throw new Error('Class not found');
+      }
+
+      // Check if this is a default class (cannot be deleted)
+      try {
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+            maxRecords: 1,
+          })
+          .firstPage();
+        if (classRecords.length > 0) {
+          const classFields = classRecords[0].fields as Record<string, any>;
+          const isDefault = Boolean(classFields['is_default'] || classFields[CLASSES_FIELD_IDS.is_default]);
+          if (isDefault) {
+            throw new Error('Die Standardklasse kann nicht gelöscht werden. Eltern können sich hier registrieren, bevor Sie Klassen einrichten.');
+          }
+        }
+      } catch (error) {
+        // If it's our error about default class, re-throw it
+        if (error instanceof Error && error.message.includes('Standardklasse')) {
+          throw error;
+        }
+        // Otherwise, also check by name convention as fallback
+        const className = records[0].fields.class || records[0].fields[AIRTABLE_FIELD_IDS.class];
+        if (className === 'Alle Kinder') {
+          throw new Error('Die Standardklasse kann nicht gelöscht werden. Eltern können sich hier registrieren, bevor Sie Klassen einrichten.');
+        }
       }
 
       // Check if any record has registered children
@@ -1429,6 +1544,24 @@ class TeacherService {
           const classSongs = songs.filter((s) => s.classId === classId);
           const classAudioFiles = audioFiles.filter((a) => a.classId === classId);
 
+          // Check if this is a default class by querying Classes table or by name convention
+          let isDefault = classData.className === 'Alle Kinder';
+          try {
+            const classRecords = await this.base(CLASSES_TABLE_ID)
+              .select({
+                filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+                maxRecords: 1,
+              })
+              .firstPage();
+            if (classRecords.length > 0) {
+              const classFields = classRecords[0].fields as Record<string, any>;
+              isDefault = Boolean(classFields['is_default'] || classFields[CLASSES_FIELD_IDS.is_default]);
+            }
+          } catch (error) {
+            // Fallback to name convention if Classes table query fails
+            console.warn('Could not query Classes table for is_default:', error);
+          }
+
           classViews.push({
             classId: classData.classId,
             className: classData.className,
@@ -1439,6 +1572,7 @@ class TeacherService {
               hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
               hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
             },
+            isDefault,
           });
         }
 
