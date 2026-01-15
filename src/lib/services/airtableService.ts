@@ -2247,10 +2247,10 @@ class AirtableService {
         const assignedStaffIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_staff] as string[];
         const assignedStaffId = assignedStaffIds?.[0];
 
-        // Get all classes for this event
+        // Get all classes for this event (by event link OR legacy_booking_id fallback)
         const classRecords = await this.base(CLASSES_TABLE_ID)
           .select({
-            filterByFormula: `SEARCH('${eventRecord.id}', {${CLASSES_FIELD_IDS.event_id}})`,
+            filterByFormula: `OR(SEARCH('${eventRecord.id}', {${CLASSES_FIELD_IDS.event_id}}), {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId}')`,
             returnFieldsByFieldId: true,
           })
           .all();
