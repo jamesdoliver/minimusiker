@@ -2229,10 +2229,10 @@ class AirtableService {
     if (this.useNormalizedTables()) {
       // NEW: Query normalized tables
       try {
-        // Find the event
+        // Find the event by event_id OR legacy_booking_id
         const eventRecords = await this.base(EVENTS_TABLE_ID)
           .select({
-            filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId}'`,
+            filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${eventId}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${eventId}')`,
             returnFieldsByFieldId: true,
             maxRecords: 1,
           })
