@@ -377,7 +377,8 @@ function RegistrationPageContent() {
   }
 
   const effectiveEventId = isDiscoveryMode ? discoveryState.eventId : urlEventId;
-  const effectiveClassId = isDiscoveryMode ? discoveryState.classId : urlClassId;
+  // Use discoveryState.classId when QR flow auto-selects single class, otherwise use URL param
+  const effectiveClassId = discoveryState.classId || urlClassId;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

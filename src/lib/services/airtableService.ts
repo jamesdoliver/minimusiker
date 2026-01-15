@@ -308,6 +308,7 @@ class AirtableService {
   async create(data: Partial<ParentJourney>): Promise<ParentJourney & { id: string }> {
     if (this.useNormalizedTables()) {
       // NEW: Create in normalized tables (Parents + Registrations)
+      this.ensureNormalizedTablesInitialized();
       try {
         if (!data.parent_email || !data.booking_id || !data.class_id) {
           throw new Error('parent_email, booking_id, and class_id are required for registration');
@@ -327,7 +328,7 @@ class AirtableService {
           if (data.parent_telephone) parentFields[PARENTS_FIELD_IDS.parent_telephone] = data.parent_telephone;
           if (data.email_campaigns) parentFields[PARENTS_FIELD_IDS.email_campaigns] = data.email_campaigns;
 
-          const newParentRecords = await this.parentsTable!.create([parentFields]);
+          const newParentRecords = await this.parentsTable!.create([{ fields: parentFields }]);
           parentRecordId = newParentRecords[0].id;
         } else {
           parentRecordId = parentRecord.id;
@@ -366,7 +367,7 @@ class AirtableService {
         if (data.order_number) registrationFields[REGISTRATIONS_FIELD_IDS.order_number] = data.order_number;
         if (data.registered_complete !== undefined) registrationFields[REGISTRATIONS_FIELD_IDS.registered_complete] = data.registered_complete;
 
-        const registrationRecords = await this.registrationsTable!.create([registrationFields]);
+        const registrationRecords = await this.registrationsTable!.create([{ fields: registrationFields }]);
         const registrationRecord = registrationRecords[0];
 
         // Step 5: Transform to ParentJourney format for backward compatibility

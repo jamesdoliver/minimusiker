@@ -16,8 +16,8 @@ export function isValidClassId(classId: string): boolean {
     return false;
   }
 
-  // Pattern: cls_ + alphanumeric/underscore + _ + 8-digit date + _ + alphanumeric + _ + 6-char hash
-  const pattern = /^cls_[a-z0-9_]+_\d{8}_[a-z0-9]+_[a-f0-9]{6}$/;
+  // Pattern: cls_ + school_slug + _ + 8-digit date + _ + class_slug (may include underscores) + _ + 6-char hash
+  const pattern = /^cls_[a-z0-9_]+_\d{8}_[a-z0-9_]+_[a-f0-9]{6}$/;
   return pattern.test(classId);
 }
 
