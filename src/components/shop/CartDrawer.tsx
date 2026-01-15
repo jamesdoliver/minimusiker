@@ -43,6 +43,9 @@ export default function CartDrawer({ parentId, parentEmail, eventId, classId }: 
 
   // Handle checkout
   const handleCheckout = () => {
+    if (!eventId) {
+      console.warn('[CartDrawer] Missing eventId - order may not be linked to Event!');
+    }
     checkout({
       parentId: parentId || '',
       parentEmail: parentEmail || '',

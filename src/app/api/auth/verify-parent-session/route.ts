@@ -51,7 +51,8 @@ export async function GET(request: NextRequest) {
             childName: decoded.childName,
             bookingId: decoded.bookingId,
             class: '',
-            eventId: '',
+            classId: '',
+            eventId: decoded.bookingId || '',  // Use bookingId as fallback for eventId
             schoolName: decoded.schoolName,
             eventType: decoded.eventType,
           }],

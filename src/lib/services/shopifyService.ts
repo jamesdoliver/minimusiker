@@ -392,7 +392,7 @@ class ShopifyService {
     // Add custom attributes if provided
     if (attributes) {
       cartInput.attributes = Object.entries(attributes)
-        .filter(([_, value]) => value !== undefined && value !== null)
+        .filter(([_, value]) => value !== undefined && value !== null && value !== '')
         .map(([key, value]) => ({
           key,
           value: String(value),
