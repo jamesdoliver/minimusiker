@@ -2625,6 +2625,8 @@ class AirtableService {
     schoolName: string;
     eventCount: number;
   }>> {
+    this.ensureNormalizedTablesInitialized();
+
     if (this.useNormalizedTables()) {
       // NEW: Query Events table directly
       try {
