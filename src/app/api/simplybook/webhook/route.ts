@@ -82,25 +82,12 @@ export async function POST(request: Request) {
     );
     console.log('Einrichtung ID found:', einrichtungId);
 
-    // Parse date/time from SimplyBook format "YYYY-MM-DD HH:MM:SS"
-    // Airtable Date field needs "YYYY-MM-DD", time fields can be "HH:MM:SS"
-    const parseDateTime = (dateTimeStr: string | undefined): { date: string; time: string } => {
-      if (!dateTimeStr) return { date: '', time: '' };
-      const parts = dateTimeStr.split(' ');
-      return {
-        date: parts[0] || '',  // "2026-06-02"
-        time: parts[1] || '',  // "08:00:00"
-      };
-    };
-
-    const startParsed = parseDateTime(booking.start_date);
-    const endParsed = parseDateTime(booking.end_date);
-
     // Create record in SchoolBookings table
     const record = await airtable.table(SCHOOL_BOOKINGS_TABLE_ID).create({
       [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id]: payload.booking_id,
       [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_hash]: booking.code || booking.hash || payload.booking_hash,
-      [SCHOOL_BOOKINGS_FIELD_IDS.school_name]: mappedData.schoolName || booking.client || booking.client_name || '',
+      // School name is in "Client Name" field in SimplyBook
+      [SCHOOL_BOOKINGS_FIELD_IDS.school_name]: booking.client_name || booking.client || '',
       [SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name]: mappedData.contactPerson,
       [SCHOOL_BOOKINGS_FIELD_IDS.school_contact_email]: mappedData.contactEmail,
       [SCHOOL_BOOKINGS_FIELD_IDS.school_phone]: mappedData.phone || '',
@@ -111,11 +98,11 @@ export async function POST(request: Request) {
       [SCHOOL_BOOKINGS_FIELD_IDS.estimated_children]: mappedData.numberOfChildren,
       [SCHOOL_BOOKINGS_FIELD_IDS.school_size_category]: mappedData.costCategory,
       [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status]: 'confirmed',
-      // Booking date/time fields - parse from datetime format
-      [SCHOOL_BOOKINGS_FIELD_IDS.start_date]: startParsed.date,
-      [SCHOOL_BOOKINGS_FIELD_IDS.end_date]: endParsed.date,
-      [SCHOOL_BOOKINGS_FIELD_IDS.start_time]: startParsed.time || booking.start_time,
-      [SCHOOL_BOOKINGS_FIELD_IDS.end_time]: endParsed.time || booking.end_time,
+      // Booking date - use mappedData.bookingDate which has proper fallback logic
+      [SCHOOL_BOOKINGS_FIELD_IDS.start_date]: mappedData.bookingDate,
+      [SCHOOL_BOOKINGS_FIELD_IDS.end_date]: mappedData.bookingDate,
+      [SCHOOL_BOOKINGS_FIELD_IDS.start_time]: booking.start_time || '',
+      [SCHOOL_BOOKINGS_FIELD_IDS.end_time]: booking.end_time || '',
       // Link to staff if found
       ...(staffId && { [SCHOOL_BOOKINGS_FIELD_IDS.main_contact_person]: [staffId] }),
       // Link to Einrichtung if found
