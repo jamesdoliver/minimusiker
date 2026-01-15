@@ -4257,7 +4257,6 @@ class AirtableService {
         [EVENTS_FIELD_IDS.event_date]: eventDate,
         [EVENTS_FIELD_IDS.event_type]: 'concert', // Default type, can be updated later
         [EVENTS_FIELD_IDS.simplybook_booking]: [schoolBookingRecordId],
-        [EVENTS_FIELD_IDS.created_at]: new Date().toISOString(),
       };
 
       // Add staff assignment if provided
