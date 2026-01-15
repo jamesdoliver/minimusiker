@@ -108,6 +108,7 @@ class AirtableService {
       const records = await this.parentsTable.select({
         filterByFormula: `LOWER({${PARENTS_FIELD_IDS.parent_email}}) = LOWER('${email.replace(/'/g, "\\'")}')`,
         maxRecords: 1,
+        returnFieldsByFieldId: true,
       }).firstPage();
 
       if (records.length === 0) return null;
@@ -179,7 +180,16 @@ class AirtableService {
     if (!this.eventsTable) return null;
 
     try {
-      const record = await this.eventsTable.find(eventRecordId);
+      // Use .select() with RECORD_ID() filter instead of .find() to support returnFieldsByFieldId
+      const records = await this.eventsTable.select({
+        filterByFormula: `RECORD_ID() = '${eventRecordId}'`,
+        maxRecords: 1,
+        returnFieldsByFieldId: true,
+      }).firstPage();
+
+      if (records.length === 0) return null;
+      const record = records[0];
+
       return {
         id: record.id,
         event_id: record.fields[EVENTS_FIELD_IDS.event_id] as string,
@@ -207,7 +217,16 @@ class AirtableService {
     if (!this.classesTable) return null;
 
     try {
-      const record = await this.classesTable.find(classRecordId);
+      // Use .select() with RECORD_ID() filter instead of .find() to support returnFieldsByFieldId
+      const records = await this.classesTable.select({
+        filterByFormula: `RECORD_ID() = '${classRecordId}'`,
+        maxRecords: 1,
+        returnFieldsByFieldId: true,
+      }).firstPage();
+
+      if (records.length === 0) return null;
+      const record = records[0];
+
       return {
         id: record.id,
         class_id: record.fields[CLASSES_FIELD_IDS.class_id] as string,
