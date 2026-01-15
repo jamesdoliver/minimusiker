@@ -369,7 +369,7 @@ class TaskService {
     // Get event details
     let schoolName = 'Unknown School';
     let eventDate = task.deadline;
-    let eventType = 'concert';
+    let eventType: string | undefined;
 
     if (task.event_id) {
       const event = await this.airtable.getEventById(task.event_id);

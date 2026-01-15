@@ -602,7 +602,7 @@ export interface Event {
   event_id: string;                     // Our event identifier (was booking_id)
   school_name: string;
   event_date: string;                   // ISO date string
-  event_type: 'concert' | 'recital' | 'competition' | 'showcase';
+  event_type?: string; // 'Minimusikertag' | 'Minimusikertag PLUS' | 'Minimusikertag Kita' (legacy: 'concert')
   assigned_staff?: string[];            // Linked record IDs → Personen
   assigned_engineer?: string[];         // Linked record IDs → Personen
   created_at: string;

@@ -40,7 +40,7 @@ export interface Task {
 export interface TaskWithEventDetails extends Task {
   school_name: string;
   event_date: string;
-  event_type: string;
+  event_type?: string; // May be undefined for events without type set
   go_display_id?: string; // GO-0001 format
   urgency_score: number; // Calculated urgency (lower = more urgent)
   days_until_due: number; // Days until/since deadline

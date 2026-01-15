@@ -4234,7 +4234,8 @@ class AirtableService {
     schoolBookingRecordId: string,
     schoolName: string,
     eventDate: string,
-    staffId?: string
+    staffId?: string,
+    eventType?: string
   ): Promise<Event> {
     this.ensureNormalizedTablesInitialized();
 
@@ -4255,9 +4256,13 @@ class AirtableService {
         [EVENTS_FIELD_IDS.event_id]: eventId,
         [EVENTS_FIELD_IDS.school_name]: schoolName,
         [EVENTS_FIELD_IDS.event_date]: eventDate,
-        [EVENTS_FIELD_IDS.event_type]: 'concert', // Default type, can be updated later
         [EVENTS_FIELD_IDS.simplybook_booking]: [schoolBookingRecordId],
       };
+
+      // Only set event_type if provided (allows graceful degradation)
+      if (eventType) {
+        eventFields[EVENTS_FIELD_IDS.event_type] = eventType;
+      }
 
       // Add staff assignment if provided
       if (staffId) {

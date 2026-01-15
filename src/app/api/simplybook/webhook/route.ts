@@ -8,7 +8,6 @@ import {
 import { getEmailService } from '@/lib/services/emailService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getR2Service } from '@/lib/services/r2Service';
-import { getPrintableService } from '@/lib/services/printableService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import Airtable from 'airtable';
 
@@ -112,15 +111,13 @@ export async function POST(request: Request) {
     console.log('Created SchoolBooking record:', record.id);
 
     // ========================================
-    // Phase 3: Auto-create Events record & generate printables
+    // Phase 3: Auto-create Events record & initialize R2 folder
     // ========================================
     let eventRecord = null;
-    let printablesResult = null;
 
     try {
       const airtableService = getAirtableService();
       const r2Service = getR2Service();
-      const printableService = getPrintableService();
 
       // Generate deterministic event_id
       const eventId = generateEventId(
@@ -136,7 +133,8 @@ export async function POST(request: Request) {
         record.id, // SchoolBookings record ID
         mappedData.schoolName,
         booking.start_date,
-        staffId || undefined
+        staffId || undefined,
+        booking.event_name // SimplyBook service type (Minimusikertag, Minimusikertag PLUS, etc.)
       );
       console.log('Created Event record:', eventRecord.id, 'event_id:', eventId);
 
@@ -172,26 +170,11 @@ export async function POST(request: Request) {
         }
       }
 
-      // Generate printables (non-blocking - log errors but don't fail webhook)
-      try {
-        printablesResult = await printableService.generateAllPrintables(
-          eventId,
-          mappedData.schoolName,
-          booking.start_date,
-          logoBuffer
-        );
-
-        if (printablesResult.success) {
-          console.log('Generated all printables for event:', eventId);
-        } else {
-          console.warn('Some printables failed:', printablesResult.errors);
-        }
-      } catch (printError) {
-        console.warn('Printable generation failed (templates may not be uploaded):', printError);
-      }
+      // Note: Printables are NOT auto-generated here. Admin will use "Confirm Printables"
+      // button to customize text/QR positions before generating.
     } catch (eventError) {
       // Log but don't fail the webhook - SchoolBookings was created successfully
-      console.error('Error creating Event record or generating printables:', eventError);
+      console.error('Error creating Event record:', eventError);
     }
 
     // Send email notification to assigned staff
@@ -242,8 +225,6 @@ export async function POST(request: Request) {
       eventCreated: !!eventRecord,
       eventRecordId: eventRecord?.id,
       eventId: eventRecord?.event_id,
-      printablesGenerated: printablesResult?.success ?? false,
-      printablesErrors: printablesResult?.errors ?? [],
     });
   } catch (error) {
     console.error('SimplyBook webhook error:', error);
