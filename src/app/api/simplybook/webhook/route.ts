@@ -123,9 +123,9 @@ export async function POST(request: Request) {
 
       // Generate deterministic event_id
       const eventId = generateEventId(
-        mappedData.schoolName,
+        booking.client_name || booking.client || '',
         'MiniMusiker', // Default event type
-        booking.start_date
+        mappedData.bookingDate
       );
       console.log('Generated event_id:', eventId);
 
@@ -133,8 +133,8 @@ export async function POST(request: Request) {
       eventRecord = await airtableService.createEventFromBooking(
         eventId,
         record.id, // SchoolBookings record ID
-        mappedData.schoolName,
-        booking.start_date,
+        booking.client_name || booking.client || '',
+        mappedData.bookingDate,
         staffId || undefined,
         booking.event_name // SimplyBook service type (Minimusikertag, Minimusikertag PLUS, etc.)
       );
