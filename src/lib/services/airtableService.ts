@@ -2509,6 +2509,7 @@ class AirtableService {
   ): Promise<import('@/lib/types/airtable').EventClassDetails | null> {
     if (this.useNormalizedTables()) {
       // NEW: Query Events and Classes tables
+      this.ensureNormalizedTablesInitialized();
       try {
         // Query event by event_id (booking_id)
         const eventRecords = await this.eventsTable!.select({
@@ -2522,10 +2523,11 @@ class AirtableService {
         const eventFields = eventRecord.fields as Record<string, any>;
 
         // Query class by class_id and verify it belongs to this event
+        // Use legacy_booking_id (text field) instead of event_id (linked record)
         const classRecords = await this.classesTable!.select({
           filterByFormula: `AND(
             {${CLASSES_FIELD_IDS.class_id}} = '${classId}',
-            {${CLASSES_FIELD_IDS.event_id}} = '${eventRecord.id}'
+            {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${bookingId}'
           )`,
           maxRecords: 1,
         }).firstPage();
@@ -2536,13 +2538,14 @@ class AirtableService {
         const classFields = classRecord.fields as Record<string, any>;
 
         // Transform to EventClassDetails format
+        // Note: Airtable returns field names, not field IDs
         return {
-          schoolName: eventFields[EVENTS_FIELD_IDS.school_name] || '',
-          eventType: eventFields[EVENTS_FIELD_IDS.event_type] || '',
-          bookingDate: eventFields[EVENTS_FIELD_IDS.event_date] || '',
-          className: classFields[CLASSES_FIELD_IDS.class_name] || '',
-          teacherName: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
-          otherTeachers: classFields[CLASSES_FIELD_IDS.other_teachers] || '',
+          schoolName: eventFields['school_name'] || '',
+          eventType: eventFields['event_type'] || '',
+          bookingDate: eventFields['event_date'] || '',
+          className: classFields['class_name'] || '',
+          teacherName: classFields['main_teacher'] || '',
+          otherTeachers: classFields['other_teachers'] || '',
           bookingId: bookingId,
         };
       } catch (error) {
