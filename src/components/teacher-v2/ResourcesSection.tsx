@@ -17,8 +17,7 @@ interface ResourcesSectionProps {
 }
 
 // Static resource configuration with images
-// resource1, resource2, resource3 = PDFs from Airtable
-// resource4 = Video (static, links to future training section)
+// All resources are PDFs fetched from Airtable TeacherResources table
 const RESOURCE_CONFIG = [
   {
     key: 'resource1',
@@ -40,10 +39,9 @@ const RESOURCE_CONFIG = [
   },
   {
     key: 'resource4',
-    thumbnail: '/images/teacher_portal_resources/Teacher-portal_MATERIAL_4.png',
-    type: 'video' as const,
-    fallbackTitle: 'Warm Up',
-    staticHref: '#', // Will link to training video section in future
+    thumbnail: '/images/teacher_portal_resources/Teacher-portal_MATERIAL_4.jpeg',
+    type: 'pdf' as const,
+    fallbackTitle: 'Material',
   },
 ];
 
@@ -83,18 +81,7 @@ export function ResourcesSection({ eventDate, eventId }: ResourcesSectionProps) 
 
   // Build resources by merging Airtable data with static config
   const resources = RESOURCE_CONFIG.map((config) => {
-    // For video (resource4), use static config
-    if (config.type === 'video') {
-      return {
-        id: config.key,
-        title: config.fallbackTitle,
-        thumbnail: config.thumbnail,
-        type: config.type,
-        href: config.staticHref || '#',
-      };
-    }
-
-    // For PDFs, find matching Airtable resource
+    // Find matching Airtable resource for PDFs
     const airtableResource = airtableResources.find(
       (r) => r.resourceKey === config.key
     );
@@ -134,12 +121,7 @@ export function ResourcesSection({ eventDate, eventId }: ResourcesSectionProps) 
               thumbnail={resource.thumbnail}
               type={resource.type}
               href={resource.href}
-              isLoading={isLoading && resource.type === 'pdf'}
-              onClick={
-                resource.type === 'video' && eventDate && eventId
-                  ? () => setIsVideoPopupOpen(true)
-                  : undefined
-              }
+              isLoading={isLoading}
             />
           ))}
         </div>
