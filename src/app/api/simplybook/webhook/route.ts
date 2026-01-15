@@ -8,6 +8,7 @@ import {
 import { getEmailService } from '@/lib/services/emailService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getR2Service } from '@/lib/services/r2Service';
+import { getTeacherService } from '@/lib/services/teacherService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import Airtable from 'airtable';
 
@@ -178,6 +179,25 @@ export async function POST(request: Request) {
       console.error('Error creating Event record:', eventError);
     }
 
+    // ========================================
+    // Auto-create Teacher record for portal access
+    // ========================================
+    if (mappedData.contactEmail) {
+      try {
+        const teacherService = getTeacherService();
+        const teacher = await teacherService.findOrCreateTeacher({
+          email: mappedData.contactEmail,
+          name: mappedData.contactPerson || mappedData.schoolName,
+          schoolName: mappedData.schoolName,
+          simplybookBookingId: payload.booking_id,
+        });
+        console.log(`Teacher found/created: ${teacher.email} (id: ${teacher.id})`);
+      } catch (teacherError) {
+        // Log but don't fail the webhook - booking creation succeeded
+        console.error('Failed to create teacher:', teacherError);
+      }
+    }
+
     // Send email notification to assigned staff
     if (staffId) {
       try {
@@ -307,6 +327,22 @@ async function handleBookingChange(payload: SimplybookWebhookPayload) {
     });
 
     console.log('[SimplyBook] Updated booking record:', existingRecord.id);
+
+    // Ensure teacher exists for updated contact email
+    if (mappedData.contactEmail) {
+      try {
+        const teacherService = getTeacherService();
+        const teacher = await teacherService.findOrCreateTeacher({
+          email: mappedData.contactEmail,
+          name: mappedData.contactPerson || mappedData.schoolName,
+          schoolName: mappedData.schoolName,
+          simplybookBookingId: payload.booking_id,
+        });
+        console.log(`[SimplyBook] Teacher found/created: ${teacher.email}`);
+      } catch (teacherError) {
+        console.error('[SimplyBook] Failed to create teacher:', teacherError);
+      }
+    }
 
     return NextResponse.json({
       status: 'updated',
