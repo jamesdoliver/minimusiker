@@ -56,6 +56,17 @@ function ShopContent() {
           // Store all children for selection
           if (data.data.children?.length > 0) {
             setChildren(data.data.children);
+            // Log session data for debugging
+            console.log('[shop] Session loaded:', {
+              parentId: data.data.parentId,
+              childrenCount: data.data.children.length,
+              children: data.data.children.map((c: SessionChild) => ({
+                childName: c.childName,
+                eventId: c.eventId,
+                bookingId: c.bookingId,
+                classId: c.classId,
+              })),
+            });
           }
         }
       } catch (error) {

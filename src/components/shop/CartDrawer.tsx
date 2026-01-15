@@ -19,6 +19,9 @@ export default function CartDrawer({ parentId, parentEmail, eventId, classId }: 
   const { cart, removeItem, updateQuantity, isCartOpen, setIsCartOpen } = useCart();
   const { checkout, isCheckingOut, error: checkoutError } = useCheckout();
 
+  // Log props for debugging attribute flow
+  console.log('[CartDrawer] Props:', { parentId, parentEmail, eventId, classId });
+
   // Close drawer on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

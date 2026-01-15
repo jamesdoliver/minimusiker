@@ -398,6 +398,9 @@ class ShopifyService {
           value: String(value),
         }));
 
+      // Log attributes being sent to Shopify
+      console.log('[createCart] Sending attributes to Shopify:', cartInput.attributes);
+
       // Set buyer identity with email for better order tracking
       if (attributes.parentEmail) {
         cartInput.buyerIdentity = {

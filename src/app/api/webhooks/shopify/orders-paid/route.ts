@@ -71,8 +71,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract custom attributes
+    console.log('[orders-paid] Raw note_attributes:', order.note_attributes);
     const attributes = extractCustomAttributes(order.note_attributes);
-    console.log('[orders-paid] Custom attributes:', attributes);
+    console.log('[orders-paid] Extracted attributes:', attributes);
 
     // Transform line items for storage
     const lineItems: ShopifyOrderLineItem[] = order.line_items.map((item) => ({
