@@ -7,7 +7,7 @@ interface ContactSectionProps {
 
 export function ContactSection({
   supportEmail = 'info@minimusiker.de',
-  supportPhone = '+49 123 456789',
+  supportPhone = '0251 3966054',
 }: ContactSectionProps) {
   return (
     <section className="bg-mm-bg-muted py-12 md:py-16">

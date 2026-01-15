@@ -1434,9 +1434,12 @@ class TeacherService {
         const SONGS_PER_CLASS = 1;
         const expectedSongs = classesCount * SONGS_PER_CLASS;
 
+        // Use school name from SchoolBookings table (source of truth), fall back to parent_journey
+        const actualSchoolName = schoolBooking?.schoolName || eventData.schoolName;
+
         events.push({
           eventId: eventData.eventId,
-          schoolName: eventData.schoolName,
+          schoolName: actualSchoolName,
           eventDate: actualEventDate,
           eventType: eventData.eventType,
           classes: classViews,
