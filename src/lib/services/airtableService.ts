@@ -2807,28 +2807,23 @@ class AirtableService {
     registeredCount: number;
   }>> {
     if (this.useNormalizedTables()) {
+      // Ensure tables are initialized
+      this.ensureNormalizedTablesInitialized();
+
       // NEW: Query Classes table and Registrations
       try {
-        // First, get the event by event_id (bookingId)
-        const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
-          maxRecords: 1,
-        }).firstPage();
-
-        if (eventRecords.length === 0) return [];
-
-        const eventRecordId = eventRecords[0].id;
-
-        // Get all classes for this event
+        // Get all classes for this event using legacy_booking_id (stores string event_id)
+        // Note: event_id is a linked record field, so we can't compare it directly
         const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.event_id}} = '${eventRecordId}'`,
+          filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${bookingId}'`,
         }).all();
 
         // For each class, count registered children
         const classesWithCounts = await Promise.all(
           classRecords.map(async (classRecord) => {
             const classFields = classRecord.fields as Record<string, any>;
-            const classId = classFields[CLASSES_FIELD_IDS.class_id];
+            // Note: Airtable returns human-readable field names, not field IDs
+            const classId = classFields['class_id'] || classFields[CLASSES_FIELD_IDS.class_id];
 
             // Count registrations for this class (excluding placeholders if any)
             const registrations = await this.registrationsTable!.select({
@@ -2844,8 +2839,8 @@ class AirtableService {
 
             return {
               classId: classId || '',
-              className: classFields[CLASSES_FIELD_IDS.class_name] || 'Unknown Class',
-              teacherName: classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+              className: classFields['class_name'] || classFields[CLASSES_FIELD_IDS.class_name] || 'Unknown Class',
+              teacherName: classFields['main_teacher'] || classFields[CLASSES_FIELD_IDS.main_teacher] || '',
               registeredCount: realRegistrations.length,
             };
           })

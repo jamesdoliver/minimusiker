@@ -17,7 +17,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function getStatusBadge(status: 'upcoming' | 'in-progress' | 'completed') {
+function getStatusBadge(status: 'upcoming' | 'in-progress' | 'completed' | 'needs-setup') {
   switch (status) {
     case 'upcoming':
       return (
@@ -35,6 +35,12 @@ function getStatusBadge(status: 'upcoming' | 'in-progress' | 'completed') {
       return (
         <span className="px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-700">
           Abgeschlossen
+        </span>
+      );
+    case 'needs-setup':
+      return (
+        <span className="px-3 py-1 text-sm font-medium rounded-full bg-yellow-100 text-yellow-800">
+          Setup erforderlich
         </span>
       );
   }

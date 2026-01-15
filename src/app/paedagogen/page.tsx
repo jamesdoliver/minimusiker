@@ -147,7 +147,7 @@ export default function TeacherDashboard() {
   const filteredEvents = useMemo(() => {
     if (activeFilter === 'all') return events;
     if (activeFilter === 'upcoming') {
-      return events.filter((e) => e.status === 'upcoming' || e.status === 'in-progress');
+      return events.filter((e) => e.status === 'upcoming' || e.status === 'in-progress' || e.status === 'needs-setup');
     }
     return events.filter((e) => e.status === 'completed');
   }, [events, activeFilter]);

@@ -9,8 +9,9 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ event }: ProjectCardProps) {
-  const { eventId, eventDate, progress } = event;
+  const { eventId, eventDate, progress, status, bookingRecordId } = event;
   const [showDateChangeModal, setShowDateChangeModal] = useState(false);
+  const needsSetup = status === 'needs-setup';
 
   const formattedDate = formatGermanDate(eventDate);
   const timeUntilEvent = progress?.daysUntilEvent
@@ -49,6 +50,14 @@ export function ProjectCard({ event }: ProjectCardProps) {
       <div className="p-6">
         {/* Status badges */}
         <div className="flex flex-wrap gap-2 mb-4">
+          {needsSetup && (
+            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              Setup erforderlich
+            </span>
+          )}
           {timeUntilEvent && (
             <span className="px-3 py-1 bg-mm-accent/10 text-mm-accent text-xs font-medium rounded-full">
               {timeUntilEvent}
@@ -64,8 +73,17 @@ export function ProjectCard({ event }: ProjectCardProps) {
             )}
         </div>
 
-        {/* Checklist */}
-        {progress && (
+        {/* Setup instruction for events needing setup */}
+        {needsSetup && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-yellow-800">
+              Richten Sie Ihre Klassen ein, um Lieder hinzuzufügen und Eltern zur Registrierung einzuladen.
+            </p>
+          </div>
+        )}
+
+        {/* Checklist - only show when not needing setup */}
+        {!needsSetup && progress && (
           <div className="space-y-3 mb-4">
             <ChecklistItem
               status={
@@ -90,26 +108,45 @@ export function ProjectCard({ event }: ProjectCardProps) {
           </div>
         )}
 
-        {/* Link */}
-        <button className="text-mm-accent text-sm hover:underline mb-4 block">
-          Was ist noch zu tun?
-        </button>
+        {/* Link - only show when not needing setup */}
+        {!needsSetup && (
+          <button className="text-mm-accent text-sm hover:underline mb-4 block">
+            Was ist noch zu tun?
+          </button>
+        )}
 
-        {/* CTA Button */}
-        <Link
-          href={`/paedagogen/events/${eventId}`}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-mm-primary-dark text-white rounded-lg font-medium text-sm hover:bg-mm-primary-dark/90 transition-colors"
-        >
-          Zur Liederliste
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </Link>
+        {/* CTA Button - different for setup vs normal */}
+        {needsSetup ? (
+          <Link
+            href={`/paedagogen/setup-booking/${bookingRecordId}`}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-mm-accent text-white rounded-lg font-medium text-sm hover:bg-mm-accent/90 transition-colors"
+          >
+            Jetzt einrichten
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </Link>
+        ) : (
+          <Link
+            href={`/paedagogen/events/${eventId}`}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-mm-primary-dark text-white rounded-lg font-medium text-sm hover:bg-mm-primary-dark/90 transition-colors"
+          >
+            Zur Liederliste
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </Link>
+        )}
       </div>
 
       {/* Date Change Contact Modal */}

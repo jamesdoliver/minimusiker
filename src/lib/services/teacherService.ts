@@ -76,6 +76,18 @@ class TeacherService {
     return process.env.USE_NORMALIZED_TABLES === 'true';
   }
 
+  /**
+   * Ensure normalized tables are initialized (lazy initialization)
+   * Called at the start of every method that needs normalized tables
+   * to avoid race condition with environment variable loading
+   */
+  private ensureNormalizedTablesInitialized(): void {
+    if (this.useNormalizedTables() && !this.eventsTable) {
+      this.eventsTable = this.base(EVENTS_TABLE_ID);
+      this.classesTable = this.base(CLASSES_TABLE_ID);
+    }
+  }
+
   // =============================================================================
   // TEACHER CRUD OPERATIONS
   // =============================================================================
@@ -392,9 +404,12 @@ class TeacherService {
     if (this.useNormalizedTables()) {
       // NEW: Use linked record field (class_link)
       try {
+        // Ensure tables are initialized
+        this.ensureNormalizedTablesInitialized();
+
         // First, find the Classes record by class_id field
         const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -438,28 +453,42 @@ class TeacherService {
    */
   async getSongsByEventId(eventId: string): Promise<Song[]> {
     if (this.useNormalizedTables()) {
-      // NEW: Use linked record field (event_link)
+      // NEW: Use linked record field (event_link) OR text field as fallback
       try {
+        // Ensure tables are initialized
+        this.ensureNormalizedTablesInitialized();
+
         // First, find the Events record by event_id field
         const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
-        if (eventRecords.length === 0) return [];
-
-        const eventRecordId = eventRecords[0].id;
-
-        // Query Songs table by linked record (event_link)
-        const records = await this.base(SONGS_TABLE)
-          .select({
-            filterByFormula: `{${SONGS_LINKED_FIELD_IDS.event_link}} = '${eventRecordId}'`,
-            sort: [
-              { field: 'class_id', direction: 'asc' },
-              { field: 'order', direction: 'asc' },
-            ],
-          })
-          .all();
+        let records;
+        if (eventRecords.length > 0) {
+          const eventRecordId = eventRecords[0].id;
+          // Query Songs table by linked record (event_link)
+          records = await this.base(SONGS_TABLE)
+            .select({
+              filterByFormula: `{${SONGS_LINKED_FIELD_IDS.event_link}} = '${eventRecordId}'`,
+              sort: [
+                { field: 'class_id', direction: 'asc' },
+                { field: 'order', direction: 'asc' },
+              ],
+            })
+            .all();
+        } else {
+          // Fallback: Query by text event_id field (for events not yet in Events table)
+          records = await this.base(SONGS_TABLE)
+            .select({
+              filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
+              sort: [
+                { field: 'class_id', direction: 'asc' },
+                { field: 'order', direction: 'asc' },
+              ],
+            })
+            .all();
+        }
 
         return records.map((record) => this.transformSongRecord(record));
       } catch (error) {
@@ -533,9 +562,12 @@ class TeacherService {
 
       // If using normalized tables, also populate linked record fields
       if (this.useNormalizedTables()) {
+        // Ensure tables are initialized
+        this.ensureNormalizedTablesInitialized();
+
         // Find Classes record by class_id
         const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -545,7 +577,7 @@ class TeacherService {
 
         // Find Events record by event_id
         const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -636,7 +668,7 @@ class TeacherService {
       try {
         // First, find the Classes record by class_id field
         const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -684,7 +716,7 @@ class TeacherService {
       try {
         // First, find the Events record by event_id field
         const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -732,7 +764,7 @@ class TeacherService {
       try {
         // First, find the Classes record by class_id field
         const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -805,7 +837,7 @@ class TeacherService {
       if (this.useNormalizedTables()) {
         // Find Classes record by class_id
         const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -815,7 +847,7 @@ class TeacherService {
 
         // Find Events record by event_id
         const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -942,7 +974,7 @@ class TeacherService {
 
         // Find the Events record by event_id field
         const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -1053,7 +1085,7 @@ class TeacherService {
       if (this.useNormalizedTables()) {
         // Find Classes record by class_id
         const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -1063,7 +1095,7 @@ class TeacherService {
 
         // Find Events record by event_id
         const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}'}`,
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
@@ -1102,7 +1134,11 @@ class TeacherService {
     numChildren?: number;
   }): Promise<TeacherClassView> {
     try {
-      // First, get an existing record for this event to copy school info
+      let schoolName = '';
+      let eventType = '';
+      let bookingDate = '';
+
+      // First, try to get school info from existing parent_journey records
       const existingRecords = await this.base(PARENT_JOURNEY_TABLE)
         .select({
           filterByFormula: `{booking_id} = '${data.eventId.replace(/'/g, "\\'")}'`,
@@ -1110,15 +1146,21 @@ class TeacherService {
         })
         .all();
 
-      let schoolName = '';
-      let eventType = '';
-      let bookingDate = '';
-
       if (existingRecords.length > 0) {
         const existing = existingRecords[0];
         schoolName = (existing.fields.school_name || existing.fields[AIRTABLE_FIELD_IDS.school_name] || '') as string;
         eventType = (existing.fields.event_type || existing.fields[AIRTABLE_FIELD_IDS.event_type] || '') as string;
         bookingDate = (existing.fields.booking_date || existing.fields[AIRTABLE_FIELD_IDS.booking_date] || '') as string;
+      }
+
+      // If no parent_journey records, fall back to SchoolBookings (source of truth)
+      if (!schoolName || !bookingDate) {
+        const schoolBooking = await getAirtableService().getSchoolBookingBySimplybookId(data.eventId);
+        if (schoolBooking) {
+          schoolName = schoolName || schoolBooking.schoolName || schoolBooking.schoolContactName || '';
+          eventType = eventType || 'MiniMusiker Day';
+          bookingDate = bookingDate || schoolBooking.startDate || '';
+        }
       }
 
       // Generate a consistent class_id using generateClassId() when we have the required data
@@ -1134,7 +1176,7 @@ class TeacherService {
 
       // Create a placeholder record for this class
       // This record serves as the class definition (no child registered yet)
-      const record = await this.base(PARENT_JOURNEY_TABLE).create({
+      const classFields: Record<string, unknown> = {
         [AIRTABLE_FIELD_IDS.booking_id]: data.eventId,
         [AIRTABLE_FIELD_IDS.class_id]: classId,
         [AIRTABLE_FIELD_IDS.class]: data.className,
@@ -1143,13 +1185,19 @@ class TeacherService {
         [AIRTABLE_FIELD_IDS.booking_date]: bookingDate,
         [AIRTABLE_FIELD_IDS.parent_email]: data.teacherEmail,
         [AIRTABLE_FIELD_IDS.main_teacher]: data.teacherName || '',
-        [AIRTABLE_FIELD_IDS.total_children]: data.numChildren || 0,
         // Placeholder values for required fields
         [AIRTABLE_FIELD_IDS.registered_child]: '',
         [AIRTABLE_FIELD_IDS.parent_first_name]: '',
         [AIRTABLE_FIELD_IDS.parent_telephone]: '',
         [AIRTABLE_FIELD_IDS.parent_id]: '',
-      });
+      };
+
+      // Only add total_children if it's a positive number
+      if (data.numChildren && data.numChildren > 0) {
+        classFields[AIRTABLE_FIELD_IDS.total_children] = data.numChildren;
+      }
+
+      const record = await this.base(PARENT_JOURNEY_TABLE).create(classFields as Airtable.FieldSet);
 
       // Also create a record in the normalized Classes table
       // This ensures orders can link to Class records
@@ -1312,6 +1360,8 @@ class TeacherService {
           eventDate: string;
           eventType: string;
           classes: Map<string, { classId: string; className: string; numChildren?: number }>;
+          needsSetup?: boolean;
+          bookingRecordId?: string;
         }
       >();
 
@@ -1338,6 +1388,24 @@ class TeacherService {
             className: (record.fields.class || record.fields[AIRTABLE_FIELD_IDS.class] || '') as string,
             numChildren: (record.fields.total_children ||
               record.fields[AIRTABLE_FIELD_IDS.total_children]) as number | undefined,
+          });
+        }
+      }
+
+      // Also include future SchoolBookings that haven't been initialized yet
+      const schoolBookings = await getAirtableService().getBookingsForTeacher(teacherEmail);
+      for (const booking of schoolBookings) {
+        const bookingEventId = booking.simplybookId;
+        // Only add if not already in eventMap (not yet initialized)
+        if (bookingEventId && !eventMap.has(bookingEventId)) {
+          eventMap.set(bookingEventId, {
+            eventId: bookingEventId,
+            schoolName: booking.schoolName || '',
+            eventDate: booking.startDate || '',
+            eventType: '', // SchoolBooking doesn't have eventType
+            classes: new Map(),
+            needsSetup: true,
+            bookingRecordId: booking.id,
           });
         }
       }
@@ -1391,8 +1459,10 @@ class TeacherService {
           now.getDate()
         );
 
-        let status: 'upcoming' | 'in-progress' | 'completed';
-        if (eventDateOnly > nowDateOnly) {
+        let status: 'upcoming' | 'in-progress' | 'completed' | 'needs-setup';
+        if (eventData.needsSetup) {
+          status = 'needs-setup';
+        } else if (eventDateOnly > nowDateOnly) {
           status = 'upcoming';
         } else if (eventDateOnly.getTime() === nowDateOnly.getTime()) {
           status = 'in-progress';
@@ -1445,6 +1515,7 @@ class TeacherService {
           classes: classViews,
           status,
           simplybookHash: schoolBooking?.simplybookHash,
+          bookingRecordId: eventData.bookingRecordId,
           progress: {
             classesCount,
             expectedClasses: undefined, // TODO: Get from booking config when available

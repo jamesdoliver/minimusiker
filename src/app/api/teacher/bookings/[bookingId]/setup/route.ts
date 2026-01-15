@@ -5,7 +5,7 @@ import { getAirtableService } from '@/lib/services/airtableService';
 /**
  * POST /api/teacher/bookings/[bookingId]/setup
  * Initialize an event from a SchoolBooking
- * Creates a placeholder record in parent_journey_table and updates portal status
+ * Updates portal status to allow class creation (no placeholder records needed)
  */
 export async function POST(
   request: NextRequest,
@@ -46,7 +46,7 @@ export async function POST(
       );
     }
 
-    // Check if booking is already setup (has parent_journey records)
+    // Check if booking is already setup
     if (booking.portalStatus === 'classes_added' || booking.portalStatus === 'ready') {
       return NextResponse.json(
         {
@@ -57,35 +57,15 @@ export async function POST(
       );
     }
 
-    // Generate a booking_id for the parent_journey_table
-    // Use the simplybookId as the booking_id for consistency
-    const eventBookingId = booking.simplybookId;
-
-    // Create a placeholder record in parent_journey_table
-    // This serves as the "event shell" that classes will be added to
-    // The placeholder is marked with PLACEHOLDER parent_id so it won't be counted as a real registration
-    await getAirtableService().create({
-      booking_id: eventBookingId,
-      school_name: booking.schoolContactName || 'Unknown School',
-      main_teacher: session.name || '',
-      class: 'SETUP_PLACEHOLDER', // This placeholder class will be removed when real classes are added
-      registered_child: 'SETUP_PLACEHOLDER',
-      parent_first_name: 'PLACEHOLDER',
-      parent_email: booking.schoolContactEmail,
-      parent_telephone: booking.schoolPhone || '',
-      event_type: 'MiniMusiker Day',
-      parent_id: 'PLACEHOLDER',
-      booking_date: booking.startDate || undefined,
-    });
-
     // Update the school booking portal status to 'classes_added'
-    // (Even though no classes are added yet, we're moving past 'pending_setup')
+    // This marks the event as initialized - real classes will be created separately
+    // No placeholder records needed since getTeacherEvents() now queries SchoolBookings directly
     await getAirtableService().updateBookingPortalStatus(bookingId, 'classes_added');
 
     return NextResponse.json({
       success: true,
       message: 'Event initialized successfully',
-      eventId: eventBookingId,
+      eventId: booking.simplybookId,
       booking: {
         id: booking.id,
         simplybookId: booking.simplybookId,
@@ -159,8 +139,6 @@ export async function GET(
 
     if (booking.portalStatus === 'classes_added' || booking.portalStatus === 'ready') {
       classes = await getAirtableService().getEventClasses(booking.simplybookId);
-      // Filter out the placeholder class
-      classes = classes.filter(c => c.className !== 'SETUP_PLACEHOLDER');
     }
 
     return NextResponse.json({
