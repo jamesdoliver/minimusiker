@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { ResourceCard } from './ResourceCard';
+import WeeklyVideosPopup from './WeeklyVideosPopup';
+import { calculateVideoFolder, type WeekInfo } from '@/lib/utils/weekCalculator';
 
 interface TeacherResource {
   resourceKey: string;
   pdfUrl: string;
   displayTitle: string;
+}
+
+interface ResourcesSectionProps {
+  eventDate?: string;
+  eventId?: string;
 }
 
 // Static resource configuration with images
@@ -40,13 +47,23 @@ const RESOURCE_CONFIG = [
   },
 ];
 
-export function ResourcesSection() {
+export function ResourcesSection({ eventDate, eventId }: ResourcesSectionProps) {
   const [airtableResources, setAirtableResources] = useState<TeacherResource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isVideoPopupOpen, setIsVideoPopupOpen] = useState(false);
+  const [weekInfo, setWeekInfo] = useState<WeekInfo | null>(null);
 
   useEffect(() => {
     fetchResources();
   }, []);
+
+  // Calculate week info for video popup
+  useEffect(() => {
+    if (eventDate) {
+      const info = calculateVideoFolder(eventDate);
+      setWeekInfo(info);
+    }
+  }, [eventDate]);
 
   const fetchResources = async () => {
     try {
@@ -118,10 +135,25 @@ export function ResourcesSection() {
               type={resource.type}
               href={resource.href}
               isLoading={isLoading && resource.type === 'pdf'}
+              onClick={
+                resource.type === 'video' && eventDate && eventId
+                  ? () => setIsVideoPopupOpen(true)
+                  : undefined
+              }
             />
           ))}
         </div>
       </div>
+
+      {/* Video Popup */}
+      {isVideoPopupOpen && eventDate && eventId && weekInfo && (
+        <WeeklyVideosPopup
+          eventDate={eventDate}
+          eventId={eventId}
+          weekInfo={weekInfo}
+          onClose={() => setIsVideoPopupOpen(false)}
+        />
+      )}
     </section>
   );
 }

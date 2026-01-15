@@ -40,7 +40,7 @@ import { ManualCost } from '@/lib/types/analytics';
 import {
   TeacherResource,
   TEACHER_RESOURCES_TABLE_ID,
-  TEACHER_RESOURCES_FIELD_IDS,
+  TEACHER_RESOURCES_FIELD_NAMES,
 } from '@/lib/types/teacher-resources';
 
 // Single table name in Airtable
@@ -4569,18 +4569,18 @@ class AirtableService {
       const records = await this.base(TEACHER_RESOURCES_TABLE_ID)
         .select({
           fields: [
-            TEACHER_RESOURCES_FIELD_IDS.resource_key,
-            TEACHER_RESOURCES_FIELD_IDS.pdf_url,
-            TEACHER_RESOURCES_FIELD_IDS.display_title,
+            TEACHER_RESOURCES_FIELD_NAMES.resource_key,
+            TEACHER_RESOURCES_FIELD_NAMES.pdf_url,
+            TEACHER_RESOURCES_FIELD_NAMES.display_title,
           ],
         })
         .all();
 
       return records.map((record) => ({
         id: record.id,
-        resourceKey: (record.get(TEACHER_RESOURCES_FIELD_IDS.resource_key) as string) || '',
-        pdfUrl: (record.get(TEACHER_RESOURCES_FIELD_IDS.pdf_url) as string) || '',
-        displayTitle: (record.get(TEACHER_RESOURCES_FIELD_IDS.display_title) as string) || '',
+        resourceKey: (record.get(TEACHER_RESOURCES_FIELD_NAMES.resource_key) as string) || '',
+        pdfUrl: (record.get(TEACHER_RESOURCES_FIELD_NAMES.pdf_url) as string) || '',
+        displayTitle: (record.get(TEACHER_RESOURCES_FIELD_NAMES.display_title) as string) || '',
       }));
     } catch (error) {
       console.error('Error fetching teacher resources:', error);
@@ -4595,7 +4595,7 @@ class AirtableService {
     try {
       const records = await this.base(TEACHER_RESOURCES_TABLE_ID)
         .select({
-          filterByFormula: `{${TEACHER_RESOURCES_FIELD_IDS.resource_key}} = '${resourceKey}'`,
+          filterByFormula: `{${TEACHER_RESOURCES_FIELD_NAMES.resource_key}} = '${resourceKey}'`,
           maxRecords: 1,
         })
         .firstPage();
@@ -4605,9 +4605,9 @@ class AirtableService {
       const record = records[0];
       return {
         id: record.id,
-        resourceKey: (record.get(TEACHER_RESOURCES_FIELD_IDS.resource_key) as string) || '',
-        pdfUrl: (record.get(TEACHER_RESOURCES_FIELD_IDS.pdf_url) as string) || '',
-        displayTitle: (record.get(TEACHER_RESOURCES_FIELD_IDS.display_title) as string) || '',
+        resourceKey: (record.get(TEACHER_RESOURCES_FIELD_NAMES.resource_key) as string) || '',
+        pdfUrl: (record.get(TEACHER_RESOURCES_FIELD_NAMES.pdf_url) as string) || '',
+        displayTitle: (record.get(TEACHER_RESOURCES_FIELD_NAMES.display_title) as string) || '',
       };
     } catch (error) {
       console.error('Error fetching teacher resource by key:', error);

@@ -8,13 +8,21 @@
 export const TEACHER_RESOURCES_TABLE_ID = 'tblaRsMdEW1gmGh1X';
 
 // =============================================================================
-// AIRTABLE FIELD IDs
+// AIRTABLE FIELD NAMES
 // =============================================================================
 
+// Note: Using field names instead of IDs since Airtable returns names by default
+export const TEACHER_RESOURCES_FIELD_NAMES = {
+  resource_key: 'resource_key', // Single line text (Primary) - e.g., "resource1", "resource2", "resource3"
+  pdf_url: 'pdf_url', // Single line text - URL for PDF download
+  display_title: 'display_title', // Single line text - Display name
+} as const;
+
+// Keep field IDs for reference (if needed with returnFieldsByFieldId option)
 export const TEACHER_RESOURCES_FIELD_IDS = {
-  resource_key: 'fldv29iEAXPvtw1UJ', // Single line text (Primary) - e.g., "resource1", "resource2", "resource3"
-  pdf_url: 'fld0IHtOhSXMZuIiQ', // Single line text - Dropbox sharing URL
-  display_title: 'fld6SquD5v8vs9J8K', // Single line text - Display name
+  resource_key: 'fldv29iEAXPvtw1UJ',
+  pdf_url: 'fld0IHtOhSXMZuIiQ',
+  display_title: 'fld6SquD5v8vs9J8K',
 } as const;
 
 // =============================================================================

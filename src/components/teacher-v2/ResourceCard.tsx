@@ -6,10 +6,11 @@ interface ResourceCardProps {
   type: 'pdf' | 'video';
   href: string;
   isLoading?: boolean;
+  onClick?: () => void; // For video type to trigger popup
 }
 
-export function ResourceCard({ title, thumbnail, type, href, isLoading = false }: ResourceCardProps) {
-  const isDisabled = href === '#' || isLoading;
+export function ResourceCard({ title, thumbnail, type, href, isLoading = false, onClick }: ResourceCardProps) {
+  const isDisabled = (href === '#' && !onClick) || isLoading;
 
   return (
     <div className="flex flex-col">
@@ -69,6 +70,13 @@ export function ResourceCard({ title, thumbnail, type, href, isLoading = false }
         >
           {isLoading ? 'Laden...' : (type === 'pdf' ? 'PDF downloaden' : 'Video ansehen')}
         </span>
+      ) : onClick ? (
+        <button
+          onClick={onClick}
+          className="px-4 py-2 bg-mm-accent text-white text-sm font-medium rounded-lg text-center hover:bg-mm-accent/90 transition-colors w-full"
+        >
+          {type === 'pdf' ? 'PDF downloaden' : 'Video ansehen'}
+        </button>
       ) : (
         <a
           href={href}

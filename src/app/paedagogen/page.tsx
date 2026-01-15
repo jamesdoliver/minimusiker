@@ -244,7 +244,10 @@ export default function TeacherDashboard() {
         <ContactSection />
 
         {/* Resources Section */}
-        <ResourcesSection />
+        <ResourcesSection
+          eventDate={filteredEvents[currentEventIndex]?.eventDate}
+          eventId={filteredEvents[currentEventIndex]?.eventId}
+        />
 
         {/* Shop Access Section */}
         <ShopAccessSection discountCode={discountCode} />
