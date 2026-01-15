@@ -461,6 +461,15 @@ export default function ProductSelector({
         return;
       }
 
+      // Log attributes for debugging
+      console.log('[ProductSelector] Checkout attributes:', {
+        parentId,
+        parentEmail,
+        eventId,
+        classId,
+        schoolName,
+      });
+
       // Create Shopify cart via API
       const response = await fetch('/api/shopify/create-checkout', {
         method: 'POST',

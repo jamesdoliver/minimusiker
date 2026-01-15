@@ -64,6 +64,21 @@ function ParentPortalContent() {
 
       const sessionData = await sessionResponse.json();
       if (sessionData.success) {
+        // Log session data for debugging
+        console.log('[familie] Session loaded:', {
+          parentId: sessionData.data.parentId,
+          email: sessionData.data.email,
+          eventId: sessionData.data.eventId,
+          schoolName: sessionData.data.schoolName,
+          childrenCount: sessionData.data.children?.length,
+          children: sessionData.data.children?.map((c: any) => ({
+            childName: c.childName,
+            eventId: c.eventId,
+            bookingId: c.bookingId,
+            classId: c.classId,
+            schoolName: c.schoolName,
+          })),
+        });
         setSession(sessionData.data);
 
         // Load parent portal data
