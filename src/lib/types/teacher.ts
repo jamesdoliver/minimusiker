@@ -229,6 +229,42 @@ export interface TeacherClassView {
   isDefault?: boolean;  // Auto-created "Alle Kinder" catch-all class
 }
 
+/**
+ * ClassGroup - "Classes Singing Together"
+ * Groups multiple classes for combined performances with their own songs/audio
+ */
+export interface ClassGroup {
+  groupId: string;
+  groupName: string;
+  eventId: string;
+  memberClassIds: string[];       // Airtable record IDs of member classes
+  memberClasses?: TeacherClassView[]; // Populated when fetching with details
+  songs: Song[];
+  audioStatus: {
+    hasRawAudio: boolean;
+    hasPreview: boolean;
+    hasFinal: boolean;
+  };
+  createdAt: string;
+  createdBy: string;              // Teacher email who created the group
+}
+
+/**
+ * Input for creating a new class group
+ */
+export interface CreateClassGroupInput {
+  groupName: string;
+  memberClassIds: string[];       // At least 2 classes required
+}
+
+/**
+ * Input for updating a class group
+ */
+export interface UpdateClassGroupInput {
+  groupName?: string;
+  memberClassIds?: string[];      // Can update which classes are in the group
+}
+
 // =============================================================================
 // UTILITY TYPES
 // =============================================================================

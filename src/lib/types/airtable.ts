@@ -524,6 +524,18 @@ export const CLASSES_FIELD_IDS = {
   is_default: 'fldJouWNH4fudWQl0',      // Auto-created "Alle Kinder" catch-all class
 } as const;
 
+// Groups Table - "Classes Singing Together" - groups of classes that perform together
+export const GROUPS_TABLE_ID = 'tblAPwTzqYTHbaz2k';
+
+export const GROUPS_FIELD_IDS = {
+  group_id: 'fld6BW3r6uAADjuMx',           // Unique identifier
+  group_name: 'fldiqq6p37u8G6iGs',         // Display name (e.g., "Year 3 + Year 4 Combined")
+  event_id: 'fld1wQzJMIA4uCNeQ',           // Linked record → Events
+  member_classes: 'fldyeuP6wYE3DRrXX',     // Linked records → Classes (multiple)
+  created_at: 'fld8v4sD1IX6wfzBy',         // When group was created
+  created_by: 'flduZ1riZm12QWD5Y',         // Teacher email who created it
+} as const;
+
 // Parents Table - 1 row per unique parent (deduplicated by email)
 export const PARENTS_TABLE_ID = 'tblaMYOUj93yp7jHE';
 

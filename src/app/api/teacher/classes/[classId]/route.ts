@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
+import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 
 /**
- * PUT /api/admin/classes/[classId]
- * Update a class (admin only)
+ * PUT /api/teacher/classes/[classId]
+ * Update a class (teacher must own the event)
  */
 export async function PUT(
   request: NextRequest,
   { params }: { params: { classId: string } }
 ) {
   try {
-    // Verify admin session
-    const session = verifyAdminSession(request);
+    const session = verifyTeacherSession(request);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -29,7 +28,15 @@ export async function PUT(
 
     const teacherService = getTeacherService();
 
-    // Admins can update any class - no ownership check
+    // Verify teacher owns this class by checking event ownership
+    const hasAccess = await teacherService.verifyTeacherOwnsClass(classId, session.email);
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: 'Class not found or you do not have access' },
+        { status: 404 }
+      );
+    }
+
     await teacherService.updateClass(classId, {
       className: className.trim(),
       numChildren: numChildren !== undefined && numChildren !== null && numChildren !== ''
@@ -42,7 +49,7 @@ export async function PUT(
       message: 'Class updated successfully',
     });
   } catch (error) {
-    console.error('Error updating class (admin):', error);
+    console.error('Error updating class (teacher):', error);
     return NextResponse.json(
       {
         success: false,
@@ -54,16 +61,15 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/admin/classes/[classId]
- * Delete a class (admin only)
+ * DELETE /api/teacher/classes/[classId]
+ * Delete a class (teacher must own the event)
  */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { classId: string } }
 ) {
   try {
-    // Verify admin session
-    const session = verifyAdminSession(request);
+    const session = verifyTeacherSession(request);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -71,7 +77,15 @@ export async function DELETE(
     const classId = decodeURIComponent(params.classId);
     const teacherService = getTeacherService();
 
-    // Admins can delete any class - no ownership check
+    // Verify teacher owns this class by checking event ownership
+    const hasAccess = await teacherService.verifyTeacherOwnsClass(classId, session.email);
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: 'Class not found or you do not have access' },
+        { status: 404 }
+      );
+    }
+
     // Business rules (cannot delete if has children/songs) enforced in service layer
     await teacherService.deleteClass(classId);
 
@@ -80,7 +94,7 @@ export async function DELETE(
       message: 'Class deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting class (admin):', error);
+    console.error('Error deleting class (teacher):', error);
     return NextResponse.json(
       {
         success: false,

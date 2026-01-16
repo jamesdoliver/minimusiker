@@ -8,6 +8,9 @@ import {
   SongWithAudio,
   TeacherEventView,
   TeacherClassView,
+  ClassGroup,
+  CreateClassGroupInput,
+  UpdateClassGroupInput,
   UpsertSongRequest,
   UpsertClassRequest,
   AudioFileType,
@@ -30,6 +33,8 @@ import {
   AUDIO_FILES_LINKED_FIELD_IDS,
   EVENTS_TABLE_ID,
   CLASSES_TABLE_ID,
+  GROUPS_TABLE_ID,
+  GROUPS_FIELD_IDS,
 } from '@/lib/types/airtable';
 import { getAirtableService } from './airtableService';
 
@@ -48,6 +53,7 @@ class TeacherService {
   private static instance: TeacherService;
   private eventsTable: Airtable.Table<any> | null = null;
   private classesTable: Airtable.Table<any> | null = null;
+  private groupsTable: Airtable.Table<any> | null = null;
 
   private constructor() {
     Airtable.configure({
@@ -60,6 +66,9 @@ class TeacherService {
       this.eventsTable = this.base(EVENTS_TABLE_ID);
       this.classesTable = this.base(CLASSES_TABLE_ID);
     }
+
+    // Groups table is always available (not behind feature flag)
+    this.groupsTable = this.base(GROUPS_TABLE_ID);
   }
 
   public static getInstance(): TeacherService {
@@ -1416,6 +1425,39 @@ class TeacherService {
   }
 
   /**
+   * Verify that a teacher owns a class (via event ownership)
+   */
+  async verifyTeacherOwnsClass(classId: string, teacherEmail: string): Promise<boolean> {
+    try {
+      // Find the class record to get its booking_id
+      const classRecords = await this.base(PARENT_JOURNEY_TABLE)
+        .select({
+          filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+        })
+        .all();
+
+      if (classRecords.length === 0) {
+        return false;
+      }
+
+      const classRecord = classRecords[0];
+      const bookingId = (classRecord.fields.booking_id || classRecord.fields[AIRTABLE_FIELD_IDS.booking_id]) as string;
+
+      if (!bookingId) {
+        return false;
+      }
+
+      // Check if teacher has access to this event
+      const event = await this.getTeacherEventDetail(bookingId, teacherEmail);
+      return event !== null;
+    } catch (error) {
+      console.error('Error verifying class ownership:', error);
+      return false;
+    }
+  }
+
+  /**
    * Delete a class (only if no children registered and no songs)
    */
   async deleteClass(classId: string): Promise<void> {
@@ -1481,6 +1523,424 @@ class TeacherService {
     } catch (error) {
       console.error('Error deleting class:', error);
       throw new Error(`Failed to delete class: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // =============================================================================
+  // CLASS GROUP OPERATIONS ("Classes Singing Together")
+  // =============================================================================
+
+  /**
+   * Transform Airtable record to ClassGroup interface
+   */
+  private transformGroupRecord(record: any): ClassGroup {
+    const memberClasses = record.fields[GROUPS_FIELD_IDS.member_classes] || [];
+    return {
+      groupId: record.fields[GROUPS_FIELD_IDS.group_id] || record.id,
+      groupName: record.fields[GROUPS_FIELD_IDS.group_name] || '',
+      eventId: '', // Will be populated from linked record lookup
+      memberClassIds: Array.isArray(memberClasses) ? memberClasses : [],
+      songs: [], // Will be populated separately
+      audioStatus: {
+        hasRawAudio: false,
+        hasPreview: false,
+        hasFinal: false,
+      },
+      createdAt: record.fields[GROUPS_FIELD_IDS.created_at] || record.createdTime || '',
+      createdBy: record.fields[GROUPS_FIELD_IDS.created_by] || '',
+    };
+  }
+
+  /**
+   * Get all groups for an event
+   */
+  async getGroupsByEventId(eventId: string): Promise<ClassGroup[]> {
+    try {
+      if (!this.groupsTable) {
+        console.warn('Groups table not initialized');
+        return [];
+      }
+
+      // First, find the Events record by event_id
+      const eventRecords = await this.base(EVENTS_TABLE_ID)
+        .select({
+          filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}')`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (eventRecords.length === 0) {
+        return [];
+      }
+
+      const eventRecordId = eventRecords[0].id;
+
+      // Query Groups table by event_id linked record
+      const records = await this.groupsTable
+        .select({
+          filterByFormula: `FIND('${eventRecordId}', ARRAYJOIN({${GROUPS_FIELD_IDS.event_id}}))`,
+        })
+        .all();
+
+      const groups: ClassGroup[] = [];
+
+      for (const record of records) {
+        const group = this.transformGroupRecord(record);
+        group.eventId = eventId;
+
+        // Get songs for this group (stored with group_id as the class_id)
+        const songs = await this.getSongsByClassId(group.groupId);
+        group.songs = songs;
+
+        // Get audio files for this group
+        const audioFiles = await this.getAudioFilesByClassId(group.groupId);
+        group.audioStatus = {
+          hasRawAudio: audioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
+          hasPreview: audioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
+          hasFinal: audioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+        };
+
+        // Populate member classes details
+        if (group.memberClassIds.length > 0) {
+          const memberClasses: TeacherClassView[] = [];
+          for (const classRecordId of group.memberClassIds) {
+            try {
+              const classRecord = await this.base(CLASSES_TABLE_ID).find(classRecordId);
+              const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
+              const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
+              const numChildren = classRecord.fields[CLASSES_FIELD_IDS.total_children] as number | undefined;
+              memberClasses.push({
+                classId,
+                className,
+                numChildren,
+                songs: [],
+                audioStatus: { hasRawAudio: false, hasPreview: false, hasFinal: false },
+              });
+            } catch (err) {
+              console.warn(`Could not fetch class record ${classRecordId}:`, err);
+            }
+          }
+          group.memberClasses = memberClasses;
+        }
+
+        groups.push(group);
+      }
+
+      return groups;
+    } catch (error) {
+      console.error('Error getting groups by event ID:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get a single group by ID
+   */
+  async getGroupById(groupId: string): Promise<ClassGroup | null> {
+    try {
+      if (!this.groupsTable) {
+        return null;
+      }
+
+      // Query by group_id field
+      const records = await this.groupsTable
+        .select({
+          filterByFormula: `{${GROUPS_FIELD_IDS.group_id}} = '${groupId.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        return null;
+      }
+
+      const group = this.transformGroupRecord(records[0]);
+
+      // Get the event_id from the linked record
+      const eventLink = records[0].fields[GROUPS_FIELD_IDS.event_id];
+      if (Array.isArray(eventLink) && eventLink.length > 0) {
+        try {
+          const eventRecord = await this.base(EVENTS_TABLE_ID).find(eventLink[0]);
+          group.eventId = (eventRecord.fields[EVENTS_FIELD_IDS.event_id] || eventRecord.fields[EVENTS_FIELD_IDS.legacy_booking_id] || '') as string;
+        } catch (err) {
+          console.warn('Could not fetch event record:', err);
+        }
+      }
+
+      // Get songs and audio for this group
+      group.songs = await this.getSongsByClassId(groupId);
+      const audioFiles = await this.getAudioFilesByClassId(groupId);
+      group.audioStatus = {
+        hasRawAudio: audioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
+        hasPreview: audioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
+        hasFinal: audioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+      };
+
+      return group;
+    } catch (error) {
+      console.error('Error getting group by ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create a new class group
+   */
+  async createGroup(data: {
+    eventId: string;
+    groupName: string;
+    memberClassIds: string[];  // These are class_id values (not Airtable record IDs)
+    createdBy: string;
+  }): Promise<ClassGroup> {
+    try {
+      if (!this.groupsTable) {
+        throw new Error('Groups table not initialized');
+      }
+
+      if (data.memberClassIds.length < 2) {
+        throw new Error('A group must contain at least 2 classes');
+      }
+
+      // Generate a unique group_id
+      const groupId = `group_${data.eventId}_${Date.now()}`;
+
+      // Find the Events record
+      const eventRecords = await this.base(EVENTS_TABLE_ID)
+        .select({
+          filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${data.eventId.replace(/'/g, "\\'")}')`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (eventRecords.length === 0) {
+        throw new Error('Event not found');
+      }
+
+      const eventRecordId = eventRecords[0].id;
+
+      // Convert class_id values to Airtable record IDs
+      const classRecordIds: string[] = [];
+      for (const classId of data.memberClassIds) {
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+            maxRecords: 1,
+          })
+          .firstPage();
+
+        if (classRecords.length > 0) {
+          classRecordIds.push(classRecords[0].id);
+        } else {
+          console.warn(`Class not found: ${classId}`);
+        }
+      }
+
+      if (classRecordIds.length < 2) {
+        throw new Error('Could not find enough valid classes to create group');
+      }
+
+      // Create the group record
+      const record = await this.groupsTable.create({
+        [GROUPS_FIELD_IDS.group_id]: groupId,
+        [GROUPS_FIELD_IDS.group_name]: data.groupName,
+        [GROUPS_FIELD_IDS.event_id]: [eventRecordId],
+        [GROUPS_FIELD_IDS.member_classes]: classRecordIds,
+        [GROUPS_FIELD_IDS.created_at]: new Date().toISOString(),
+        [GROUPS_FIELD_IDS.created_by]: data.createdBy,
+      });
+
+      const group = this.transformGroupRecord(record);
+      group.eventId = data.eventId;
+      group.memberClassIds = classRecordIds;
+
+      return group;
+    } catch (error) {
+      console.error('Error creating group:', error);
+      throw new Error(`Failed to create group: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update a class group
+   */
+  async updateGroup(
+    groupId: string,
+    data: UpdateClassGroupInput
+  ): Promise<ClassGroup> {
+    try {
+      if (!this.groupsTable) {
+        throw new Error('Groups table not initialized');
+      }
+
+      // Find the group record
+      const records = await this.groupsTable
+        .select({
+          filterByFormula: `{${GROUPS_FIELD_IDS.group_id}} = '${groupId.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        throw new Error('Group not found');
+      }
+
+      const recordId = records[0].id;
+      const updateFields: Record<string, any> = {};
+
+      if (data.groupName !== undefined) {
+        updateFields[GROUPS_FIELD_IDS.group_name] = data.groupName;
+      }
+
+      if (data.memberClassIds !== undefined) {
+        if (data.memberClassIds.length < 2) {
+          throw new Error('A group must contain at least 2 classes');
+        }
+
+        // Convert class_id values to Airtable record IDs
+        const classRecordIds: string[] = [];
+        for (const classId of data.memberClassIds) {
+          const classRecords = await this.base(CLASSES_TABLE_ID)
+            .select({
+              filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+              maxRecords: 1,
+            })
+            .firstPage();
+
+          if (classRecords.length > 0) {
+            classRecordIds.push(classRecords[0].id);
+          }
+        }
+
+        if (classRecordIds.length < 2) {
+          throw new Error('Could not find enough valid classes');
+        }
+
+        updateFields[GROUPS_FIELD_IDS.member_classes] = classRecordIds;
+      }
+
+      const updatedRecord = await this.groupsTable.update(recordId, updateFields);
+      const group = this.transformGroupRecord(updatedRecord);
+
+      // Fetch full group details
+      const fullGroup = await this.getGroupById(groupId);
+      return fullGroup || group;
+    } catch (error) {
+      console.error('Error updating group:', error);
+      throw new Error(`Failed to update group: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Delete a class group
+   */
+  async deleteGroup(groupId: string): Promise<void> {
+    try {
+      if (!this.groupsTable) {
+        throw new Error('Groups table not initialized');
+      }
+
+      // Find the group record
+      const records = await this.groupsTable
+        .select({
+          filterByFormula: `{${GROUPS_FIELD_IDS.group_id}} = '${groupId.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        throw new Error('Group not found');
+      }
+
+      // Check if group has songs (cannot delete if has songs)
+      const songs = await this.getSongsByClassId(groupId);
+      if (songs.length > 0) {
+        throw new Error('Cannot delete group with songs. Remove songs first.');
+      }
+
+      // Check if group has audio files
+      const audioFiles = await this.getAudioFilesByClassId(groupId);
+      if (audioFiles.length > 0) {
+        throw new Error('Cannot delete group with audio files. Remove audio files first.');
+      }
+
+      await this.groupsTable.destroy(records[0].id);
+    } catch (error) {
+      console.error('Error deleting group:', error);
+      throw new Error(`Failed to delete group: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get all groups that a specific class belongs to
+   */
+  async getGroupsForClass(classId: string): Promise<ClassGroup[]> {
+    try {
+      if (!this.groupsTable) {
+        return [];
+      }
+
+      // First, find the class record ID
+      const classRecords = await this.base(CLASSES_TABLE_ID)
+        .select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (classRecords.length === 0) {
+        return [];
+      }
+
+      const classRecordId = classRecords[0].id;
+
+      // Query Groups where member_classes contains this class record ID
+      const records = await this.groupsTable
+        .select({
+          filterByFormula: `FIND('${classRecordId}', ARRAYJOIN({${GROUPS_FIELD_IDS.member_classes}}))`,
+        })
+        .all();
+
+      const groups: ClassGroup[] = [];
+      for (const record of records) {
+        const group = this.transformGroupRecord(record);
+
+        // Get the event_id from the linked record
+        const eventLink = record.fields[GROUPS_FIELD_IDS.event_id];
+        if (Array.isArray(eventLink) && eventLink.length > 0) {
+          try {
+            const eventRecord = await this.base(EVENTS_TABLE_ID).find(eventLink[0]);
+            group.eventId = (eventRecord.fields[EVENTS_FIELD_IDS.event_id] || eventRecord.fields[EVENTS_FIELD_IDS.legacy_booking_id] || '') as string;
+          } catch (err) {
+            console.warn('Could not fetch event record:', err);
+          }
+        }
+
+        groups.push(group);
+      }
+
+      return groups;
+    } catch (error) {
+      console.error('Error getting groups for class:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Verify that a teacher owns a group (via event ownership)
+   */
+  async verifyTeacherOwnsGroup(groupId: string, teacherEmail: string): Promise<boolean> {
+    try {
+      const group = await this.getGroupById(groupId);
+      if (!group || !group.eventId) {
+        return false;
+      }
+
+      // Check if teacher has access to this event
+      const event = await this.getTeacherEventDetail(group.eventId, teacherEmail);
+      return event !== null;
+    } catch (error) {
+      console.error('Error verifying group ownership:', error);
+      return false;
     }
   }
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { TeacherEventView, TeacherClassView, Song } from '@/lib/types/teacher';
+import { TeacherEventView, TeacherClassView, Song, ClassGroup } from '@/lib/types/teacher';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 function formatDate(dateStr: string): string {
@@ -332,6 +332,655 @@ function SongCard({ song, onDelete }: { song: Song; onDelete: (songId: string) =
   );
 }
 
+interface EditClassModalProps {
+  classId: string;
+  className: string;
+  numChildren?: number;
+  onClose: () => void;
+  onClassUpdated: () => void;
+}
+
+function EditClassModal({ classId, className: initialName, numChildren: initialChildren, onClose, onClassUpdated }: EditClassModalProps) {
+  const [className, setClassName] = useState(initialName);
+  const [numChildren, setNumChildren] = useState(initialChildren?.toString() || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!className.trim()) {
+      setError('Bitte geben Sie einen Klassennamen ein');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/teacher/classes/${encodeURIComponent(classId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          className: className.trim(),
+          numChildren: numChildren ? parseInt(numChildren, 10) : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Fehler beim Aktualisieren');
+      }
+
+      onClassUpdated();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler beim Aktualisieren');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Klasse bearbeiten</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Klassenname <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={className}
+              onChange={(e) => setClassName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500"
+              placeholder="z.B. Klasse 3a, Jahrgang 2, etc."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Anzahl Kinder
+            </label>
+            <input
+              type="number"
+              value={numChildren}
+              onChange={(e) => setNumChildren(e.target.value)}
+              min="0"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500"
+              placeholder="z.B. 25"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Abbrechen
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? 'Speichern...' : 'Speichern'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+interface DeleteClassModalProps {
+  classId: string;
+  className: string;
+  onClose: () => void;
+  onClassDeleted: () => void;
+}
+
+function DeleteClassModal({ classId, className, onClose, onClassDeleted }: DeleteClassModalProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/teacher/classes/${encodeURIComponent(classId)}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Fehler beim Löschen');
+      }
+
+      onClassDeleted();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler beim Löschen');
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Klasse löschen</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-yellow-800">Achtung</p>
+              <p className="text-sm text-yellow-700 mt-1">
+                Möchten Sie die Klasse <strong>&quot;{className}&quot;</strong> wirklich löschen?
+                Diese Aktion kann nicht rückgängig gemacht werden.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isDeleting}
+            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            Abbrechen
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+          >
+            {isDeleting ? 'Löschen...' : 'Löschen'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CreateGroupModalProps {
+  eventId: string;
+  classes: TeacherClassView[];
+  onClose: () => void;
+  onGroupCreated: () => void;
+}
+
+function CreateGroupModal({ eventId, classes, onClose, onGroupCreated }: CreateGroupModalProps) {
+  const [groupName, setGroupName] = useState('');
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  // Filter out default classes from selection
+  const availableClasses = classes.filter(c => !c.isDefault);
+
+  const toggleClass = (classId: string) => {
+    setSelectedClassIds(prev =>
+      prev.includes(classId)
+        ? prev.filter(id => id !== classId)
+        : [...prev, classId]
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!groupName.trim()) {
+      setError('Bitte geben Sie einen Gruppennamen ein');
+      return;
+    }
+
+    if (selectedClassIds.length < 2) {
+      setError('Bitte wählen Sie mindestens 2 Klassen aus');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/groups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          groupName: groupName.trim(),
+          memberClassIds: selectedClassIds,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Fehler beim Erstellen');
+      }
+
+      onGroupCreated();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler beim Erstellen');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Klassen zusammen singen lassen</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-blue-800">Gruppen-Aufnahme</p>
+              <p className="text-sm text-blue-700 mt-1">
+                Eine Gruppe erhält eine gemeinsame Audio-Aufnahme.
+                Fügen Sie nach der Erstellung Lieder zur Gruppe hinzu.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Gruppenname <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500"
+              placeholder="z.B. Klassen 2a + 2b, Schulchor, etc."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Klassen auswählen <span className="text-red-500">*</span>
+              <span className="font-normal text-gray-500 ml-1">(mindestens 2)</span>
+            </label>
+            {availableClasses.length < 2 ? (
+              <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                <p className="text-sm">Sie benötigen mindestens 2 Klassen, um eine Gruppe zu erstellen.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {availableClasses.map((cls) => (
+                  <label
+                    key={cls.classId}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedClassIds.includes(cls.classId)
+                        ? 'border-pink-500 bg-pink-50'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedClassIds.includes(cls.classId)}
+                      onChange={() => toggleClass(cls.classId)}
+                      className="w-4 h-4 text-pink-600 border-gray-300 rounded focus:ring-pink-500"
+                    />
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{cls.className}</p>
+                      <p className="text-sm text-gray-500">
+                        {cls.numChildren ? `${cls.numChildren} Kinder` : 'Keine Kinderanzahl'}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedClassIds.length > 0 && (
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">{selectedClassIds.length}</span> Klasse(n) ausgewählt
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Abbrechen
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || availableClasses.length < 2}
+              className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? 'Wird erstellt...' : 'Gruppe erstellen'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+interface DeleteGroupModalProps {
+  groupId: string;
+  groupName: string;
+  onClose: () => void;
+  onGroupDeleted: () => void;
+}
+
+function DeleteGroupModal({ groupId, groupName, onClose, onGroupDeleted }: DeleteGroupModalProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/teacher/groups/${encodeURIComponent(groupId)}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Fehler beim Löschen');
+      }
+
+      onGroupDeleted();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler beim Löschen');
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Gruppe löschen</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-yellow-800">Achtung</p>
+              <p className="text-sm text-yellow-700 mt-1">
+                Möchten Sie die Gruppe <strong>&quot;{groupName}&quot;</strong> wirklich löschen?
+                Die einzelnen Klassen bleiben erhalten.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isDeleting}
+            className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            Abbrechen
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+          >
+            {isDeleting ? 'Löschen...' : 'Löschen'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GroupCard({
+  group,
+  eventId,
+  isEditable,
+  onGroupsUpdated,
+}: {
+  group: ClassGroup;
+  eventId: string;
+  isEditable: boolean;
+  onGroupsUpdated: () => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showAddSong, setShowAddSong] = useState(false);
+  const [showDeleteGroup, setShowDeleteGroup] = useState(false);
+
+  const handleDeleteSong = async (songId: string) => {
+    try {
+      const response = await fetch(`/api/teacher/songs/${songId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete song');
+      }
+
+      onGroupsUpdated();
+    } catch (err) {
+      console.error('Error deleting song:', err);
+      alert('Fehler beim Löschen des Liedes');
+    }
+  };
+
+  const memberClassNames = group.memberClasses?.map(c => c.className).join(', ') || '';
+
+  return (
+    <div className="bg-white rounded-xl border-2 border-purple-200 shadow-sm overflow-hidden">
+      {/* Group Header - Always Visible */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-5 py-4 flex items-center justify-between hover:bg-purple-50/50 transition-colors"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+            <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </div>
+          <div className="text-left">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900">{group.groupName}</h3>
+              <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-medium">
+                Gruppe
+              </span>
+            </div>
+            <p className="text-sm text-gray-500">
+              {memberClassNames || 'Keine Klassen'} · {group.songs.length} {group.songs.length === 1 ? 'Lied' : 'Lieder'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Audio Status Badges */}
+          <div className="flex gap-1">
+            {group.audioStatus.hasRawAudio && (
+              <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">Raw</span>
+            )}
+            {group.audioStatus.hasPreview && (
+              <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded">Vorschau</span>
+            )}
+            {group.audioStatus.hasFinal && (
+              <span className="px-2 py-0.5 text-xs bg-green-100 text-green-600 rounded">Final</span>
+            )}
+          </div>
+          {/* Delete button */}
+          {isEditable && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteGroup(true);
+              }}
+              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+              title="Gruppe löschen"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
+          <svg
+            className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="border-t border-purple-100 px-5 py-4">
+          {/* Member Classes Info */}
+          <div className="mb-4 p-3 bg-purple-50 rounded-lg">
+            <p className="text-sm font-medium text-purple-800 mb-1">Enthaltene Klassen:</p>
+            <p className="text-sm text-purple-700">{memberClassNames || 'Keine Klassen zugewiesen'}</p>
+          </div>
+
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-medium text-gray-700">Lieder für diese Gruppe</h4>
+            {isEditable && (
+              <button
+                onClick={() => setShowAddSong(true)}
+                className="text-sm text-pink-600 hover:text-pink-700 font-medium flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Lied hinzufügen
+              </button>
+            )}
+          </div>
+
+          {group.songs.length === 0 ? (
+            <div className="text-center py-6 text-gray-500">
+              <svg
+                className="w-8 h-8 mx-auto mb-2 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                />
+              </svg>
+              <p className="text-sm">Noch keine Lieder für diese Gruppe</p>
+              {isEditable && (
+                <button
+                  onClick={() => setShowAddSong(true)}
+                  className="mt-2 text-sm text-pink-600 hover:text-pink-700"
+                >
+                  Erstes Lied hinzufügen
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {group.songs.map((song) => (
+                <SongCard key={song.id} song={song} onDelete={isEditable ? handleDeleteSong : () => {}} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Song Modal - Uses group ID as class ID */}
+      {showAddSong && (
+        <AddSongModal
+          classId={group.groupId}
+          eventId={eventId}
+          onClose={() => setShowAddSong(false)}
+          onSongAdded={onGroupsUpdated}
+        />
+      )}
+
+      {/* Delete Group Modal */}
+      {showDeleteGroup && (
+        <DeleteGroupModal
+          groupId={group.groupId}
+          groupName={group.groupName}
+          onClose={() => setShowDeleteGroup(false)}
+          onGroupDeleted={onGroupsUpdated}
+        />
+      )}
+    </div>
+  );
+}
+
 function ClassCard({
   cls,
   eventId,
@@ -345,6 +994,8 @@ function ClassCard({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showAddSong, setShowAddSong] = useState(false);
+  const [showEditClass, setShowEditClass] = useState(false);
+  const [showDeleteClass, setShowDeleteClass] = useState(false);
 
   const handleDeleteSong = async (songId: string) => {
     try {
@@ -409,6 +1060,35 @@ function ClassCard({
               <span className="px-2 py-0.5 text-xs bg-green-100 text-green-600 rounded">Final</span>
             )}
           </div>
+          {/* Edit/Delete buttons - only for editable non-default classes */}
+          {isEditable && !cls.isDefault && (
+            <div className="flex gap-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowEditClass(true);
+                }}
+                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                title="Klasse bearbeiten"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDeleteClass(true);
+                }}
+                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                title="Klasse löschen"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          )}
           <svg
             className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
             fill="none"
@@ -482,6 +1162,27 @@ function ClassCard({
           onSongAdded={onSongsUpdated}
         />
       )}
+
+      {/* Edit Class Modal */}
+      {showEditClass && (
+        <EditClassModal
+          classId={cls.classId}
+          className={cls.className}
+          numChildren={cls.numChildren}
+          onClose={() => setShowEditClass(false)}
+          onClassUpdated={onSongsUpdated}
+        />
+      )}
+
+      {/* Delete Class Modal */}
+      {showDeleteClass && (
+        <DeleteClassModal
+          classId={cls.classId}
+          className={cls.className}
+          onClose={() => setShowDeleteClass(false)}
+          onClassDeleted={onSongsUpdated}
+        />
+      )}
     </div>
   );
 }
@@ -490,15 +1191,18 @@ export default function TeacherEventDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [event, setEvent] = useState<TeacherEventView | null>(null);
+  const [groups, setGroups] = useState<ClassGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddClass, setShowAddClass] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
 
   const eventId = params.eventId as string;
 
   useEffect(() => {
     if (eventId) {
       fetchEventDetail();
+      fetchGroups();
     }
   }, [eventId]);
 
@@ -527,6 +1231,23 @@ export default function TeacherEventDetailPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchGroups = async () => {
+    try {
+      const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/groups`);
+      if (response.ok) {
+        const data = await response.json();
+        setGroups(data.groups || []);
+      }
+    } catch (err) {
+      console.error('Error fetching groups:', err);
+    }
+  };
+
+  const handleRefresh = () => {
+    fetchEventDetail();
+    fetchGroups();
   };
 
   const isEditable = event?.status !== 'completed';
@@ -641,15 +1362,27 @@ export default function TeacherEventDetailPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900">Klassen & Lieder</h2>
             {isEditable && (
-              <button
-                onClick={() => setShowAddClass(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Klasse hinzufügen
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowCreateGroup(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                  title="Mehrere Klassen für eine gemeinsame Aufnahme gruppieren"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Gruppe erstellen
+                </button>
+                <button
+                  onClick={() => setShowAddClass(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Klasse hinzufügen
+                </button>
+              </div>
             )}
           </div>
 
@@ -680,19 +1413,52 @@ export default function TeacherEventDetailPage() {
                   cls={cls}
                   eventId={event.eventId}
                   isEditable={isEditable}
-                  onSongsUpdated={fetchEventDetail}
+                  onSongsUpdated={handleRefresh}
                 />
               ))}
             </div>
           )}
         </div>
 
+        {/* Groups Section */}
+        {groups.length > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center gap-3 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Gruppen</h2>
+              <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-medium">
+                Klassen die zusammen singen
+              </span>
+            </div>
+            <div className="space-y-4">
+              {groups.map((group) => (
+                <GroupCard
+                  key={group.groupId}
+                  group={group}
+                  eventId={event.eventId}
+                  isEditable={isEditable}
+                  onGroupsUpdated={handleRefresh}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Add Class Modal */}
         {showAddClass && (
           <AddClassModal
             eventId={event.eventId}
             onClose={() => setShowAddClass(false)}
-            onClassAdded={fetchEventDetail}
+            onClassAdded={handleRefresh}
+          />
+        )}
+
+        {/* Create Group Modal */}
+        {showCreateGroup && (
+          <CreateGroupModal
+            eventId={event.eventId}
+            classes={event.classes}
+            onClose={() => setShowCreateGroup(false)}
+            onGroupCreated={handleRefresh}
           />
         )}
       </div>

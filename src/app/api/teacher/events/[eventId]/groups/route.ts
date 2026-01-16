@@ -3,8 +3,8 @@ import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 
 /**
- * GET /api/teacher/events/[eventId]/classes
- * Get all classes for an event
+ * GET /api/teacher/events/[eventId]/groups
+ * Get all class groups for an event
  */
 export async function GET(
   request: NextRequest,
@@ -19,6 +19,7 @@ export async function GET(
     const eventId = decodeURIComponent(params.eventId);
     const teacherService = getTeacherService();
 
+    // Verify teacher has access to this event
     const event = await teacherService.getTeacherEventDetail(eventId, session.email);
     if (!event) {
       return NextResponse.json(
@@ -27,22 +28,24 @@ export async function GET(
       );
     }
 
+    const groups = await teacherService.getGroupsByEventId(eventId);
+
     return NextResponse.json({
       success: true,
-      classes: event.classes,
+      groups,
     });
   } catch (error) {
-    console.error('Error fetching classes:', error);
+    console.error('Error fetching groups:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch classes' },
+      { success: false, error: 'Failed to fetch groups' },
       { status: 500 }
     );
   }
 }
 
 /**
- * POST /api/teacher/events/[eventId]/classes
- * Add a new class to an event
+ * POST /api/teacher/events/[eventId]/groups
+ * Create a new class group for an event
  */
 export async function POST(
   request: NextRequest,
@@ -55,11 +58,19 @@ export async function POST(
     }
 
     const eventId = decodeURIComponent(params.eventId);
-    const { className, numChildren } = await request.json();
+    const { groupName, memberClassIds } = await request.json();
 
-    if (!className || typeof className !== 'string' || className.trim().length === 0) {
+    // Validation
+    if (!groupName || typeof groupName !== 'string' || groupName.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Class name is required' },
+        { error: 'Group name is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(memberClassIds) || memberClassIds.length < 2) {
+      return NextResponse.json(
+        { error: 'At least 2 classes must be selected for a group' },
         { status: 400 }
       );
     }
@@ -75,35 +86,43 @@ export async function POST(
       );
     }
 
-    // Check if event is still editable (not completed)
+    // Check if event is still editable
     if (event.status === 'completed') {
       return NextResponse.json(
-        { error: 'Cannot add classes to completed events' },
+        { error: 'Cannot add groups to completed events' },
         { status: 400 }
       );
     }
 
-    // Create the class
-    const newClass = await teacherService.createClass({
+    // Verify all selected classes belong to this event
+    const eventClassIds = event.classes.map(c => c.classId);
+    const invalidClasses = memberClassIds.filter(id => !eventClassIds.includes(id));
+    if (invalidClasses.length > 0) {
+      return NextResponse.json(
+        { error: 'One or more selected classes do not belong to this event' },
+        { status: 400 }
+      );
+    }
+
+    // Create the group
+    const newGroup = await teacherService.createGroup({
       eventId,
-      className: className.trim(),
-      teacherEmail: session.email,
-      numChildren: numChildren !== undefined && numChildren !== null && numChildren !== ''
-        ? parseInt(String(numChildren), 10)
-        : undefined,
+      groupName: groupName.trim(),
+      memberClassIds,
+      createdBy: session.email,
     });
 
     return NextResponse.json({
       success: true,
-      class: newClass,
-      message: 'Class added successfully',
+      group: newGroup,
+      message: 'Group created successfully',
     });
   } catch (error) {
-    console.error('Error adding class:', error);
+    console.error('Error creating group:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to add class',
+        error: error instanceof Error ? error.message : 'Failed to create group',
       },
       { status: 500 }
     );

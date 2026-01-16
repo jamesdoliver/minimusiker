@@ -24,6 +24,20 @@ interface AudioStatus {
   schoolLogoUrl?: string;
 }
 
+// Group type for parent portal
+interface ParentGroup {
+  groupId: string;
+  groupName: string;
+  eventId: string;
+  memberClasses: { classId: string; className: string }[];
+  songs: { id: string; title: string; artist?: string }[];
+  audioStatus: {
+    hasRawAudio: boolean;
+    hasPreview: boolean;
+    hasFinal: boolean;
+  };
+}
+
 // Inner component that uses hooks
 function ParentPortalContent() {
   const router = useRouter();
@@ -41,6 +55,8 @@ function ParentPortalContent() {
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [hasDigitalAccess, setHasDigitalAccess] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [groups, setGroups] = useState<ParentGroup[]>([]);
+  const [groupAudioStatuses, setGroupAudioStatuses] = useState<Record<string, AudioStatus>>({});
 
   // Fetch shop products
   const { products: shopProducts } = useProducts({
@@ -150,6 +166,58 @@ function ParentPortalContent() {
       setAudioStatus(null);
     }
   }, [session, eventId, classId, fetchAudioStatus]);
+
+  // Fetch groups for the current class
+  const fetchGroups = useCallback(async (clsId: string, evtId: string) => {
+    try {
+      const response = await fetch(`/api/parent/groups?classId=${encodeURIComponent(clsId)}`, {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.groups) {
+          setGroups(data.groups);
+
+          // Fetch audio status for each group that has audio
+          const audioStatuses: Record<string, AudioStatus> = {};
+          for (const group of data.groups) {
+            if (group.audioStatus.hasFinal || group.audioStatus.hasPreview) {
+              try {
+                const audioResponse = await fetch(
+                  `/api/r2/class-audio-status?eventId=${encodeURIComponent(evtId)}&classId=${encodeURIComponent(group.groupId)}`,
+                  { credentials: 'include' }
+                );
+                if (audioResponse.ok) {
+                  const audioData = await audioResponse.json();
+                  if (audioData.success && audioData.data) {
+                    audioStatuses[group.groupId] = audioData.data;
+                  }
+                }
+              } catch (err) {
+                console.error(`Error fetching audio for group ${group.groupId}:`, err);
+              }
+            }
+          }
+          setGroupAudioStatuses(audioStatuses);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching groups:', err);
+      setGroups([]);
+    }
+  }, []);
+
+  // Fetch groups when class changes
+  useEffect(() => {
+    if (!session) return;
+    if (classId && eventId) {
+      fetchGroups(classId, eventId);
+    } else {
+      setGroups([]);
+      setGroupAudioStatuses({});
+    }
+  }, [session, classId, eventId, fetchGroups]);
 
   // Check digital access when event changes
   const checkDigitalAccess = useCallback(async (evId: string) => {
@@ -457,6 +525,53 @@ function ParentPortalContent() {
           </div>
         </section>
       )}
+
+      {/* Group Audio Sections - Show audio for groups the class belongs to */}
+      {groups.filter(g => groupAudioStatuses[g.groupId]?.hasAudio).map((group) => {
+        const groupAudio = groupAudioStatuses[group.groupId];
+        if (!groupAudio?.hasAudio || !groupAudio.audioUrl) return null;
+
+        return (
+          <section key={group.groupId} className="bg-purple-50 py-12">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-purple-200">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">{group.groupName}</h3>
+                    <p className="text-sm text-purple-600 font-medium">
+                      Gruppen-Aufnahme: {group.memberClasses.map(c => c.className).join(' + ')}
+                    </p>
+                  </div>
+                </div>
+
+                <PreviewPlayer
+                  eventId={eventId || 'demo'}
+                  classId={group.groupId}
+                  className={group.groupName}
+                  audioUrl={groupAudio.audioUrl}
+                  isLocked={true}
+                  previewLimit={10}
+                  fadeOutDuration={1}
+                  title={`${group.groupName} - Gruppenaufnahme`}
+                  previewBadge={tPreview('previewBadge')}
+                  previewMessage={tPreview('previewMessage')}
+                />
+
+                <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                  <p className="text-sm text-purple-800">
+                    Diese Aufnahme enthält alle Klassen der Gruppe: {group.memberClasses.map(c => c.className).join(', ')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      })}
 
       {/* Main Content - Shopping Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
