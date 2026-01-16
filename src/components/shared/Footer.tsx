@@ -1,72 +1,40 @@
 import Link from 'next/link';
 
 export default function Footer() {
-  const currentYear = new Date().getFullYear();
-
   return (
-    <footer className="bg-gray-50 border-t">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center space-x-2 mb-4">
-              <img
-                src="/images/minimusiker_logo.jpeg"
-                alt="MiniMusiker"
-                className="h-8 w-auto"
-              />
-              <h3 className="text-lg font-bold text-gray-900">MiniMusiker</h3>
-            </div>
-            <p className="text-sm text-gray-600 mb-4">
-              Connecting schools, parents, and memories through music events.
+    <footer className="bg-[#f8f7f4] border-t border-gray-200 py-8">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="text-sm text-gray-500">
+            <p className="font-medium text-gray-700">Minimusiker</p>
+            <p className="text-xs text-gray-400">powered by Guesstimate Nexus</p>
+            <p className="mt-2 font-medium text-gray-600">Polytope Management Group</p>
+            <p>Guesstimate Loftyard Studios</p>
+            <p>Willdenowstraße 4, 13353 Berlin</p>
+            <p className="mt-2">
+              <a
+                href="mailto:support@minimusiker.de"
+                className="hover:text-pink-600 transition-colors"
+              >
+                support@minimusiker.de
+              </a>
             </p>
           </div>
-
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">
-              Quick Links
-            </h4>
-            <ul className="space-y-2">
-              <li>
-                <Link href="/about" className="text-sm text-gray-600 hover:text-gray-900">
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="text-sm text-gray-600 hover:text-gray-900">
-                  Contact
-                </Link>
-              </li>
-              <li>
-                <Link href="/faq" className="text-sm text-gray-600 hover:text-gray-900">
-                  FAQ
-                </Link>
-              </li>
-            </ul>
+          <div className="flex gap-4 text-sm text-gray-500">
+            <Link
+              href="/datenschutz"
+              className="hover:text-pink-600 transition-colors"
+            >
+              Datenschutz
+            </Link>
+            <span>|</span>
+            <Link
+              href="/agb"
+              className="hover:text-pink-600 transition-colors"
+            >
+              AGB
+            </Link>
           </div>
-
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4">
-              Legal
-            </h4>
-            <ul className="space-y-2">
-              <li>
-                <Link href="/privacy" className="text-sm text-gray-600 hover:text-gray-900">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="text-sm text-gray-600 hover:text-gray-900">
-                  Terms of Service
-                </Link>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="mt-8 pt-8 border-t border-gray-200">
-          <p className="text-center text-sm text-gray-600">
-            © {currentYear} MiniMusiker. All rights reserved.
-          </p>
         </div>
       </div>
     </footer>

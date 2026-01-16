@@ -74,16 +74,6 @@ export default function ImpressumPage() {
             </div>
           </section>
         </div>
-
-        {/* Back link */}
-        <div className="mt-8 text-center">
-          <a
-            href="/familie-login"
-            className="text-pink-600 hover:text-pink-700 font-medium"
-          >
-            ← Zurück zur Startseite
-          </a>
-        </div>
       </div>
     </div>
   );
