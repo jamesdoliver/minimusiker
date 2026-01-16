@@ -22,6 +22,7 @@ interface ClothingProductCardProps {
     quantity: number
   ) => void;
   isAdded?: boolean;
+  className?: string;
 }
 
 export default function ClothingProductCard({
@@ -35,7 +36,8 @@ export default function ClothingProductCard({
   showTshirtSize,
   showHoodieSize,
   onAdd,
-  isAdded = false
+  isAdded = false,
+  className = ''
 }: ClothingProductCardProps) {
   const [tshirtSize, setTshirtSize] = useState<TshirtSize>(TSHIRT_SIZES[2]);
   const [hoodieSize, setHoodieSize] = useState<HoodieSize>(HOODIE_SIZES[1]);
@@ -58,7 +60,8 @@ export default function ClothingProductCard({
         'relative flex flex-col p-6 rounded-xl border-2 transition-all duration-200 bg-white',
         isAdded
           ? 'border-sage-400 shadow-md'
-          : 'border-gray-200 hover:border-sage-300 hover:shadow-md'
+          : 'border-gray-200 hover:border-sage-300 hover:shadow-md',
+        className
       )}
     >
       {/* Savings Badge */}

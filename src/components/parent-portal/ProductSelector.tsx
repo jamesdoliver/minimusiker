@@ -5,6 +5,8 @@ import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { ParentSessionChild } from '@/types/airtable';
 import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/stock';
+import { useProducts } from '@/lib/hooks/useProducts';
+import { Product } from '@/lib/types/airtable';
 import AudioProductCard from './AudioProductCard';
 import ClothingProductCard from './ClothingProductCard';
 
@@ -13,7 +15,7 @@ import ClothingProductCard from './ClothingProductCard';
 // ============================================================================
 
 type AudioProductId = 'minicard' | 'cd' | 'tonie' | 'minicard-cd-bundle';
-type ClothingProductId = 'tshirt' | 'hoodie';
+type ClothingProductId = 'tshirt' | 'hoodie' | 'tshirt-hoodie';
 
 interface AudioSelection {
   productId: AudioProductId;
@@ -138,6 +140,16 @@ const CLOTHING_PRODUCTS: ClothingProduct[] = [
     imageSrc: '/images/products/hoodie.jpeg',
     showTshirtSize: false,
     showHoodieSize: true,
+  },
+  {
+    id: 'tshirt-hoodie',
+    name: 'T-Shirt & Hoodie',
+    description: 'Das komplette Minimusiker Set',
+    price: 59.00,
+    imageSrc: '/images/products/tshirt-hoodie-bundle.jpeg',
+    showTshirtSize: true,
+    showHoodieSize: true,
+    savings: 15,
   },
 ];
 
@@ -343,6 +355,19 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
 // MAIN PRODUCT SELECTOR COMPONENT
 // ============================================================================
 
+// Helper to find Shopify product image by variant ID
+function findProductImageByVariantId(products: Product[], variantIdSubstring: string): string | null {
+  for (const product of products) {
+    if (product.variants) {
+      const hasVariant = product.variants.some(v => v.id.includes(variantIdSubstring));
+      if (hasVariant && product.images?.length > 0) {
+        return product.images[0].url;
+      }
+    }
+  }
+  return null;
+}
+
 export default function ProductSelector({
   eventId,
   classId,
@@ -358,6 +383,58 @@ export default function ProductSelector({
     clothing: [],
   });
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Fetch products from Shopify for images (use 'all' to get all products)
+  const { products: shopifyProducts } = useProducts({ tagFilter: 'all' });
+
+  // Get Shopify product images for audio items
+  const audioImages = useMemo(() => {
+    if (!shopifyProducts || shopifyProducts.length === 0) {
+      return {
+        minicard: null,
+        cd: null,
+        tonie: null,
+        'minicard-cd-bundle': null,
+      };
+    }
+
+    // Extract variant ID substrings from our mapping (the numeric part)
+    return {
+      minicard: findProductImageByVariantId(shopifyProducts, '53258099720538'),
+      cd: findProductImageByVariantId(shopifyProducts, '53258098639194'),
+      tonie: findProductImageByVariantId(shopifyProducts, '53271523557722'),
+      'minicard-cd-bundle': findProductImageByVariantId(shopifyProducts, '53327238824282'),
+    };
+  }, [shopifyProducts]);
+
+  // Get Shopify product images for clothing items
+  const clothingImages = useMemo(() => {
+    if (!shopifyProducts || shopifyProducts.length === 0) {
+      return {
+        tshirt: '/images/products/tshirt.jpeg',
+        hoodie: '/images/products/hoodie.jpeg',
+        'tshirt-hoodie': '/images/products/tshirt-hoodie-bundle.jpeg',
+      };
+    }
+
+    // Extract variant ID substrings from our mapping (the numeric part)
+    const tshirtVariantId = '53328491512154'; // First T-Shirt variant
+    const hoodieVariantId = '53325998948698'; // First Hoodie variant
+
+    // Find bundle product by searching for a product with "bundle" or "set" in title
+    const bundleImage = shopifyProducts.find(p =>
+      p.title.toLowerCase().includes('bundle') ||
+      p.title.toLowerCase().includes('set') ||
+      p.title.toLowerCase().includes('t-shirt & hoodie') ||
+      p.title.toLowerCase().includes('t-shirt + hoodie')
+    )?.images?.[0]?.url;
+
+    return {
+      tshirt: findProductImageByVariantId(shopifyProducts, tshirtVariantId) || '/images/products/tshirt.jpeg',
+      hoodie: findProductImageByVariantId(shopifyProducts, hoodieVariantId) || '/images/products/hoodie.jpeg',
+      'tshirt-hoodie': bundleImage || '/images/products/tshirt-hoodie-bundle.jpeg',
+    };
+  }, [shopifyProducts]);
 
   const totals = useMemo(() => calculateTotal(selection), [selection]);
 
@@ -452,6 +529,16 @@ export default function ProductSelector({
           const variantId = SHOPIFY_VARIANT_MAP[`hoodie-${item.hoodieSize}`];
           if (variantId) {
             lineItems.push({ variantId, quantity: item.quantity });
+          }
+        } else if (item.productId === 'tshirt-hoodie' && item.tshirtSize && item.hoodieSize) {
+          // Bundle: add both t-shirt and hoodie as separate line items
+          const tshirtVariantId = SHOPIFY_VARIANT_MAP[`tshirt-${item.tshirtSize}`];
+          const hoodieVariantId = SHOPIFY_VARIANT_MAP[`hoodie-${item.hoodieSize}`];
+          if (tshirtVariantId) {
+            lineItems.push({ variantId: tshirtVariantId, quantity: item.quantity });
+          }
+          if (hoodieVariantId) {
+            lineItems.push({ variantId: hoodieVariantId, quantity: item.quantity });
           }
         }
       });
@@ -548,7 +635,7 @@ export default function ProductSelector({
           <h3 className="text-lg font-bold text-gray-900">{t('chooseAudio')}</h3>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {AUDIO_PRODUCTS.map((product) => (
             <AudioProductCard
               key={product.id}
@@ -556,6 +643,7 @@ export default function ProductSelector({
               name={product.name}
               description={product.description}
               price={product.price}
+              imageSrc={audioImages[product.id as keyof typeof audioImages] || undefined}
               imageEmoji={product.imageEmoji}
               isSelected={isAudioSelected(product.id)}
               quantity={getAudioQuantity(product.id)}
@@ -590,7 +678,7 @@ export default function ProductSelector({
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {CLOTHING_PRODUCTS.map((product) => (
             <ClothingProductCard
               key={product.id}
@@ -598,11 +686,12 @@ export default function ProductSelector({
               name={product.name}
               description={product.description}
               price={product.price}
-              imageSrc={product.imageSrc}
+              imageSrc={clothingImages[product.id as keyof typeof clothingImages]}
               savings={product.savings}
               showTshirtSize={product.showTshirtSize}
               showHoodieSize={product.showHoodieSize}
               onAdd={handleAddClothing}
+              className={product.id === 'tshirt-hoodie' ? 'col-span-2 lg:col-span-1' : ''}
             />
           ))}
         </div>
@@ -618,10 +707,10 @@ export default function ProductSelector({
                 return (
                   <div key={item.id} className="flex items-center justify-between bg-sage-50 p-3 rounded-lg">
                     <div className="flex items-center gap-3">
-                      {product.imageSrc && (
+                      {clothingImages[item.productId as keyof typeof clothingImages] && (
                         <div className="relative w-12 h-12 rounded overflow-hidden">
                           <Image
-                            src={product.imageSrc}
+                            src={clothingImages[item.productId as keyof typeof clothingImages]}
                             alt={product.name}
                             fill
                             className="object-cover"

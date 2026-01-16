@@ -10,7 +10,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const tag = searchParams.get('tag') || 'minimusiker-shop';
+    const tagParam = searchParams.get('tag');
+    // Use 'all' to fetch without tag filter, otherwise default to 'minimusiker-shop'
+    const tag = tagParam === 'all' ? undefined : (tagParam || 'minimusiker-shop');
     const category = searchParams.get('category');
 
     // Fetch products from Shopify
