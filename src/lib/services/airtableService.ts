@@ -2637,11 +2637,13 @@ class AirtableService {
         const today = new Date().toISOString().split('T')[0];
 
         // Get all events with future dates and matching school name
+        // Use returnFieldsByFieldId: true so we can read results using field IDs
         const events = await this.eventsTable!.select({
           filterByFormula: `AND(
             IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${today}'),
             SEARCH(LOWER('${searchQuery.toLowerCase()}'), LOWER({${EVENTS_FIELD_IDS.school_name}}))
           )`,
+          returnFieldsByFieldId: true,
         }).all();
 
         // Group by school and count events
