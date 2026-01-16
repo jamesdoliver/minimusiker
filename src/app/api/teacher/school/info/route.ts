@@ -1,22 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
-import { updateTeacherSchoolInfo, updateSchoolBookingInfo } from '@/lib/services/teacherService';
+import {
+  updateTeacherSchoolInfo,
+  updateSchoolBookingInfo,
+  updateSchoolBookingById,
+} from '@/lib/services/teacherService';
 
 /**
  * PUT /api/teacher/school/info
  * Update school contact information for the authenticated teacher
  *
- * This endpoint updates BOTH:
- * 1. Teachers table (for teacher portal display)
- * 2. School Bookings table (for admin view - keeps data in sync)
+ * This endpoint updates:
+ * 1. Teachers table (for teacher portal display - backward compatibility)
+ * 2. School Bookings table:
+ *    - If bookingId provided: updates ONLY that specific booking
+ *    - If no bookingId: updates ALL bookings for this teacher (legacy behavior)
  *
  * Request body:
  * {
  *   address?: string,
- *   phone?: string
+ *   phone?: string,
+ *   bookingId?: string  // Airtable record ID of specific booking to update
  * }
- *
- * Note: school_email uses the teacher's email field
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -29,7 +34,7 @@ export async function PUT(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { address, phone } = body;
+    const { address, phone, bookingId } = body;
 
     // Validate input
     if (!address && !phone) {
@@ -58,18 +63,27 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Update school info in Teachers table
+    // Update school info in Teachers table (for backward compatibility)
     await updateTeacherSchoolInfo(session.email, {
       address,
       phone,
     });
 
-    // Also update School Bookings table to keep admin view in sync
-    // This runs silently - if it fails, the teacher update still succeeds
-    await updateSchoolBookingInfo(session.email, {
-      address,
-      phone,
-    });
+    // Update School Bookings table
+    // If bookingId provided, update only that specific booking
+    // Otherwise, update all bookings for this teacher (legacy behavior)
+    if (bookingId) {
+      await updateSchoolBookingById(bookingId, {
+        address,
+        phone,
+      });
+    } else {
+      // Legacy: update all bookings for this teacher
+      await updateSchoolBookingInfo(session.email, {
+        address,
+        phone,
+      });
+    }
 
     return NextResponse.json({
       success: true,

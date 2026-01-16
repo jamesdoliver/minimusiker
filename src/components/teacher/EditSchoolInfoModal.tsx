@@ -7,6 +7,7 @@ export interface EditSchoolInfoModalProps {
   onClose: () => void;
   currentAddress?: string;
   currentPhone?: string;
+  bookingId?: string; // Airtable record ID of the specific booking to update
   onSuccess: () => void; // Refresh parent data
 }
 
@@ -15,6 +16,7 @@ export function EditSchoolInfoModal({
   onClose,
   currentAddress = '',
   currentPhone = '',
+  bookingId,
   onSuccess,
 }: EditSchoolInfoModalProps) {
   const [address, setAddress] = useState(currentAddress);
@@ -65,6 +67,7 @@ export function EditSchoolInfoModal({
         body: JSON.stringify({
           address: address.trim(),
           phone: phone.trim() || undefined,
+          bookingId,
         }),
       });
 

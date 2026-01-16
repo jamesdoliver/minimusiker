@@ -158,6 +158,9 @@ export default function TeacherDashboard() {
     return upcomingEvent?.simplybookHash;
   }, [events]);
 
+  // Get current event for address/phone display and editing
+  const currentEvent = filteredEvents[currentEventIndex];
+
   // Reset index when filter changes
   useEffect(() => {
     setCurrentEventIndex(0);
@@ -213,9 +216,9 @@ export default function TeacherDashboard() {
           <div className="max-w-[1100px] mx-auto px-6">
             <SchoolInfoCard
               schoolName={teacherInfo?.schoolName || ''}
-              address={teacherInfo?.schoolAddress}
+              address={currentEvent?.schoolAddress || teacherInfo?.schoolAddress}
               email={teacherInfo?.email || ''}
-              phone={teacherInfo?.schoolPhone}
+              phone={currentEvent?.schoolPhone || teacherInfo?.schoolPhone}
               logoUrl={schoolLogoUrl || undefined}
               onEdit={() => setIsEditModalOpen(true)}
               onLogoUpload={(url) => setSchoolLogoUrl(url)}
@@ -260,8 +263,9 @@ export default function TeacherDashboard() {
       <EditSchoolInfoModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        currentAddress={teacherInfo?.schoolAddress}
-        currentPhone={teacherInfo?.schoolPhone}
+        currentAddress={currentEvent?.schoolAddress || teacherInfo?.schoolAddress}
+        currentPhone={currentEvent?.schoolPhone || teacherInfo?.schoolPhone}
+        bookingId={currentEvent?.bookingRecordId}
         onSuccess={handleInfoUpdate}
       />
 

@@ -198,6 +198,8 @@ export interface TeacherEventView {
   status: 'upcoming' | 'in-progress' | 'completed' | 'needs-setup';
   simplybookHash?: string; // Used as discount code for teacher shop
   bookingRecordId?: string; // Airtable record ID for setup navigation
+  schoolAddress?: string; // From SchoolBookings - per-booking address
+  schoolPhone?: string; // From SchoolBookings - per-booking phone
   // Progress tracking fields (for dashboard)
   progress?: {
     classesCount: number; // Number of classes created

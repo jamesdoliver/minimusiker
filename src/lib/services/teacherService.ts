@@ -376,6 +376,42 @@ class TeacherService {
     }
   }
 
+  /**
+   * Update a specific school booking's contact information by ID
+   * Used when teacher edits address/phone for a specific event
+   */
+  async updateSchoolBookingById(
+    bookingId: string,
+    data: {
+      address?: string;
+      phone?: string;
+    }
+  ): Promise<void> {
+    try {
+      // Build update object using field IDs
+      const updateFields: Record<string, string> = {};
+
+      if (data.address !== undefined) {
+        updateFields[SCHOOL_BOOKINGS_FIELD_IDS.school_address] = data.address;
+      }
+
+      if (data.phone !== undefined) {
+        updateFields[SCHOOL_BOOKINGS_FIELD_IDS.school_phone] = data.phone;
+      }
+
+      if (Object.keys(updateFields).length === 0) {
+        console.warn('[updateSchoolBookingById] No fields to update');
+        return;
+      }
+
+      await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingId, updateFields);
+      console.log(`[updateSchoolBookingById] Successfully updated booking: ${bookingId}`);
+    } catch (error) {
+      console.error('[updateSchoolBookingById] Error updating booking:', error);
+      throw new Error(`Failed to update booking: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   // =============================================================================
   // SONG CRUD OPERATIONS
   // =============================================================================
@@ -1649,7 +1685,9 @@ class TeacherService {
           classes: classViews,
           status,
           simplybookHash: schoolBooking?.simplybookHash,
-          bookingRecordId: eventData.bookingRecordId,
+          bookingRecordId: eventData.bookingRecordId || schoolBooking?.id,
+          schoolAddress: schoolBooking?.schoolAddress,
+          schoolPhone: schoolBooking?.schoolPhone,
           progress: {
             classesCount,
             expectedClasses: undefined, // TODO: Get from booking config when available
@@ -1705,6 +1743,16 @@ export async function updateSchoolBookingInfo(
 ): Promise<void> {
   const service = TeacherService.getInstance();
   return service.updateSchoolBookingInfo(teacherEmail, data);
+}
+
+// Export standalone function for updating a specific booking by ID
+// Used when teacher edits address/phone for a specific event (not all bookings)
+export async function updateSchoolBookingById(
+  bookingId: string,
+  data: { address?: string; phone?: string }
+): Promise<void> {
+  const service = TeacherService.getInstance();
+  return service.updateSchoolBookingById(bookingId, data);
 }
 
 export default TeacherService;

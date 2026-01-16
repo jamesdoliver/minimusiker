@@ -23,13 +23,22 @@ export async function GET(request: NextRequest) {
     // Get teacher's events
     const events = await teacherService.getTeacherEvents(session.email);
 
+    // Find school name from soonest upcoming event (events are sorted by date ascending)
+    const upcomingEvents = events.filter(
+      (e) => e.status === 'upcoming' || e.status === 'in-progress' || e.status === 'needs-setup'
+    );
+    // Fallback: soonest upcoming event -> first event -> session (static)
+    const displaySchoolName = upcomingEvents[0]?.schoolName
+      || events[0]?.schoolName
+      || session.schoolName;
+
     return NextResponse.json({
       success: true,
       events,
       teacher: {
         email: session.email,
         name: session.name,
-        schoolName: session.schoolName,
+        schoolName: displaySchoolName,
       },
     });
   } catch (error) {
