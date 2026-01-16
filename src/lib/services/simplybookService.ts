@@ -339,24 +339,64 @@ class SimplybookService {
   }
 
   /**
+   * Normalize region name for matching
+   * Converts separators (/, -, space) to common format and lowercases
+   * This handles mismatches like "Rhein-Main-Neckar" vs "Rhein/Main/Neckar"
+   */
+  private normalizeRegionName(name: string): string {
+    if (!name) return '';
+    // Replace all separators (dash, space) with forward slash
+    // Then lowercase for case-insensitive matching
+    return name
+      .replace(/[-\s]+/g, '/')
+      .toLowerCase()
+      .trim();
+  }
+
+  /**
    * Find Teams/Regionen record ID by region name
+   * Uses normalized substring matching to handle:
+   * - Separator differences (e.g., "Rhein-Main-Neckar" matches "Rhein/Main/Neckar")
+   * - Partial names (e.g., "Osnabrück/OWL/Paderborn" matches "Osnabrück")
    * Returns the record ID for linking, or null if not found
    */
   async findTeamsRegionenByName(regionName: string | undefined): Promise<string | null> {
     if (!regionName) return null;
 
-    try {
-      const escapedName = regionName.replace(/"/g, '\\"');
+    const normalizedInput = this.normalizeRegionName(regionName);
+    if (!normalizedInput) return null;
 
+    try {
       const records = await this.airtable
         .table(TEAMS_REGIONEN_TABLE_ID)
-        .select({
-          filterByFormula: `LOWER({Name}) = LOWER("${escapedName}")`,
-          maxRecords: 1,
-        })
+        .select({ fields: ['Name'] })
         .firstPage();
 
-      return records[0]?.id || null;
+      // Find best match using substring matching
+      // Prefer exact matches, then longest substring match
+      let bestMatch: { id: string; name: string; length: number } | null = null;
+
+      for (const record of records) {
+        const name = record.get('Name') as string;
+        if (!name) continue;
+
+        const normalizedName = this.normalizeRegionName(name);
+
+        // Exact match - return immediately
+        if (normalizedName === normalizedInput) {
+          return record.id;
+        }
+
+        // Check if Airtable name is contained in SimplyBook input
+        // e.g., "osnabrück" is in "osnabrück/owl/paderborn"
+        if (normalizedInput.includes(normalizedName)) {
+          if (!bestMatch || normalizedName.length > bestMatch.length) {
+            bestMatch = { id: record.id, name, length: normalizedName.length };
+          }
+        }
+      }
+
+      return bestMatch?.id || null;
     } catch (error) {
       console.error('Error finding Teams/Regionen by name:', error);
       return null;

@@ -185,11 +185,24 @@ function mapIntakeFields(booking) {
 }
 
 /**
- * Build a map of Teams/Regionen names to record IDs
+ * Normalize region name for matching
+ * Converts separators (/, -, space) to common format and lowercases
+ * This handles mismatches like "Rhein-Main-Neckar" vs "Rhein/Main/Neckar"
  */
-async function buildRegionMap() {
-  console.log('Building Teams/Regionen name -> ID map...');
-  const regionMap = new Map();
+function normalizeRegionName(name) {
+  if (!name) return '';
+  return name
+    .replace(/[-\s]+/g, '/')
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Build a list of Teams/Regionen with normalized names
+ */
+async function buildRegionList() {
+  console.log('Building Teams/Regionen list (with normalization)...');
+  const regions = [];
 
   const records = await airtable
     .table(TEAMS_REGIONEN_TABLE_ID)
@@ -199,12 +212,44 @@ async function buildRegionMap() {
   for (const record of records) {
     const name = record.get('Name');
     if (name) {
-      regionMap.set(name.toLowerCase(), record.id);
+      const normalized = normalizeRegionName(name);
+      regions.push({ id: record.id, name, normalized });
+      console.log(`  "${name}" -> normalized: "${normalized}"`);
     }
   }
 
-  console.log(`Found ${records.length} regions: ${[...regionMap.keys()].join(', ')}`);
-  return regionMap;
+  console.log(`Found ${regions.length} regions`);
+  return regions;
+}
+
+/**
+ * Find best matching region using substring matching
+ * Handles cases like "Osnabrück/OWL/Paderborn" matching "Osnabrück"
+ */
+function findBestRegionMatch(regionList, inputRegion) {
+  if (!inputRegion) return null;
+
+  const normalizedInput = normalizeRegionName(inputRegion);
+  if (!normalizedInput) return null;
+
+  let bestMatch = null;
+
+  for (const region of regionList) {
+    // Exact match - return immediately
+    if (region.normalized === normalizedInput) {
+      return { id: region.id, name: region.name, matchType: 'exact' };
+    }
+
+    // Check if Airtable name is contained in SimplyBook input
+    // e.g., "osnabrück" is in "osnabrück/owl/paderborn"
+    if (normalizedInput.includes(region.normalized)) {
+      if (!bestMatch || region.normalized.length > bestMatch.normalized.length) {
+        bestMatch = { ...region, matchType: 'substring' };
+      }
+    }
+  }
+
+  return bestMatch ? { id: bestMatch.id, name: bestMatch.name, matchType: bestMatch.matchType } : null;
 }
 
 /**
@@ -245,8 +290,8 @@ async function runMigration(dryRun = false, verbose = false) {
   console.log(`Mode: ${dryRun ? 'DRY RUN (no changes)' : 'LIVE'}`);
   console.log(`Verbose: ${verbose}\n`);
 
-  // Build region lookup map
-  const regionMap = await buildRegionMap();
+  // Build region list for substring matching
+  const regionList = await buildRegionList();
 
   // Get all bookings with SimplyBook IDs
   const bookings = await getBookingsToMigrate();
@@ -293,11 +338,18 @@ async function runMigration(dryRun = false, verbose = false) {
         console.log(`  - Current Airtable: region="${currentRegion}", city="${currentCity}"`);
       }
 
-      // Look up region record ID
+      // Look up region record ID using substring matching
       let regionRecordId = null;
+      let matchedRegionName = null;
       if (mapped.region) {
-        regionRecordId = regionMap.get(mapped.region.toLowerCase());
-        if (!regionRecordId) {
+        const match = findBestRegionMatch(regionList, mapped.region);
+        if (match) {
+          regionRecordId = match.id;
+          matchedRegionName = match.name;
+          if (verbose) {
+            console.log(`  - Looking up: "${mapped.region}" -> matched "${match.name}" (${match.matchType})`);
+          }
+        } else {
           console.log(`  - WARNING: Region "${mapped.region}" not found in Teams/Regionen`);
           results.regionNotMatched.push({ simplybookId, schoolName, region: mapped.region });
         }
@@ -309,7 +361,7 @@ async function runMigration(dryRun = false, verbose = false) {
       // Update region (linked field format)
       if (regionRecordId) {
         updateFields[FIELD_IDS.region] = [regionRecordId];
-        console.log(`  - Region: "${mapped.region}" -> linked record ${regionRecordId}`);
+        console.log(`  - Region: "${mapped.region}" -> "${matchedRegionName}" (${regionRecordId})`);
       } else {
         updateFields[FIELD_IDS.region] = [];
         console.log(`  - Region: (none or not matched)`);
