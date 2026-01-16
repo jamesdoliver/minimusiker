@@ -86,3 +86,4 @@ Thumbs.db
 
 # Worktrees
 .worktrees/
+.env.vercel

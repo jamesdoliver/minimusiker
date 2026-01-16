@@ -57,6 +57,9 @@ export interface SimplybookBooking {
   client_name?: string;
   client_email?: string;
   client_phone?: string;
+  client_city?: string;       // City from client record
+  client_zip?: string;        // Postal code from client record
+  client_address1?: string;   // Address from client record
   text?: string;              // Often same as client
   is_confirmed: boolean;
   status?: string;

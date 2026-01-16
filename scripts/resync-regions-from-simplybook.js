@@ -143,8 +143,9 @@ async function fetchBookingFromSimplyBook(bookingId) {
 }
 
 /**
- * Extract region and city from SimplyBook booking using the same logic as the webhook
- * (Updated with 'additional field 12' for city)
+ * Extract region and city from SimplyBook booking
+ * Region comes from unit_name (e.g., "Minimusiker Köln/Bonn" -> "Köln/Bonn")
+ * City comes from client_city or "Ort" intake field
  */
 function mapIntakeFields(booking) {
   const rawFields = booking.additional_fields || [];
@@ -168,9 +169,18 @@ function mapIntakeFields(booking) {
     return '';
   };
 
+  // Extract region from unit_name (e.g., "Minimusiker Köln/Bonn" -> "Köln/Bonn")
+  let region;
+  if (booking.unit_name) {
+    region = booking.unit_name.replace(/^Minimusiker\s+/i, '').trim() || undefined;
+  }
+
+  // City: prefer client_city, then "Ort" from intake form
+  const city = booking.client_city || findField(['ort', 'stadt', 'city']) || undefined;
+
   return {
-    region: findField(['region', 'standort', 'location', 'gebiet', 'ort']) || undefined,
-    city: findField(['stadt', 'city', 'additional field 12']) || undefined,
+    region,
+    city,
   };
 }
 

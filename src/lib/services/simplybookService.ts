@@ -290,15 +290,25 @@ class SimplybookService {
     const schoolNameFromFields = findField(['name', 'schule', 'school', 'einrichtung']);
     const schoolName = booking.client || schoolNameFromFields || booking.client_name || '';
 
+    // Extract region from unit_name (e.g., "Minimusiker Köln/Bonn" -> "Köln/Bonn")
+    let region: string | undefined;
+    if (booking.unit_name) {
+      // Strip "Minimusiker " prefix if present
+      region = booking.unit_name.replace(/^Minimusiker\s+/i, '').trim() || undefined;
+    }
+
+    // City: prefer client_city, then "Ort" from intake form
+    const city = booking.client_city || findField(['ort', 'stadt', 'city']) || undefined;
+
     return {
       schoolName,
       contactPerson: findField(['ansprechpartner', 'ansprechperson', 'contact person', 'contact', 'kontakt']) || booking.client_name || '',
       contactEmail: booking.client_email || findField(['email', 'e-mail']) || '',
       phone: booking.client_phone || findField(['telefon', 'phone', 'tel']) || undefined,
-      address: findField(['adresse', 'address', 'strasse', 'street']) || undefined,
-      postalCode: findField(['plz', 'postal', 'postleitzahl', 'postcode']) || undefined,
-      region: findField(['region', 'standort', 'location', 'gebiet', 'ort']) || undefined,
-      city: findField(['stadt', 'city', 'additional field 12']) || undefined,
+      address: findField(['adresse', 'address', 'strasse', 'street']) || booking.client_address1 || undefined,
+      postalCode: findField(['plz', 'postal', 'postleitzahl', 'postcode']) || booking.client_zip || undefined,
+      region,
+      city,
       numberOfChildren,
       costCategory,
       bookingDate,
