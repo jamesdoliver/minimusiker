@@ -4,11 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import Image from 'next/image';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import LanguageSelector from '@/components/shared/LanguageSelector';
 import PreviewPlayer from '@/components/landing/PreviewPlayer';
 import ProductSelector from '@/components/parent-portal/ProductSelector';
-import VideoCard from '@/components/parent-portal/VideoCard';
+import HeroIntroSection from '@/components/parent-portal/HeroIntroSection';
+import PreparationSection from '@/components/parent-portal/PreparationSection';
+// Note: VideoCard removed - video is now handled in HeroIntroSection
 import { CartProvider } from '@/lib/contexts/CartContext';
 import { FeaturedProducts, CartSummary, CartDrawer } from '@/components/shop';
 import { useProducts } from '@/lib/hooks/useProducts';
@@ -337,43 +340,60 @@ function ParentPortalContent() {
         </div>
       )}
 
-      {/* School Banner */}
+      {/* School Banner - Blue background */}
       <div
-        className="relative py-12 px-4"
+        className="relative py-8 md:py-12 px-4 overflow-hidden"
         style={{
-          background: `linear-gradient(135deg, ${schoolColor} 0%, ${schoolColor}dd 100%)`,
+          background: '#25A3B9',
         }}
       >
-        <div className="max-w-7xl mx-auto text-center text-sage-900">
-          <h2 className="text-3xl md:text-4xl font-bold mb-2">{schoolName}</h2>
-          <p className="text-xl opacity-95">{eventType}</p>
-          {className && (
-            <p className="text-lg mt-1 opacity-90 font-medium">
-              {tBanner('class', { className })}
+        {/* Girl Image - Positioned on the left */}
+        <div className="absolute left-4 md:left-8 lg:left-12 bottom-0 w-44 h-44 md:w-64 md:h-64 lg:w-72 lg:h-72">
+          <Image
+            src="/images/familie_portal/girl_with_headphones.png"
+            alt="Girl with headphones"
+            fill
+            className="object-contain object-bottom"
+            priority
+          />
+        </div>
+
+        {/* School Info - Centered on the page */}
+        <div className="max-w-7xl mx-auto">
+          <div className="text-white text-center py-4 md:py-8">
+            <h2 className="text-4xl md:text-5xl font-bold mb-3" style={{ color: 'white' }}>{schoolName}</h2>
+            {className && (
+              <p className="text-lg md:text-xl font-medium opacity-90">
+                {tBanner('class', { className })}
+              </p>
+            )}
+            <p className="text-xl md:text-2xl opacity-95 mt-2">{eventType}</p>
+            <p className="text-base md:text-lg mt-2 opacity-90">
+              {new Date(eventDate).toLocaleDateString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              })}
             </p>
-          )}
-          <p className="text-sm mt-2 opacity-90">
-            {new Date(eventDate).toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </p>
-          {hasMultipleChildren && selectedChild && (
-            <p className="text-sm mt-1 opacity-90">
-              {tBanner('recordingFor', { childName: selectedChild.childName })}
-            </p>
-          )}
+            {hasMultipleChildren && selectedChild && (
+              <p className="text-sm mt-1 opacity-90">
+                {tBanner('recordingFor', { childName: selectedChild.childName })}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Media Section - Only show when audio is available */}
-        {!isLoadingAudio && audioStatus?.hasAudio && audioStatus.audioUrl && (
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-            {/* Left - Audio Preview */}
+      {/* Hero Intro Section - Video and Introduction */}
+      <HeroIntroSection />
+
+      {/* Preparation Section - Yellow PDF Download */}
+      <PreparationSection />
+
+      {/* Audio Preview Section - Full width, only show when audio is available */}
+      {!isLoadingAudio && audioStatus?.hasAudio && audioStatus.audioUrl && (
+        <section className="bg-white py-12">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
                 <img src="/images/familie/mascot_logo.png" alt="" className="h-6 w-auto mr-2" />
@@ -434,16 +454,13 @@ function ParentPortalContent() {
                 )}
               </div>
             </div>
+          </div>
+        </section>
+      )}
 
-            {/* Right - Video Card */}
-            <VideoCard
-              title="Unser Video"
-              videoUrl={undefined}
-            />
-          </section>
-        )}
-
-        {/* Shopping Section - Primary hero when no audio, otherwise below media */}
+      {/* Main Content - Shopping Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Shopping Section */}
         <section className="mb-12">
           <ProductSelector
             eventId={eventId}
