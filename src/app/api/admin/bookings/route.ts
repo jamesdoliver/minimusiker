@@ -41,7 +41,7 @@ function transformToBookingWithDetails(booking: SchoolBooking): BookingWithDetai
     phone: booking.schoolPhone,
     address: booking.schoolAddress,
     postalCode: booking.schoolPostalCode,
-    region: booking.region,
+    region: Array.isArray(booking.region) ? booking.region[0] : booking.region,
     numberOfChildren: booking.estimatedChildren || 0,
     costCategory: booking.schoolSizeCategory || '<150 children',
     bookingDate: booking.startDate || '',

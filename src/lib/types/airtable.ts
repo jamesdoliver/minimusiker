@@ -98,6 +98,9 @@ export const EINRICHTUNGEN_FIELD_IDS = {
 // Personen table ID
 export const PERSONEN_TABLE_ID = 'tblu8iWectQaQGTto';
 
+// Teams/Regionen table (regions for staff assignment)
+export const TEAMS_REGIONEN_TABLE_ID = 'tblQm2nyPKU7k2N2N';
+
 // Rollen record IDs
 export const ROLLEN_IDS = {
   team: 'rec4nmwoqYehpGOC5',
@@ -443,7 +446,7 @@ export interface SchoolBooking {
   schoolPhone?: string;
   schoolAddress?: string;
   schoolPostalCode?: string;
-  region?: string;
+  region?: string[];  // Linked record IDs to Teams/Regionen
   city?: string;
   estimatedChildren?: number;
   schoolSizeCategory?: '>150 children' | '<150 children';
@@ -507,6 +510,9 @@ export const EVENTS_FIELD_IDS = {
   simplybook_booking: 'fldK7vyxLd9MxgmES',  // Linked record → SchoolBookings
   access_code: 'flduhYSy17fsa6n3x',  // Autonumber field for short URLs (e.g., 1562)
   audio_published: 'fldxrRfHZHjl8ZdIw',  // Checkbox - when true, audio preview visible to parents
+  school_address: 'fldl7AAISoormK5Lr',  // School address (synced from booking)
+  school_phone: 'fldLPXOAWpGyYXoIT',    // School phone (synced from booking)
+  teachers: 'fldivuUPiW6Q09vce',        // Linked record → Teachers
 } as const;
 
 // Classes Table - 1 row per class
@@ -627,6 +633,10 @@ export interface Event {
   r2_event_folder?: string;             // R2 path: events/{event_id}/
   printables_generated?: boolean;       // Flag indicating printables have been generated
   printables_generated_at?: string;     // ISO timestamp of last generation
+  // School contact info (synced from booking)
+  school_address?: string;
+  school_phone?: string;
+  teachers?: string[];                  // Linked record IDs → Teachers
 }
 
 /**

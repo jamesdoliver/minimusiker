@@ -115,7 +115,7 @@ class TeacherService {
         record.fields.simplybook_booking_id || record.fields[TEACHERS_FIELD_IDS.simplybook_booking_id],
       magicLinkToken: record.fields.magic_link_token || record.fields[TEACHERS_FIELD_IDS.magic_link_token],
       tokenExpiresAt: record.fields.token_expires_at || record.fields[TEACHERS_FIELD_IDS.token_expires_at],
-      eventIds: record.fields.events || record.fields[TEACHERS_FIELD_IDS.events],
+      linkedEvents: record.fields.linked_events || record.fields[TEACHERS_FIELD_IDS.linked_events],
       createdAt: record.fields.created_at || record.fields[TEACHERS_FIELD_IDS.created_at] || record.createdTime,
       // New fields for portal revamp
       region: record.fields.region || record.fields[TEACHERS_FIELD_IDS.region],
@@ -192,6 +192,10 @@ class TeacherService {
     phone?: string;
     schoolName: string;
     simplybookBookingId?: string;
+    schoolAddress?: string;
+    schoolPhone?: string;
+    region?: string;
+    linkedEventId?: string;
   }): Promise<Teacher> {
     try {
       const record = await this.base(TEACHERS_TABLE).create({
@@ -201,6 +205,10 @@ class TeacherService {
         school_name: data.schoolName,
         simplybook_booking_id: data.simplybookBookingId,
         created_at: new Date().toISOString(),
+        school_address: data.schoolAddress,
+        school_phone: data.schoolPhone,
+        region: data.region,
+        linked_events: data.linkedEventId ? [data.linkedEventId] : [],
       });
 
       return this.transformTeacherRecord(record);
@@ -279,14 +287,54 @@ class TeacherService {
     phone?: string;
     schoolName: string;
     simplybookBookingId?: string;
+    schoolAddress?: string;
+    schoolPhone?: string;
+    region?: string;
+    eventRecordId?: string;
   }): Promise<Teacher> {
     let teacher = await this.getTeacherByEmail(data.email);
 
     if (!teacher) {
-      teacher = await this.createTeacher(data);
+      // Create new teacher with all data including linked event
+      teacher = await this.createTeacher({
+        email: data.email,
+        name: data.name,
+        phone: data.phone,
+        schoolName: data.schoolName,
+        simplybookBookingId: data.simplybookBookingId,
+        schoolAddress: data.schoolAddress,
+        schoolPhone: data.schoolPhone,
+        region: data.region,
+        linkedEventId: data.eventRecordId,
+      });
+    } else if (data.eventRecordId) {
+      // Teacher exists - link this event to them
+      await this.linkEventToTeacher(teacher.id, data.eventRecordId);
     }
 
     return teacher;
+  }
+
+  /**
+   * Link an event to an existing teacher
+   * Appends the event ID to the teacher's linked_events field
+   */
+  async linkEventToTeacher(teacherId: string, eventRecordId: string): Promise<void> {
+    try {
+      // Get current linked events
+      const records = await this.base(TEACHERS_TABLE).find(teacherId);
+      const currentLinkedEvents = (records.get('linked_events') as string[]) || [];
+
+      // Only add if not already linked
+      if (!currentLinkedEvents.includes(eventRecordId)) {
+        await this.base(TEACHERS_TABLE).update(teacherId, {
+          linked_events: [...currentLinkedEvents, eventRecordId],
+        });
+      }
+    } catch (error) {
+      console.error('Error linking event to teacher:', error);
+      // Non-blocking - don't throw
+    }
   }
 
   /**
@@ -388,6 +436,7 @@ class TeacherService {
   /**
    * Update a specific school booking's contact information by ID
    * Used when teacher edits address/phone for a specific event
+   * Also cascades updates to the linked Events record
    */
   async updateSchoolBookingById(
     bookingId: string,
@@ -415,6 +464,22 @@ class TeacherService {
 
       await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingId, updateFields);
       console.log(`[updateSchoolBookingById] Successfully updated booking: ${bookingId}`);
+
+      // Cascade update to linked Event record
+      try {
+        const airtableService = getAirtableService();
+        const linkedEvent = await airtableService.getEventByBookingRecordId(bookingId);
+        if (linkedEvent) {
+          await airtableService.updateEvent(linkedEvent.id, {
+            school_address: data.address,
+            school_phone: data.phone,
+          });
+          console.log(`[updateSchoolBookingById] Cascaded update to Event: ${linkedEvent.id}`);
+        }
+      } catch (eventError) {
+        // Log but don't fail - booking update succeeded
+        console.error('[updateSchoolBookingById] Failed to cascade to Event:', eventError);
+      }
     } catch (error) {
       console.error('[updateSchoolBookingById] Error updating booking:', error);
       throw new Error(`Failed to update booking: ${error instanceof Error ? error.message : 'Unknown error'}`);

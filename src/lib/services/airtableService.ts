@@ -4244,7 +4244,9 @@ class AirtableService {
     schoolName: string,
     eventDate: string,
     staffId?: string,
-    eventType?: string
+    eventType?: string,
+    schoolAddress?: string,
+    schoolPhone?: string
   ): Promise<Event> {
     this.ensureNormalizedTablesInitialized();
 
@@ -4276,6 +4278,14 @@ class AirtableService {
       // Add staff assignment if provided
       if (staffId) {
         eventFields[EVENTS_FIELD_IDS.assigned_staff] = [staffId];
+      }
+
+      // Add school contact info if provided
+      if (schoolAddress) {
+        eventFields[EVENTS_FIELD_IDS.school_address] = schoolAddress;
+      }
+      if (schoolPhone) {
+        eventFields[EVENTS_FIELD_IDS.school_phone] = schoolPhone;
       }
 
       const record = await this.base(EVENTS_TABLE_ID).create(eventFields);
@@ -4358,6 +4368,60 @@ class AirtableService {
     } catch (error) {
       console.error('Error fetching Event by access_code:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get an Event by its linked SchoolBookings record ID
+   * Used to find the Event associated with a specific booking
+   */
+  async getEventByBookingRecordId(bookingRecordId: string): Promise<Event | null> {
+    try {
+      // Find Events where simplybook_booking contains this booking record ID
+      const records = await this.base(EVENTS_TABLE_ID).select({
+        filterByFormula: `FIND("${bookingRecordId}", ARRAYJOIN({simplybook_booking}))`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (records.length === 0) {
+        return null;
+      }
+
+      return this.transformEventRecord(records[0]);
+    } catch (error) {
+      console.error('Error fetching Event by booking record ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update an Event record
+   * Used to sync school contact info from teacher portal updates
+   */
+  async updateEvent(
+    eventRecordId: string,
+    updates: {
+      school_address?: string;
+      school_phone?: string;
+    }
+  ): Promise<void> {
+    try {
+      const updateFields: Record<string, any> = {};
+
+      if (updates.school_address !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.school_address] = updates.school_address;
+      }
+      if (updates.school_phone !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.school_phone] = updates.school_phone;
+      }
+
+      if (Object.keys(updateFields).length > 0) {
+        await this.base(EVENTS_TABLE_ID).update(eventRecordId, updateFields);
+        console.log(`Updated Event ${eventRecordId} with:`, Object.keys(updateFields));
+      }
+    } catch (error) {
+      console.error('Error updating Event:', error);
+      throw new Error(`Failed to update Event: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

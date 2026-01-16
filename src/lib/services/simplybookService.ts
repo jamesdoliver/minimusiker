@@ -10,6 +10,7 @@ import {
   PERSONEN_FIELD_IDS,
   EINRICHTUNGEN_TABLE_ID,
   EINRICHTUNGEN_FIELD_IDS,
+  TEAMS_REGIONEN_TABLE_ID,
 } from '@/lib/types/airtable';
 import Airtable from 'airtable';
 
@@ -297,7 +298,7 @@ class SimplybookService {
       address: findField(['adresse', 'address', 'strasse', 'street']) || undefined,
       postalCode: findField(['plz', 'postal', 'postleitzahl', 'postcode']) || undefined,
       region: findField(['region', 'standort', 'location', 'gebiet', 'ort']) || undefined,
-      city: findField(['stadt', 'city']) || undefined,
+      city: findField(['stadt', 'city', 'additional field 12']) || undefined,
       numberOfChildren,
       costCategory,
       bookingDate,
@@ -323,6 +324,31 @@ class SimplybookService {
       return records[0]?.id || null;
     } catch (error) {
       console.error('Error finding staff by region:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Find Teams/Regionen record ID by region name
+   * Returns the record ID for linking, or null if not found
+   */
+  async findTeamsRegionenByName(regionName: string | undefined): Promise<string | null> {
+    if (!regionName) return null;
+
+    try {
+      const escapedName = regionName.replace(/"/g, '\\"');
+
+      const records = await this.airtable
+        .table(TEAMS_REGIONEN_TABLE_ID)
+        .select({
+          filterByFormula: `LOWER({Name}) = LOWER("${escapedName}")`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      return records[0]?.id || null;
+    } catch (error) {
+      console.error('Error finding Teams/Regionen by name:', error);
       return null;
     }
   }

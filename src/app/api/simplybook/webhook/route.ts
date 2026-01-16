@@ -72,6 +72,13 @@ export async function POST(request: Request) {
     const mappedData = simplybookService.mapIntakeFields(booking);
     console.log('Mapped booking data:', mappedData);
 
+    // Look up Teams/Regionen record ID for linked field
+    const regionRecordId = await simplybookService.findTeamsRegionenByName(mappedData.region);
+    if (mappedData.region && !regionRecordId) {
+      console.warn(`[SimplyBook] Region not found in Teams/Regionen: "${mappedData.region}"`);
+    }
+    console.log('Region record ID found:', regionRecordId);
+
     // Find staff by region for auto-assignment
     const staffId = await simplybookService.findStaffByRegion(mappedData.region);
     console.log('Staff ID found by region:', staffId);
@@ -94,8 +101,8 @@ export async function POST(request: Request) {
       [SCHOOL_BOOKINGS_FIELD_IDS.school_phone]: mappedData.phone || '',
       [SCHOOL_BOOKINGS_FIELD_IDS.school_address]: mappedData.address || '',
       [SCHOOL_BOOKINGS_FIELD_IDS.school_postal_code]: mappedData.postalCode || '',
-      [SCHOOL_BOOKINGS_FIELD_IDS.region]: mappedData.region || '',
-      [SCHOOL_BOOKINGS_FIELD_IDS.city]: mappedData.city || mappedData.region || '',
+      [SCHOOL_BOOKINGS_FIELD_IDS.region]: regionRecordId ? [regionRecordId] : [],
+      [SCHOOL_BOOKINGS_FIELD_IDS.city]: mappedData.city || '',
       [SCHOOL_BOOKINGS_FIELD_IDS.estimated_children]: mappedData.numberOfChildren,
       [SCHOOL_BOOKINGS_FIELD_IDS.school_size_category]: mappedData.costCategory,
       [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status]: 'confirmed',
@@ -136,7 +143,9 @@ export async function POST(request: Request) {
         booking.client_name || booking.client || '',
         mappedData.bookingDate,
         staffId || undefined,
-        booking.event_name // SimplyBook service type (Minimusikertag, Minimusikertag PLUS, etc.)
+        booking.event_name, // SimplyBook service type (Minimusikertag, Minimusikertag PLUS, etc.)
+        mappedData.address, // School address
+        mappedData.phone // School phone
       );
       console.log('Created Event record:', eventRecord.id, 'event_id:', eventId);
 
@@ -214,6 +223,10 @@ export async function POST(request: Request) {
           name: mappedData.contactPerson || mappedData.schoolName,
           schoolName: mappedData.schoolName,
           simplybookBookingId: payload.booking_id,
+          schoolAddress: mappedData.address,
+          schoolPhone: mappedData.phone,
+          region: mappedData.region,
+          eventRecordId: eventRecord?.id,
         });
         console.log(`Teacher found/created: ${teacher.email} (id: ${teacher.id})`);
       } catch (teacherError) {
@@ -332,6 +345,12 @@ async function handleBookingChange(payload: SimplybookWebhookPayload) {
       schoolName: mappedData.schoolName,
     });
 
+    // Look up Teams/Regionen record ID for linked field
+    const regionRecordId = await simplybookService.findTeamsRegionenByName(mappedData.region);
+    if (mappedData.region && !regionRecordId) {
+      console.warn(`[SimplyBook] Region not found in Teams/Regionen: "${mappedData.region}"`);
+    }
+
     // Update the record with new details
     await airtable.table(SCHOOL_BOOKINGS_TABLE_ID).update(existingRecord.id, {
       [SCHOOL_BOOKINGS_FIELD_IDS.school_name]: mappedData.schoolName || '',
@@ -340,8 +359,8 @@ async function handleBookingChange(payload: SimplybookWebhookPayload) {
       [SCHOOL_BOOKINGS_FIELD_IDS.school_phone]: mappedData.phone || '',
       [SCHOOL_BOOKINGS_FIELD_IDS.school_address]: mappedData.address || '',
       [SCHOOL_BOOKINGS_FIELD_IDS.school_postal_code]: mappedData.postalCode || '',
-      [SCHOOL_BOOKINGS_FIELD_IDS.region]: mappedData.region || '',
-      [SCHOOL_BOOKINGS_FIELD_IDS.city]: mappedData.city || mappedData.region || '',
+      [SCHOOL_BOOKINGS_FIELD_IDS.region]: regionRecordId ? [regionRecordId] : [],
+      [SCHOOL_BOOKINGS_FIELD_IDS.city]: mappedData.city || '',
       [SCHOOL_BOOKINGS_FIELD_IDS.estimated_children]: mappedData.numberOfChildren,
       [SCHOOL_BOOKINGS_FIELD_IDS.school_size_category]: mappedData.costCategory,
       [SCHOOL_BOOKINGS_FIELD_IDS.start_date]: booking.start_date,
@@ -356,11 +375,18 @@ async function handleBookingChange(payload: SimplybookWebhookPayload) {
     if (mappedData.contactEmail) {
       try {
         const teacherService = getTeacherService();
+        const airtableService = getAirtableService();
+        // Try to find the linked Event for this booking
+        const linkedEvent = await airtableService.getEventByBookingRecordId(existingRecord.id);
         const teacher = await teacherService.findOrCreateTeacher({
           email: mappedData.contactEmail,
           name: mappedData.contactPerson || mappedData.schoolName,
           schoolName: mappedData.schoolName,
           simplybookBookingId: payload.booking_id,
+          schoolAddress: mappedData.address,
+          schoolPhone: mappedData.phone,
+          region: mappedData.region,
+          eventRecordId: linkedEvent?.id,
         });
         console.log(`[SimplyBook] Teacher found/created: ${teacher.email}`);
       } catch (teacherError) {

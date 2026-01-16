@@ -21,7 +21,7 @@ export const TEACHERS_FIELD_IDS = {
   simplybook_booking_id: 'fldoaHHkcyTgwaLO0', // Original SimplyBook booking reference
   magic_link_token: 'fld8HA5AkDtuLhwpY', // Current magic link token
   token_expires_at: 'fld5H6xvoPPN9wuDz', // Token expiration datetime
-  events: 'fldJeROezAUX6zfA7', // Text field for event IDs (booking_ids)
+  linked_events: 'fldJeROezAUX6zfA7', // Linked record to Events table
   created_at: 'fldmnLMTKXgQFLh1W', // When teacher was created
   linked_bookings: 'fldxukHyKQ4KEBDWv', // Linked records to bookings
   // New fields for portal revamp
@@ -72,7 +72,7 @@ export interface Teacher {
   simplybookBookingId?: string; // Original SimplyBook booking reference
   magicLinkToken?: string; // Current magic link token (null if no active token)
   tokenExpiresAt?: string; // Token expiration (ISO datetime)
-  eventIds?: string[]; // Array of booking_ids they manage
+  linkedEvents?: string[]; // Linked record IDs to Events table
   createdAt: string; // When teacher was created
   // New fields for portal revamp
   region?: string; // Region for representative assignment
