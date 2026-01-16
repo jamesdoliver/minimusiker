@@ -41,10 +41,49 @@ export default function EngineerEventDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadStates, setUploadStates] = useState<Record<string, ClassUploadState>>({});
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
+  const [isTogglingPublish, setIsTogglingPublish] = useState(false);
 
   useEffect(() => {
     fetchEventDetail();
+    fetchPublishStatus();
   }, [eventId]);
+
+  const fetchPublishStatus = async () => {
+    try {
+      const response = await fetch(`/api/engineer/events/${encodeURIComponent(eventId)}/publish`);
+      if (response.ok) {
+        const data = await response.json();
+        setIsPublished(data.published);
+      }
+    } catch (err) {
+      console.error('Error fetching publish status:', err);
+    }
+  };
+
+  const handleTogglePublish = async () => {
+    setIsTogglingPublish(true);
+    try {
+      const response = await fetch(`/api/engineer/events/${encodeURIComponent(eventId)}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ published: !isPublished }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setIsPublished(data.published);
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Failed to update publish status');
+      }
+    } catch (err) {
+      console.error('Error toggling publish:', err);
+      alert('Failed to update publish status');
+    } finally {
+      setIsTogglingPublish(false);
+    }
+  };
 
   const fetchEventDetail = async () => {
     try {
@@ -299,6 +338,50 @@ export default function EngineerEventDetailPage() {
               <p className="text-sm text-gray-500">Status</p>
               <p className="font-medium capitalize">{event.mixingStatus.replace('-', ' ')}</p>
             </div>
+          </div>
+
+          {/* Publish Toggle */}
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Publish Audio Preview</p>
+                <p className="text-xs text-gray-500">
+                  {isPublished
+                    ? 'Parents can see the 10-second audio preview'
+                    : 'Audio preview is hidden from parents'}
+                </p>
+              </div>
+              <button
+                onClick={handleTogglePublish}
+                disabled={isTogglingPublish || event.classes.every(c => !c.finalFile)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isPublished ? 'bg-green-500' : 'bg-gray-300'
+                }`}
+                title={event.classes.every(c => !c.finalFile) ? 'Upload final audio first' : undefined}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isPublished ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            {isPublished && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Live
+                </span>
+                <span className="text-xs text-gray-500">Audio preview is visible to parents</span>
+              </div>
+            )}
+            {event.classes.every(c => !c.finalFile) && (
+              <p className="mt-2 text-xs text-amber-600">
+                Upload at least one final audio file before publishing
+              </p>
+            )}
           </div>
 
           {/* Download all button */}

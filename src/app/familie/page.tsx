@@ -7,7 +7,6 @@ import Link from 'next/link';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import LanguageSelector from '@/components/shared/LanguageSelector';
 import PreviewPlayer from '@/components/landing/PreviewPlayer';
-import AudioComingSoon from '@/components/parent-portal/AudioComingSoon';
 import ProductSelector from '@/components/parent-portal/ProductSelector';
 import VideoCard from '@/components/parent-portal/VideoCard';
 import { CartProvider } from '@/lib/contexts/CartContext';
@@ -262,7 +261,7 @@ function ParentPortalContent() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
               <img
-                src="/images/minimusiker_logo.jpeg"
+                src="/images/familie/mascot_logo.png"
                 alt="MiniMusiker Logo"
                 className="h-10 w-auto"
               />
@@ -371,20 +370,16 @@ function ParentPortalContent() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Media Section - Audio Preview + Video Card side by side */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          {/* Left - Audio Preview */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-              <img src="/images/minimusiker_logo.jpeg" alt="" className="h-6 w-auto mr-2" />
-              {tPreview('title')}
-            </h3>
+        {/* Media Section - Only show when audio is available */}
+        {!isLoadingAudio && audioStatus?.hasAudio && audioStatus.audioUrl && (
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            {/* Left - Audio Preview */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <img src="/images/familie/mascot_logo.png" alt="" className="h-6 w-auto mr-2" />
+                {tPreview('title')}
+              </h3>
 
-            {isLoadingAudio ? (
-              <div className="flex items-center justify-center py-12">
-                <LoadingSpinner size="md" />
-              </div>
-            ) : audioStatus?.hasAudio && audioStatus.audioUrl ? (
               <div>
                 <PreviewPlayer
                   eventId={eventId || 'demo'}
@@ -438,23 +433,17 @@ function ParentPortalContent() {
                   </div>
                 )}
               </div>
-            ) : (
-              <AudioComingSoon
-                schoolLogoUrl={audioStatus?.schoolLogoUrl}
-                message={tPreview('comingSoon')}
-                title={tPreview('title')}
-              />
-            )}
-          </div>
+            </div>
 
-          {/* Right - Video Card */}
-          <VideoCard
-            title="Unser Video"
-            videoUrl={undefined}
-          />
-        </section>
+            {/* Right - Video Card */}
+            <VideoCard
+              title="Unser Video"
+              videoUrl={undefined}
+            />
+          </section>
+        )}
 
-        {/* Shopping Section - Full Width */}
+        {/* Shopping Section - Primary hero when no audio, otherwise below media */}
         <section className="mb-12">
           <ProductSelector
             eventId={eventId}

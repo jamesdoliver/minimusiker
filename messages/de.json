@@ -7,7 +7,7 @@
   },
   "header": {
     "minimusiker": "MiniMusiker",
-    "parentPortal": "Elternportal",
+    "parentPortal": "Familienportal",
     "welcome": "Willkommen, {firstName}!"
   },
   "childSelector": {
@@ -75,7 +75,7 @@
   },
   "shop": {
     "header": {
-      "breadcrumbPortal": "Elternportal",
+      "breadcrumbPortal": "Familienportal",
       "breadcrumbShop": "Shop",
       "title": "MiniMusiker Shop",
       "subtitle": "Exklusive Merchandise für unsere Musikfamilien"

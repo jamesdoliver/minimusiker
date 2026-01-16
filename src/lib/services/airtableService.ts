@@ -4507,6 +4507,51 @@ class AirtableService {
   }
 
   /**
+   * Get the audio publish status for an event
+   * Returns true if audio_published is checked, false otherwise
+   */
+  async getEventPublishStatus(eventId: string): Promise<boolean> {
+    try {
+      const records = await this.base(EVENTS_TABLE_ID)
+        .select({
+          filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${eventId}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${eventId}')`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        return false;
+      }
+
+      const eventFields = records[0].fields as Record<string, any>;
+      return eventFields[EVENTS_FIELD_IDS.audio_published] === true;
+    } catch (error) {
+      console.error('Error getting event publish status:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Set the audio publish status for an event
+   * When published is true, audio preview becomes visible to parents
+   */
+  async setEventPublishStatus(eventId: string, published: boolean): Promise<void> {
+    try {
+      const recordId = await this.getEventsRecordIdByBookingId(eventId);
+      if (!recordId) {
+        throw new Error(`Event not found: ${eventId}`);
+      }
+
+      await this.base(EVENTS_TABLE_ID).update(recordId, {
+        [EVENTS_FIELD_IDS.audio_published]: published,
+      } as Partial<FieldSet>);
+    } catch (error) {
+      console.error('Error setting event publish status:', error);
+      throw new Error(`Failed to update publish status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Create a new manual cost entry
    */
   async createManualCost(

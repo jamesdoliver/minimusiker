@@ -34,19 +34,23 @@ export async function GET(request: NextRequest) {
     }
 
     const r2Service = getR2Service();
+    const airtableService = getAirtableService();
     const isR2Enabled = process.env.ENABLE_DIGITAL_DELIVERY === 'true';
+
+    // First, check if the event is published (engineer must toggle this)
+    const isPublished = await airtableService.getEventPublishStatus(eventId);
 
     // Check for final audio in the new structure
     // Path: events/{eventId}/classes/{classId}/final/final.mp3
     const finalAudioKey = `${R2_PATHS.CLASS_FINAL(eventId, classId)}/final.mp3`;
 
-    let hasAudio = false;
+    let hasAudioFile = false;
     let audioUrl: string | undefined;
 
     if (isR2Enabled) {
-      hasAudio = await r2Service.fileExistsInAssetsBucket(finalAudioKey);
+      hasAudioFile = await r2Service.fileExistsInAssetsBucket(finalAudioKey);
 
-      if (hasAudio) {
+      if (hasAudioFile) {
         // Generate signed URL (1 hour expiry for preview playback)
         audioUrl = await r2Service.generateSignedUrlForAssetsBucket(finalAudioKey, 3600);
       } else {
@@ -54,17 +58,25 @@ export async function GET(request: NextRequest) {
         // Try: recordings/{eventId}/{classId}/final.mp3
         const legacyKey1 = `recordings/${eventId}/${classId}/final.mp3`;
         if (await r2Service.fileExists(legacyKey1)) {
-          hasAudio = true;
+          hasAudioFile = true;
           audioUrl = await r2Service.generateSignedUrl(legacyKey1, 3600);
         } else {
           // Try: events/{eventId}/{classId}/full.mp3
           const legacyKey2 = `events/${eventId}/${classId}/full.mp3`;
           if (await r2Service.fileExists(legacyKey2)) {
-            hasAudio = true;
+            hasAudioFile = true;
             audioUrl = await r2Service.generateSignedUrl(legacyKey2, 3600);
           }
         }
       }
+    }
+
+    // Audio is only available if file exists AND event is published
+    const hasAudio = hasAudioFile && isPublished;
+
+    // Clear audioUrl if not published (don't expose URL to unpublished audio)
+    if (!isPublished) {
+      audioUrl = undefined;
     }
 
     // If no audio, get school logo URL
@@ -83,7 +95,6 @@ export async function GET(request: NextRequest) {
       // Fallback: try to get from Airtable Einrichtung if schoolId provided
       if (!schoolLogoUrl && schoolId) {
         try {
-          const airtableService = getAirtableService();
           const airtableLogoUrl = await airtableService.getEinrichtungLogoUrl(schoolId);
           if (airtableLogoUrl) {
             schoolLogoUrl = airtableLogoUrl;
