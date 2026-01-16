@@ -206,7 +206,6 @@ export interface TeacherEventView {
     expectedClasses?: number; // Expected number of classes (from booking config)
     songsCount: number; // Total songs added across all classes
     expectedSongs?: number; // Expected songs (classes × songs_per_class, default 2)
-    hasLogo: boolean; // Whether school logo is uploaded
     registrationsCount: number; // Number of parent registrations
     totalChildrenExpected?: number; // Total expected children (from booking or sum of class totals)
     daysUntilEvent: number; // Days until event (negative if past)

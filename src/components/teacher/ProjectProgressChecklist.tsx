@@ -23,7 +23,6 @@ export function ProjectProgressChecklist({ progress }: ProjectProgressChecklistP
     expectedClasses,
     songsCount,
     expectedSongs,
-    hasLogo,
   } = progress;
 
   // Determine status for each item
@@ -70,12 +69,6 @@ export function ProjectProgressChecklist({ progress }: ProjectProgressChecklistP
       status: 'complete',
     });
   }
-
-  // Logo upload
-  items.push({
-    label: hasLogo ? 'Logo hochgeladen' : 'Logo noch nicht hochgeladen',
-    status: hasLogo ? 'complete' : 'incomplete',
-  });
 
   return (
     <div className="space-y-3">

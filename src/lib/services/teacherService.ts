@@ -1644,15 +1644,6 @@ class TeacherService {
         const classesCount = eventData.classes.size;
         const songsCount = songs.length;
 
-        // Check if school logo is uploaded
-        let hasLogo = false;
-        try {
-          const einrichtung = await getAirtableService().getEinrichtungForTeacher(teacherEmail, eventData.schoolName);
-          hasLogo = !!(einrichtung?.logoUrl);
-        } catch (error) {
-          console.error('Error checking logo status:', error);
-        }
-
         // Count registrations for this event
         const eventRecords = records.filter(
           (r) => (r.fields.booking_id || r.fields[AIRTABLE_FIELD_IDS.booking_id]) === eventId
@@ -1693,7 +1684,6 @@ class TeacherService {
             expectedClasses: undefined, // TODO: Get from booking config when available
             songsCount,
             expectedSongs,
-            hasLogo,
             registrationsCount,
             totalChildrenExpected: totalChildrenExpected > 0 ? totalChildrenExpected : undefined,
             daysUntilEvent,
