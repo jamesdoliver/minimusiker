@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { ChildRegistrationData } from '@/lib/types/registration';
 
 interface ChildInputRowProps {
@@ -19,6 +20,8 @@ export default function ChildInputRow({
   showRemove,
   error,
 }: ChildInputRowProps) {
+  const t = useTranslations('registration.childInput');
+
   return (
     <div className="border border-gray-200 rounded-lg p-4 relative bg-white">
       {showRemove && onRemove && (
@@ -26,9 +29,9 @@ export default function ChildInputRow({
           type="button"
           onClick={() => onRemove(index)}
           className="absolute top-4 right-4 text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
-          aria-label={`Remove child ${index + 1}`}
+          aria-label={`${t('remove')} ${index + 1}`}
         >
-          Remove
+          {t('remove')}
         </button>
       )}
 
@@ -39,7 +42,7 @@ export default function ChildInputRow({
             htmlFor={`child-name-${index}`}
             className="block text-sm font-medium text-gray-700 mb-2"
           >
-            Child {index + 1}: Full Name *
+            {t('nameLabel', { index: index + 1 })}
           </label>
           <input
             type="text"
@@ -50,7 +53,7 @@ export default function ChildInputRow({
             className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
               error ? 'border-red-500' : 'border-gray-300'
             }`}
-            placeholder="e.g., Emma Johnson"
+            placeholder={t('namePlaceholder')}
             required
             autoComplete="off"
           />
@@ -63,7 +66,7 @@ export default function ChildInputRow({
             htmlFor={`child-grade-${index}`}
             className="block text-sm font-medium text-gray-700 mb-2"
           >
-            Grade/Year Level (Optional)
+            {t('gradeLabel')}
           </label>
           <input
             type="text"
@@ -72,12 +75,10 @@ export default function ChildInputRow({
             value={child.gradeLevel || ''}
             onChange={(e) => onChange(index, 'gradeLevel', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            placeholder="e.g., 3rd Grade, Year 3"
+            placeholder={t('gradePlaceholder')}
             autoComplete="off"
           />
-          <p className="mt-1 text-xs text-gray-500">
-            Help us organize recordings by grade level
-          </p>
+          <p className="mt-1 text-xs text-gray-500">{t('gradeHint')}</p>
         </div>
       </div>
     </div>

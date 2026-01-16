@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
 
 interface EventSelectionStepProps {
   schoolName: string;
@@ -20,6 +21,8 @@ export default function EventSelectionStep({
   onEventSelect,
   onBack,
 }: EventSelectionStepProps) {
+  const t = useTranslations('registration.eventSelection');
+  const locale = useLocale();
   const [events, setEvents] = useState<EventOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +53,8 @@ export default function EventSelectionStep({
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    const dateLocale = locale === 'de' ? 'de-DE' : 'en-GB';
+    return date.toLocaleDateString(dateLocale, {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -62,7 +66,7 @@ export default function EventSelectionStep({
     return (
       <div className="w-full max-w-md mx-auto text-center py-8">
         <div className="w-8 h-8 border-2 border-sage-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-600">Loading events...</p>
+        <p className="text-gray-600">{t('loading')}</p>
       </div>
     );
   }
@@ -70,11 +74,9 @@ export default function EventSelectionStep({
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Select Event Date
-        </h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('title')}</h2>
         <p className="text-gray-600">
-          Choose the event date for <strong>{schoolName}</strong>
+          {t('subtitle', { schoolName })}
         </p>
       </div>
 
@@ -86,7 +88,7 @@ export default function EventSelectionStep({
 
       {events.length === 0 ? (
         <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
-          <p className="text-gray-600">No upcoming events found for this school.</p>
+          <p className="text-gray-600">{t('noEvents')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -107,8 +109,7 @@ export default function EventSelectionStep({
                     {formatDate(event.eventDate)}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    {event.classCount} class{event.classCount !== 1 ? 'es' : ''}{' '}
-                    participating
+                    {t('classesParticipating', { count: event.classCount })}
                   </div>
                 </div>
                 <div className="text-sage-600">
@@ -137,7 +138,7 @@ export default function EventSelectionStep({
           onClick={onBack}
           className="text-sm text-gray-600 hover:text-gray-900"
         >
-          &larr; Back to school search
+          &larr; {t('backToSchoolSearch')}
         </button>
       </div>
     </div>

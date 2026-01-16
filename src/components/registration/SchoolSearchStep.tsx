@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 
 interface SchoolSearchStepProps {
@@ -17,6 +18,7 @@ export default function SchoolSearchStep({
   onSchoolSelect,
   onBack,
 }: SchoolSearchStepProps) {
+  const t = useTranslations('registration.schoolSearch');
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState<SchoolResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -62,12 +64,8 @@ export default function SchoolSearchStep({
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Find Your School
-        </h2>
-        <p className="text-gray-600">
-          Enter your school name to find upcoming events
-        </p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('title')}</h2>
+        <p className="text-gray-600">{t('subtitle')}</p>
       </div>
 
       <div className="space-y-4">
@@ -76,7 +74,7 @@ export default function SchoolSearchStep({
             htmlFor="school-search"
             className="block text-sm font-medium text-gray-700 mb-1"
           >
-            School Name
+            {t('label')}
           </label>
           <div className="relative">
             <input
@@ -84,7 +82,7 @@ export default function SchoolSearchStep({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Start typing your school name..."
+              placeholder={t('placeholder')}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
               autoComplete="off"
             />
@@ -106,7 +104,7 @@ export default function SchoolSearchStep({
         {results.length > 0 && (
           <div className="space-y-2">
             <p className="text-sm text-gray-500">
-              {results.length} school{results.length !== 1 ? 's' : ''} found
+              {t('resultsFound', { count: results.length })}
             </p>
             <div className="space-y-2 max-h-64 overflow-y-auto">
               {results.map((school) => (
@@ -119,8 +117,7 @@ export default function SchoolSearchStep({
                     {school.schoolName}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {school.eventCount} upcoming event
-                    {school.eventCount !== 1 ? 's' : ''}
+                    {t('upcomingEvents', { count: school.eventCount })}
                   </div>
                 </button>
               ))}
@@ -131,21 +128,14 @@ export default function SchoolSearchStep({
         {/* No Results */}
         {hasSearched && results.length === 0 && searchQuery.length >= 2 && (
           <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
-            <p className="text-gray-600">
-              No schools found with upcoming events matching "{searchQuery}"
-            </p>
-            <p className="text-sm text-gray-500 mt-2">
-              Please check the spelling or contact your school for the
-              registration link.
-            </p>
+            <p className="text-gray-600">{t('noResults', { query: searchQuery })}</p>
+            <p className="text-sm text-gray-500 mt-2">{t('noResultsHint')}</p>
           </div>
         )}
 
         {/* Help Text */}
         {searchQuery.length < 2 && (
-          <p className="text-sm text-gray-500 text-center">
-            Type at least 2 characters to search
-          </p>
+          <p className="text-sm text-gray-500 text-center">{t('minCharsHint')}</p>
         )}
       </div>
 
@@ -155,7 +145,7 @@ export default function SchoolSearchStep({
             onClick={onBack}
             className="text-sm text-gray-600 hover:text-gray-900"
           >
-            &larr; Back
+            &larr; {t('back')}
           </button>
         </div>
       )}

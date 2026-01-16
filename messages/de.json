@@ -1,4 +1,113 @@
 {
+  "registration": {
+    "page": {
+      "title": "Eltern-Registrierung",
+      "subtitle": "Finden Sie Ihre Schule und registrieren Sie sich für eine bevorstehende Veranstaltung",
+      "loading": "Registrierungsformular wird geladen...",
+      "registerFor": "Registrierung für {schoolName}",
+      "footerQuestion": "Haben Sie einen Registrierungslink?",
+      "footerHint": "Verwenden Sie den von Ihrer Schule bereitgestellten Link",
+      "footerHelp": "Fragen? Kontaktieren Sie Ihre Schule für Hilfe.",
+      "backToClassSelection": "Zurück zur Klassenauswahl"
+    },
+    "errors": {
+      "missingParams": {
+        "title": "Registrierungslink erforderlich",
+        "message": "Diese Seite erfordert einen Registrierungslink von Ihrer Schule.",
+        "suggestion": "Bitte verwenden Sie den von Ihrer Schule bereitgestellten Registrierungslink."
+      },
+      "invalidParams": {
+        "title": "Ungültiger Registrierungslink",
+        "message": "Dieser Registrierungslink scheint ungültig oder beschädigt zu sein.",
+        "suggestion": "Bitte kontaktieren Sie Ihre Schule für den korrekten Registrierungslink."
+      },
+      "eventNotFound": {
+        "title": "Veranstaltung nicht gefunden",
+        "message": "Wir konnten diese Veranstaltung nicht in unserem System finden.",
+        "suggestion": "Die Veranstaltung wurde möglicherweise abgesagt. Bitte kontaktieren Sie Ihre Schule."
+      },
+      "noClasses": {
+        "title": "Registrierung noch nicht möglich",
+        "message": "Diese Veranstaltung ist noch nicht für die Elternregistrierung eingerichtet.",
+        "suggestion": "Bitte schauen Sie später noch einmal vorbei oder kontaktieren Sie Ihre Schule."
+      },
+      "fetchError": {
+        "title": "Fehler beim Laden",
+        "message": "Beim Laden der Veranstaltungsdetails ist ein Fehler aufgetreten.",
+        "suggestion": "Bitte versuchen Sie es später erneut oder kontaktieren Sie Ihre Schule."
+      },
+      "networkError": {
+        "title": "Verbindungsfehler",
+        "message": "Wir haben Probleme, eine Verbindung zu unseren Servern herzustellen.",
+        "suggestion": "Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut."
+      },
+      "retry": "Erneut versuchen"
+    },
+    "eventInfo": {
+      "school": "Schule",
+      "class": "Klasse",
+      "eventType": "Veranstaltungstyp",
+      "eventDate": "Veranstaltungsdatum"
+    },
+    "stepper": {
+      "school": "Schule",
+      "event": "Termin",
+      "class": "Klasse",
+      "details": "Details"
+    },
+    "schoolSearch": {
+      "title": "Finden Sie Ihre Schule",
+      "subtitle": "Geben Sie den Namen Ihrer Schule ein, um bevorstehende Veranstaltungen zu finden",
+      "label": "Schulname",
+      "placeholder": "Beginnen Sie mit der Eingabe des Schulnamens...",
+      "resultsFound": "{count} {count, plural, =1 {Schule} other {Schulen}} gefunden",
+      "upcomingEvents": "{count} bevorstehende {count, plural, =1 {Veranstaltung} other {Veranstaltungen}}",
+      "noResults": "Keine Schulen mit bevorstehenden Veranstaltungen für \"{query}\" gefunden",
+      "noResultsHint": "Bitte überprüfen Sie die Schreibweise oder kontaktieren Sie Ihre Schule für den Registrierungslink.",
+      "minCharsHint": "Geben Sie mindestens 2 Zeichen ein, um zu suchen",
+      "back": "Zurück"
+    },
+    "eventSelection": {
+      "title": "Veranstaltungsdatum auswählen",
+      "subtitle": "Wählen Sie das Veranstaltungsdatum für {schoolName}",
+      "loading": "Veranstaltungen werden geladen...",
+      "noEvents": "Keine bevorstehenden Veranstaltungen für diese Schule gefunden.",
+      "classesParticipating": "{count} {count, plural, =1 {Klasse nimmt} other {Klassen nehmen}} teil",
+      "backToSchoolSearch": "Zurück zur Schulsuche"
+    },
+    "classSelection": {
+      "title": "Wählen Sie die Klasse Ihres Kindes",
+      "loading": "Klassen werden geladen...",
+      "noClasses": "Keine Klassen für diese Veranstaltung gefunden.",
+      "teacher": "Lehrer/in: {teacherName}",
+      "parentsRegistered": "{count} {count, plural, =1 {Elternteil} other {Eltern}} registriert",
+      "backToEventSelection": "Zurück zur Veranstaltungsauswahl"
+    },
+    "form": {
+      "parentInfo": "Elterninformationen",
+      "children": "Kinder",
+      "emailLabel": "E-Mail-Adresse *",
+      "emailPlaceholder": "ihre.email@beispiel.de",
+      "firstNameLabel": "Vorname *",
+      "firstNamePlaceholder": "Sarah",
+      "phoneLabel": "Telefonnummer (Optional)",
+      "phonePlaceholder": "+49 170 1234567",
+      "addChild": "Weiteres Kind hinzufügen",
+      "registeringFor": "Registrierung für: {className} an der {schoolName}",
+      "submitButton": "Registrierung abschließen",
+      "submitting": "Ihr Konto wird erstellt...",
+      "fixErrors": "Bitte beheben Sie die unten aufgeführten Fehler",
+      "minOneChild": "Sie müssen mindestens ein Kind registrieren"
+    },
+    "childInput": {
+      "remove": "Entfernen",
+      "nameLabel": "Kind {index}: Vollständiger Name *",
+      "namePlaceholder": "z.B. Emma Müller",
+      "gradeLabel": "Klassenstufe (Optional)",
+      "gradePlaceholder": "z.B. 3. Klasse",
+      "gradeHint": "Hilft uns, die Aufnahmen nach Klassenstufe zu organisieren"
+    }
+  },
   "common": {
     "shop": "Shop",
     "signOut": "Abmelden",

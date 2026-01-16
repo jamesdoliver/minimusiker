@@ -2,12 +2,14 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useTranslations, useLocale } from 'next-intl';
 import RegistrationForm from '@/components/registration/RegistrationForm';
 import SchoolSearchStep from '@/components/registration/SchoolSearchStep';
 import EventSelectionStep from '@/components/registration/EventSelectionStep';
 import ClassSelectionStep from '@/components/registration/ClassSelectionStep';
 import RegistrationStepper from '@/components/registration/RegistrationStepper';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import LanguageSelector from '@/components/shared/LanguageSelector';
 import { EventClassDetails } from '@/lib/types/airtable';
 import { isValidEventId, isValidClassId } from '@/lib/utils/validators';
 
@@ -24,6 +26,11 @@ interface DiscoveryState {
 
 function RegistrationPageContent() {
   const searchParams = useSearchParams();
+  const t = useTranslations('registration.page');
+  const tErrors = useTranslations('registration.errors');
+  const tEventInfo = useTranslations('registration.eventInfo');
+  const tStepper = useTranslations('registration.stepper');
+  const locale = useLocale();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [eventDetails, setEventDetails] = useState<EventClassDetails | null>(null);
@@ -238,7 +245,7 @@ function RegistrationPageContent() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <LoadingSpinner size="lg" />
-          <p className="mt-4 text-gray-600">Loading registration form...</p>
+          <p className="mt-4 text-gray-600">{t('loading')}</p>
         </div>
       </div>
     );
@@ -246,44 +253,17 @@ function RegistrationPageContent() {
 
   // Error states
   if (error) {
-    const errorMessages = {
-      missing_params: {
-        title: 'Registrierungslink erforderlich',
-        message: 'Diese Seite erfordert einen Registrierungslink von Ihrer Schule.',
-        suggestion: 'Bitte verwenden Sie den von Ihrer Schule bereitgestellten Registrierungslink.',
-      },
-      invalid_params: {
-        title: 'Ungültiger Registrierungslink',
-        message: 'Dieser Registrierungslink scheint ungültig oder beschädigt zu sein.',
-        suggestion: 'Bitte kontaktieren Sie Ihre Schule für den korrekten Registrierungslink.',
-      },
-      event_not_found: {
-        title: 'Veranstaltung nicht gefunden',
-        message: 'Wir konnten diese Veranstaltung nicht in unserem System finden.',
-        suggestion:
-          'Die Veranstaltung wurde möglicherweise abgesagt. Bitte kontaktieren Sie Ihre Schule.',
-      },
-      no_classes: {
-        title: 'Registrierung noch nicht möglich',
-        message: 'Diese Veranstaltung ist noch nicht für die Elternregistrierung eingerichtet.',
-        suggestion:
-          'Bitte schauen Sie später noch einmal vorbei oder kontaktieren Sie Ihre Schule.',
-      },
-      fetch_error: {
-        title: 'Fehler beim Laden',
-        message: 'Beim Laden der Veranstaltungsdetails ist ein Fehler aufgetreten.',
-        suggestion:
-          'Bitte versuchen Sie es später erneut oder kontaktieren Sie Ihre Schule.',
-      },
-      network_error: {
-        title: 'Verbindungsfehler',
-        message: 'Wir haben Probleme, eine Verbindung zu unseren Servern herzustellen.',
-        suggestion: 'Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.',
-      },
+    // Map error codes to translation keys
+    const errorKeyMap: Record<string, string> = {
+      missing_params: 'missingParams',
+      invalid_params: 'invalidParams',
+      event_not_found: 'eventNotFound',
+      no_classes: 'noClasses',
+      fetch_error: 'fetchError',
+      network_error: 'networkError',
     };
 
-    const errorInfo =
-      errorMessages[error as keyof typeof errorMessages] || errorMessages.fetch_error;
+    const errorKey = errorKeyMap[error] || 'fetchError';
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -303,15 +283,17 @@ function RegistrationPageContent() {
               />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{errorInfo.title}</h2>
-          <p className="text-gray-600 mb-4">{errorInfo.message}</p>
-          <p className="text-sm text-gray-500 mb-6">{errorInfo.suggestion}</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {tErrors(`${errorKey}.title`)}
+          </h2>
+          <p className="text-gray-600 mb-4">{tErrors(`${errorKey}.message`)}</p>
+          <p className="text-sm text-gray-500 mb-6">{tErrors(`${errorKey}.suggestion`)}</p>
           {error === 'network_error' && (
             <button
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
             >
-              Erneut versuchen
+              {tErrors('retry')}
             </button>
           )}
         </div>
@@ -321,19 +303,33 @@ function RegistrationPageContent() {
 
   // Discovery mode - multi-step flow
   if (isDiscoveryMode && currentStep !== 'form') {
+    const stepLabels = [
+      tStepper('school'),
+      tStepper('event'),
+      tStepper('class'),
+      tStepper('details'),
+    ];
+
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4">
+          {/* Language Selector */}
+          <div className="flex justify-end mb-4">
+            <LanguageSelector />
+          </div>
+
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Parent Registration</h1>
-            <p className="text-gray-600 mt-2">
-              Find your school and register for an upcoming event
-            </p>
+            <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+            <p className="text-gray-600 mt-2">{t('subtitle')}</p>
           </div>
 
           {/* Stepper */}
-          <RegistrationStepper currentStep={getStepNumber()} totalSteps={4} />
+          <RegistrationStepper
+            currentStep={getStepNumber()}
+            totalSteps={4}
+            stepLabels={stepLabels}
+          />
 
           {/* Step Content */}
           <div className="bg-white shadow-lg rounded-lg p-8">
@@ -362,8 +358,8 @@ function RegistrationPageContent() {
           {/* Footer */}
           <div className="mt-8 text-center text-sm text-gray-500">
             <p>
-              Have a registration link?{' '}
-              <span className="text-sage-600">Use the link provided by your school</span>
+              {t('footerQuestion')}{' '}
+              <span className="text-sage-600">{t('footerHint')}</span>
             </p>
           </div>
         </div>
@@ -380,33 +376,50 @@ function RegistrationPageContent() {
   // Use discoveryState.classId when QR flow auto-selects single class, otherwise use URL param
   const effectiveClassId = discoveryState.classId || urlClassId;
 
+  const stepLabels = [
+    tStepper('school'),
+    tStepper('event'),
+    tStepper('class'),
+    tStepper('details'),
+  ];
+
+  // Locale-aware date formatting
+  const dateLocale = locale === 'de' ? 'de-DE' : 'en-GB';
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
+        {/* Language Selector */}
+        <div className="flex justify-end mb-4">
+          <LanguageSelector />
+        </div>
+
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Parent Registration</h1>
-          <p className="text-gray-600 mt-2">Register for {eventDetails.schoolName}</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+          <p className="text-gray-600 mt-2">
+            {t('registerFor', { schoolName: eventDetails.schoolName })}
+          </p>
         </div>
 
         {/* Stepper for discovery mode */}
         {isDiscoveryMode && (
-          <RegistrationStepper currentStep={4} totalSteps={4} />
+          <RegistrationStepper currentStep={4} totalSteps={4} stepLabels={stepLabels} />
         )}
 
         {/* Event Info Card */}
         <div className="bg-primary/10 border border-primary/20 rounded-lg p-6 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center md:text-left">
             <div>
-              <p className="text-sm text-gray-600 mb-1">School</p>
+              <p className="text-sm text-gray-600 mb-1">{tEventInfo('school')}</p>
               <p className="font-semibold text-gray-900">{eventDetails.schoolName}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600 mb-1">Class</p>
+              <p className="text-sm text-gray-600 mb-1">{tEventInfo('class')}</p>
               <p className="font-semibold text-gray-900">{eventDetails.className}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600 mb-1">Event Type</p>
+              <p className="text-sm text-gray-600 mb-1">{tEventInfo('eventType')}</p>
               <p className="font-semibold text-gray-900 capitalize">
                 {eventDetails.eventType}
               </p>
@@ -414,9 +427,9 @@ function RegistrationPageContent() {
           </div>
           {eventDetails.bookingDate && (
             <div className="mt-4 text-center md:text-left">
-              <p className="text-sm text-gray-600 mb-1">Event Date</p>
+              <p className="text-sm text-gray-600 mb-1">{tEventInfo('eventDate')}</p>
               <p className="font-semibold text-gray-900">
-                {new Date(eventDetails.bookingDate).toLocaleDateString('en-GB', {
+                {new Date(eventDetails.bookingDate).toLocaleDateString(dateLocale, {
                   weekday: 'long',
                   year: 'numeric',
                   month: 'long',
@@ -444,14 +457,14 @@ function RegistrationPageContent() {
               onClick={handleBack}
               className="text-sm text-gray-600 hover:text-gray-900"
             >
-              &larr; Back to class selection
+              &larr; {t('backToClassSelection')}
             </button>
           </div>
         )}
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500">
-          <p>Questions? Contact your school for assistance.</p>
+          <p>{t('footerHelp')}</p>
         </div>
       </div>
     </div>

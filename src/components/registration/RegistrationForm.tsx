@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import ChildInputRow from './ChildInputRow';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { RegistrationData, ChildRegistrationData } from '@/lib/types/registration';
@@ -31,6 +32,7 @@ export default function RegistrationForm({
   initialEmail = '',
 }: RegistrationFormProps) {
   const router = useRouter();
+  const t = useTranslations('registration.form');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -51,7 +53,7 @@ export default function RegistrationForm({
 
   const handleRemoveChild = (index: number) => {
     if (formData.children.length === 1) {
-      alert('You must register at least one child');
+      alert(t('minOneChild'));
       return;
     }
     setFormData({
@@ -130,7 +132,7 @@ export default function RegistrationForm({
 
     // Client-side validation
     if (!validateForm()) {
-      setError('Please fix the errors below');
+      setError(t('fixErrors'));
       return;
     }
 
@@ -179,13 +181,13 @@ export default function RegistrationForm({
 
       {/* Parent Information */}
       <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Parent Information</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('parentInfo')}</h2>
 
         <div className="space-y-4">
           {/* Email */}
           <div>
             <label htmlFor="parentEmail" className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address *
+              {t('emailLabel')}
             </label>
             <input
               type="email"
@@ -201,7 +203,7 @@ export default function RegistrationForm({
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
                 fieldErrors.parentEmail ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="your.email@example.com"
+              placeholder={t('emailPlaceholder')}
               required
               autoComplete="email"
             />
@@ -216,7 +218,7 @@ export default function RegistrationForm({
               htmlFor="parentFirstName"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              First Name *
+              {t('firstNameLabel')}
             </label>
             <input
               type="text"
@@ -232,7 +234,7 @@ export default function RegistrationForm({
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
                 fieldErrors.parentFirstName ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="Sarah"
+              placeholder={t('firstNamePlaceholder')}
               required
               autoComplete="given-name"
             />
@@ -244,7 +246,7 @@ export default function RegistrationForm({
           {/* Phone */}
           <div>
             <label htmlFor="parentPhone" className="block text-sm font-medium text-gray-700 mb-2">
-              Phone Number (Optional)
+              {t('phoneLabel')}
             </label>
             <input
               type="tel"
@@ -260,7 +262,7 @@ export default function RegistrationForm({
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
                 fieldErrors.parentPhone ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="+44 7700 900000"
+              placeholder={t('phonePlaceholder')}
               autoComplete="tel"
             />
             {fieldErrors.parentPhone && (
@@ -273,14 +275,14 @@ export default function RegistrationForm({
       {/* Children */}
       <div className="bg-white shadow rounded-lg p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Children</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{t('children')}</h2>
           <button
             type="button"
             onClick={handleAddChild}
             className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors text-sm flex items-center gap-2"
           >
             <span>+</span>
-            Add Another Child
+            {t('addChild')}
           </button>
         </div>
 
@@ -299,8 +301,7 @@ export default function RegistrationForm({
         </div>
 
         <p className="mt-4 text-sm text-gray-600">
-          Registering for: <span className="font-medium">{className}</span> at{' '}
-          <span className="font-medium">{schoolName}</span>
+          {t('registeringFor', { className, schoolName })}
         </p>
       </div>
 
@@ -312,7 +313,7 @@ export default function RegistrationForm({
           className="px-6 py-3 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-lg font-medium"
         >
           {isSubmitting && <LoadingSpinner size="sm" />}
-          {isSubmitting ? 'Creating Your Account...' : 'Complete Registration'}
+          {isSubmitting ? t('submitting') : t('submitButton')}
         </button>
       </div>
     </form>

@@ -1,4 +1,113 @@
 {
+  "registration": {
+    "page": {
+      "title": "Parent Registration",
+      "subtitle": "Find your school and register for an upcoming event",
+      "loading": "Loading registration form...",
+      "registerFor": "Register for {schoolName}",
+      "footerQuestion": "Have a registration link?",
+      "footerHint": "Use the link provided by your school",
+      "footerHelp": "Questions? Contact your school for assistance.",
+      "backToClassSelection": "Back to class selection"
+    },
+    "errors": {
+      "missingParams": {
+        "title": "Registration link required",
+        "message": "This page requires a registration link from your school.",
+        "suggestion": "Please use the registration link provided by your school."
+      },
+      "invalidParams": {
+        "title": "Invalid registration link",
+        "message": "This registration link appears to be invalid or corrupted.",
+        "suggestion": "Please contact your school for the correct registration link."
+      },
+      "eventNotFound": {
+        "title": "Event not found",
+        "message": "We could not find this event in our system.",
+        "suggestion": "The event may have been cancelled. Please contact your school."
+      },
+      "noClasses": {
+        "title": "Registration not yet available",
+        "message": "This event is not yet set up for parent registration.",
+        "suggestion": "Please check back later or contact your school."
+      },
+      "fetchError": {
+        "title": "Error loading",
+        "message": "An error occurred while loading event details.",
+        "suggestion": "Please try again later or contact your school."
+      },
+      "networkError": {
+        "title": "Connection error",
+        "message": "We are having trouble connecting to our servers.",
+        "suggestion": "Please check your internet connection and try again."
+      },
+      "retry": "Retry"
+    },
+    "eventInfo": {
+      "school": "School",
+      "class": "Class",
+      "eventType": "Event Type",
+      "eventDate": "Event Date"
+    },
+    "stepper": {
+      "school": "School",
+      "event": "Event",
+      "class": "Class",
+      "details": "Details"
+    },
+    "schoolSearch": {
+      "title": "Find Your School",
+      "subtitle": "Enter your school name to find upcoming events",
+      "label": "School Name",
+      "placeholder": "Start typing your school name...",
+      "resultsFound": "{count} {count, plural, =1 {school} other {schools}} found",
+      "upcomingEvents": "{count} upcoming {count, plural, =1 {event} other {events}}",
+      "noResults": "No schools found with upcoming events matching \"{query}\"",
+      "noResultsHint": "Please check the spelling or contact your school for the registration link.",
+      "minCharsHint": "Type at least 2 characters to search",
+      "back": "Back"
+    },
+    "eventSelection": {
+      "title": "Select Event Date",
+      "subtitle": "Choose the event date for {schoolName}",
+      "loading": "Loading events...",
+      "noEvents": "No upcoming events found for this school.",
+      "classesParticipating": "{count} {count, plural, =1 {class} other {classes}} participating",
+      "backToSchoolSearch": "Back to school search"
+    },
+    "classSelection": {
+      "title": "Select Your Child's Class",
+      "loading": "Loading classes...",
+      "noClasses": "No classes found for this event.",
+      "teacher": "Teacher: {teacherName}",
+      "parentsRegistered": "{count} {count, plural, =1 {parent} other {parents}} registered",
+      "backToEventSelection": "Back to event selection"
+    },
+    "form": {
+      "parentInfo": "Parent Information",
+      "children": "Children",
+      "emailLabel": "Email Address *",
+      "emailPlaceholder": "your.email@example.com",
+      "firstNameLabel": "First Name *",
+      "firstNamePlaceholder": "Sarah",
+      "phoneLabel": "Phone Number (Optional)",
+      "phonePlaceholder": "+49 170 1234567",
+      "addChild": "Add Another Child",
+      "registeringFor": "Registering for: {className} at {schoolName}",
+      "submitButton": "Complete Registration",
+      "submitting": "Creating Your Account...",
+      "fixErrors": "Please fix the errors below",
+      "minOneChild": "You must register at least one child"
+    },
+    "childInput": {
+      "remove": "Remove",
+      "nameLabel": "Child {index}: Full Name *",
+      "namePlaceholder": "e.g., Emma Johnson",
+      "gradeLabel": "Grade/Year Level (Optional)",
+      "gradePlaceholder": "e.g., 3rd Grade, Year 3",
+      "gradeHint": "Help us organize recordings by grade level"
+    }
+  },
   "common": {
     "shop": "Shop",
     "signOut": "Sign Out",

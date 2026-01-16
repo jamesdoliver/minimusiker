@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
 
 interface ClassSelectionStepProps {
   bookingId: string;
@@ -26,6 +27,8 @@ export default function ClassSelectionStep({
   onClassSelect,
   onBack,
 }: ClassSelectionStepProps) {
+  const t = useTranslations('registration.classSelection');
+  const locale = useLocale();
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +59,8 @@ export default function ClassSelectionStep({
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    const dateLocale = locale === 'de' ? 'de-DE' : 'en-GB';
+    return date.toLocaleDateString(dateLocale, {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
@@ -67,7 +71,7 @@ export default function ClassSelectionStep({
     return (
       <div className="w-full max-w-md mx-auto text-center py-8">
         <div className="w-8 h-8 border-2 border-sage-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-600">Loading classes...</p>
+        <p className="text-gray-600">{t('loading')}</p>
       </div>
     );
   }
@@ -75,9 +79,7 @@ export default function ClassSelectionStep({
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Select Your Child's Class
-        </h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('title')}</h2>
         <div className="text-sm text-gray-600 space-y-1">
           <p>
             <strong>{schoolName}</strong>
@@ -96,7 +98,7 @@ export default function ClassSelectionStep({
 
       {classes.length === 0 ? (
         <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
-          <p className="text-gray-600">No classes found for this event.</p>
+          <p className="text-gray-600">{t('noClasses')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -113,13 +115,12 @@ export default function ClassSelectionStep({
                   </div>
                   {classItem.teacherName && (
                     <div className="text-sm text-gray-600 mt-1">
-                      Teacher: {classItem.teacherName}
+                      {t('teacher', { teacherName: classItem.teacherName })}
                     </div>
                   )}
                   {classItem.registeredCount > 0 && (
                     <div className="text-xs text-gray-500 mt-1">
-                      {classItem.registeredCount} parent
-                      {classItem.registeredCount !== 1 ? 's' : ''} registered
+                      {t('parentsRegistered', { count: classItem.registeredCount })}
                     </div>
                   )}
                 </div>
@@ -150,7 +151,7 @@ export default function ClassSelectionStep({
             onClick={onBack}
             className="text-sm text-gray-600 hover:text-gray-900"
           >
-            &larr; Back to event selection
+            &larr; {t('backToEventSelection')}
           </button>
         </div>
       )}
