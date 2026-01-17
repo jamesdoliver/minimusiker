@@ -1234,7 +1234,7 @@ class TeacherService {
 
   /**
    * Create a new class for an event
-   * Creates a placeholder record in parent_journey_table and a record in normalized Classes table
+   * Creates a record in the normalized Classes table only
    */
   async createClass(data: {
     eventId: string;
@@ -1244,34 +1244,10 @@ class TeacherService {
     numChildren?: number;
   }): Promise<TeacherClassView> {
     try {
-      let schoolName = '';
-      let eventType = '';
-      let bookingDate = '';
-
-      // First, try to get school info from existing parent_journey records
-      const existingRecords = await this.base(PARENT_JOURNEY_TABLE)
-        .select({
-          filterByFormula: `{booking_id} = '${data.eventId.replace(/'/g, "\\'")}'`,
-          maxRecords: 1,
-        })
-        .all();
-
-      if (existingRecords.length > 0) {
-        const existing = existingRecords[0];
-        schoolName = (existing.fields.school_name || existing.fields[AIRTABLE_FIELD_IDS.school_name] || '') as string;
-        eventType = (existing.fields.event_type || existing.fields[AIRTABLE_FIELD_IDS.event_type] || '') as string;
-        bookingDate = (existing.fields.booking_date || existing.fields[AIRTABLE_FIELD_IDS.booking_date] || '') as string;
-      }
-
-      // If no parent_journey records, fall back to SchoolBookings (source of truth)
-      if (!schoolName || !bookingDate) {
-        const schoolBooking = await getAirtableService().getSchoolBookingBySimplybookId(data.eventId);
-        if (schoolBooking) {
-          schoolName = schoolName || schoolBooking.schoolName || schoolBooking.schoolContactName || '';
-          eventType = eventType || 'MiniMusiker Day';
-          bookingDate = bookingDate || schoolBooking.startDate || '';
-        }
-      }
+      // Get event info from SchoolBookings (source of truth)
+      const schoolBooking = await getAirtableService().getSchoolBookingBySimplybookId(data.eventId);
+      const schoolName = schoolBooking?.schoolName || schoolBooking?.schoolContactName || '';
+      const bookingDate = schoolBooking?.startDate || '';
 
       // Generate a consistent class_id using generateClassId() when we have the required data
       // Falls back to timestamp-based ID for backward compatibility
@@ -1284,68 +1260,36 @@ class TeacherService {
         console.warn('createClass: Missing schoolName or bookingDate, using fallback class_id format');
       }
 
-      // Create a placeholder record for this class
-      // This record serves as the class definition (no child registered yet)
-      const classFields: Record<string, unknown> = {
-        [AIRTABLE_FIELD_IDS.booking_id]: data.eventId,
-        [AIRTABLE_FIELD_IDS.class_id]: classId,
-        [AIRTABLE_FIELD_IDS.class]: data.className,
-        [AIRTABLE_FIELD_IDS.school_name]: schoolName,
-        [AIRTABLE_FIELD_IDS.event_type]: eventType,
-        [AIRTABLE_FIELD_IDS.booking_date]: bookingDate,
-        [AIRTABLE_FIELD_IDS.parent_email]: data.teacherEmail,
-        [AIRTABLE_FIELD_IDS.main_teacher]: data.teacherName || '',
-        // Placeholder values for required fields
-        [AIRTABLE_FIELD_IDS.registered_child]: '',
-        [AIRTABLE_FIELD_IDS.parent_first_name]: '',
-        [AIRTABLE_FIELD_IDS.parent_telephone]: '',
-        [AIRTABLE_FIELD_IDS.parent_id]: '',
+      // Look up the Event record to get the Airtable record ID for linking
+      const eventRecords = await this.base(EVENTS_TABLE_ID)
+        .select({
+          filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${data.eventId.replace(/'/g, "\\'")}')`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      const eventRecordId = eventRecords.length > 0 ? eventRecords[0].id : null;
+
+      // Create Class record in normalized Classes table
+      const classFields: Airtable.FieldSet = {
+        [CLASSES_FIELD_IDS.class_id]: classId,
+        [CLASSES_FIELD_IDS.class_name]: data.className,
+        [CLASSES_FIELD_IDS.main_teacher]: data.teacherName || '',
+        [CLASSES_FIELD_IDS.legacy_booking_id]: data.eventId,
       };
 
       // Only add total_children if it's a positive number
       if (data.numChildren && data.numChildren > 0) {
-        classFields[AIRTABLE_FIELD_IDS.total_children] = data.numChildren;
+        classFields[CLASSES_FIELD_IDS.total_children] = data.numChildren;
       }
 
-      const record = await this.base(PARENT_JOURNEY_TABLE).create(classFields as Airtable.FieldSet);
-
-      // Also create a record in the normalized Classes table
-      // This ensures orders can link to Class records
-      try {
-        // Look up the Event record to get the Airtable record ID for linking
-        const eventRecords = await this.base(EVENTS_TABLE_ID)
-          .select({
-            filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${data.eventId.replace(/'/g, "\\'")}')`,
-            maxRecords: 1,
-          })
-          .firstPage();
-
-        const eventRecordId = eventRecords.length > 0 ? eventRecords[0].id : null;
-
-        // Create Class record in normalized table
-        const classFields: Airtable.FieldSet = {
-          [CLASSES_FIELD_IDS.class_id]: classId,
-          [CLASSES_FIELD_IDS.class_name]: data.className,
-          [CLASSES_FIELD_IDS.main_teacher]: data.teacherName || '',
-          [CLASSES_FIELD_IDS.legacy_booking_id]: data.eventId,
-        };
-
-        // Only add total_children if it's a positive number
-        if (data.numChildren && data.numChildren > 0) {
-          classFields[CLASSES_FIELD_IDS.total_children] = data.numChildren;
-        }
-
-        // Link to Event if found
-        if (eventRecordId) {
-          classFields[CLASSES_FIELD_IDS.event_id] = [eventRecordId];
-        }
-
-        await this.base(CLASSES_TABLE_ID).create([{ fields: classFields }]);
-        console.log(`Created Class record in normalized table: ${classId}`);
-      } catch (normalizedError) {
-        // Log but don't fail - parent_journey_table record was created successfully
-        console.error('Warning: Failed to create normalized Classes record:', normalizedError);
+      // Link to Event if found
+      if (eventRecordId) {
+        classFields[CLASSES_FIELD_IDS.event_id] = [eventRecordId];
       }
+
+      await this.base(CLASSES_TABLE_ID).create([{ fields: classFields }]);
+      console.log(`Created Class record: ${classId}`);
 
       // Return the new class view
       return {
@@ -1396,29 +1340,7 @@ class TeacherService {
         return null;
       }
 
-      // Create a placeholder record in parent_journey_table (legacy support)
-      const legacyFields: Record<string, unknown> = {
-        [AIRTABLE_FIELD_IDS.booking_id]: data.eventId,
-        [AIRTABLE_FIELD_IDS.class_id]: classId,
-        [AIRTABLE_FIELD_IDS.class]: DEFAULT_CLASS_NAME,
-        [AIRTABLE_FIELD_IDS.school_name]: data.schoolName,
-        [AIRTABLE_FIELD_IDS.event_type]: 'MiniMusiker',
-        [AIRTABLE_FIELD_IDS.booking_date]: data.bookingDate,
-        [AIRTABLE_FIELD_IDS.parent_email]: '',
-        [AIRTABLE_FIELD_IDS.main_teacher]: '',
-        [AIRTABLE_FIELD_IDS.registered_child]: '',
-        [AIRTABLE_FIELD_IDS.parent_first_name]: '',
-        [AIRTABLE_FIELD_IDS.parent_telephone]: '',
-        [AIRTABLE_FIELD_IDS.parent_id]: '',
-      };
-
-      if (data.estimatedChildren && data.estimatedChildren > 0) {
-        legacyFields[AIRTABLE_FIELD_IDS.total_children] = data.estimatedChildren;
-      }
-
-      await this.base(PARENT_JOURNEY_TABLE).create(legacyFields as Airtable.FieldSet);
-
-      // Create record in normalized Classes table with is_default flag
+      // Create record in Classes table with is_default flag
       const classFields: Airtable.FieldSet = {
         [CLASSES_FIELD_IDS.class_id]: classId,
         [CLASSES_FIELD_IDS.class_name]: DEFAULT_CLASS_NAME,
@@ -1464,25 +1386,25 @@ class TeacherService {
     }
   ): Promise<void> {
     try {
-      // Find all records with this class_id and update them
-      const records = await this.base(PARENT_JOURNEY_TABLE)
+      // Find the class record in Classes table
+      const classRecords = await this.base(CLASSES_TABLE_ID)
         .select({
-          filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
         })
-        .all();
+        .firstPage();
 
-      if (records.length === 0) {
+      if (classRecords.length === 0) {
         throw new Error('Class not found');
       }
 
-      // Update each record with the new class info
-      const updates: any = {};
-      if (data.className !== undefined) updates[AIRTABLE_FIELD_IDS.class] = data.className;
-      if (data.numChildren !== undefined) updates[AIRTABLE_FIELD_IDS.total_children] = data.numChildren;
+      // Build updates for Classes table
+      const updates: Airtable.FieldSet = {};
+      if (data.className !== undefined) updates[CLASSES_FIELD_IDS.class_name] = data.className;
+      if (data.numChildren !== undefined) updates[CLASSES_FIELD_IDS.total_children] = data.numChildren;
 
-      for (const record of records) {
-        await this.base(PARENT_JOURNEY_TABLE).update(record.id, updates);
-      }
+      // Update the Classes table record
+      await this.base(CLASSES_TABLE_ID).update(classRecords[0].id, updates);
     } catch (error) {
       console.error('Error updating class:', error);
       throw new Error(`Failed to update class: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1494,20 +1416,21 @@ class TeacherService {
    */
   async verifyTeacherOwnsClass(classId: string, teacherEmail: string): Promise<boolean> {
     try {
-      // Find the class record to get its booking_id
-      const classRecords = await this.base(PARENT_JOURNEY_TABLE)
+      // Find the class record in Classes table to get its booking_id
+      const classRecords = await this.base(CLASSES_TABLE_ID)
         .select({
-          filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
+          returnFieldsByFieldId: true,
         })
-        .all();
+        .firstPage();
 
       if (classRecords.length === 0) {
         return false;
       }
 
       const classRecord = classRecords[0];
-      const bookingId = (classRecord.fields.booking_id || classRecord.fields[AIRTABLE_FIELD_IDS.booking_id]) as string;
+      const bookingId = classRecord.fields[CLASSES_FIELD_IDS.legacy_booking_id] as string;
 
       if (!bookingId) {
         return false;
@@ -1527,51 +1450,38 @@ class TeacherService {
    */
   async deleteClass(classId: string): Promise<void> {
     try {
-      // Find all records with this class_id
-      const records = await this.base(PARENT_JOURNEY_TABLE)
+      // Find the class record in Classes table
+      const classRecords = await this.base(CLASSES_TABLE_ID)
         .select({
-          filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
         })
-        .all();
+        .firstPage();
 
-      if (records.length === 0) {
+      if (classRecords.length === 0) {
         throw new Error('Class not found');
       }
 
+      const classRecord = classRecords[0];
+      const classFields = classRecord.fields as Record<string, unknown>;
+
       // Check if this is a default class (cannot be deleted)
-      try {
-        const classRecords = await this.base(CLASSES_TABLE_ID)
-          .select({
-            filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
-            maxRecords: 1,
-          })
-          .firstPage();
-        if (classRecords.length > 0) {
-          const classFields = classRecords[0].fields as Record<string, any>;
-          const isDefault = Boolean(classFields['is_default'] || classFields[CLASSES_FIELD_IDS.is_default]);
-          if (isDefault) {
-            throw new Error('Die Standardklasse kann nicht gelöscht werden. Eltern können sich hier registrieren, bevor Sie Klassen einrichten.');
-          }
-        }
-      } catch (error) {
-        // If it's our error about default class, re-throw it
-        if (error instanceof Error && error.message.includes('Standardklasse')) {
-          throw error;
-        }
-        // Otherwise, also check by name convention as fallback
-        const className = records[0].fields.class || records[0].fields[AIRTABLE_FIELD_IDS.class];
-        if (className === 'Alle Kinder') {
-          throw new Error('Die Standardklasse kann nicht gelöscht werden. Eltern können sich hier registrieren, bevor Sie Klassen einrichten.');
-        }
+      const isDefault = Boolean(classFields[CLASSES_FIELD_IDS.is_default]);
+      const className = classFields[CLASSES_FIELD_IDS.class_name] as string;
+      if (isDefault || className === 'Alle Kinder') {
+        throw new Error('Die Standardklasse kann nicht gelöscht werden. Eltern können sich hier registrieren, bevor Sie Klassen einrichten.');
       }
 
-      // Check if any record has registered children
-      const hasRegisteredChildren = records.some((r) => {
-        const childName = r.fields.registered_child || r.fields[AIRTABLE_FIELD_IDS.registered_child];
-        return childName && (childName as string).trim() !== '';
-      });
+      // Check if any children are registered for this class (from parent_journey_table)
+      const registrationRecords = await this.base(PARENT_JOURNEY_TABLE)
+        .select({
+          filterByFormula: `AND({${AIRTABLE_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
+          maxRecords: 1,
+        })
+        .firstPage();
 
-      if (hasRegisteredChildren) {
+      if (registrationRecords.length > 0) {
         throw new Error('Cannot delete class with registered children');
       }
 
@@ -1581,10 +1491,8 @@ class TeacherService {
         throw new Error('Cannot delete class with songs. Remove songs first.');
       }
 
-      // Delete all records for this class
-      for (const record of records) {
-        await this.base(PARENT_JOURNEY_TABLE).destroy(record.id);
-      }
+      // Delete the class from Classes table
+      await this.base(CLASSES_TABLE_ID).destroy(classRecord.id);
     } catch (error) {
       console.error('Error deleting class:', error);
       throw new Error(`Failed to delete class: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1670,7 +1578,16 @@ class TeacherService {
           const memberClasses: TeacherClassView[] = [];
           for (const classRecordId of group.memberClassIds) {
             try {
-              const classRecord = await this.base(CLASSES_TABLE_ID).find(classRecordId);
+              // Use .select() instead of .find() to support returnFieldsByFieldId
+              const classRecords = await this.base(CLASSES_TABLE_ID)
+                .select({
+                  filterByFormula: `RECORD_ID() = '${classRecordId}'`,
+                  maxRecords: 1,
+                  returnFieldsByFieldId: true,
+                })
+                .firstPage();
+              if (classRecords.length === 0) continue;
+              const classRecord = classRecords[0];
               const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
               const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
               const numChildren = classRecord.fields[CLASSES_FIELD_IDS.total_children] as number | undefined;
@@ -2019,114 +1936,72 @@ class TeacherService {
    */
   async getTeacherEvents(teacherEmail: string): Promise<TeacherEventView[]> {
     try {
-      // Query parent_journey_table for events where this teacher is the contact
-      // We'll group by booking_id to get unique events
-      const records = await this.base(PARENT_JOURNEY_TABLE)
+      // Get teacher's bookings from SchoolBookings table (source of truth)
+      const schoolBookings = await getAirtableService().getBookingsForTeacher(teacherEmail);
+
+      // Also check parent_journey_table for legacy/test events not in SchoolBookings
+      const legacyRecords = await this.base(PARENT_JOURNEY_TABLE)
         .select({
-          filterByFormula: `LOWER({parent_email}) = LOWER('${teacherEmail.replace(/'/g, "\\'")}')`,
+          filterByFormula: `LOWER({${AIRTABLE_FIELD_IDS.parent_email}}) = LOWER('${teacherEmail.replace(/'/g, "\\'")}')`,
         })
         .all();
 
-      // Group by booking_id
-      const eventMap = new Map<
-        string,
-        {
-          eventId: string;
-          schoolName: string;
-          eventDate: string;
-          eventType: string;
-          classes: Map<string, { classId: string; className: string; numChildren?: number }>;
-          needsSetup?: boolean;
-          bookingRecordId?: string;
-        }
-      >();
-
-      for (const record of records) {
-        const eventId = record.fields.booking_id || record.fields[AIRTABLE_FIELD_IDS.booking_id];
-        const classId = record.fields.class_id || record.fields[AIRTABLE_FIELD_IDS.class_id];
-
-        if (!eventId) continue;
-
-        if (!eventMap.has(eventId as string)) {
-          eventMap.set(eventId as string, {
-            eventId: eventId as string,
+      // Collect unique event IDs from legacy records
+      const legacyEventIds = new Set<string>();
+      const legacyEventData = new Map<string, { schoolName: string; eventDate: string; eventType: string }>();
+      for (const record of legacyRecords) {
+        const eventId = (record.fields.booking_id || record.fields[AIRTABLE_FIELD_IDS.booking_id]) as string;
+        if (eventId && !legacyEventIds.has(eventId)) {
+          legacyEventIds.add(eventId);
+          legacyEventData.set(eventId, {
             schoolName: (record.fields.school_name || record.fields[AIRTABLE_FIELD_IDS.school_name] || '') as string,
             eventDate: (record.fields.booking_date || record.fields[AIRTABLE_FIELD_IDS.booking_date] || '') as string,
             eventType: (record.fields.event_type || record.fields[AIRTABLE_FIELD_IDS.event_type] || '') as string,
-            classes: new Map(),
-          });
-        }
-
-        const event = eventMap.get(eventId as string)!;
-        if (classId && !event.classes.has(classId as string)) {
-          event.classes.set(classId as string, {
-            classId: classId as string,
-            className: (record.fields.class || record.fields[AIRTABLE_FIELD_IDS.class] || '') as string,
-            numChildren: (record.fields.total_children ||
-              record.fields[AIRTABLE_FIELD_IDS.total_children]) as number | undefined,
           });
         }
       }
 
-      // Also include future SchoolBookings that haven't been initialized yet
-      const schoolBookings = await getAirtableService().getBookingsForTeacher(teacherEmail);
-      for (const booking of schoolBookings) {
-        const bookingEventId = booking.simplybookId;
-        // Only add if not already in eventMap (not yet initialized)
-        if (bookingEventId && !eventMap.has(bookingEventId)) {
-          eventMap.set(bookingEventId, {
-            eventId: bookingEventId,
-            schoolName: booking.schoolName || '',
-            eventDate: booking.startDate || '',
-            eventType: '', // SchoolBooking doesn't have eventType
-            classes: new Map(),
-            needsSetup: true,
-            bookingRecordId: booking.id,
-          });
-        }
-      }
+      // Build a set of booking IDs we already have from SchoolBookings
+      const schoolBookingIds = new Set(schoolBookings.map(b => b.simplybookId).filter(Boolean));
 
       // Build TeacherEventView array
       const events: TeacherEventView[] = [];
 
-      for (const [eventId, eventData] of eventMap) {
-        // Lookup SchoolBooking to get the current date (source of truth)
-        // This ensures date changes by admin are reflected immediately
-        const schoolBooking = await getAirtableService().getSchoolBookingBySimplybookId(eventId);
-        const actualEventDate = schoolBooking?.startDate || eventData.eventDate;
+      // Process SchoolBookings first
+      for (const booking of schoolBookings) {
+        const eventId = booking.simplybookId;
+        if (!eventId) continue;
+
+        const actualEventDate = booking.startDate || '';
+        const actualSchoolName = booking.schoolName || '';
+
+        // Query Classes table to get classes for this event
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+            returnFieldsByFieldId: true,
+          })
+          .all();
 
         // Get songs and audio files for this event
         const songs = await this.getSongsByEventId(eventId);
         const audioFiles = await this.getAudioFilesByEventId(eventId);
 
-        // Build class views
+        // Build class views from Classes table
         const classViews: TeacherClassView[] = [];
-        for (const [classId, classData] of eventData.classes) {
+        for (const classRecord of classRecords) {
+          const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
+          const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
+          const numChildren = classRecord.fields[CLASSES_FIELD_IDS.total_children] as number | undefined;
+          const isDefault = Boolean(classRecord.fields[CLASSES_FIELD_IDS.is_default]);
+
           const classSongs = songs.filter((s) => s.classId === classId);
           const classAudioFiles = audioFiles.filter((a) => a.classId === classId);
 
-          // Check if this is a default class by querying Classes table or by name convention
-          let isDefault = classData.className === 'Alle Kinder';
-          try {
-            const classRecords = await this.base(CLASSES_TABLE_ID)
-              .select({
-                filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
-                maxRecords: 1,
-              })
-              .firstPage();
-            if (classRecords.length > 0) {
-              const classFields = classRecords[0].fields as Record<string, any>;
-              isDefault = Boolean(classFields['is_default'] || classFields[CLASSES_FIELD_IDS.is_default]);
-            }
-          } catch (error) {
-            // Fallback to name convention if Classes table query fails
-            console.warn('Could not query Classes table for is_default:', error);
-          }
-
           classViews.push({
-            classId: classData.classId,
-            className: classData.className,
-            numChildren: classData.numChildren,
+            classId,
+            className,
+            numChildren,
             songs: classSongs,
             audioStatus: {
               hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
@@ -2142,7 +2017,6 @@ class TeacherService {
         const now = new Date();
 
         // Normalize both dates to start of day in local timezone
-        // This strips time component and avoids UTC conversion issues
         const eventDateOnly = new Date(
           eventDate.getFullYear(),
           eventDate.getMonth(),
@@ -2154,8 +2028,11 @@ class TeacherService {
           now.getDate()
         );
 
+        // Events with no classes are considered "needs-setup"
+        const needsSetup = classViews.length === 0;
+
         let status: 'upcoming' | 'in-progress' | 'completed' | 'needs-setup';
-        if (eventData.needsSetup) {
+        if (needsSetup) {
           status = 'needs-setup';
         } else if (eventDateOnly > nowDateOnly) {
           status = 'upcoming';
@@ -2166,18 +2043,26 @@ class TeacherService {
         }
 
         // Calculate progress metrics
-        const classesCount = eventData.classes.size;
+        const classesCount = classViews.length;
         const songsCount = songs.length;
 
-        // Count registrations for this event
-        const eventRecords = records.filter(
-          (r) => (r.fields.booking_id || r.fields[AIRTABLE_FIELD_IDS.booking_id]) === eventId
-        );
-        const registrationsCount = eventRecords.length;
+        // Count registrations for this event from parent_journey_table
+        // (registrations with actual children, not class placeholders)
+        let registrationsCount = 0;
+        try {
+          const registrationRecords = await this.base(PARENT_JOURNEY_TABLE)
+            .select({
+              filterByFormula: `AND({${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
+            })
+            .all();
+          registrationsCount = registrationRecords.length;
+        } catch (err) {
+          console.warn('Could not get registration count:', err);
+        }
 
         // Calculate total expected children (sum of total_children from all classes)
-        const totalChildrenExpected = Array.from(eventData.classes.values()).reduce(
-          (sum, classData) => sum + (classData.numChildren || 0),
+        const totalChildrenExpected = classViews.reduce(
+          (sum, cls) => sum + (cls.numChildren || 0),
           0
         );
 
@@ -2186,27 +2071,130 @@ class TeacherService {
         const daysUntilEvent = Math.floor((eventDate.getTime() - now.getTime()) / msPerDay);
         const weeksUntilEvent = Math.round(daysUntilEvent / 7);
 
-        // Expected songs: default to 1 song per class (can be configured later)
+        // Expected songs: default to 1 song per class
         const SONGS_PER_CLASS = 1;
         const expectedSongs = classesCount * SONGS_PER_CLASS;
 
-        // Use school name from SchoolBookings table (source of truth), fall back to parent_journey
-        const actualSchoolName = schoolBooking?.schoolName || eventData.schoolName;
-
         events.push({
-          eventId: eventData.eventId,
+          eventId,
           schoolName: actualSchoolName,
           eventDate: actualEventDate,
-          eventType: eventData.eventType,
+          eventType: 'MiniMusiker Day',
           classes: classViews,
           status,
-          simplybookHash: schoolBooking?.simplybookHash,
-          bookingRecordId: eventData.bookingRecordId || schoolBooking?.id,
-          schoolAddress: schoolBooking?.schoolAddress,
-          schoolPhone: schoolBooking?.schoolPhone,
+          simplybookHash: booking.simplybookHash,
+          bookingRecordId: booking.id,
+          schoolAddress: booking.schoolAddress,
+          schoolPhone: booking.schoolPhone,
           progress: {
             classesCount,
-            expectedClasses: undefined, // TODO: Get from booking config when available
+            expectedClasses: undefined,
+            songsCount,
+            expectedSongs,
+            registrationsCount,
+            totalChildrenExpected: totalChildrenExpected > 0 ? totalChildrenExpected : undefined,
+            daysUntilEvent,
+            weeksUntilEvent,
+          },
+        });
+      }
+
+      // Process legacy events not in SchoolBookings
+      for (const eventId of legacyEventIds) {
+        if (schoolBookingIds.has(eventId)) continue; // Skip if already processed
+
+        const legacyData = legacyEventData.get(eventId)!;
+        const actualEventDate = legacyData.eventDate;
+        const actualSchoolName = legacyData.schoolName;
+
+        // Query Classes table to get classes for this event
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+            returnFieldsByFieldId: true,
+          })
+          .all();
+
+        // Get songs and audio files for this event
+        const songs = await this.getSongsByEventId(eventId);
+        const audioFiles = await this.getAudioFilesByEventId(eventId);
+
+        // Build class views from Classes table
+        const classViews: TeacherClassView[] = [];
+        for (const classRecord of classRecords) {
+          const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
+          const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
+          const numChildren = classRecord.fields[CLASSES_FIELD_IDS.total_children] as number | undefined;
+          const isDefault = Boolean(classRecord.fields[CLASSES_FIELD_IDS.is_default]);
+
+          const classSongs = songs.filter((s) => s.classId === classId);
+          const classAudioFiles = audioFiles.filter((a) => a.classId === classId);
+
+          classViews.push({
+            classId,
+            className,
+            numChildren,
+            songs: classSongs,
+            audioStatus: {
+              hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
+              hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
+              hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+            },
+            isDefault,
+          });
+        }
+
+        // Determine event status
+        const eventDate = new Date(actualEventDate);
+        const now = new Date();
+        const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+        const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        const needsSetup = classViews.length === 0;
+        let status: 'upcoming' | 'in-progress' | 'completed' | 'needs-setup';
+        if (needsSetup) {
+          status = 'needs-setup';
+        } else if (eventDateOnly > nowDateOnly) {
+          status = 'upcoming';
+        } else if (eventDateOnly.getTime() === nowDateOnly.getTime()) {
+          status = 'in-progress';
+        } else {
+          status = 'completed';
+        }
+
+        // Calculate progress metrics
+        const classesCount = classViews.length;
+        const songsCount = songs.length;
+
+        let registrationsCount = 0;
+        try {
+          const registrationRecords = await this.base(PARENT_JOURNEY_TABLE)
+            .select({
+              filterByFormula: `AND({${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
+            })
+            .all();
+          registrationsCount = registrationRecords.length;
+        } catch (err) {
+          console.warn('Could not get registration count:', err);
+        }
+
+        const totalChildrenExpected = classViews.reduce((sum, cls) => sum + (cls.numChildren || 0), 0);
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const daysUntilEvent = Math.floor((eventDate.getTime() - now.getTime()) / msPerDay);
+        const weeksUntilEvent = Math.round(daysUntilEvent / 7);
+        const SONGS_PER_CLASS = 1;
+        const expectedSongs = classesCount * SONGS_PER_CLASS;
+
+        events.push({
+          eventId,
+          schoolName: actualSchoolName,
+          eventDate: actualEventDate,
+          eventType: legacyData.eventType || 'MiniMusiker Day',
+          classes: classViews,
+          status,
+          progress: {
+            classesCount,
+            expectedClasses: undefined,
             songsCount,
             expectedSongs,
             registrationsCount,
