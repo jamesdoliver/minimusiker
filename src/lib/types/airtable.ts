@@ -101,6 +101,15 @@ export const PERSONEN_TABLE_ID = 'tblu8iWectQaQGTto';
 // Teams/Regionen table (regions for staff assignment)
 export const TEAMS_REGIONEN_TABLE_ID = 'tblQm2nyPKU7k2N2N';
 
+// Teams/Regionen field IDs
+export const TEAMS_REGIONEN_FIELD_IDS = {
+  name: 'fldvhnTbs2s8RGS7n', // Region name (e.g., "Köln/Bonn")
+  personenname: 'fldYw4p2eFNXrIcM6', // Staff person's name (formula from linked Personen)
+  staff_foto: 'fldGUQ0ccIfLpOJg3', // URL to staff photo in R2
+  staff_bio: 'fldFENkKjCYkQXvjn', // Staff bio text
+  staff_email: 'fldrByfDNOYS9p0R0', // Staff contact email
+} as const;
+
 // Rollen record IDs
 export const ROLLEN_IDS = {
   team: 'rec4nmwoqYehpGOC5',
