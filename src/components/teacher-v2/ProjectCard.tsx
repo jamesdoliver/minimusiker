@@ -82,29 +82,15 @@ export function ProjectCard({ event }: ProjectCardProps) {
           </div>
         )}
 
-        {/* Checklist - only show when not needing setup */}
+        {/* Tally - only show when not needing setup */}
         {!needsSetup && progress && (
-          <div className="space-y-3 mb-4">
-            <ChecklistItem
-              status={
-                progress.expectedClasses && progress.classesCount >= progress.expectedClasses
-                  ? 'complete'
-                  : 'incomplete'
-              }
-            >
-              {progress.classesCount} von {progress.expectedClasses || 0} Gruppen/Klassen
-              angelegt
-            </ChecklistItem>
-            <ChecklistItem
-              status={
-                progress.expectedSongs && progress.songsCount >= progress.expectedSongs
-                  ? 'complete'
-                  : 'incomplete'
-              }
-            >
-              {progress.songsCount} von {progress.expectedSongs || 0} Liedern
-              festgelegt
-            </ChecklistItem>
+          <div className="space-y-2 mb-4">
+            <p className="text-sm text-gray-700">
+              {progress.classesCount} Gruppen/Klassen angelegt
+            </p>
+            <p className="text-sm text-gray-700">
+              {progress.songsCount} Liedern festgelegt
+            </p>
           </div>
         )}
 
@@ -172,48 +158,6 @@ export function ProjectCard({ event }: ProjectCardProps) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-interface ChecklistItemProps {
-  status: 'complete' | 'incomplete';
-  children: React.ReactNode;
-}
-
-function ChecklistItem({ status, children }: ChecklistItemProps) {
-  return (
-    <div className="flex items-center gap-2">
-      {status === 'complete' ? (
-        <svg
-          className="w-5 h-5 text-mm-success flex-shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M5 13l4 4L19 7"
-          />
-        </svg>
-      ) : (
-        <svg
-          className="w-5 h-5 text-mm-warning flex-shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-          />
-        </svg>
-      )}
-      <span className="text-sm text-gray-700">{children}</span>
     </div>
   );
 }
