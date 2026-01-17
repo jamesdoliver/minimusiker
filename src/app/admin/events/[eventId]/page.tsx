@@ -29,6 +29,17 @@ import AddSongModal from '@/components/shared/class-management/AddSongModal';
 import EditClassModal from '@/components/shared/class-management/EditClassModal';
 import EditSongModal from '@/components/shared/class-management/EditSongModal';
 import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfirmModal';
+import AddGroupModal from '@/components/shared/class-management/AddGroupModal';
+import EditGroupModal from '@/components/shared/class-management/EditGroupModal';
+
+// Group type for admin view
+interface ClassGroup {
+  groupId: string;
+  groupName: string;
+  memberClasses: Array<{ classId: string; className: string }>;
+  songs: Array<{ id: string; title: string; artist?: string; notes?: string }>;
+  songCount: number;
+}
 
 function formatDate(dateString: string): string {
   if (!dateString) return 'No date';
@@ -82,9 +93,16 @@ export default function EventDetailPage() {
   // Track which classes are expanded to show songs
   const [expandedClasses, setExpandedClasses] = useState<Set<string>>(new Set());
 
+  // Group management state
+  const [groups, setGroups] = useState<ClassGroup[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [showAddGroup, setShowAddGroup] = useState(false);
+  const [showEditGroup, setShowEditGroup] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<ClassGroup | null>(null);
+
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{
-    type: 'class' | 'song';
+    type: 'class' | 'song' | 'group';
     id: string;
     name: string;
   } | null>(null);
@@ -97,6 +115,7 @@ export default function EventDetailPage() {
     if (eventId) {
       fetchEventDetail();
       fetchTeamStaff();
+      fetchGroups();
     }
   }, [eventId]);
 
@@ -132,6 +151,18 @@ export default function EventDetailPage() {
       }
     } catch (err) {
       console.error('Error fetching team staff:', err);
+    }
+  };
+
+  const fetchGroups = async () => {
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/groups`);
+      if (response.ok) {
+        const data = await response.json();
+        setGroups(data.groups || []);
+      }
+    } catch (err) {
+      console.error('Error fetching groups:', err);
     }
   };
 
@@ -233,6 +264,44 @@ export default function EventDetailPage() {
     setShowDeleteConfirm(true);
   };
 
+  // Group management handlers
+  const handleAddGroup = () => {
+    setShowAddGroup(true);
+  };
+
+  const handleEditGroup = (group: ClassGroup) => {
+    setSelectedGroup(group);
+    setShowEditGroup(true);
+  };
+
+  const handleDeleteGroup = (group: ClassGroup) => {
+    setDeleteTarget({
+      type: 'group',
+      id: group.groupId,
+      name: group.groupName,
+    });
+    setShowDeleteConfirm(true);
+  };
+
+  const handleAddSongToGroup = (groupId: string) => {
+    // Reuse the song modal with group ID
+    setSelectedClass({ id: groupId, name: '', numChildren: 0 });
+    setShowAddSong(true);
+  };
+
+  // Toggle group expansion
+  const toggleGroupExpanded = (groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
   // Toggle class expansion
   const toggleClassExpanded = (classId: string) => {
     setExpandedClasses((prev) => {
@@ -246,16 +315,20 @@ export default function EventDetailPage() {
     });
   };
 
-  // Confirm delete (class or song)
+  // Confirm delete (class, song, or group)
   const confirmDelete = async () => {
     if (!deleteTarget) return;
 
     setIsDeleting(true);
     try {
-      const endpoint =
-        deleteTarget.type === 'class'
-          ? `/api/admin/classes/${deleteTarget.id}`
-          : `/api/admin/songs/${deleteTarget.id}`;
+      let endpoint: string;
+      if (deleteTarget.type === 'class') {
+        endpoint = `/api/admin/classes/${deleteTarget.id}`;
+      } else if (deleteTarget.type === 'group') {
+        endpoint = `/api/admin/groups/${deleteTarget.id}`;
+      } else {
+        endpoint = `/api/admin/songs/${deleteTarget.id}`;
+      }
 
       const response = await fetch(endpoint, { method: 'DELETE' });
 
@@ -264,10 +337,16 @@ export default function EventDetailPage() {
         throw new Error(data.error || 'Failed to delete');
       }
 
-      toast.success(`${deleteTarget.type === 'class' ? 'Class' : 'Song'} deleted successfully`);
+      const typeLabel = deleteTarget.type === 'class' ? 'Class' : deleteTarget.type === 'group' ? 'Group' : 'Song';
+      toast.success(`${typeLabel} deleted successfully`);
       setShowDeleteConfirm(false);
       setDeleteTarget(null);
-      fetchEventDetail(); // Refetch to update UI
+
+      // Refetch appropriate data
+      fetchEventDetail();
+      if (deleteTarget.type === 'group') {
+        fetchGroups();
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete');
     } finally {
@@ -689,6 +768,225 @@ export default function EventDetailPage() {
         )}
       </div>
 
+      {/* Groups Section */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Gruppen
+            {groups.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                ({groups.length} {groups.length === 1 ? 'Gruppe' : 'Gruppen'})
+              </span>
+            )}
+          </h2>
+          <button
+            onClick={handleAddGroup}
+            disabled={!event?.classes || event.classes.length < 2}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            title={event?.classes && event.classes.length < 2 ? 'Need at least 2 classes to create a group' : ''}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Gruppe erstellen
+          </button>
+        </div>
+
+        {groups.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-purple-100 p-8 text-center">
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Keine Gruppen</h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Gruppen ermöglichen es mehreren Klassen, gemeinsame Lieder zu haben.
+              <br />
+              Sie benötigen mindestens 2 Klassen, um eine Gruppe zu erstellen.
+            </p>
+            {event?.classes && event.classes.length >= 2 && (
+              <button
+                onClick={handleAddGroup}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Erste Gruppe erstellen
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {groups.map((group) => {
+              const isExpanded = expandedGroups.has(group.groupId);
+              const songs = group.songs || [];
+
+              return (
+                <div
+                  key={group.groupId}
+                  className="bg-white rounded-xl shadow-sm border border-purple-200 overflow-hidden group"
+                >
+                  {/* Group Header - Clickable to expand */}
+                  <button
+                    onClick={() => toggleGroupExpanded(group.groupId)}
+                    className="w-full px-5 py-4 flex items-center justify-between hover:bg-purple-50/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      {/* Group Icon */}
+                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </div>
+
+                      {/* Group Info */}
+                      <div className="text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{group.groupName}</span>
+                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                            Gruppe
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {group.memberClasses.map((c) => c.className).join(', ')} • {songs.length}{' '}
+                          {songs.length === 1 ? 'Lied' : 'Lieder'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expand/Collapse Icon & Actions */}
+                    <div className="flex items-center gap-2">
+                      {/* Action buttons (visible on hover) */}
+                      <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditGroup(group);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                          title="Gruppe bearbeiten"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteGroup(group);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Gruppe löschen"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <svg
+                        className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+
+                  {/* Expanded Content - Songs List */}
+                  {isExpanded && (
+                    <div className="border-t border-purple-100 px-5 py-4 bg-purple-50/30">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-medium text-gray-700">Lieder</h4>
+                        <button
+                          onClick={() => handleAddSongToGroup(group.groupId)}
+                          className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Lied hinzufügen
+                        </button>
+                      </div>
+
+                      {songs.length === 0 ? (
+                        <div className="text-center py-6 text-gray-500">
+                          <svg
+                            className="w-8 h-8 mx-auto mb-2 text-gray-300"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                            />
+                          </svg>
+                          <p className="text-sm">Noch keine Lieder</p>
+                          <button
+                            onClick={() => handleAddSongToGroup(group.groupId)}
+                            className="mt-2 text-sm text-purple-600 hover:text-purple-700"
+                          >
+                            Erstes Lied hinzufügen
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {songs.map((song: any) => (
+                            <div
+                              key={song.id}
+                              className="flex items-center justify-between p-3 bg-white rounded-lg group hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-gray-900 truncate">{song.title}</div>
+                                {song.artist && (
+                                  <div className="text-sm text-gray-500 truncate">{song.artist}</div>
+                                )}
+                                {song.notes && (
+                                  <div className="text-xs text-gray-400 mt-1 truncate">{song.notes}</div>
+                                )}
+                              </div>
+
+                              {/* Song actions */}
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleEditSong(song)}
+                                  className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                                  title="Lied bearbeiten"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSong(song)}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Lied löschen"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Modals */}
       {showAddClass && (
         <AddClassModal
@@ -732,6 +1030,7 @@ export default function EventDetailPage() {
             setShowAddSong(false);
             setSelectedClass(null);
             fetchEventDetail();
+            fetchGroups(); // Also refetch groups for group songs
           }}
           apiBasePath="/api/admin"
         />
@@ -756,12 +1055,50 @@ export default function EventDetailPage() {
         />
       )}
 
+      {showAddGroup && event?.classes && (
+        <AddGroupModal
+          eventId={eventId}
+          availableClasses={event.classes.map((c: any) => ({
+            classId: c.classId,
+            className: c.className,
+          }))}
+          onClose={() => setShowAddGroup(false)}
+          onSuccess={() => {
+            setShowAddGroup(false);
+            fetchGroups();
+          }}
+          apiBasePath="/api/admin"
+        />
+      )}
+
+      {showEditGroup && selectedGroup && event?.classes && (
+        <EditGroupModal
+          group={selectedGroup}
+          availableClasses={event.classes.map((c: any) => ({
+            classId: c.classId,
+            className: c.className,
+          }))}
+          onClose={() => {
+            setShowEditGroup(false);
+            setSelectedGroup(null);
+          }}
+          onSuccess={() => {
+            setShowEditGroup(false);
+            setSelectedGroup(null);
+            fetchGroups();
+          }}
+          apiBasePath="/api/admin"
+        />
+      )}
+
       {showDeleteConfirm && deleteTarget && (
         <DeleteConfirmModal
-          title={`Delete ${deleteTarget.type === 'class' ? 'Class' : 'Song'}?`}
+          title={`Delete ${deleteTarget.type === 'class' ? 'Class' : deleteTarget.type === 'group' ? 'Group' : 'Song'}?`}
           message={`Are you sure you want to delete "${deleteTarget.name}"? This action cannot be undone.${
             deleteTarget.type === 'class'
               ? ' Note: You cannot delete a class that has songs or registered children.'
+              : deleteTarget.type === 'group'
+              ? ' Note: You cannot delete a group that has songs.'
               : ''
           }`}
           onConfirm={confirmDelete}

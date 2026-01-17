@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 /**
  * POST /api/admin/classes/[classId]/songs
- * Add a new song to a class (admin only)
+ * Add a new song to a class or group (admin only)
  */
 export async function POST(
   request: NextRequest,
@@ -35,8 +36,42 @@ export async function POST(
     }
 
     const teacherService = getTeacherService();
+    const airtableService = getAirtableService();
 
-    // Admins can create songs for any class - no ownership check
+    // Verify event exists
+    const event = await airtableService.getSchoolEventDetail(eventId);
+    if (!event) {
+      return NextResponse.json(
+        { error: 'Event not found' },
+        { status: 404 }
+      );
+    }
+
+    // Verify the class or group belongs to this event
+    const isGroup = classId.startsWith('group_');
+
+    if (isGroup) {
+      // Verify group belongs to this event
+      const groups = await teacherService.getGroupsByEventId(eventId);
+      const groupExists = groups.some((g) => g.groupId === classId);
+      if (!groupExists) {
+        return NextResponse.json(
+          { error: 'Group not found in this event' },
+          { status: 404 }
+        );
+      }
+    } else {
+      // Verify class belongs to this event
+      const classExists = event.classes.some((c) => c.classId === classId);
+      if (!classExists) {
+        return NextResponse.json(
+          { error: 'Class not found in this event' },
+          { status: 404 }
+        );
+      }
+    }
+
+    // Create the song
     const newSong = await teacherService.createSong({
       classId,
       eventId,

@@ -511,6 +511,25 @@ class TeacherService {
    * Get songs for a class
    */
   async getSongsByClassId(classId: string): Promise<Song[]> {
+    // For groups (classId starts with 'group_'), query by class_id text field directly
+    // because groups don't use the class_link linked record field
+    const isGroup = classId.startsWith('group_');
+
+    if (isGroup) {
+      try {
+        const records = await this.base(SONGS_TABLE)
+          .select({
+            filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
+            sort: [{ field: 'order', direction: 'asc' }],
+          })
+          .all();
+        return records.map((record) => this.transformSongRecord(record));
+      } catch (error) {
+        console.error('Error getting songs for group:', error);
+        return [];
+      }
+    }
+
     if (this.useNormalizedTables()) {
       // NEW: Use linked record field (class_link)
       try {
@@ -1548,12 +1567,16 @@ class TeacherService {
 
       const eventRecordId = eventRecords[0].id;
 
-      // Query Groups table by event_id linked record
-      const records = await this.groupsTable
-        .select({
-          filterByFormula: `FIND('${eventRecordId}', ARRAYJOIN({${GROUPS_FIELD_IDS.event_id}}))`,
-        })
-        .all();
+      // Query Groups table and filter by event_id linked record
+      // Note: We fetch all groups and filter in JS because ARRAYJOIN on linked record fields
+      // returns display text (primary field values), not record IDs
+      const allRecords = await this.groupsTable.select({ returnFieldsByFieldId: true }).all();
+
+      // Filter to groups where the event_id linked record contains our target event record ID
+      const records = allRecords.filter((record) => {
+        const linkedEventIds = record.fields[GROUPS_FIELD_IDS.event_id];
+        return Array.isArray(linkedEventIds) && linkedEventIds.includes(eventRecordId);
+      });
 
       const groups: ClassGroup[] = [];
 
@@ -1629,6 +1652,7 @@ class TeacherService {
         .select({
           filterByFormula: `{${GROUPS_FIELD_IDS.group_id}} = '${groupId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
+          returnFieldsByFieldId: true,
         })
         .firstPage();
 
@@ -1759,6 +1783,7 @@ class TeacherService {
         .select({
           filterByFormula: `{${GROUPS_FIELD_IDS.group_id}} = '${groupId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
+          returnFieldsByFieldId: true,
         })
         .firstPage();
 
@@ -1826,6 +1851,7 @@ class TeacherService {
         .select({
           filterByFormula: `{${GROUPS_FIELD_IDS.group_id}} = '${groupId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
+          returnFieldsByFieldId: true,
         })
         .firstPage();
 
@@ -1876,11 +1902,14 @@ class TeacherService {
       const classRecordId = classRecords[0].id;
 
       // Query Groups where member_classes contains this class record ID
-      const records = await this.groupsTable
-        .select({
-          filterByFormula: `FIND('${classRecordId}', ARRAYJOIN({${GROUPS_FIELD_IDS.member_classes}}))`,
-        })
-        .all();
+      // Note: We fetch all groups and filter in JS because ARRAYJOIN on linked record fields
+      // returns display text (primary field values), not record IDs
+      const allRecords = await this.groupsTable.select({ returnFieldsByFieldId: true }).all();
+
+      const records = allRecords.filter((record) => {
+        const memberClassIds = record.fields[GROUPS_FIELD_IDS.member_classes];
+        return Array.isArray(memberClassIds) && memberClassIds.includes(classRecordId);
+      });
 
       const groups: ClassGroup[] = [];
       for (const record of records) {

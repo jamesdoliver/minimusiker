@@ -76,11 +76,20 @@ export async function POST(
       );
     }
 
-    // Verify the class belongs to this event
+    // Verify the class or group belongs to this event
     const classExists = event.classes.some((c) => c.classId === classId);
-    if (!classExists) {
+    const isGroup = classId.startsWith('group_');
+
+    // If it's a group, verify the group belongs to this event
+    let groupExists = false;
+    if (isGroup) {
+      const groups = await teacherService.getGroupsByEventId(eventId);
+      groupExists = groups.some((g) => g.groupId === classId);
+    }
+
+    if (!classExists && !groupExists) {
       return NextResponse.json(
-        { error: 'Class not found in this event' },
+        { error: isGroup ? 'Group not found in this event' : 'Class not found in this event' },
         { status: 404 }
       );
     }
