@@ -45,22 +45,11 @@ export function ContactSection({
 
           {/* Right: Decorative image */}
           <div className="hidden md:flex justify-end">
-            <div className="w-64 h-64 bg-gray-300 rounded-lg flex items-center justify-center text-gray-500">
-              {/* Placeholder for support person image */}
-              <svg
-                className="w-24 h-24"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-            </div>
+            <img
+              src="/images/teacher_portal_resources/support-contact.jpeg"
+              alt="Minimusiker Support"
+              className="w-64 h-64 rounded-lg object-cover object-right-bottom"
+            />
           </div>
         </div>
       </div>
