@@ -8,7 +8,9 @@
       "footerQuestion": "Haben Sie einen Registrierungslink?",
       "footerHint": "Verwenden Sie den von Ihrer Schule bereitgestellten Link",
       "footerHelp": "Fragen? Kontaktieren Sie Ihre Schule für Hilfe.",
-      "backToClassSelection": "Zurück zur Klassenauswahl"
+      "backToClassSelection": "Zurück zur Klassenauswahl",
+      "notYourSchool": "Nicht Ihre Schule?",
+      "searchCorrectSchool": "Hier nach der richtigen Schule suchen"
     },
     "errors": {
       "missingParams": {

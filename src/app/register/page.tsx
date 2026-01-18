@@ -224,6 +224,22 @@ function RegistrationPageContent() {
     }
   };
 
+  const handleSwitchSchool = () => {
+    // Reset all state to start fresh school search
+    setIsDiscoveryMode(true);
+    setIsQrFlow(false);
+    setCurrentStep('school');
+    setEventDetails(null);
+    setDiscoveryState({
+      schoolName: '',
+      eventId: '',
+      eventDate: '',
+      eventType: '',
+      classId: '',
+      className: '',
+    });
+  };
+
   const getStepNumber = (): number => {
     switch (currentStep) {
       case 'school':
@@ -465,6 +481,18 @@ function RegistrationPageContent() {
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500">
           <p>{t('footerHelp')}</p>
+
+          {/* Not Your School Link - show when coming from QR/direct link */}
+          {!isDiscoveryMode && (
+            <p className="mt-4">
+              <button
+                onClick={handleSwitchSchool}
+                className="text-sage-600 hover:text-sage-700 underline"
+              >
+                {t('notYourSchool')} {t('searchCorrectSchool')}
+              </button>
+            </p>
+          )}
         </div>
       </div>
     </div>
