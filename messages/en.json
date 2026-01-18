@@ -104,7 +104,13 @@
       "submitButton": "Complete Registration",
       "submitting": "Creating Your Account...",
       "fixErrors": "Please fix the errors below",
-      "minOneChild": "You must register at least one child"
+      "minOneChild": "You must register at least one child",
+      "termsLabel": "I accept the",
+      "termsLink": "Terms and Conditions",
+      "privacyLabel": "I accept the",
+      "privacyLink": "Privacy Policy",
+      "termsRequired": "You must accept the Terms and Conditions to continue",
+      "privacyRequired": "You must accept the Privacy Policy to continue"
     },
     "childInput": {
       "remove": "Remove",

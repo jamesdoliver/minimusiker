@@ -36,6 +36,8 @@ export default function RegistrationForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const [formData, setFormData] = useState<Omit<RegistrationData, 'eventId' | 'classId'>>({
     parentEmail: initialEmail,
@@ -83,6 +85,22 @@ export default function RegistrationForm({
     }
   };
 
+  const handleTermsChange = () => {
+    setTermsAccepted(!termsAccepted);
+    if (fieldErrors.termsAccepted) {
+      const { termsAccepted: _, ...rest } = fieldErrors;
+      setFieldErrors(rest);
+    }
+  };
+
+  const handlePrivacyChange = () => {
+    setPrivacyAccepted(!privacyAccepted);
+    if (fieldErrors.privacyAccepted) {
+      const { privacyAccepted: _, ...rest } = fieldErrors;
+      setFieldErrors(rest);
+    }
+  };
+
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
@@ -120,6 +138,14 @@ export default function RegistrationForm({
       setError(duplicateCheck.error!);
       setFieldErrors(errors);
       return false;
+    }
+
+    // Validate consent checkboxes
+    if (!termsAccepted) {
+      errors.termsAccepted = t('termsRequired');
+    }
+    if (!privacyAccepted) {
+      errors.privacyAccepted = t('privacyRequired');
     }
 
     setFieldErrors(errors);
@@ -303,6 +329,59 @@ export default function RegistrationForm({
         <p className="mt-4 text-sm text-gray-600">
           {t('registeringFor', { className, schoolName })}
         </p>
+      </div>
+
+      {/* Legal Consent Section */}
+      <div className="space-y-4">
+        {/* Terms Checkbox */}
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            id="terms"
+            checked={termsAccepted}
+            onChange={handleTermsChange}
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+          />
+          <label htmlFor="terms" className="text-sm text-gray-700 cursor-pointer">
+            {t('termsLabel')}{' '}
+            <a
+              href="/agb"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:text-primary/80 underline"
+            >
+              {t('termsLink')}
+            </a>
+          </label>
+        </div>
+        {fieldErrors.termsAccepted && (
+          <p className="text-red-600 text-sm ml-7">{fieldErrors.termsAccepted}</p>
+        )}
+
+        {/* Privacy Checkbox */}
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            id="privacy"
+            checked={privacyAccepted}
+            onChange={handlePrivacyChange}
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+          />
+          <label htmlFor="privacy" className="text-sm text-gray-700 cursor-pointer">
+            {t('privacyLabel')}{' '}
+            <a
+              href="/datenschutz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:text-primary/80 underline"
+            >
+              {t('privacyLink')}
+            </a>
+          </label>
+        </div>
+        {fieldErrors.privacyAccepted && (
+          <p className="text-red-600 text-sm ml-7">{fieldErrors.privacyAccepted}</p>
+        )}
       </div>
 
       {/* Submit Button */}

@@ -104,7 +104,13 @@
       "submitButton": "Registrierung abschließen",
       "submitting": "Ihr Konto wird erstellt...",
       "fixErrors": "Bitte beheben Sie die unten aufgeführten Fehler",
-      "minOneChild": "Sie müssen mindestens ein Kind registrieren"
+      "minOneChild": "Sie müssen mindestens ein Kind registrieren",
+      "termsLabel": "Ich akzeptiere die",
+      "termsLink": "Allgemeinen Geschäftsbedingungen (AGB)",
+      "privacyLabel": "Ich akzeptiere die",
+      "privacyLink": "Datenschutzerklärung",
+      "termsRequired": "Sie müssen den AGB zustimmen, um fortzufahren",
+      "privacyRequired": "Sie müssen der Datenschutzerklärung zustimmen, um fortzufahren"
     },
     "childInput": {
       "remove": "Entfernen",
