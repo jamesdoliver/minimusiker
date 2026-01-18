@@ -367,6 +367,9 @@ class AirtableService {
         if (data.order_number) registrationFields[REGISTRATIONS_FIELD_IDS.order_number] = data.order_number;
         if (data.registered_complete !== undefined) registrationFields[REGISTRATIONS_FIELD_IDS.registered_complete] = data.registered_complete;
 
+        // Always set registration_date to current timestamp
+        registrationFields[REGISTRATIONS_FIELD_IDS.registration_date] = new Date().toISOString();
+
         const registrationRecords = await this.registrationsTable!.create([{ fields: registrationFields }]);
         const registrationRecord = registrationRecords[0];
 
@@ -2230,7 +2233,7 @@ class AirtableService {
       // NEW: Query normalized tables
       try {
         // Find the event by event_id OR legacy_booking_id
-        const eventRecords = await this.base(EVENTS_TABLE_ID)
+        let eventRecords = await this.base(EVENTS_TABLE_ID)
           .select({
             filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${eventId}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${eventId}')`,
             returnFieldsByFieldId: true,
@@ -2238,7 +2241,40 @@ class AirtableService {
           })
           .firstPage();
 
-        if (eventRecords.length === 0) return null;
+        let resolvedVia: 'event_id' | 'legacy_booking_id' | 'simplybook_id' = 'event_id';
+
+        // If not found, try SimplyBook ID resolution
+        if (eventRecords.length === 0) {
+          console.log(`[getSchoolEventDetail] Primary lookup failed for: ${eventId}, trying SimplyBook ID`);
+
+          const booking = await this.getSchoolBookingBySimplybookId(eventId);
+          if (booking) {
+            const linkedEvent = await this.getEventBySchoolBookingId(booking.id);
+            if (linkedEvent) {
+              // Fetch the full event record with field IDs
+              const eventRecord = await this.base(EVENTS_TABLE_ID)
+                .select({
+                  filterByFormula: `RECORD_ID() = '${linkedEvent.id}'`,
+                  returnFieldsByFieldId: true,
+                  maxRecords: 1,
+                })
+                .firstPage();
+
+              if (eventRecord.length > 0) {
+                eventRecords = eventRecord;
+                resolvedVia = 'simplybook_id';
+                console.log(`[getSchoolEventDetail] Resolved via SimplyBook ID: ${eventId} -> Event record: ${linkedEvent.id}`);
+              }
+            }
+          }
+        }
+
+        if (eventRecords.length === 0) {
+          console.log(`[getSchoolEventDetail] No event found for: ${eventId}`);
+          return null;
+        }
+
+        console.log(`[getSchoolEventDetail] Found event via: ${resolvedVia}`);
 
         const eventRecord = eventRecords[0];
         const schoolName = eventRecord.fields[EVENTS_FIELD_IDS.school_name] as string;
@@ -2247,13 +2283,30 @@ class AirtableService {
         const assignedStaffIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_staff] as string[];
         const assignedStaffId = assignedStaffIds?.[0];
 
-        // Get all classes for this event (by event link OR legacy_booking_id fallback)
-        const classRecords = await this.base(CLASSES_TABLE_ID)
-          .select({
-            filterByFormula: `OR(SEARCH('${eventRecord.id}', {${CLASSES_FIELD_IDS.event_id}}), {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId}')`,
-            returnFieldsByFieldId: true,
-          })
-          .all();
+        // Get linked class IDs from the event record
+        const linkedClassIds = eventRecord.fields[EVENTS_FIELD_IDS.classes] as string[] || [];
+        console.log(`[getSchoolEventDetail] Event has ${linkedClassIds.length} linked classes`);
+
+        // Fetch each class record directly using the linked IDs
+        const classRecords: Airtable.Record<Airtable.FieldSet>[] = [];
+        for (const classId of linkedClassIds) {
+          try {
+            const classRecord = await this.base(CLASSES_TABLE_ID).find(classId);
+            // Convert to format expected by rest of code (with field IDs)
+            const recordWithFieldIds = await this.base(CLASSES_TABLE_ID)
+              .select({
+                filterByFormula: `RECORD_ID() = '${classId}'`,
+                returnFieldsByFieldId: true,
+                maxRecords: 1,
+              })
+              .firstPage();
+            if (recordWithFieldIds.length > 0) {
+              classRecords.push(recordWithFieldIds[0]);
+            }
+          } catch (error) {
+            console.error(`[getSchoolEventDetail] Error fetching class ${classId}:`, error);
+          }
+        }
 
         // Build class details with registration counts
         const classes: EventClassDetail[] = [];
@@ -2270,15 +2323,9 @@ class AirtableService {
             mainTeacher = classMainTeacher;
           }
 
-          // Count registrations for this class
-          const registrations = await this.base(REGISTRATIONS_TABLE_ID)
-            .select({
-              filterByFormula: `SEARCH('${classRecord.id}', {${REGISTRATIONS_FIELD_IDS.class_id}})`,
-              returnFieldsByFieldId: true,
-            })
-            .all();
-
-          const registeredParents = registrations.length;
+          // Count registrations for this class using linked field
+          const linkedRegistrationIds = classRecord.fields[CLASSES_FIELD_IDS.registrations] as string[] || [];
+          const registeredParents = linkedRegistrationIds.length;
 
           classes.push({
             classId,

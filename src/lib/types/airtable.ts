@@ -522,6 +522,7 @@ export const EVENTS_FIELD_IDS = {
   school_address: 'fldl7AAISoormK5Lr',  // School address (synced from booking)
   school_phone: 'fldLPXOAWpGyYXoIT',    // School phone (synced from booking)
   teachers: 'fldivuUPiW6Q09vce',        // Linked record → Teachers
+  classes: 'fld08ht43r8rknIPI',         // Linked record → Classes (reverse lookup from Classes.event_id)
 } as const;
 
 // Classes Table - 1 row per class
@@ -537,6 +538,7 @@ export const CLASSES_FIELD_IDS = {
   created_at: 'fld3q0jZPIAlsx8FD',
   legacy_booking_id: 'fldXGF3yXrHeI4vWn',  // Original booking_id from parent_journey_table
   is_default: 'fldJouWNH4fudWQl0',      // Auto-created "Alle Kinder" catch-all class
+  registrations: 'fld9hLZ4aNOw4v75X',   // Linked record → Registrations (reverse lookup)
 } as const;
 
 // Groups Table - "Classes Singing Together" - groups of classes that perform together
