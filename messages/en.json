@@ -10,7 +10,12 @@
       "footerHelp": "Questions? Contact your school for assistance.",
       "backToClassSelection": "Back to class selection",
       "notYourSchool": "Not your school?",
-      "searchCorrectSchool": "Search for the correct school here"
+      "searchCorrectSchool": "Search for the correct school here",
+      "heroTitle": "Here's where the music plays!",
+      "heroSubtitle": "Dear parent! By registering your child, you'll get access to recordings from the MiniMusiker day, additional products, and free materials.",
+      "registerCardTitle": "Register your child now",
+      "registerCardSubtitle": "Find your school and register your child for the MiniMusiker day.",
+      "registerCardCta": "Register now"
     },
     "errors": {
       "missingParams": {

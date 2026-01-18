@@ -10,7 +10,12 @@
       "footerHelp": "Fragen? Kontaktieren Sie Ihre Schule für Hilfe.",
       "backToClassSelection": "Zurück zur Klassenauswahl",
       "notYourSchool": "Nicht Ihre Schule?",
-      "searchCorrectSchool": "Hier nach der richtigen Schule suchen"
+      "searchCorrectSchool": "Hier nach der richtigen Schule suchen",
+      "heroTitle": "Hier spielt die Musik!",
+      "heroSubtitle": "Liebes Elternteil! Mit der Registrierung deines Kindes erhältst du Zugriff auf die Aufnahmen vom Minimusikertag, weitere Produkte und kostenfreies Material.",
+      "registerCardTitle": "Registriere jetzt dein Kind",
+      "registerCardSubtitle": "Finde deine Schule und melde dein Kind für den Minimusikertag an.",
+      "registerCardCta": "Jetzt registrieren"
     },
     "errors": {
       "missingParams": {

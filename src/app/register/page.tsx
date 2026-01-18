@@ -3,11 +3,14 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
+import Image from 'next/image';
 import RegistrationForm from '@/components/registration/RegistrationForm';
 import SchoolSearchStep from '@/components/registration/SchoolSearchStep';
 import EventSelectionStep from '@/components/registration/EventSelectionStep';
 import ClassSelectionStep from '@/components/registration/ClassSelectionStep';
 import RegistrationStepper from '@/components/registration/RegistrationStepper';
+import VideoPlayer from '@/components/registration/VideoPlayer';
+import RegisterCTACard from '@/components/registration/RegisterCTACard';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import LanguageSelector from '@/components/shared/LanguageSelector';
 import { EventClassDetails } from '@/lib/types/airtable';
@@ -317,6 +320,11 @@ function RegistrationPageContent() {
     );
   }
 
+  // Helper function to scroll to registration form
+  const scrollToForm = () => {
+    document.getElementById('registration-form')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   // Discovery mode - multi-step flow
   if (isDiscoveryMode && currentStep !== 'form') {
     const stepLabels = [
@@ -327,48 +335,73 @@ function RegistrationPageContent() {
     ];
 
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-4xl mx-auto px-4">
+      <div className="min-h-screen bg-[#f8f7f4] py-8">
+        <div className="max-w-6xl mx-auto px-4">
           {/* Language Selector */}
           <div className="flex justify-end mb-4">
             <LanguageSelector />
           </div>
 
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
-            <p className="text-gray-600 mt-2">{t('subtitle')}</p>
+          {/* Hero Section */}
+          <div className="flex items-start justify-between mb-8 md:mb-12">
+            <div className="flex-1">
+              <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4">
+                {t('heroTitle')}
+              </h1>
+              <p className="text-gray-600 text-lg max-w-xl">
+                {t('heroSubtitle')}
+              </p>
+            </div>
+            {/* Mascot - hidden on mobile */}
+            <div className="hidden md:block w-32 lg:w-40 flex-shrink-0 ml-4">
+              <Image
+                src="/images/familie/mascot_logo.png"
+                alt="MiniMusiker Mascot"
+                width={160}
+                height={180}
+                className="w-full h-auto"
+              />
+            </div>
           </div>
 
-          {/* Stepper */}
-          <RegistrationStepper
-            currentStep={getStepNumber()}
-            totalSteps={4}
-            stepLabels={stepLabels}
-          />
+          {/* Video + CTA Card Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start mb-12">
+            <VideoPlayer />
+            <RegisterCTACard onRegisterClick={scrollToForm} />
+          </div>
 
-          {/* Step Content */}
-          <div className="bg-white shadow-lg rounded-lg p-8">
-            {currentStep === 'school' && (
-              <SchoolSearchStep onSchoolSelect={handleSchoolSelect} />
-            )}
-            {currentStep === 'event' && (
-              <EventSelectionStep
-                schoolName={discoveryState.schoolName}
-                onEventSelect={handleEventSelect}
-                onBack={handleBack}
-              />
-            )}
-            {currentStep === 'class' && (
-              <ClassSelectionStep
-                bookingId={discoveryState.eventId}
-                schoolName={discoveryState.schoolName}
-                eventDate={discoveryState.eventDate}
-                eventType={discoveryState.eventType}
-                onClassSelect={handleClassSelect}
-                onBack={isQrFlow ? undefined : handleBack}
-              />
-            )}
+          {/* Registration Form Section */}
+          <div id="registration-form">
+            {/* Stepper */}
+            <RegistrationStepper
+              currentStep={getStepNumber()}
+              totalSteps={4}
+              stepLabels={stepLabels}
+            />
+
+            {/* Step Content */}
+            <div className="bg-white shadow-lg rounded-lg p-8">
+              {currentStep === 'school' && (
+                <SchoolSearchStep onSchoolSelect={handleSchoolSelect} />
+              )}
+              {currentStep === 'event' && (
+                <EventSelectionStep
+                  schoolName={discoveryState.schoolName}
+                  onEventSelect={handleEventSelect}
+                  onBack={handleBack}
+                />
+              )}
+              {currentStep === 'class' && (
+                <ClassSelectionStep
+                  bookingId={discoveryState.eventId}
+                  schoolName={discoveryState.schoolName}
+                  eventDate={discoveryState.eventDate}
+                  eventType={discoveryState.eventType}
+                  onClassSelect={handleClassSelect}
+                  onBack={isQrFlow ? undefined : handleBack}
+                />
+              )}
+            </div>
           </div>
 
           {/* Footer */}
@@ -403,80 +436,103 @@ function RegistrationPageContent() {
   const dateLocale = locale === 'de' ? 'de-DE' : 'en-GB';
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-[#f8f7f4] py-8">
+      <div className="max-w-6xl mx-auto px-4">
         {/* Language Selector */}
         <div className="flex justify-end mb-4">
           <LanguageSelector />
         </div>
 
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="text-gray-600 mt-2">
-            {t('registerFor', { schoolName: eventDetails.schoolName })}
-          </p>
+        {/* Hero Section */}
+        <div className="flex items-start justify-between mb-8 md:mb-12">
+          <div className="flex-1">
+            <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4">
+              {t('heroTitle')}
+            </h1>
+            <p className="text-gray-600 text-lg max-w-xl">
+              {t('heroSubtitle')}
+            </p>
+          </div>
+          {/* Mascot - hidden on mobile */}
+          <div className="hidden md:block w-32 lg:w-40 flex-shrink-0 ml-4">
+            <Image
+              src="/images/familie/mascot_logo.png"
+              alt="MiniMusiker Mascot"
+              width={160}
+              height={180}
+              className="w-full h-auto"
+            />
+          </div>
         </div>
 
-        {/* Stepper for discovery mode */}
-        {isDiscoveryMode && (
-          <RegistrationStepper currentStep={4} totalSteps={4} stepLabels={stepLabels} />
-        )}
+        {/* Video + CTA Card Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start mb-12">
+          <VideoPlayer />
+          <RegisterCTACard onRegisterClick={scrollToForm} />
+        </div>
 
-        {/* Event Info Card */}
-        <div className="bg-primary/10 border border-primary/20 rounded-lg p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center md:text-left">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">{tEventInfo('school')}</p>
-              <p className="font-semibold text-gray-900">{eventDetails.schoolName}</p>
+        {/* Registration Form Section */}
+        <div id="registration-form">
+          {/* Stepper for discovery mode */}
+          {isDiscoveryMode && (
+            <RegistrationStepper currentStep={4} totalSteps={4} stepLabels={stepLabels} />
+          )}
+
+          {/* Event Info Card */}
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center md:text-left">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{tEventInfo('school')}</p>
+                <p className="font-semibold text-gray-900">{eventDetails.schoolName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{tEventInfo('class')}</p>
+                <p className="font-semibold text-gray-900">{eventDetails.className}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{tEventInfo('eventType')}</p>
+                <p className="font-semibold text-gray-900 capitalize">
+                  {eventDetails.eventType}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">{tEventInfo('class')}</p>
-              <p className="font-semibold text-gray-900">{eventDetails.className}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">{tEventInfo('eventType')}</p>
-              <p className="font-semibold text-gray-900 capitalize">
-                {eventDetails.eventType}
-              </p>
-            </div>
+            {eventDetails.bookingDate && (
+              <div className="mt-4 text-center md:text-left">
+                <p className="text-sm text-gray-600 mb-1">{tEventInfo('eventDate')}</p>
+                <p className="font-semibold text-gray-900">
+                  {new Date(eventDetails.bookingDate).toLocaleDateString(dateLocale, {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </p>
+              </div>
+            )}
           </div>
-          {eventDetails.bookingDate && (
-            <div className="mt-4 text-center md:text-left">
-              <p className="text-sm text-gray-600 mb-1">{tEventInfo('eventDate')}</p>
-              <p className="font-semibold text-gray-900">
-                {new Date(eventDetails.bookingDate).toLocaleDateString(dateLocale, {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </p>
+
+          {/* Registration Form */}
+          <RegistrationForm
+            eventId={effectiveEventId}
+            classId={effectiveClassId}
+            schoolName={eventDetails.schoolName}
+            className={eventDetails.className}
+            eventType={eventDetails.eventType}
+            initialEmail={initialEmail}
+          />
+
+          {/* Back button for discovery mode */}
+          {isDiscoveryMode && (
+            <div className="mt-4 text-center">
+              <button
+                onClick={handleBack}
+                className="text-sm text-gray-600 hover:text-gray-900"
+              >
+                &larr; {t('backToClassSelection')}
+              </button>
             </div>
           )}
         </div>
-
-        {/* Registration Form */}
-        <RegistrationForm
-          eventId={effectiveEventId}
-          classId={effectiveClassId}
-          schoolName={eventDetails.schoolName}
-          className={eventDetails.className}
-          eventType={eventDetails.eventType}
-          initialEmail={initialEmail}
-        />
-
-        {/* Back button for discovery mode */}
-        {isDiscoveryMode && (
-          <div className="mt-4 text-center">
-            <button
-              onClick={handleBack}
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              &larr; {t('backToClassSelection')}
-            </button>
-          </div>
-        )}
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500">
