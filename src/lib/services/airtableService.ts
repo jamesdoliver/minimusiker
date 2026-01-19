@@ -3288,6 +3288,7 @@ class AirtableService {
   async assignStaffToEvent(bookingId: string, staffId: string | null): Promise<number> {
     if (this.useNormalizedTables()) {
       // NEW: Update Events table assigned_staff field
+      this.ensureNormalizedTablesInitialized();
       try {
         // Find the event by event_id (bookingId)
         const events = await this.eventsTable!.select({

@@ -50,15 +50,23 @@ export async function POST(
       }
     }
 
-    if (!eventDetail || !eventDetail.mainTeacher) {
+    // Only fail if event doesn't exist at all
+    if (!eventDetail) {
       return NextResponse.json(
-        { error: 'Could not find teacher for this event. Please ensure the event has a registered teacher.' },
-        { status: 400 }
+        { error: 'Event not found' },
+        { status: 404 }
       );
     }
 
-    // Use mainTeacher as the email (this is the teacher email from parent_journey)
-    const teacherEmail = eventDetail.mainTeacher;
+    // Use fallback chain for teacher name: mainTeacher → assignedStaffName → placeholder
+    let teacherEmail: string;
+    if (eventDetail.mainTeacher) {
+      teacherEmail = eventDetail.mainTeacher;
+    } else if (eventDetail.assignedStaffName) {
+      teacherEmail = eventDetail.assignedStaffName;
+    } else {
+      teacherEmail = 'Admin Created';
+    }
     const teacherService = getTeacherService();
 
     // Admins can create classes for any event - no ownership check needed
