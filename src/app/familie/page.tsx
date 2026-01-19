@@ -314,7 +314,7 @@ function ParentPortalContent() {
   const hasMultipleChildren = children.length > 1;
   const schoolName = selectedChild?.schoolName || session?.schoolName || portalData?.parentJourney?.school_name || 'Springfield Elementary School';
   const schoolColor = '#94B8B3'; // Default sage color
-  const eventType = selectedChild?.eventType || session?.eventType || portalData?.parentJourney?.event_type || 'Spring Concert';
+  const eventType = selectedChild?.eventType || session?.eventType || portalData?.parentJourney?.event_type || 'Minimusiker';
   const eventDate = selectedChild?.bookingDate || session?.bookingDate || portalData?.parentJourney?.booking_date || '2024-12-15';
   const className = selectedChild?.class || portalData?.parentJourney?.class || '';
 
