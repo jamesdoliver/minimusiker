@@ -531,25 +531,12 @@ class TeacherService {
     }
 
     if (this.useNormalizedTables()) {
-      // NEW: Use linked record field (class_link)
+      // Use text field (class_id) for querying - linked record queries don't work
+      // reliably in Airtable formulas. The text class_id is always set and indexed.
       try {
-        // Ensure tables are initialized
-        this.ensureNormalizedTablesInitialized();
-
-        // First, find the Classes record by class_id field
-        const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
-          maxRecords: 1,
-        }).firstPage();
-
-        if (classRecords.length === 0) return [];
-
-        const classRecordId = classRecords[0].id;
-
-        // Query Songs table by linked record (class_link)
         const records = await this.base(SONGS_TABLE)
           .select({
-            filterByFormula: `{${SONGS_LINKED_FIELD_IDS.class_link}} = '${classRecordId}'`,
+            filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
             sort: [{ field: 'order', direction: 'asc' }],
           })
           .all();
@@ -582,42 +569,18 @@ class TeacherService {
    */
   async getSongsByEventId(eventId: string): Promise<Song[]> {
     if (this.useNormalizedTables()) {
-      // NEW: Use linked record field (event_link) OR text field as fallback
+      // Use text field (event_id) for querying - linked record queries don't work
+      // reliably in Airtable formulas. The text event_id is always set and indexed.
       try {
-        // Ensure tables are initialized
-        this.ensureNormalizedTablesInitialized();
-
-        // First, find the Events record by event_id field
-        const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
-          maxRecords: 1,
-        }).firstPage();
-
-        let records;
-        if (eventRecords.length > 0) {
-          const eventRecordId = eventRecords[0].id;
-          // Query Songs table by linked record (event_link)
-          records = await this.base(SONGS_TABLE)
-            .select({
-              filterByFormula: `{${SONGS_LINKED_FIELD_IDS.event_link}} = '${eventRecordId}'`,
-              sort: [
-                { field: 'class_id', direction: 'asc' },
-                { field: 'order', direction: 'asc' },
-              ],
-            })
-            .all();
-        } else {
-          // Fallback: Query by text event_id field (for events not yet in Events table)
-          records = await this.base(SONGS_TABLE)
-            .select({
-              filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
-              sort: [
-                { field: 'class_id', direction: 'asc' },
-                { field: 'order', direction: 'asc' },
-              ],
-            })
-            .all();
-        }
+        const records = await this.base(SONGS_TABLE)
+          .select({
+            filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
+            sort: [
+              { field: 'class_id', direction: 'asc' },
+              { field: 'order', direction: 'asc' },
+            ],
+          })
+          .all();
 
         return records.map((record) => this.transformSongRecord(record));
       } catch (error) {
@@ -1263,10 +1226,34 @@ class TeacherService {
     numChildren?: number;
   }): Promise<TeacherClassView> {
     try {
-      // Get event info from SchoolBookings (source of truth)
-      const schoolBooking = await getAirtableService().getSchoolBookingBySimplybookId(data.eventId);
-      const schoolName = schoolBooking?.schoolName || schoolBooking?.schoolContactName || '';
-      const bookingDate = schoolBooking?.startDate || '';
+      // First, look up the Event record - it's the source of truth for event info
+      let eventRecord = await getAirtableService().getEventByEventId(data.eventId);
+
+      // Fallback: if eventId looks like a simplybookId (numeric), resolve via SchoolBookings
+      // This handles the case where getTeacherEvents() fell back to simplybookId because
+      // the Event wasn't linked to the SchoolBooking via simplybook_booking field
+      if (!eventRecord && /^\d+$/.test(data.eventId)) {
+        console.log(`createClass: eventId "${data.eventId}" looks like a simplybookId, trying fallback resolution`);
+        const booking = await getAirtableService().getSchoolBookingBySimplybookId(data.eventId);
+        if (booking) {
+          eventRecord = await getAirtableService().getEventBySchoolBookingId(booking.id);
+          if (eventRecord) {
+            console.log(`createClass: Resolved Event via SchoolBooking: ${eventRecord.id} (${eventRecord.event_id})`);
+          }
+        }
+      }
+
+      // Get school info from Event record (preferred) or fallback to SchoolBooking lookup
+      let schoolName = eventRecord?.school_name || '';
+      let bookingDate = eventRecord?.event_date || '';
+      const eventRecordId = eventRecord?.id || null;
+
+      // If Event doesn't have school info, try looking up the linked SchoolBooking
+      if ((!schoolName || !bookingDate) && eventRecord?.simplybook_booking?.[0]) {
+        const schoolBooking = await getAirtableService().getSchoolBookingById(eventRecord.simplybook_booking[0]);
+        schoolName = schoolName || schoolBooking?.schoolName || schoolBooking?.schoolContactName || '';
+        bookingDate = bookingDate || schoolBooking?.startDate || '';
+      }
 
       // Generate a consistent class_id using generateClassId() when we have the required data
       // Falls back to timestamp-based ID for backward compatibility
@@ -1278,16 +1265,6 @@ class TeacherService {
         classId = `${data.eventId}_class_${Date.now()}`;
         console.warn('createClass: Missing schoolName or bookingDate, using fallback class_id format');
       }
-
-      // Look up the Event record to get the Airtable record ID for linking
-      const eventRecords = await this.base(EVENTS_TABLE_ID)
-        .select({
-          filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${data.eventId.replace(/'/g, "\\'")}')`,
-          maxRecords: 1,
-        })
-        .firstPage();
-
-      const eventRecordId = eventRecords.length > 0 ? eventRecords[0].id : null;
 
       // Create Class record in normalized Classes table
       const classFields: Airtable.FieldSet = {
@@ -1998,16 +1975,27 @@ class TeacherService {
 
       // Process SchoolBookings first
       for (const booking of schoolBookings) {
-        const eventId = booking.simplybookId;
+        // Look up the Event record to get the canonical event_id
+        // This ensures we use a consistent identifier for class queries
+        const eventRecord = await getAirtableService().getEventBySchoolBookingId(booking.id);
+
+        // Use Event's event_id if available, fallback to simplybookId for legacy support
+        const eventId = eventRecord?.event_id || booking.simplybookId;
         if (!eventId) continue;
 
         const actualEventDate = booking.startDate || '';
         const actualSchoolName = booking.schoolName || '';
 
         // Query Classes table to get classes for this event
+        // Search for both event_id format AND simplybookId to catch classes created with either identifier
+        const simplybookId = booking.simplybookId;
+        const classFilterFormula = simplybookId && simplybookId !== eventId
+          ? `OR({${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${simplybookId.replace(/'/g, "\\'")}')`
+          : `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`;
+
         const classRecords = await this.base(CLASSES_TABLE_ID)
           .select({
-            filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+            filterByFormula: classFilterFormula,
             returnFieldsByFieldId: true,
           })
           .all();
