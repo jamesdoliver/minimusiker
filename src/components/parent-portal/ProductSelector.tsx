@@ -497,7 +497,7 @@ export default function ProductSelector({
 
   // Checkout handler
   const handleCheckout = async () => {
-    if (selection.audioProducts.length === 0) return;
+    if (selection.audioProducts.length === 0 && selection.clothing.length === 0) return;
 
     setIsProcessing(true);
 
