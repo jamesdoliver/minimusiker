@@ -149,13 +149,14 @@
     "availableSoon": "Recording will be available after the event"
   },
   "productSelector": {
-    "title": "Complete Your Order",
-    "subtitle": "Capture the memories from {schoolName}",
+    "title": "How to get the recordings",
+    "subtitle": "Choose the right medium for all the songs from the Minimusiker day. For the right look, you can also order a T-Shirt or Hoodie.",
     "chooseAudio": "Choose Your Audio",
     "required": "(Required)",
     "addClothing": "Add Clothing",
     "optional": "(Optional)",
     "discountBanner": "Save 10% when you add clothing to your order!",
+    "addItems": "Add items",
     "comboHint": "10% off with audio!",
     "addButton": "Add",
     "addedItems": "Added Items:",
@@ -191,7 +192,7 @@
     "total": "Total",
     "processing": "Processing...",
     "checkout": "Checkout - €{total}",
-    "selectAudio": "Select audio to continue",
+    "addItems": "Add items to checkout",
     "secure": "Secure",
     "fastDelivery": "Fast Delivery"
   },

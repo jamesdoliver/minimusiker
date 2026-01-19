@@ -13,8 +13,7 @@ import HeroIntroSection from '@/components/parent-portal/HeroIntroSection';
 import PreparationSection from '@/components/parent-portal/PreparationSection';
 // Note: VideoCard removed - video is now handled in HeroIntroSection
 import { CartProvider } from '@/lib/contexts/CartContext';
-import { FeaturedProducts, CartSummary, CartDrawer } from '@/components/shop';
-import { useProducts } from '@/lib/hooks/useProducts';
+import { CartDrawer } from '@/components/shop';
 import { ParentSession, ParentPortalData } from '@/lib/types';
 
 // Audio status response type
@@ -57,11 +56,6 @@ function ParentPortalContent() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [groups, setGroups] = useState<ParentGroup[]>([]);
   const [groupAudioStatuses, setGroupAudioStatuses] = useState<Record<string, AudioStatus>>({});
-
-  // Fetch shop products
-  const { products: shopProducts } = useProducts({
-    tagFilter: 'minimusiker-shop',
-  });
 
   useEffect(() => {
     verifySessionAndLoadData();
@@ -587,16 +581,9 @@ function ParentPortalContent() {
           />
         </section>
 
-        {/* Featured Products Section */}
-        {shopProducts.length > 0 && (
-          <section>
-            <FeaturedProducts products={shopProducts} maxItems={3} />
-          </section>
-        )}
       </div>
 
-      {/* Cart Components */}
-      <CartSummary />
+      {/* Cart Drawer */}
       <CartDrawer parentId={session.parentId} parentEmail={session.email} eventId={eventId} classId={classId} />
     </div>
   );

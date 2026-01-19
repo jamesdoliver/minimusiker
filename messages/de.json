@@ -149,13 +149,14 @@
     "availableSoon": "Die Aufnahme wird nach der Veranstaltung verfügbar sein"
   },
   "productSelector": {
-    "title": "Vervollständigen Sie Ihre Bestellung",
-    "subtitle": "Halten Sie die Erinnerungen von {schoolName} fest",
+    "title": "So gelangt ihr an die Aufnahmen",
+    "subtitle": "Wähle den für euch passenden Tonträger mit allen Liedern des Minimusikertags. Für den passenden Look kannst du auch ein T-Shirt oder Hoodie bestellen.",
     "chooseAudio": "Wählen Sie Ihr Audio",
     "required": "(Erforderlich)",
     "addClothing": "Kleidung hinzufügen",
     "optional": "(Optional)",
     "discountBanner": "Sparen Sie 10%, wenn Sie Kleidung zu Ihrer Bestellung hinzufügen!",
+    "addItems": "Artikel hinzufügen",
     "comboHint": "10% Rabatt mit Audio!",
     "addButton": "Hinzufügen",
     "addedItems": "Hinzugefügte Artikel:",
@@ -191,7 +192,7 @@
     "total": "Gesamt",
     "processing": "Wird verarbeitet...",
     "checkout": "Zur Kasse - €{total}",
-    "selectAudio": "Wählen Sie Audio, um fortzufahren",
+    "addItems": "Artikel hinzufügen, um zur Kasse zu gehen",
     "secure": "Sicher",
     "fastDelivery": "Schnelle Lieferung"
   },

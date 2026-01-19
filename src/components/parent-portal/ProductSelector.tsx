@@ -220,7 +220,7 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
   const t = useTranslations('orderSummary');
 
   const hasItems = selection.audioProducts.length > 0 || selection.clothing.length > 0;
-  const canCheckout = selection.audioProducts.length > 0;
+  const canCheckout = hasItems;
 
   return (
     <div className="bg-white rounded-xl border-2 border-gray-200 shadow-lg p-6">
@@ -327,7 +327,7 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
             {t('checkout', { total: totals.total.toFixed(2) })}
           </>
         ) : (
-          t('selectAudio')
+          t('addItems')
         )}
       </button>
 
