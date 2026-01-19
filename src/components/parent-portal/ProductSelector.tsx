@@ -90,7 +90,7 @@ const AUDIO_PRODUCTS: AudioProduct[] = [
   {
     id: 'cd',
     name: 'CD',
-    description: 'Klassische Audio-CD im Jewel Case',
+    description: 'Die klassische CD für deinen CD-Player - im plastikfreien Digifile mit Liederliste',
     price: 19.00,
     imageEmoji: '💿',
   },
