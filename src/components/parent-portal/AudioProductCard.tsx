@@ -72,7 +72,7 @@ export default function AudioProductCard({
       {/* Product Image or Emoji */}
       <div className="flex justify-center items-center h-24 mb-4 mt-2">
         {imageSrc ? (
-          <div className="relative w-20 h-20">
+          <div className="relative w-24 h-24">
             <Image
               src={imageSrc}
               alt={name}
@@ -83,7 +83,7 @@ export default function AudioProductCard({
         ) : imageEmoji ? (
           <span className="text-5xl">{imageEmoji}</span>
         ) : (
-          <div className="w-20 h-20 bg-sage-100 rounded-lg flex items-center justify-center">
+          <div className="w-24 h-24 bg-sage-100 rounded-lg flex items-center justify-center">
             <svg className="w-10 h-10 text-sage-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </svg>

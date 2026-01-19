@@ -74,7 +74,7 @@ export default function ClothingProductCard({
       {/* Product Image or Emoji */}
       <div className="flex justify-center items-center h-32 mb-4">
         {imageSrc ? (
-          <div className="relative w-28 h-28">
+          <div className="relative w-32 h-32">
             <Image
               src={imageSrc}
               alt={name}
@@ -85,7 +85,7 @@ export default function ClothingProductCard({
         ) : imageEmoji ? (
           <span className="text-6xl">{imageEmoji}</span>
         ) : (
-          <div className="w-28 h-28 bg-sage-100 rounded-lg flex items-center justify-center">
+          <div className="w-32 h-32 bg-sage-100 rounded-lg flex items-center justify-center">
             <svg className="w-14 h-14 text-sage-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
