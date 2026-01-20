@@ -1531,12 +1531,28 @@ class TeacherService {
       }
 
       // First, find the Events record by event_id
-      const eventRecords = await this.base(EVENTS_TABLE_ID)
+      let eventRecords = await this.base(EVENTS_TABLE_ID)
         .select({
           filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}')`,
           maxRecords: 1,
         })
         .firstPage();
+
+      // Fallback: if eventId looks like a simplybookId (numeric), resolve via SchoolBookings
+      if (eventRecords.length === 0 && /^\d+$/.test(eventId)) {
+        const booking = await getAirtableService().getSchoolBookingBySimplybookId(eventId);
+        if (booking) {
+          const eventRecord = await getAirtableService().getEventBySchoolBookingId(booking.id);
+          if (eventRecord) {
+            eventRecords = await this.base(EVENTS_TABLE_ID)
+              .select({
+                filterByFormula: `RECORD_ID() = '${eventRecord.id}'`,
+                maxRecords: 1,
+              })
+              .firstPage();
+          }
+        }
+      }
 
       if (eventRecords.length === 0) {
         return [];
@@ -1688,12 +1704,31 @@ class TeacherService {
       const groupId = `group_${data.eventId}_${Date.now()}`;
 
       // Find the Events record
-      const eventRecords = await this.base(EVENTS_TABLE_ID)
+      let eventRecords = await this.base(EVENTS_TABLE_ID)
         .select({
           filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${data.eventId.replace(/'/g, "\\'")}')`,
           maxRecords: 1,
         })
         .firstPage();
+
+      // Fallback: if eventId looks like a simplybookId (numeric), resolve via SchoolBookings
+      if (eventRecords.length === 0 && /^\d+$/.test(data.eventId)) {
+        console.log(`createGroup: eventId "${data.eventId}" looks like a simplybookId, trying fallback resolution`);
+        const booking = await getAirtableService().getSchoolBookingBySimplybookId(data.eventId);
+        if (booking) {
+          const eventRecord = await getAirtableService().getEventBySchoolBookingId(booking.id);
+          if (eventRecord) {
+            console.log(`createGroup: Resolved Event via SchoolBooking: ${eventRecord.id} (${eventRecord.event_id})`);
+            // Get the event record from Airtable directly
+            eventRecords = await this.base(EVENTS_TABLE_ID)
+              .select({
+                filterByFormula: `RECORD_ID() = '${eventRecord.id}'`,
+                maxRecords: 1,
+              })
+              .firstPage();
+          }
+        }
+      }
 
       if (eventRecords.length === 0) {
         throw new Error('Event not found');
