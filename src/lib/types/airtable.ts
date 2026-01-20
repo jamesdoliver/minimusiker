@@ -819,3 +819,73 @@ export const EVENT_MANUAL_COSTS_FIELD_IDS = {
   description: 'fldy3azQdpvujHaUr',           // Long text (optional)
   is_verified: 'fldFMq9Io39WPQwdc',           // Checkbox (optional)
 } as const;
+
+// ======================================================================
+// EVENT ACTIVITY TABLE - Audit log for event operations
+// ======================================================================
+
+export const EVENT_ACTIVITY_TABLE_ID = 'tbljy6InuG4xMngQg';
+
+// Field IDs for creating/updating records
+export const EVENT_ACTIVITY_FIELD_IDS = {
+  activity_id: 'fldj05KGUUjFolkpv',           // Autonumber (Primary)
+  event_id: 'fldHXdy9XckysZkN5',              // Linked record → Events
+  activity_type: 'fldkq8kGUpN1EGMEm',         // Single select
+  description: 'flduPDeYq7N5JAhGm',           // Long text
+  actor_email: 'fld8BkhP9HrERtKdD',           // Single line text
+  actor_type: 'flduzSRoFPcJZrjM8',            // Single select
+  metadata: 'fldkpYFQYLiv281jX',              // Long text (JSON)
+  created_at: 'fldX0yqyLEFtBAGjA',            // Created time
+} as const;
+
+// Field names for reading records (Airtable .get() uses names, not IDs)
+export const EVENT_ACTIVITY_FIELD_NAMES = {
+  activity_id: 'activity_id',
+  event_id: 'event_id',
+  activity_type: 'activity_type',
+  description: 'description',
+  actor_email: 'actor_email',
+  actor_type: 'actor_type',
+  metadata: 'metadata',
+  created_at: 'created_at',
+} as const;
+
+export type EventActivityType =
+  | 'event_created'
+  | 'date_changed'
+  | 'staff_assigned'
+  | 'staff_unassigned'
+  | 'class_added'
+  | 'class_updated'
+  | 'class_deleted'
+  | 'group_created'
+  | 'group_updated'
+  | 'group_deleted'
+  | 'song_added'
+  | 'song_updated'
+  | 'song_deleted'
+  | 'tasks_generated'
+  | 'booking_status_changed';
+
+export type ActorType = 'teacher' | 'admin' | 'system';
+
+export interface EventActivity {
+  id: string;
+  activityId: number;
+  eventId: string;
+  activityType: EventActivityType;
+  description: string;
+  actorEmail: string;
+  actorType: ActorType;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface CreateEventActivityInput {
+  eventRecordId: string;
+  activityType: EventActivityType;
+  description: string;
+  actorEmail: string;
+  actorType: ActorType;
+  metadata?: Record<string, unknown>;
+}

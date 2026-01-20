@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
 /**
  * GET /api/teacher/events/[eventId]/classes
@@ -92,6 +94,34 @@ export async function POST(
         ? parseInt(String(numChildren), 10)
         : undefined,
     });
+
+    // Resolve eventRecordId for activity logging
+    const airtableService = getAirtableService();
+    let eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+    if (!eventRecordId && /^\d+$/.test(eventId)) {
+      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      if (booking) {
+        const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (eventRecord) {
+          eventRecordId = eventRecord.id;
+        }
+      }
+    }
+
+    // Log activity (fire-and-forget)
+    if (eventRecordId) {
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'class_added',
+        description: ActivityService.generateDescription('class_added', {
+          className: className.trim(),
+          numChildren: numChildren || 0,
+        }),
+        actorEmail: session.email,
+        actorType: 'teacher',
+        metadata: { className: className.trim(), numChildren, classId: newClass.classId },
+      });
+    }
 
     return NextResponse.json({
       success: true,

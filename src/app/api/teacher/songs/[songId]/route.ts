@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
 /**
  * GET /api/teacher/songs/[songId]
@@ -93,6 +95,32 @@ export async function PUT(
       notes: notes?.trim(),
     });
 
+    // Log activity (fire-and-forget) - resolve eventRecordId from eventId
+    const airtableService = getAirtableService();
+    let eventRecordId = await airtableService.getEventsRecordIdByBookingId(existingSong.eventId);
+    if (!eventRecordId && /^\d+$/.test(existingSong.eventId)) {
+      const booking = await airtableService.getSchoolBookingBySimplybookId(existingSong.eventId);
+      if (booking) {
+        const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (eventRecord) {
+          eventRecordId = eventRecord.id;
+        }
+      }
+    }
+
+    if (eventRecordId) {
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'song_updated',
+        description: ActivityService.generateDescription('song_updated', {
+          songTitle: title?.trim() || existingSong.title,
+        }),
+        actorEmail: session.email,
+        actorType: 'teacher',
+        metadata: { songId, title: title?.trim(), artist, notes },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       song: updatedSong,
@@ -155,6 +183,32 @@ export async function DELETE(
 
     // Delete the song
     await teacherService.deleteSong(songId);
+
+    // Log activity (fire-and-forget) - resolve eventRecordId from eventId
+    const airtableService = getAirtableService();
+    let eventRecordId = await airtableService.getEventsRecordIdByBookingId(existingSong.eventId);
+    if (!eventRecordId && /^\d+$/.test(existingSong.eventId)) {
+      const booking = await airtableService.getSchoolBookingBySimplybookId(existingSong.eventId);
+      if (booking) {
+        const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (eventRecord) {
+          eventRecordId = eventRecord.id;
+        }
+      }
+    }
+
+    if (eventRecordId) {
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'song_deleted',
+        description: ActivityService.generateDescription('song_deleted', {
+          songTitle: existingSong.title,
+        }),
+        actorEmail: session.email,
+        actorType: 'teacher',
+        metadata: { songId, title: existingSong.title },
+      });
+    }
 
     return NextResponse.json({
       success: true,

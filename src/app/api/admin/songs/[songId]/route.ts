@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
 /**
  * PUT /api/admin/songs/[songId]
@@ -28,6 +30,10 @@ export async function PUT(
     }
 
     const teacherService = getTeacherService();
+    const airtableService = getAirtableService();
+
+    // Get song info for activity logging before update
+    const songInfo = await teacherService.getSongById(songId);
 
     // Admins can update any song - no ownership check
     await teacherService.updateSong(songId, {
@@ -35,6 +41,33 @@ export async function PUT(
       artist: artist?.trim() || '',
       notes: notes?.trim() || '',
     });
+
+    // Log activity (fire-and-forget) - resolve eventRecordId from songInfo.eventId
+    if (songInfo?.eventId) {
+      let eventRecordId = await airtableService.getEventsRecordIdByBookingId(songInfo.eventId);
+      if (!eventRecordId && /^\d+$/.test(songInfo.eventId)) {
+        const booking = await airtableService.getSchoolBookingBySimplybookId(songInfo.eventId);
+        if (booking) {
+          const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+          if (eventRecord) {
+            eventRecordId = eventRecord.id;
+          }
+        }
+      }
+
+      if (eventRecordId) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'song_updated',
+          description: ActivityService.generateDescription('song_updated', {
+            songTitle: title.trim(),
+          }),
+          actorEmail: session.email,
+          actorType: 'admin',
+          metadata: { songId, title: title.trim(), artist, notes },
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -69,9 +102,40 @@ export async function DELETE(
 
     const songId = decodeURIComponent(params.songId);
     const teacherService = getTeacherService();
+    const airtableService = getAirtableService();
+
+    // Get song info for activity logging before deletion
+    const songInfo = await teacherService.getSongById(songId);
 
     // Admins can delete any song - no ownership check
     await teacherService.deleteSong(songId);
+
+    // Log activity (fire-and-forget) - resolve eventRecordId from songInfo.eventId
+    if (songInfo?.eventId) {
+      let eventRecordId = await airtableService.getEventsRecordIdByBookingId(songInfo.eventId);
+      if (!eventRecordId && /^\d+$/.test(songInfo.eventId)) {
+        const booking = await airtableService.getSchoolBookingBySimplybookId(songInfo.eventId);
+        if (booking) {
+          const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+          if (eventRecord) {
+            eventRecordId = eventRecord.id;
+          }
+        }
+      }
+
+      if (eventRecordId) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'song_deleted',
+          description: ActivityService.generateDescription('song_deleted', {
+            songTitle: songInfo.title || 'Unknown',
+          }),
+          actorEmail: session.email,
+          actorType: 'admin',
+          metadata: { songId, title: songInfo.title },
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,

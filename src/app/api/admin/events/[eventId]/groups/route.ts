@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
 /**
  * GET /api/admin/events/[eventId]/groups
@@ -96,6 +97,32 @@ export async function POST(
       memberClassIds,
       createdBy: admin.email || 'admin',
     });
+
+    // Resolve eventRecordId for activity logging
+    let eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+    if (!eventRecordId && /^\d+$/.test(eventId)) {
+      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      if (booking) {
+        const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (eventRecord) {
+          eventRecordId = eventRecord.id;
+        }
+      }
+    }
+
+    // Log activity (fire-and-forget)
+    if (eventRecordId) {
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'group_created',
+        description: ActivityService.generateDescription('group_created', {
+          groupName: groupName.trim(),
+        }),
+        actorEmail: admin.email,
+        actorType: 'admin',
+        metadata: { groupId: newGroup.groupId, groupName: groupName.trim(), memberClassIds },
+      });
+    }
 
     return NextResponse.json({
       success: true,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
 /**
  * POST /api/admin/classes/[classId]/songs
@@ -79,6 +80,40 @@ export async function POST(
       artist: artist?.trim() || '',
       notes: notes?.trim() || '',
     });
+
+    // Resolve eventRecordId for activity logging
+    let eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+    if (!eventRecordId && /^\d+$/.test(eventId)) {
+      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      if (booking) {
+        const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (eventRecord) {
+          eventRecordId = eventRecord.id;
+        }
+      }
+    }
+
+    // Log activity (fire-and-forget)
+    if (eventRecordId) {
+      // Determine target type and name
+      const targetType = isGroup ? 'group' : 'class';
+      const targetName = isGroup
+        ? (await teacherService.getGroupsByEventId(eventId)).find(g => g.groupId === classId)?.groupName || 'Unknown'
+        : event.classes.find(c => c.classId === classId)?.className || 'Unknown';
+
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'song_added',
+        description: ActivityService.generateDescription('song_added', {
+          songTitle: title.trim(),
+          targetType,
+          targetName,
+        }),
+        actorEmail: session.email,
+        actorType: 'admin',
+        metadata: { songId: newSong.id, title: title.trim(), classId, targetType, targetName },
+      });
+    }
 
     return NextResponse.json({
       success: true,

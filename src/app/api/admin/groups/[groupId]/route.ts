@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService, ActivityService } from '@/lib/services/activityService';
+
+// Helper to resolve eventRecordId from eventId (booking_id or simplybookId)
+async function resolveEventRecordId(eventId: string): Promise<string | null> {
+  const airtableService = getAirtableService();
+  let eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+  if (!eventRecordId && /^\d+$/.test(eventId)) {
+    const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+    if (booking) {
+      const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+      if (eventRecord) {
+        eventRecordId = eventRecord.id;
+      }
+    }
+  }
+  return eventRecordId;
+}
 
 /**
  * GET /api/admin/groups/[groupId]
@@ -100,6 +118,23 @@ export async function PUT(
 
     const updatedGroup = await teacherService.updateGroup(groupId, updateData);
 
+    // Log activity (fire-and-forget) - resolve eventRecordId from eventId
+    if (existingGroup.eventId) {
+      const eventRecordId = await resolveEventRecordId(existingGroup.eventId);
+      if (eventRecordId) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'group_updated',
+          description: ActivityService.generateDescription('group_updated', {
+            groupName: updateData.groupName || existingGroup.groupName,
+          }),
+          actorEmail: admin.email,
+          actorType: 'admin',
+          metadata: { groupId, ...updateData },
+        });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       group: updatedGroup,
@@ -154,6 +189,23 @@ export async function DELETE(
     }
 
     await teacherService.deleteGroup(groupId);
+
+    // Log activity (fire-and-forget) - resolve eventRecordId from eventId
+    if (existingGroup.eventId) {
+      const eventRecordId = await resolveEventRecordId(existingGroup.eventId);
+      if (eventRecordId) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'group_deleted',
+          description: ActivityService.generateDescription('group_deleted', {
+            groupName: existingGroup.groupName,
+          }),
+          actorEmail: admin.email,
+          actorType: 'admin',
+          metadata: { groupId, groupName: existingGroup.groupName },
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,

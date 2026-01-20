@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
+import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
 /**
  * POST /api/admin/events/[eventId]/assign-staff
@@ -47,8 +48,36 @@ export async function POST(
     }
 
     // Get updated event data with staff info
-    const updatedEvents = await getAirtableService().getSchoolEventSummaries();
+    const airtableService = getAirtableService();
+    const updatedEvents = await airtableService.getSchoolEventSummaries();
     const updatedEvent = updatedEvents.find(e => e.eventId === eventId);
+
+    // Resolve eventRecordId for activity logging
+    let eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+    if (!eventRecordId && /^\d+$/.test(eventId)) {
+      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      if (booking) {
+        const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (eventRecord) {
+          eventRecordId = eventRecord.id;
+        }
+      }
+    }
+
+    // Log activity (fire-and-forget)
+    if (eventRecordId) {
+      const activityType = staffId ? 'staff_assigned' : 'staff_unassigned';
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType,
+        description: ActivityService.generateDescription(activityType, {
+          staffName: updatedEvent?.assignedStaffName || 'Staff member',
+        }),
+        actorEmail: admin.email,
+        actorType: 'admin',
+        metadata: { staffId, staffName: updatedEvent?.assignedStaffName },
+      });
+    }
 
     return NextResponse.json({
       success: true,

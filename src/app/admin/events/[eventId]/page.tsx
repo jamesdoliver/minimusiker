@@ -31,6 +31,7 @@ import EditSongModal from '@/components/shared/class-management/EditSongModal';
 import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfirmModal';
 import AddGroupModal from '@/components/shared/class-management/AddGroupModal';
 import EditGroupModal from '@/components/shared/class-management/EditGroupModal';
+import EventActivityTimeline from '@/components/admin/EventActivityTimeline';
 
 // Group type for admin view
 interface ClassGroup {
@@ -109,6 +110,11 @@ export default function EventDetailPage() {
 
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Date editing state
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [editedDate, setEditedDate] = useState('');
+  const [isUpdatingDate, setIsUpdatingDate] = useState(false);
+
   const eventId = params.eventId as string;
 
   useEffect(() => {
@@ -163,6 +169,64 @@ export default function EventDetailPage() {
       }
     } catch (err) {
       console.error('Error fetching groups:', err);
+    }
+  };
+
+  // Date editing handlers
+  const handleStartDateEdit = () => {
+    if (event?.eventDate) {
+      // Convert display date to YYYY-MM-DD format for input
+      const date = new Date(event.eventDate);
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      setEditedDate(`${yyyy}-${mm}-${dd}`);
+    }
+    setIsEditingDate(true);
+  };
+
+  const handleCancelDateEdit = () => {
+    setIsEditingDate(false);
+    setEditedDate('');
+  };
+
+  const handleSaveDateEdit = async () => {
+    if (!editedDate) return;
+
+    setIsUpdatingDate(true);
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_date: editedDate }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update date');
+      }
+
+      const data = await response.json();
+
+      // Update local state with new date
+      setEvent(prev => prev ? { ...prev, eventDate: editedDate } : null);
+      setIsEditingDate(false);
+      setEditedDate('');
+
+      // Build success message with details
+      let message = 'Event date updated';
+      if (data.bookingUpdated) {
+        message += ' and synced to booking';
+      }
+      if (data.tasksRecalculated > 0) {
+        message += ` (${data.tasksRecalculated} task deadline${data.tasksRecalculated === 1 ? '' : 's'} recalculated)`;
+      }
+      toast.success(message);
+    } catch (err) {
+      console.error('Error updating date:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update date');
+    } finally {
+      setIsUpdatingDate(false);
     }
   };
 
@@ -401,7 +465,52 @@ export default function EventDetailPage() {
           <div>
             <div className="flex items-center gap-3 mb-3">
               <EventBadge type={event.eventType} size="md" />
-              <span className="text-gray-500">{formatDate(event.eventDate)}</span>
+              {isEditingDate ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={editedDate}
+                    onChange={(e) => setEditedDate(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isUpdatingDate}
+                  />
+                  <button
+                    onClick={handleSaveDateEdit}
+                    disabled={isUpdatingDate || !editedDate}
+                    className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {isUpdatingDate ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={handleCancelDateEdit}
+                    disabled={isUpdatingDate}
+                    className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleStartDateEdit}
+                  className="flex items-center gap-1 text-gray-500 hover:text-gray-700 group"
+                  title="Click to edit date"
+                >
+                  <span>{formatDate(event.eventDate)}</span>
+                  <svg
+                    className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">{event.schoolName}</h1>
             <p className="text-gray-600">
@@ -985,6 +1094,11 @@ export default function EventDetailPage() {
             })}
           </div>
         )}
+      </div>
+
+      {/* Activity Timeline */}
+      <div className="mt-8">
+        <EventActivityTimeline eventId={eventId} />
       </div>
 
       {/* Modals */}
