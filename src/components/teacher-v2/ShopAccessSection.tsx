@@ -7,7 +7,7 @@ interface ShopAccessSectionProps {
 
 export function ShopAccessSection({
   discountCode = 'KEH1038US',
-  shopUrl = 'https://shop.minimusiker.de/products/Songs-&-Playbacks-c145270503',
+  shopUrl = 'https://shop.minimusiker.de/minimusikertag',
 }: ShopAccessSectionProps) {
   return (
     <section className="bg-white py-12 md:py-16">
