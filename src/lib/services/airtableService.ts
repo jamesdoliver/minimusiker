@@ -2022,8 +2022,14 @@ class AirtableService {
     }
   }
 
-  // Get school-level event summaries for admin cards view
-  // Groups by booking_id (school + date) and aggregates stats
+  /**
+   * Get school-level event summaries for admin cards view.
+   * Groups by booking_id (school + date) and aggregates stats.
+   *
+   * WARNING: This method fetches ALL events and is O(n) with database size.
+   * Do NOT use in user-facing API endpoints. Use getSchoolEvents(schoolName) instead.
+   * Only appropriate for admin dashboards with pagination.
+   */
   async getSchoolEventSummaries(): Promise<SchoolEventSummary[]> {
     if (this.useNormalizedTables()) {
       // NEW: Query Events table directly

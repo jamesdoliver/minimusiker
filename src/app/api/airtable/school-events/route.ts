@@ -44,26 +44,12 @@ export async function GET(request: NextRequest) {
 
     // Case 2: Get events for a school
     if (schoolName) {
-      // Get all events for this school
-      const allEvents = await airtableService.getSchoolEventSummaries();
+      const start = Date.now();
 
-      // Filter by school name (case-insensitive)
-      const schoolEvents = allEvents.filter(
-        (event) => event.schoolName.toLowerCase() === schoolName.toLowerCase()
-      );
+      // Use efficient method that filters at Airtable query level
+      const events = await airtableService.getSchoolEvents(schoolName);
 
-      // Transform to expected format
-      const events = await Promise.all(
-        schoolEvents.map(async (event) => {
-          const classes = await airtableService.getEventClasses(event.eventId);
-          return {
-            bookingId: event.eventId,
-            eventType: event.eventType,
-            eventDate: event.eventDate,
-            classCount: classes.length,
-          };
-        })
-      );
+      console.log(`[school-events] Fetched ${events.length} events for "${schoolName}" in ${Date.now() - start}ms`);
 
       return NextResponse.json({
         success: true,
