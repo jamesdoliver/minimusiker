@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     if (customAttributes?.eventId) {
       try {
         const airtable = getAirtableService();
-        const event = await airtable.getEventById(customAttributes.eventId);
+        const event = await airtable.getEventByEventId(customAttributes.eventId);
         if (event?.event_date) {
           const eventDate = new Date(event.event_date);
           const daysUntilEvent = Math.ceil(
