@@ -5,31 +5,15 @@ import Image from 'next/image';
 import { useCart } from '@/lib/contexts/CartContext';
 import { useProducts } from '@/lib/hooks/useProducts';
 import { ProductVariant } from '@/lib/types/airtable';
+import {
+  canOrderPersonalizedProducts,
+  getPersonalizedProductCountdown,
+} from '@/lib/utils/eventTimeline';
 
 interface PersonalizedTshirtPromoProps {
   schoolName: string;
   eventDate: string; // ISO date string
   productHandle?: string; // Shopify product handle, defaults to searching for t-shirt
-}
-
-// Calculate deadline: 14 days before event
-function getDeadline(eventDate: string): Date {
-  const event = new Date(eventDate);
-  event.setDate(event.getDate() - 14);
-  return event;
-}
-
-// Calculate time remaining until deadline
-function getTimeRemaining(deadline: Date): { days: number; hours: number } | null {
-  const now = new Date();
-  const diff = deadline.getTime() - now.getTime();
-
-  if (diff <= 0) return null; // Deadline passed
-
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-
-  return { days, hours };
 }
 
 // Get font size class based on school name length
@@ -85,20 +69,17 @@ export default function PersonalizedTshirtPromo({
     }
   }, [availableSizes, selectedSize]);
 
-  // Calculate deadline
-  const deadline = useMemo(() => getDeadline(eventDate), [eventDate]);
-
-  // Update countdown timer
+  // Update countdown timer using eventTimeline utility
   useEffect(() => {
     const updateTimer = () => {
-      setTimeRemaining(getTimeRemaining(deadline));
+      setTimeRemaining(getPersonalizedProductCountdown(eventDate));
     };
 
     updateTimer();
     const interval = setInterval(updateTimer, 60000); // Update every minute
 
     return () => clearInterval(interval);
-  }, [deadline]);
+  }, [eventDate]);
 
   // Handle add to cart
   const handleAddToCart = async () => {
@@ -124,8 +105,9 @@ export default function PersonalizedTshirtPromo({
     }
   };
 
-  // Don't render if deadline has passed or no event date
-  if (!eventDate || !timeRemaining) {
+  // Don't render if deadline has passed, no event date, or countdown not ready
+  // Uses TSHIRT_ORDER_DEADLINE milestone from eventTimeline
+  if (!eventDate || !canOrderPersonalizedProducts(eventDate) || !timeRemaining) {
     return null;
   }
 

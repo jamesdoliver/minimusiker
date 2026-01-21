@@ -4474,6 +4474,70 @@ class AirtableService {
   }
 
   /**
+   * Update an Event's date with proper sync to linked SchoolBooking
+   * @param eventRecordId - The Airtable record ID of the event
+   * @param newDate - The new date in YYYY-MM-DD format
+   * @returns Object with updated event and whether booking was also updated
+   */
+  async updateEventDate(
+    eventRecordId: string,
+    newDate: string
+  ): Promise<{ success: boolean; bookingUpdated: boolean; message: string }> {
+    try {
+      // Validate date format
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(newDate)) {
+        throw new Error('Invalid date format. Expected YYYY-MM-DD');
+      }
+
+      // Parse and validate the date is valid
+      const parsedDate = new Date(newDate);
+      if (isNaN(parsedDate.getTime())) {
+        throw new Error('Invalid date value');
+      }
+
+      // First, get the current event to find linked SchoolBooking
+      const eventRecord = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
+      const linkedBookingIds = eventRecord.get(EVENTS_FIELD_IDS.simplybook_booking) as string[] | undefined;
+
+      // Update the Events table
+      await this.base(EVENTS_TABLE_ID).update(eventRecordId, {
+        [EVENTS_FIELD_IDS.event_date]: newDate,
+      });
+      console.log(`Updated Event ${eventRecordId} date to: ${newDate}`);
+
+      // If there's a linked SchoolBooking, update it too
+      let bookingUpdated = false;
+      if (linkedBookingIds && linkedBookingIds.length > 0) {
+        const bookingRecordId = linkedBookingIds[0];
+        try {
+          await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecordId, {
+            [SCHOOL_BOOKINGS_FIELD_IDS.start_date]: newDate,
+          });
+          console.log(`Updated SchoolBooking ${bookingRecordId} start_date to: ${newDate}`);
+          bookingUpdated = true;
+        } catch (bookingError) {
+          console.error('Warning: Could not update linked SchoolBooking:', bookingError);
+          // Don't throw - the main event update succeeded
+        }
+      }
+
+      return {
+        success: true,
+        bookingUpdated,
+        message: bookingUpdated
+          ? 'Event date updated and synced to booking'
+          : 'Event date updated (no linked booking to sync)',
+      };
+    } catch (error) {
+      console.error('Error updating Event date:', error);
+      throw new Error(
+        `Failed to update Event date: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
    * Get logo URL for an Einrichtung (school)
    * Returns the logo_url field if it exists
    */

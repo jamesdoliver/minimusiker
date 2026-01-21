@@ -15,7 +15,12 @@
       "heroSubtitle": "Liebes Elternteil! Mit der Registrierung deines Kindes erhältst du Zugriff auf die Aufnahmen vom Minimusikertag, weitere Produkte und kostenfreies Material.",
       "registerCardTitle": "Registriere jetzt dein Kind",
       "registerCardSubtitle": "Finde deine Schule und melde dein Kind für den Minimusikertag an.",
-      "registerCardCta": "Jetzt registrieren"
+      "registerCardCta": "Jetzt registrieren",
+      "alreadyRegistered": "Schon registriert? Hier anmelden",
+      "loginEmail": "E-Mail-Adresse",
+      "loginButton": "Anmelden",
+      "loginNotFound": "Keine Registrierung gefunden. Bitte registrieren Sie sich oben.",
+      "loginError": "Verbindungsfehler. Bitte versuchen Sie es erneut."
     },
     "errors": {
       "missingParams": {

@@ -15,7 +15,12 @@
       "heroSubtitle": "Dear parent! By registering your child, you'll get access to recordings from the MiniMusiker day, additional products, and free materials.",
       "registerCardTitle": "Register your child now",
       "registerCardSubtitle": "Find your school and register your child for the MiniMusiker day.",
-      "registerCardCta": "Register now"
+      "registerCardCta": "Register now",
+      "alreadyRegistered": "Already registered? Log in here",
+      "loginEmail": "Email address",
+      "loginButton": "Log in",
+      "loginNotFound": "No registration found. Please register above.",
+      "loginError": "Connection error. Please try again."
     },
     "errors": {
       "missingParams": {

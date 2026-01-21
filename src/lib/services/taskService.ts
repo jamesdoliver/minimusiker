@@ -430,6 +430,68 @@ class TaskService {
       created_at: (record.get(GUESSTIMATE_ORDERS_FIELD_IDS.created_at) as string) || '',
     };
   }
+
+  /**
+   * Recalculate deadlines for all pending tasks when event date changes
+   * Only affects tasks with status 'pending' - completed tasks are not modified
+   * @param eventRecordId - The Airtable record ID of the event
+   * @param newEventDate - The new event date in YYYY-MM-DD format
+   * @returns Number of tasks updated
+   */
+  async recalculateDeadlinesForEvent(
+    eventRecordId: string,
+    newEventDate: string
+  ): Promise<{ updatedCount: number; tasks: string[] }> {
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+
+    // Parse new event date
+    const eventDate = new Date(newEventDate);
+    if (isNaN(eventDate.getTime())) {
+      throw new Error('Invalid event date format');
+    }
+
+    // Find all pending tasks for this event
+    const records = await table
+      .select({
+        filterByFormula: `AND(
+          {${TASKS_FIELD_IDS.event_id}} = '${eventRecordId}',
+          {${TASKS_FIELD_IDS.status}} = 'pending'
+        )`,
+      })
+      .all();
+
+    const updatedTasks: string[] = [];
+
+    // Update each task's deadline based on its timeline_offset
+    for (const record of records) {
+      const timelineOffset = record.get(TASKS_FIELD_IDS.timeline_offset) as number | undefined;
+
+      // Skip tasks without timeline_offset (e.g., manually created tasks)
+      if (timelineOffset === undefined || timelineOffset === null) {
+        continue;
+      }
+
+      // Calculate new deadline using the existing calculateDeadline function
+      const newDeadline = calculateDeadline(eventDate, timelineOffset);
+
+      // Update the task
+      await table.update(record.id, {
+        [TASKS_FIELD_IDS.deadline]: newDeadline.toISOString().split('T')[0], // Date only
+      });
+
+      updatedTasks.push(record.id);
+    }
+
+    console.log(
+      `Recalculated deadlines for ${updatedTasks.length} tasks for event ${eventRecordId} with new date ${newEventDate}`
+    );
+
+    return {
+      updatedCount: updatedTasks.length,
+      tasks: updatedTasks,
+    };
+  }
 }
 
 // Singleton instance
