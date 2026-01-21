@@ -119,6 +119,58 @@ function getTeacherMagicLinkTemplate(teacherName: string, magicLinkUrl: string):
 /**
  * Send magic link email to teacher for portal login
  */
+/**
+ * Send a generic campaign email
+ */
+export async function sendCampaignEmail(
+  to: string,
+  subject: string,
+  html: string
+): Promise<SendEmailResult> {
+  // Development fallback - log instead of sending
+  if (!process.env.RESEND_API_KEY) {
+    console.log('========================================');
+    console.log('CAMPAIGN EMAIL (Resend not configured):');
+    console.log('To:', to);
+    console.log('Subject:', subject);
+    console.log('HTML length:', html.length);
+    console.log('========================================');
+    return { success: true, messageId: 'dev-mode' };
+  }
+
+  try {
+    const resend = getResendClient();
+    const { data, error } = await resend.emails.send({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to,
+      subject,
+      html,
+    });
+
+    if (error) {
+      console.error('Resend campaign email error:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+
+    return {
+      success: true,
+      messageId: data?.id,
+    };
+  } catch (error) {
+    console.error('Resend campaign email error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown email error',
+    };
+  }
+}
+
+/**
+ * Send magic link email to teacher for portal login
+ */
 export async function sendTeacherMagicLinkEmail(
   email: string,
   name: string,
