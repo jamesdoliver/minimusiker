@@ -38,6 +38,7 @@ export interface ProductSelection {
 export interface CheckoutLineItem {
   variantId: string;
   quantity: number;
+  productType?: 'tshirt' | 'hoodie' | 'audio';
 }
 
 // Checkout custom attributes

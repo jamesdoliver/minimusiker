@@ -9,6 +9,12 @@
  */
 
 /**
+ * Early-bird discount deadline: orders placed more than this many days
+ * before the event qualify for the early-bird discount (10% off)
+ */
+export const EARLY_BIRD_DEADLINE_DAYS = 19;
+
+/**
  * Event milestones with their timeline offsets (days relative to event)
  * Negative = before event, Positive = after event
  */

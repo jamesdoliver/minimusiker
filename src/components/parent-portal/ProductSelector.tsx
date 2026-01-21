@@ -507,14 +507,14 @@ export default function ProductSelector({
         return;
       }
 
-      // Build line items for Shopify cart
-      const lineItems: Array<{ variantId: string; quantity: number }> = [];
+      // Build line items for Shopify cart (with productType for discount code logic)
+      const lineItems: Array<{ variantId: string; quantity: number; productType?: 'tshirt' | 'hoodie' | 'audio' }> = [];
 
       // Add audio products
       selection.audioProducts.forEach((item) => {
         const variantId = SHOPIFY_VARIANT_MAP[item.productId];
         if (variantId) {
-          lineItems.push({ variantId, quantity: item.quantity });
+          lineItems.push({ variantId, quantity: item.quantity, productType: 'audio' });
         }
       });
 
@@ -523,22 +523,22 @@ export default function ProductSelector({
         if (item.productId === 'tshirt' && item.tshirtSize) {
           const variantId = SHOPIFY_VARIANT_MAP[`tshirt-${item.tshirtSize}`];
           if (variantId) {
-            lineItems.push({ variantId, quantity: item.quantity });
+            lineItems.push({ variantId, quantity: item.quantity, productType: 'tshirt' });
           }
         } else if (item.productId === 'hoodie' && item.hoodieSize) {
           const variantId = SHOPIFY_VARIANT_MAP[`hoodie-${item.hoodieSize}`];
           if (variantId) {
-            lineItems.push({ variantId, quantity: item.quantity });
+            lineItems.push({ variantId, quantity: item.quantity, productType: 'hoodie' });
           }
         } else if (item.productId === 'tshirt-hoodie' && item.tshirtSize && item.hoodieSize) {
-          // Bundle: add both t-shirt and hoodie as separate line items
+          // Bundle: add both t-shirt and hoodie as separate line items with their types
           const tshirtVariantId = SHOPIFY_VARIANT_MAP[`tshirt-${item.tshirtSize}`];
           const hoodieVariantId = SHOPIFY_VARIANT_MAP[`hoodie-${item.hoodieSize}`];
           if (tshirtVariantId) {
-            lineItems.push({ variantId: tshirtVariantId, quantity: item.quantity });
+            lineItems.push({ variantId: tshirtVariantId, quantity: item.quantity, productType: 'tshirt' });
           }
           if (hoodieVariantId) {
-            lineItems.push({ variantId: hoodieVariantId, quantity: item.quantity });
+            lineItems.push({ variantId: hoodieVariantId, quantity: item.quantity, productType: 'hoodie' });
           }
         }
       });

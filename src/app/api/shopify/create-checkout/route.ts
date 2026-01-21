@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import shopifyService from '@/lib/services/shopifyService';
 import { CheckoutLineItem, CheckoutCustomAttributes } from '@/lib/types/shop';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { EARLY_BIRD_DEADLINE_DAYS } from '@/lib/utils/eventTimeline';
 
 interface CheckoutRequest {
   lineItems: CheckoutLineItem[];
@@ -60,6 +62,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Determine discount codes to apply
+    const discountCodes: string[] = [];
+
+    // 1. Early-bird check (requires event date lookup)
+    if (customAttributes?.eventId) {
+      try {
+        const airtable = getAirtableService();
+        const event = await airtable.getEventById(customAttributes.eventId);
+        if (event?.event_date) {
+          const eventDate = new Date(event.event_date);
+          const daysUntilEvent = Math.ceil(
+            (eventDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          );
+          if (daysUntilEvent > EARLY_BIRD_DEADLINE_DAYS) {
+            discountCodes.push('EARLYBIRD10');
+            console.log('[create-checkout] Early-bird discount applied:', {
+              eventDate: event.event_date,
+              daysUntilEvent,
+              threshold: EARLY_BIRD_DEADLINE_DAYS,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[create-checkout] Error checking early-bird eligibility:', error);
+        // Continue without early-bird discount if lookup fails
+      }
+    }
+
+    // 2. Bundle check (T-shirt + Hoodie)
+    const hasTshirt = lineItems.some(item => item.productType === 'tshirt');
+    const hasHoodie = lineItems.some(item => item.productType === 'hoodie');
+    if (hasTshirt && hasHoodie) {
+      discountCodes.push('BUNDLE15');
+      console.log('[create-checkout] Bundle discount applied: T-shirt + Hoodie combo');
+    }
+
+    if (discountCodes.length > 0) {
+      console.log('[create-checkout] Discount codes to apply:', discountCodes);
+    }
+
     // Check if Shopify integration is enabled
     const isShopifyEnabled = process.env.ENABLE_SHOPIFY_INTEGRATION === 'true';
 
@@ -70,6 +112,7 @@ export async function POST(request: NextRequest) {
         cartId: mockCartId,
         lineItems,
         customAttributes,
+        discountCodes,
       });
 
       return NextResponse.json({
@@ -82,11 +125,16 @@ export async function POST(request: NextRequest) {
         checkoutId: mockCartId,
         webUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout/mock/${mockCartId}`,
         message: 'Shopify integration is disabled. This is a mock cart.',
+        discountCodes, // Include for debugging in mock mode
       });
     }
 
     // Create real Shopify cart using modern Cart API
-    const cart = await shopifyService.createCartFromCheckoutItems(lineItems, customAttributes);
+    const cart = await shopifyService.createCartFromCheckoutItems(
+      lineItems,
+      customAttributes,
+      discountCodes
+    );
 
     console.log('[create-checkout] Shopify cart created:', {
       cartId: cart.cartId,

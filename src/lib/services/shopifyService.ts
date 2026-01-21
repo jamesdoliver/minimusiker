@@ -324,7 +324,8 @@ class ShopifyService {
    */
   async createCart(
     lineItems: CartLineInput[],
-    attributes?: MiniMusikerCartAttributes
+    attributes?: MiniMusikerCartAttributes,
+    discountCodes?: string[]
   ): Promise<CartCreateResult> {
     const mutation = `
       mutation CartCreate($input: CartInput!) {
@@ -382,12 +383,19 @@ class ShopifyService {
       lines: Array<{ merchandiseId: string; quantity: number }>;
       attributes?: Array<{ key: string; value: string }>;
       buyerIdentity?: { email: string };
+      discountCodes?: string[];
     } = {
       lines: lineItems.map((item) => ({
         merchandiseId: item.merchandiseId,
         quantity: item.quantity,
       })),
     };
+
+    // Add discount codes if provided
+    if (discountCodes && discountCodes.length > 0) {
+      cartInput.discountCodes = discountCodes;
+      console.log('[createCart] Applying discount codes:', discountCodes);
+    }
 
     // Add custom attributes if provided
     if (attributes) {
@@ -576,7 +584,8 @@ class ShopifyService {
    */
   async createCartFromCheckoutItems(
     lineItems: CheckoutLineItem[],
-    customAttributes?: CheckoutCustomAttributes
+    customAttributes?: CheckoutCustomAttributes,
+    discountCodes?: string[]
   ): Promise<CartCreateResult> {
     // Convert CheckoutLineItem to CartLineInput
     const cartLines: CartLineInput[] = lineItems.map((item) => ({
@@ -595,7 +604,7 @@ class ShopifyService {
         }
       : undefined;
 
-    return this.createCart(cartLines, cartAttributes);
+    return this.createCart(cartLines, cartAttributes, discountCodes);
   }
 
   /**
