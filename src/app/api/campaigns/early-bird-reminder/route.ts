@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getEarlyBirdTargets, CampaignRecipient } from '@/lib/services/campaignService';
 import { sendCampaignEmail } from '@/lib/services/resendService';
 
-// Target schools for this campaign (access_codes, used for short URLs like minimusiker.app/1718)
-const TARGET_ACCESS_CODES = [1718, 1602];
+// Target schools for this campaign (access_codes, used for short URLs like minimusiker.app/24)
+// - Grundschule am Römerbad (Zunzweier): 24
+// - Schule an der Ruhr: 16
+const TARGET_ACCESS_CODES = [24, 16];
 
 /**
  * Generate email HTML for early bird reminder
