@@ -2005,6 +2005,16 @@ class TeacherService {
       // Build a set of booking IDs we already have from SchoolBookings
       const schoolBookingIds = new Set(schoolBookings.map(b => b.simplybookId).filter(Boolean));
 
+      // Get teacher record to check linked_events field
+      const teacher = await this.getTeacherByEmail(teacherEmail);
+      const linkedEventRecordIds = teacher?.linkedEvents || [];
+
+      // Fetch events directly linked to teacher via Teachers.linked_events
+      const linkedEvents = await getAirtableService().getEventsByRecordIds(linkedEventRecordIds);
+
+      // Track all processed event IDs to avoid duplicates
+      const processedEventIds = new Set<string>();
+
       // Build TeacherEventView array
       const events: TeacherEventView[] = [];
 
@@ -2149,6 +2159,9 @@ class TeacherService {
             weeksUntilEvent,
           },
         });
+
+        // Track this event to avoid duplicates from linked_events
+        processedEventIds.add(eventId);
       }
 
       // Process legacy events not in SchoolBookings
@@ -2255,6 +2268,131 @@ class TeacherService {
             weeksUntilEvent,
           },
         });
+
+        // Track this event to avoid duplicates from linked_events
+        processedEventIds.add(eventId);
+      }
+
+      // Process events from Teachers.linked_events that aren't already included
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (const linkedEvent of linkedEvents) {
+        const eventId = linkedEvent.event_id;
+
+        // Skip if already processed via SchoolBookings or legacy
+        if (processedEventIds.has(eventId)) continue;
+        if (schoolBookingIds.has(eventId)) continue;
+        if (legacyEventIds.has(eventId)) continue;
+
+        // Apply date filter - only future/current events
+        const eventDate = new Date(linkedEvent.event_date);
+        eventDate.setHours(0, 0, 0, 0);
+        if (eventDate < today) continue;
+
+        const actualEventDate = linkedEvent.event_date;
+        const actualSchoolName = linkedEvent.school_name;
+
+        // Query Classes table to get classes for this event
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+            returnFieldsByFieldId: true,
+          })
+          .all();
+
+        // Get songs and audio files for this event
+        const songs = await this.getSongsByEventId(eventId);
+        const audioFiles = await this.getAudioFilesByEventId(eventId);
+
+        // Build class views from Classes table
+        const classViews: TeacherClassView[] = [];
+        for (const classRecord of classRecords) {
+          const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
+          const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
+          const numChildren = classRecord.fields[CLASSES_FIELD_IDS.total_children] as number | undefined;
+          const isDefault = Boolean(classRecord.fields[CLASSES_FIELD_IDS.is_default]);
+
+          const classSongs = songs.filter((s) => s.classId === classId);
+          const classAudioFiles = audioFiles.filter((a) => a.classId === classId);
+
+          classViews.push({
+            classId,
+            className,
+            numChildren,
+            songs: classSongs,
+            audioStatus: {
+              hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
+              hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
+              hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+            },
+            isDefault,
+          });
+        }
+
+        // Determine event status
+        const eventDateParsed = new Date(actualEventDate);
+        const now = new Date();
+        const eventDateOnly = new Date(eventDateParsed.getFullYear(), eventDateParsed.getMonth(), eventDateParsed.getDate());
+        const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        const needsSetup = classViews.length === 0;
+        let status: 'upcoming' | 'in-progress' | 'completed' | 'needs-setup';
+        if (needsSetup) {
+          status = 'needs-setup';
+        } else if (eventDateOnly > nowDateOnly) {
+          status = 'upcoming';
+        } else if (eventDateOnly.getTime() === nowDateOnly.getTime()) {
+          status = 'in-progress';
+        } else {
+          status = 'completed';
+        }
+
+        // Calculate progress metrics
+        const classesCount = classViews.length;
+        const songsCount = songs.length;
+
+        let registrationsCount = 0;
+        try {
+          const registrationRecords = await this.base(PARENT_JOURNEY_TABLE)
+            .select({
+              filterByFormula: `AND({${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
+            })
+            .all();
+          registrationsCount = registrationRecords.length;
+        } catch (err) {
+          console.warn('Could not get registration count:', err);
+        }
+
+        const totalChildrenExpected = classViews.reduce((sum, cls) => sum + (cls.numChildren || 0), 0);
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const daysUntilEvent = Math.floor((eventDateParsed.getTime() - now.getTime()) / msPerDay);
+        const weeksUntilEvent = Math.round(daysUntilEvent / 7);
+        const SONGS_PER_CLASS = 1;
+        const expectedSongs = classesCount * SONGS_PER_CLASS;
+
+        events.push({
+          eventId,
+          schoolName: actualSchoolName,
+          eventDate: actualEventDate,
+          eventType: linkedEvent.event_type || 'MiniMusiker Day',
+          classes: classViews,
+          status,
+          simplybookHash: undefined,  // No booking for directly linked events
+          bookingRecordId: undefined, // No booking for directly linked events
+          progress: {
+            classesCount,
+            expectedClasses: undefined,
+            songsCount,
+            expectedSongs,
+            registrationsCount,
+            totalChildrenExpected: totalChildrenExpected > 0 ? totalChildrenExpected : undefined,
+            daysUntilEvent,
+            weeksUntilEvent,
+          },
+        });
+
+        processedEventIds.add(eventId);
       }
 
       // Sort by date (upcoming first)

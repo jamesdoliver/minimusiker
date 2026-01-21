@@ -4574,6 +4574,25 @@ class AirtableService {
   }
 
   /**
+   * Get multiple Events by their Airtable record IDs
+   * Used to fetch events linked to a teacher via linked_events field
+   */
+  async getEventsByRecordIds(recordIds: string[]): Promise<Event[]> {
+    if (!recordIds || recordIds.length === 0) {
+      return [];
+    }
+
+    const events: Event[] = [];
+    for (const recordId of recordIds) {
+      const event = await this.getEventById(recordId);
+      if (event) {
+        events.push(event);
+      }
+    }
+    return events;
+  }
+
+  /**
    * Get an Event by its linked SchoolBooking record ID
    * Used to get access_code for a booking
    *
