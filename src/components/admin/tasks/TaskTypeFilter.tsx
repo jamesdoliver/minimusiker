@@ -2,7 +2,7 @@
 
 'use client';
 
-import { TaskFilterTab, TASK_TYPE_CONFIG } from '@/lib/types/tasks';
+import { TaskFilterTab } from '@/lib/types/tasks';
 
 interface TaskTypeFilterProps {
   value: TaskFilterTab;
