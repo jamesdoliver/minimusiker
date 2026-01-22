@@ -7,6 +7,9 @@ import {
   TASKS_FIELD_IDS,
 } from '@/lib/types/airtable';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +22,15 @@ export async function GET(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { taskId } = await params;
 
     if (!taskId) {
@@ -76,6 +88,15 @@ export async function POST(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const { taskId } = await params;
 
     if (!taskId) {
@@ -104,6 +125,14 @@ export async function POST(
       );
     }
 
+    // Validate file size (max 10MB)
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { success: false, error: 'File size exceeds 10MB limit' },
+        { status: 400 }
+      );
+    }
+
     // Get file buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -114,7 +143,13 @@ export async function POST(
 
     // Upload to R2
     const r2 = getR2Service();
-    await r2.uploadToAssetsBucket(r2Key, buffer, file.type);
+    const result = await r2.uploadToAssetsBucket(r2Key, buffer, file.type);
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to upload to storage' },
+        { status: 500 }
+      );
+    }
 
     // Update task completion_data with invoice_r2_key
     const airtable = getAirtableService();
