@@ -213,13 +213,18 @@ class ClothingOrdersService {
     const registrationsTable = base(REGISTRATIONS_TABLE_ID);
     const parentsTable = base(PARENTS_TABLE_ID);
 
-    // Get all orders and filter by event in code
+    // Fetch all data upfront to avoid multiple Airtable calls in loops
     // (SEARCH with ARRAYJOIN doesn't work reliably with linked record fields)
-    const allOrders = await ordersTable
-      .select({
-        returnFieldsByFieldId: true,
-      })
-      .all();
+    const [allOrders, allParents, allRegistrations] = await Promise.all([
+      ordersTable.select({ returnFieldsByFieldId: true }).all(),
+      parentsTable.select({ returnFieldsByFieldId: true }).all(),
+      registrationsTable.select({ returnFieldsByFieldId: true }).all(),
+    ]);
+
+    // Create lookup maps for efficient access
+    const parentsById = new Map(
+      allParents.map((p) => [p.id, p.get(PARENTS_FIELD_IDS.parent_first_name) as string])
+    );
 
     // Filter to orders linked to this event
     const orders = allOrders.filter((order) => {
@@ -255,48 +260,23 @@ class ClothingOrdersService {
 
       if (clothingItems.length === 0) continue;
 
-      // Get parent info
-      // Use .select() with RECORD_ID() filter instead of .find() to support returnFieldsByFieldId
+      // Get parent name from lookup map
       const parentIds = order.get(ORDERS_FIELD_IDS.parent_id) as string[] | undefined;
-      let parentName = 'Unknown';
-      if (parentIds?.[0]) {
-        try {
-          const parentRecords = await parentsTable
-            .select({
-              filterByFormula: `RECORD_ID() = '${parentIds[0]}'`,
-              returnFieldsByFieldId: true,
-              maxRecords: 1,
-            })
-            .all();
-          if (parentRecords.length > 0) {
-            parentName = parentRecords[0].get(PARENTS_FIELD_IDS.parent_first_name) as string || 'Unknown';
-          }
-        } catch {
-          // Ignore if parent not found
-        }
-      }
+      const parentName = parentIds?.[0] ? (parentsById.get(parentIds[0]) || 'Unknown') : 'Unknown';
 
-      // Get child names from registrations
+      // Get child names from registrations (filter in code)
       const childNames: string[] = [];
       const classIds = order.get(ORDERS_FIELD_IDS.class_id) as string[] | undefined;
       if (classIds?.[0] && parentIds?.[0]) {
-        try {
-          const registrations = await registrationsTable
-            .select({
-              filterByFormula: `AND(
-                SEARCH('${parentIds[0]}', ARRAYJOIN({${REGISTRATIONS_FIELD_IDS.parent_id}})),
-                SEARCH('${classIds[0]}', ARRAYJOIN({${REGISTRATIONS_FIELD_IDS.class_id}}))
-              )`,
-              returnFieldsByFieldId: true,
-            })
-            .all();
+        const matchingRegs = allRegistrations.filter((reg) => {
+          const regParentIds = reg.get(REGISTRATIONS_FIELD_IDS.parent_id) as string[] | undefined;
+          const regClassIds = reg.get(REGISTRATIONS_FIELD_IDS.class_id) as string[] | undefined;
+          return regParentIds?.includes(parentIds[0]) && regClassIds?.includes(classIds[0]);
+        });
 
-          for (const reg of registrations) {
-            const childName = reg.get(REGISTRATIONS_FIELD_IDS.registered_child) as string;
-            if (childName) childNames.push(childName);
-          }
-        } catch {
-          // Ignore if registrations not found
+        for (const reg of matchingRegs) {
+          const childName = reg.get(REGISTRATIONS_FIELD_IDS.registered_child) as string;
+          if (childName) childNames.push(childName);
         }
       }
 
