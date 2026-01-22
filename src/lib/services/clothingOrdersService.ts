@@ -67,6 +67,7 @@ class ClothingOrdersService {
           IS_BEFORE({${EVENTS_FIELD_IDS.event_date}}, '${visibilityThreshold.toISOString().split('T')[0]}'),
           IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${pastCutoff.toISOString().split('T')[0]}')
         )`,
+        returnFieldsByFieldId: true,
       })
       .all();
 
@@ -77,6 +78,7 @@ class ClothingOrdersService {
           {${TASKS_FIELD_IDS.task_type}} = 'clothing_order',
           {${TASKS_FIELD_IDS.status}} = 'completed'
         )`,
+        returnFieldsByFieldId: true,
       })
       .all();
 
@@ -88,7 +90,9 @@ class ClothingOrdersService {
     );
 
     // Get all orders and filter by clothing items
-    const allOrders = await ordersTable.select().all();
+    const allOrders = await ordersTable.select({
+      returnFieldsByFieldId: true,
+    }).all();
 
     // Group orders by event
     const ordersByEvent = new Map<string, {
@@ -213,6 +217,7 @@ class ClothingOrdersService {
     const orders = await ordersTable
       .select({
         filterByFormula: `SEARCH('${eventRecordId}', ARRAYJOIN({${ORDERS_FIELD_IDS.event_id}}))`,
+        returnFieldsByFieldId: true,
       })
       .all();
 
@@ -245,12 +250,21 @@ class ClothingOrdersService {
       if (clothingItems.length === 0) continue;
 
       // Get parent info
+      // Use .select() with RECORD_ID() filter instead of .find() to support returnFieldsByFieldId
       const parentIds = order.get(ORDERS_FIELD_IDS.parent_id) as string[] | undefined;
       let parentName = 'Unknown';
       if (parentIds?.[0]) {
         try {
-          const parent = await parentsTable.find(parentIds[0]);
-          parentName = parent.get(PARENTS_FIELD_IDS.parent_first_name) as string || 'Unknown';
+          const parentRecords = await parentsTable
+            .select({
+              filterByFormula: `RECORD_ID() = '${parentIds[0]}'`,
+              returnFieldsByFieldId: true,
+              maxRecords: 1,
+            })
+            .all();
+          if (parentRecords.length > 0) {
+            parentName = parentRecords[0].get(PARENTS_FIELD_IDS.parent_first_name) as string || 'Unknown';
+          }
         } catch {
           // Ignore if parent not found
         }
@@ -267,6 +281,7 @@ class ClothingOrdersService {
                 SEARCH('${parentIds[0]}', ARRAYJOIN({${REGISTRATIONS_FIELD_IDS.parent_id}})),
                 SEARCH('${classIds[0]}', ARRAYJOIN({${REGISTRATIONS_FIELD_IDS.class_id}}))
               )`,
+              returnFieldsByFieldId: true,
             })
             .all();
 
@@ -321,8 +336,20 @@ class ClothingOrdersService {
     const tasksTable = base(TASKS_TABLE_ID);
     const eventsTable = base(EVENTS_TABLE_ID);
 
-    // Get event details
-    const event = await eventsTable.find(eventRecordId);
+    // Get event details using .select() with RECORD_ID() to support returnFieldsByFieldId
+    const eventRecords = await eventsTable
+      .select({
+        filterByFormula: `RECORD_ID() = '${eventRecordId}'`,
+        returnFieldsByFieldId: true,
+        maxRecords: 1,
+      })
+      .all();
+
+    if (eventRecords.length === 0) {
+      throw new Error(`Event not found: ${eventRecordId}`);
+    }
+
+    const event = eventRecords[0];
     const _eventId = event.get(EVENTS_FIELD_IDS.event_id) as string;
     const schoolName = event.get(EVENTS_FIELD_IDS.school_name) as string;
 
