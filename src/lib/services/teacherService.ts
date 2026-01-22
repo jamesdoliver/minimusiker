@@ -444,17 +444,43 @@ class TeacherService {
       address?: string;
       phone?: string;
     }
+  ): Promise<void>;
+  /**
+   * Update a specific school booking using raw field IDs
+   * Used by admin refresh API to update arbitrary fields
+   */
+  async updateSchoolBookingById(
+    bookingId: string,
+    data: Record<string, string | number>
+  ): Promise<void>;
+  async updateSchoolBookingById(
+    bookingId: string,
+    data: { address?: string; phone?: string } | Record<string, string | number>
   ): Promise<void> {
     try {
-      // Build update object using field IDs
-      const updateFields: Record<string, string> = {};
+      // Check if this is the semantic interface (has address/phone keys) or raw field IDs
+      const isSemanticInterface = 'address' in data || 'phone' in data;
 
-      if (data.address !== undefined) {
-        updateFields[SCHOOL_BOOKINGS_FIELD_IDS.school_address] = data.address;
-      }
+      let updateFields: Record<string, string | number>;
+      let cascadeData: { address?: string; phone?: string } | undefined;
 
-      if (data.phone !== undefined) {
-        updateFields[SCHOOL_BOOKINGS_FIELD_IDS.school_phone] = data.phone;
+      if (isSemanticInterface) {
+        // Build update object using field IDs from semantic keys
+        updateFields = {};
+        const semanticData = data as { address?: string; phone?: string };
+
+        if (semanticData.address !== undefined) {
+          updateFields[SCHOOL_BOOKINGS_FIELD_IDS.school_address] = semanticData.address;
+        }
+
+        if (semanticData.phone !== undefined) {
+          updateFields[SCHOOL_BOOKINGS_FIELD_IDS.school_phone] = semanticData.phone;
+        }
+
+        cascadeData = semanticData;
+      } else {
+        // Raw field IDs passed directly
+        updateFields = data as Record<string, string | number>;
       }
 
       if (Object.keys(updateFields).length === 0) {
@@ -465,20 +491,22 @@ class TeacherService {
       await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingId, updateFields);
       console.log(`[updateSchoolBookingById] Successfully updated booking: ${bookingId}`);
 
-      // Cascade update to linked Event record
-      try {
-        const airtableService = getAirtableService();
-        const linkedEvent = await airtableService.getEventByBookingRecordId(bookingId);
-        if (linkedEvent) {
-          await airtableService.updateEvent(linkedEvent.id, {
-            school_address: data.address,
-            school_phone: data.phone,
-          });
-          console.log(`[updateSchoolBookingById] Cascaded update to Event: ${linkedEvent.id}`);
+      // Cascade update to linked Event record (only for semantic interface with address/phone)
+      if (cascadeData) {
+        try {
+          const airtableService = getAirtableService();
+          const linkedEvent = await airtableService.getEventByBookingRecordId(bookingId);
+          if (linkedEvent) {
+            await airtableService.updateEvent(linkedEvent.id, {
+              school_address: cascadeData.address,
+              school_phone: cascadeData.phone,
+            });
+            console.log(`[updateSchoolBookingById] Cascaded update to Event: ${linkedEvent.id}`);
+          }
+        } catch (eventError) {
+          // Log but don't fail - booking update succeeded
+          console.error('[updateSchoolBookingById] Failed to cascade to Event:', eventError);
         }
-      } catch (eventError) {
-        // Log but don't fail - booking update succeeded
-        console.error('[updateSchoolBookingById] Failed to cascade to Event:', eventError);
       }
     } catch (error) {
       console.error('[updateSchoolBookingById] Error updating booking:', error);
@@ -2440,9 +2468,18 @@ export async function updateSchoolBookingInfo(
 
 // Export standalone function for updating a specific booking by ID
 // Used when teacher edits address/phone for a specific event (not all bookings)
-export async function updateSchoolBookingById(
+// Also supports raw field ID updates for admin refresh API
+export function updateSchoolBookingById(
   bookingId: string,
   data: { address?: string; phone?: string }
+): Promise<void>;
+export function updateSchoolBookingById(
+  bookingId: string,
+  data: Record<string, string | number>
+): Promise<void>;
+export function updateSchoolBookingById(
+  bookingId: string,
+  data: { address?: string; phone?: string } | Record<string, string | number>
 ): Promise<void> {
   const service = TeacherService.getInstance();
   return service.updateSchoolBookingById(bookingId, data);
