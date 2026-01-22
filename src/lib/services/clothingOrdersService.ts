@@ -312,7 +312,7 @@ class ClothingOrdersService {
 
     // Get event details
     const event = await eventsTable.find(eventRecordId);
-    const eventId = event.get(EVENTS_FIELD_IDS.event_id) as string;
+    const _eventId = event.get(EVENTS_FIELD_IDS.event_id) as string;
     const schoolName = event.get(EVENTS_FIELD_IDS.school_name) as string;
 
     // Get aggregated items for GO-ID contains field
