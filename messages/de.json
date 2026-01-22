@@ -160,7 +160,7 @@
     "required": "(Erforderlich)",
     "addClothing": "Kleidung hinzufügen",
     "optional": "(Optional)",
-    "discountBanner": "Sparen Sie 10%, wenn Sie Kleidung zu Ihrer Bestellung hinzufügen!",
+    "discountBanner": "Sparen Sie 10%, wenn Sie vor dem {date} bestellen!",
     "addItems": "Artikel hinzufügen",
     "comboHint": "10% Rabatt mit Audio!",
     "addButton": "Hinzufügen",

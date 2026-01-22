@@ -745,11 +745,19 @@ export default function ProductSelector({
         </div>
 
         {/* Discount Banner */}
-        {selection.audioProducts.length > 0 && selection.clothing.length === 0 && (
+        {selection.audioProducts.length > 0 && selection.clothing.length === 0 && eventDate && (
           <div className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg">
             <p className="text-sm text-amber-800 font-medium flex items-center gap-2">
               <span className="text-lg">🎉</span>
-              {t('discountBanner')}
+              {t('discountBanner', {
+                date: (() => {
+                  const event = new Date(eventDate);
+                  const day = event.getDate().toString().padStart(2, '0');
+                  const month = (event.getMonth() + 1).toString().padStart(2, '0');
+                  const year = event.getFullYear().toString().slice(-2);
+                  return `${day}.${month}.${year}`;
+                })()
+              })}
             </p>
           </div>
         )}

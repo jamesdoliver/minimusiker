@@ -160,7 +160,7 @@
     "required": "(Required)",
     "addClothing": "Add Clothing",
     "optional": "(Optional)",
-    "discountBanner": "Save 10% when you add clothing to your order!",
+    "discountBanner": "Save 10% when you order before {date}!",
     "addItems": "Add items",
     "comboHint": "10% off with audio!",
     "addButton": "Add",
