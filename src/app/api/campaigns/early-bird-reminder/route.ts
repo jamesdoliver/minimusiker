@@ -147,15 +147,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for dry run mode
+    // Check for dry run mode and email filter
     const { searchParams } = new URL(request.url);
     const isDryRun = searchParams.get('dryRun') === 'true';
+    const emailFilter = searchParams.get('emails'); // comma-separated list of emails to filter
 
     console.log(`Early bird reminder campaign started (dryRun: ${isDryRun})`);
     console.log(`Target access codes: ${TARGET_ACCESS_CODES.join(', ')}`);
 
     // Get recipients
-    const recipients = await getEarlyBirdTargets(TARGET_ACCESS_CODES);
+    let recipients = await getEarlyBirdTargets(TARGET_ACCESS_CODES);
+
+    // Filter by specific emails if provided (for retrying failed sends)
+    if (emailFilter) {
+      const allowedEmails = new Set(emailFilter.toLowerCase().split(',').map(e => e.trim()));
+      recipients = recipients.filter(r => allowedEmails.has(r.email.toLowerCase()));
+      console.log(`Filtered to ${recipients.length} recipients from email list`);
+    }
 
     if (isDryRun) {
       return NextResponse.json({
@@ -201,8 +209,8 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Small delay between emails to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // 500ms delay between emails to stay under Resend's 2 req/sec rate limit
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     console.log(`Campaign complete: ${results.sent} sent, ${results.failed} failed`);
