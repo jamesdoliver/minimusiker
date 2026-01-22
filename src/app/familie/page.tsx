@@ -573,6 +573,7 @@ function ParentPortalContent() {
         <section className="mb-12">
           <ProductSelector
             eventId={eventId}
+            eventDate={eventDate}
             classId={classId}
             parentId={session.parentId}
             parentEmail={session.email}

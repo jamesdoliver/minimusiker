@@ -25,7 +25,7 @@ export const EVENT_MILESTONES = {
   FLYER_ONE_DEADLINE: -42, // First flyer wave
   SONG_SELECTION_DEADLINE: -21, // 3 weeks before - teachers should have songs selected
   FLYER_TWO_DEADLINE: -22, // Second flyer wave
-  TSHIRT_ORDER_DEADLINE: -14, // 2 weeks before - last chance for personalized items
+  TSHIRT_ORDER_DEADLINE: -19, // 19 days before - last chance for personalized items (aligns with early-bird)
   FLYER_THREE_DEADLINE: -14, // Third flyer wave
   FINAL_PREP: -7, // 1 week before - final preparation phase
 
@@ -267,6 +267,28 @@ export function formatDaysDisplay(daysUntilEvent: number): string {
  */
 export function canOrderPersonalizedProducts(eventDate: string | Date): boolean {
   return !isMilestonePassed(eventDate, 'TSHIRT_ORDER_DEADLINE');
+}
+
+/**
+ * Check if personalized clothing can still be ordered
+ * Uses EARLY_BIRD_DEADLINE_DAYS (19 days) as the cutoff.
+ * >19 days before event: personalized products available
+ * ≤19 days before event: standard products only
+ *
+ * @param eventDate - The event date
+ * @returns true if more than 19 days before event (personalized available)
+ */
+export function canOrderPersonalizedClothing(eventDate: string | Date | undefined): boolean {
+  if (!eventDate) return false; // No event date = default to standard
+
+  const daysUntil = getDaysUntilEvent(eventDate);
+
+  // Event in past or invalid
+  if (daysUntil < 0) return false;
+
+  // More than 19 days = personalized available
+  // 19 days or less = standard only
+  return daysUntil > EARLY_BIRD_DEADLINE_DAYS;
 }
 
 /**

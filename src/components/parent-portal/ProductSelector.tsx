@@ -7,6 +7,7 @@ import { ParentSessionChild } from '@/types/airtable';
 import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/stock';
 import { useProducts } from '@/lib/hooks/useProducts';
 import { Product } from '@/lib/types/airtable';
+import { canOrderPersonalizedClothing } from '@/lib/utils/eventTimeline';
 import AudioProductCard from './AudioProductCard';
 import ClothingProductCard from './ClothingProductCard';
 
@@ -37,6 +38,7 @@ interface ProductSelection {
 
 interface ProductSelectorProps {
   eventId: string;
+  eventDate?: string;
   classId?: string;
   parentId: string;
   parentEmail?: string;
@@ -65,18 +67,34 @@ const SHOPIFY_VARIANT_MAP: Record<string, string> = {
   'cd': 'gid://shopify/ProductVariant/53258098639194',
   'tonie': 'gid://shopify/ProductVariant/53271523557722',
   'minicard-cd-bundle': 'gid://shopify/ProductVariant/53327238824282',
-  // T-Shirt sizes (Standard Minimusiker T-Shirt) - match TSHIRT_SIZES from stock.ts
-  'tshirt-98/104 (3-4J)': 'gid://shopify/ProductVariant/53328491512154',
-  'tshirt-110/116 (5-6J)': 'gid://shopify/ProductVariant/53328491544922',
-  'tshirt-122/128 (7-8J)': 'gid://shopify/ProductVariant/53328491577690',
-  'tshirt-134/146 (9-11J)': 'gid://shopify/ProductVariant/53328491610458',
-  'tshirt-152/164 (12-14J)': 'gid://shopify/ProductVariant/53328491643226',
-  // Hoodie sizes (Standard Minimusiker Hoodie) - match HOODIE_SIZES from stock.ts
-  'hoodie-116 (5-6 J)': 'gid://shopify/ProductVariant/53325998948698',
-  'hoodie-128 (7-8 J)': 'gid://shopify/ProductVariant/53325998981466',
-  'hoodie-140 (9-11 J)': 'gid://shopify/ProductVariant/53325999014234',
-  'hoodie-152 (12-13 J)': 'gid://shopify/ProductVariant/53325999047002',
-  'hoodie-164 (14-15 J)': 'gid://shopify/ProductVariant/53325999079770',
+
+  // Standard T-Shirt sizes (Minimusiker T-Shirt) - match TSHIRT_SIZES from stock.ts
+  'tshirt-standard-98/104 (3-4J)': 'gid://shopify/ProductVariant/53328491512154',
+  'tshirt-standard-110/116 (5-6J)': 'gid://shopify/ProductVariant/53328491544922',
+  'tshirt-standard-122/128 (7-8J)': 'gid://shopify/ProductVariant/53328491577690',
+  'tshirt-standard-134/146 (9-11J)': 'gid://shopify/ProductVariant/53328491610458',
+  'tshirt-standard-152/164 (12-14J)': 'gid://shopify/ProductVariant/53328491643226',
+
+  // Personalised T-Shirt sizes (T-Shirt Personalisiert) - match TSHIRT_SIZES from stock.ts
+  'tshirt-personalized-98/104 (3-4J)': 'gid://shopify/ProductVariant/53328502194522',
+  'tshirt-personalized-110/116 (5-6J)': 'gid://shopify/ProductVariant/53328502227290',
+  'tshirt-personalized-122/128 (7-8J)': 'gid://shopify/ProductVariant/53328502260058',
+  'tshirt-personalized-134/146 (9-11J)': 'gid://shopify/ProductVariant/53328502292826',
+  'tshirt-personalized-152/164 (12-14J)': 'gid://shopify/ProductVariant/53328502325594',
+
+  // Standard Hoodie sizes (Minimusiker Hoodie) - match HOODIE_SIZES from stock.ts
+  'hoodie-standard-116 (5-6 J)': 'gid://shopify/ProductVariant/53325998948698',
+  'hoodie-standard-128 (7-8 J)': 'gid://shopify/ProductVariant/53325998981466',
+  'hoodie-standard-140 (9-11 J)': 'gid://shopify/ProductVariant/53325999014234',
+  'hoodie-standard-152 (12-13 J)': 'gid://shopify/ProductVariant/53325999047002',
+  'hoodie-standard-164 (14-15 J)': 'gid://shopify/ProductVariant/53325999079770',
+
+  // Personalised Hoodie sizes (Hoodie Personalisiert) - match HOODIE_SIZES from stock.ts
+  'hoodie-personalized-116 (5-6 J)': 'gid://shopify/ProductVariant/53328494788954',
+  'hoodie-personalized-128 (7-8 J)': 'gid://shopify/ProductVariant/53328494821722',
+  'hoodie-personalized-140 (9-11 J)': 'gid://shopify/ProductVariant/53328494854490',
+  'hoodie-personalized-152 (12-13 J)': 'gid://shopify/ProductVariant/53328494887258',
+  'hoodie-personalized-164 (14-15 J)': 'gid://shopify/ProductVariant/53328494920026',
 };
 
 const AUDIO_PRODUCTS: AudioProduct[] = [
@@ -120,9 +138,11 @@ interface ClothingProduct {
   showTshirtSize: boolean;
   showHoodieSize: boolean;
   savings?: number;
+  isPersonalized?: boolean;
 }
 
-const CLOTHING_PRODUCTS: ClothingProduct[] = [
+// Standard clothing products (shown when ≤19 days before event)
+const STANDARD_CLOTHING_PRODUCTS: ClothingProduct[] = [
   {
     id: 'tshirt',
     name: 'T-Shirt',
@@ -131,6 +151,7 @@ const CLOTHING_PRODUCTS: ClothingProduct[] = [
     imageSrc: '/images/products/tshirt.jpeg',
     showTshirtSize: true,
     showHoodieSize: false,
+    isPersonalized: false,
   },
   {
     id: 'hoodie',
@@ -140,6 +161,7 @@ const CLOTHING_PRODUCTS: ClothingProduct[] = [
     imageSrc: '/images/products/hoodie.jpeg',
     showTshirtSize: false,
     showHoodieSize: true,
+    isPersonalized: false,
   },
   {
     id: 'tshirt-hoodie',
@@ -150,8 +172,47 @@ const CLOTHING_PRODUCTS: ClothingProduct[] = [
     showTshirtSize: true,
     showHoodieSize: true,
     savings: 15,
+    isPersonalized: false,
   },
 ];
+
+// Personalized clothing products (shown when >19 days before event)
+const PERSONALIZED_CLOTHING_PRODUCTS: ClothingProduct[] = [
+  {
+    id: 'tshirt',
+    name: 'T-Shirt Personalisiert',
+    description: 'Minimusiker T-Shirt mit Namen deines Kindes',
+    price: 25.00,
+    imageSrc: '/images/products/tshirt.jpeg',
+    showTshirtSize: true,
+    showHoodieSize: false,
+    isPersonalized: true,
+  },
+  {
+    id: 'hoodie',
+    name: 'Hoodie Personalisiert',
+    description: 'Kuscheliger Hoodie mit Namen deines Kindes',
+    price: 49.00,
+    imageSrc: '/images/products/hoodie.jpeg',
+    showTshirtSize: false,
+    showHoodieSize: true,
+    isPersonalized: true,
+  },
+  {
+    id: 'tshirt-hoodie',
+    name: 'T-Shirt & Hoodie Personalisiert',
+    description: 'Das komplette Minimusiker Set mit Namen',
+    price: 59.00,
+    imageSrc: '/images/products/tshirt-hoodie-bundle.jpeg',
+    showTshirtSize: true,
+    showHoodieSize: true,
+    savings: 15,
+    isPersonalized: true,
+  },
+];
+
+// Backwards compatibility - default to standard
+const CLOTHING_PRODUCTS = STANDARD_CLOTHING_PRODUCTS;
 
 const COMBO_DISCOUNT_PERCENT = 10;
 
@@ -370,6 +431,7 @@ function findProductImageByVariantId(products: Product[], variantIdSubstring: st
 
 export default function ProductSelector({
   eventId,
+  eventDate,
   classId,
   parentId,
   parentEmail,
@@ -383,6 +445,14 @@ export default function ProductSelector({
     clothing: [],
   });
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Determine if personalized products should be shown (>19 days before event)
+  const showPersonalized = canOrderPersonalizedClothing(eventDate);
+
+  // Select the appropriate clothing products based on time until event
+  const activeClothingProducts = showPersonalized
+    ? PERSONALIZED_CLOTHING_PRODUCTS
+    : STANDARD_CLOTHING_PRODUCTS;
 
   // Fetch products from Shopify for images (use 'all' to get all products)
   const { products: shopifyProducts } = useProducts({ tagFilter: 'all' });
@@ -408,6 +478,7 @@ export default function ProductSelector({
   }, [shopifyProducts]);
 
   // Get Shopify product images for clothing items
+  // Uses different variant IDs based on whether showing personalized or standard products
   const clothingImages = useMemo(() => {
     if (!shopifyProducts || shopifyProducts.length === 0) {
       return {
@@ -417,9 +488,11 @@ export default function ProductSelector({
       };
     }
 
-    // Extract variant ID substrings from our mapping (the numeric part)
-    const tshirtVariantId = '53328491512154'; // First T-Shirt variant
-    const hoodieVariantId = '53325998948698'; // First Hoodie variant
+    // Use different variant IDs based on personalized vs standard
+    // Personalized T-Shirt: 53328502194522, Standard T-Shirt: 53328491512154
+    // Personalized Hoodie: 53328494788954, Standard Hoodie: 53325998948698
+    const tshirtVariantId = showPersonalized ? '53328502194522' : '53328491512154';
+    const hoodieVariantId = showPersonalized ? '53328494788954' : '53325998948698';
 
     // Find bundle product by searching for a product with "bundle" or "set" in title
     const bundleImage = shopifyProducts.find(p =>
@@ -434,7 +507,7 @@ export default function ProductSelector({
       hoodie: findProductImageByVariantId(shopifyProducts, hoodieVariantId) || '/images/products/hoodie.jpeg',
       'tshirt-hoodie': bundleImage || '/images/products/tshirt-hoodie-bundle.jpeg',
     };
-  }, [shopifyProducts]);
+  }, [shopifyProducts, showPersonalized]);
 
   const totals = useMemo(() => calculateTotal(selection), [selection]);
 
@@ -519,21 +592,24 @@ export default function ProductSelector({
       });
 
       // Add clothing items with size variants
+      // Use personalized or standard variant IDs based on showPersonalized
+      const variantPrefix = showPersonalized ? 'personalized' : 'standard';
+
       selection.clothing.forEach((item) => {
         if (item.productId === 'tshirt' && item.tshirtSize) {
-          const variantId = SHOPIFY_VARIANT_MAP[`tshirt-${item.tshirtSize}`];
+          const variantId = SHOPIFY_VARIANT_MAP[`tshirt-${variantPrefix}-${item.tshirtSize}`];
           if (variantId) {
             lineItems.push({ variantId, quantity: item.quantity, productType: 'tshirt' });
           }
         } else if (item.productId === 'hoodie' && item.hoodieSize) {
-          const variantId = SHOPIFY_VARIANT_MAP[`hoodie-${item.hoodieSize}`];
+          const variantId = SHOPIFY_VARIANT_MAP[`hoodie-${variantPrefix}-${item.hoodieSize}`];
           if (variantId) {
             lineItems.push({ variantId, quantity: item.quantity, productType: 'hoodie' });
           }
         } else if (item.productId === 'tshirt-hoodie' && item.tshirtSize && item.hoodieSize) {
           // Bundle: add both t-shirt and hoodie as separate line items with their types
-          const tshirtVariantId = SHOPIFY_VARIANT_MAP[`tshirt-${item.tshirtSize}`];
-          const hoodieVariantId = SHOPIFY_VARIANT_MAP[`hoodie-${item.hoodieSize}`];
+          const tshirtVariantId = SHOPIFY_VARIANT_MAP[`tshirt-${variantPrefix}-${item.tshirtSize}`];
+          const hoodieVariantId = SHOPIFY_VARIANT_MAP[`hoodie-${variantPrefix}-${item.hoodieSize}`];
           if (tshirtVariantId) {
             lineItems.push({ variantId: tshirtVariantId, quantity: item.quantity, productType: 'tshirt' });
           }
@@ -679,7 +755,7 @@ export default function ProductSelector({
         )}
 
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-          {CLOTHING_PRODUCTS.map((product) => (
+          {activeClothingProducts.map((product) => (
             <ClothingProductCard
               key={product.id}
               productId={product.id}
