@@ -56,9 +56,18 @@ Add a clothing order task view to the admin portal that aggregates Shopify cloth
 
 ```typescript
 export const CLOTHING_VARIANTS: Record<string, { type: 'tshirt' | 'hoodie'; size: string }> = {
-  'gid://shopify/ProductVariant/XXXXX': { type: 'tshirt', size: '98/104' },
-  'gid://shopify/ProductVariant/XXXXX': { type: 'tshirt', size: '110/116' },
-  // ... additional variants
+  // T-Shirt (Personalisiert) - Product ID: 10663662747994
+  '53328502194522': { type: 'tshirt', size: '98/104' },
+  '53328502227290': { type: 'tshirt', size: '110/116' },
+  '53328502260058': { type: 'tshirt', size: '122/128' },
+  '53328502292826': { type: 'tshirt', size: '134/146' },
+  '53328502325594': { type: 'tshirt', size: '152/164' },
+  // Hoodie (Personalisiert) - Product ID: 10664195916122
+  '53328494788954': { type: 'hoodie', size: '116' },
+  '53328494821722': { type: 'hoodie', size: '128' },
+  '53328494854490': { type: 'hoodie', size: '140' },
+  '53328494887258': { type: 'hoodie', size: '152' },
+  '53328494920026': { type: 'hoodie', size: '164' },
 };
 ```
 
@@ -424,10 +433,10 @@ src/
 
 ## Prerequisites
 
-Before implementation, the following is needed:
+All prerequisites have been gathered:
 
-- **Shopify Variant IDs**: List of variant IDs for `custom-shirt` products (with sizes)
-- **Shopify Variant IDs**: List of variant IDs for `custom-hoodie` products (with sizes)
+- **T-Shirt Variant IDs**: 53328502194522 (98/104), 53328502227290 (110/116), 53328502260058 (122/128), 53328502292826 (134/146), 53328502325594 (152/164)
+- **Hoodie Variant IDs**: 53328494788954 (116), 53328494821722 (128), 53328494854490 (140), 53328494887258 (152), 53328494920026 (164)
 
 ---
 
