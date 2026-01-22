@@ -22,7 +22,7 @@ function getResendClient(): Resend {
 }
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@minimusiker.app';
-const FROM_NAME = 'MiniMusiker';
+const FROM_NAME = 'Minimusiker';
 
 /**
  * Generate the HTML email template for teacher magic links
