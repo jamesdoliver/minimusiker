@@ -148,7 +148,7 @@ const STANDARD_CLOTHING_PRODUCTS: ClothingProduct[] = [
     name: 'T-Shirt',
     description: 'Minimusiker T-Shirt mit Mini',
     price: 25.00,
-    imageSrc: '/images/products/tshirt.jpeg',
+    imageSrc: '/images/familie_portal/T-Shirt Fallback Picture.png',
     showTshirtSize: true,
     showHoodieSize: false,
     isPersonalized: false,
@@ -158,7 +158,7 @@ const STANDARD_CLOTHING_PRODUCTS: ClothingProduct[] = [
     name: 'Hoodie',
     description: 'Kuscheliger Hoodie mit Minimusiker Design',
     price: 49.00,
-    imageSrc: '/images/products/hoodie.jpeg',
+    imageSrc: '/images/familie_portal/Hoodie Fallback Picture.png',
     showTshirtSize: false,
     showHoodieSize: true,
     isPersonalized: false,
@@ -168,7 +168,7 @@ const STANDARD_CLOTHING_PRODUCTS: ClothingProduct[] = [
     name: 'T-Shirt & Hoodie',
     description: 'Das komplette Minimusiker Set',
     price: 59.00,
-    imageSrc: '/images/products/tshirt-hoodie-bundle.jpeg',
+    imageSrc: '/images/familie_portal/Hoodie and T-Shirt Picture.jpeg',
     showTshirtSize: true,
     showHoodieSize: true,
     savings: 15,
@@ -183,7 +183,7 @@ const PERSONALIZED_CLOTHING_PRODUCTS: ClothingProduct[] = [
     name: 'T-Shirt Personalisiert',
     description: 'Minimusiker T-Shirt mit Namen deines Kindes',
     price: 25.00,
-    imageSrc: '/images/products/tshirt.jpeg',
+    imageSrc: '/images/familie_portal/T-Shirt Fallback Picture.png',
     showTshirtSize: true,
     showHoodieSize: false,
     isPersonalized: true,
@@ -193,7 +193,7 @@ const PERSONALIZED_CLOTHING_PRODUCTS: ClothingProduct[] = [
     name: 'Hoodie Personalisiert',
     description: 'Kuscheliger Hoodie mit Namen deines Kindes',
     price: 49.00,
-    imageSrc: '/images/products/hoodie.jpeg',
+    imageSrc: '/images/familie_portal/Hoodie Fallback Picture.png',
     showTshirtSize: false,
     showHoodieSize: true,
     isPersonalized: true,
@@ -203,7 +203,7 @@ const PERSONALIZED_CLOTHING_PRODUCTS: ClothingProduct[] = [
     name: 'T-Shirt & Hoodie Personalisiert',
     description: 'Das komplette Minimusiker Set mit Namen',
     price: 59.00,
-    imageSrc: '/images/products/tshirt-hoodie-bundle.jpeg',
+    imageSrc: '/images/familie_portal/Hoodie and T-Shirt Picture.jpeg',
     showTshirtSize: true,
     showHoodieSize: true,
     savings: 15,
@@ -482,9 +482,9 @@ export default function ProductSelector({
   const clothingImages = useMemo(() => {
     if (!shopifyProducts || shopifyProducts.length === 0) {
       return {
-        tshirt: '/images/products/tshirt.jpeg',
-        hoodie: '/images/products/hoodie.jpeg',
-        'tshirt-hoodie': '/images/products/tshirt-hoodie-bundle.jpeg',
+        tshirt: '/images/familie_portal/T-Shirt Fallback Picture.png',
+        hoodie: '/images/familie_portal/Hoodie Fallback Picture.png',
+        'tshirt-hoodie': '/images/familie_portal/Hoodie and T-Shirt Picture.jpeg',
       };
     }
 
@@ -503,9 +503,9 @@ export default function ProductSelector({
     )?.images?.[0]?.url;
 
     return {
-      tshirt: findProductImageByVariantId(shopifyProducts, tshirtVariantId) || '/images/products/tshirt.jpeg',
-      hoodie: findProductImageByVariantId(shopifyProducts, hoodieVariantId) || '/images/products/hoodie.jpeg',
-      'tshirt-hoodie': bundleImage || '/images/products/tshirt-hoodie-bundle.jpeg',
+      tshirt: findProductImageByVariantId(shopifyProducts, tshirtVariantId) || '/images/familie_portal/T-Shirt Fallback Picture.png',
+      hoodie: findProductImageByVariantId(shopifyProducts, hoodieVariantId) || '/images/familie_portal/Hoodie Fallback Picture.png',
+      'tshirt-hoodie': bundleImage || '/images/familie_portal/Hoodie and T-Shirt Picture.jpeg',
     };
   }, [shopifyProducts, showPersonalized]);
 
