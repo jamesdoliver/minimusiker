@@ -225,7 +225,7 @@ export async function POST(request: Request) {
           simplybookBookingId: payload.booking_id,
           schoolAddress: mappedData.address,
           schoolPhone: mappedData.phone,
-          region: mappedData.region,
+          regionRecordId: regionRecordId || undefined,
           eventRecordId: eventRecord?.id,
         });
         console.log(`Teacher found/created: ${teacher.email} (id: ${teacher.id})`);
@@ -385,7 +385,7 @@ async function handleBookingChange(payload: SimplybookWebhookPayload) {
           simplybookBookingId: payload.booking_id,
           schoolAddress: mappedData.address,
           schoolPhone: mappedData.phone,
-          region: mappedData.region,
+          regionRecordId: regionRecordId || undefined,
           eventRecordId: linkedEvent?.id,
         });
         console.log(`[SimplyBook] Teacher found/created: ${teacher.email}`);

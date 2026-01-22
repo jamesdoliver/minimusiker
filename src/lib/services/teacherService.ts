@@ -194,21 +194,21 @@ class TeacherService {
     simplybookBookingId?: string;
     schoolAddress?: string;
     schoolPhone?: string;
-    region?: string;
+    regionRecordId?: string;
     linkedEventId?: string;
   }): Promise<Teacher> {
     try {
       const record = await this.base(TEACHERS_TABLE).create({
-        email: data.email,
-        name: data.name,
-        phone: data.phone,
-        school_name: data.schoolName,
-        simplybook_booking_id: data.simplybookBookingId,
-        created_at: new Date().toISOString(),
-        school_address: data.schoolAddress,
-        school_phone: data.schoolPhone,
-        region: data.region,
-        linked_events: data.linkedEventId ? [data.linkedEventId] : [],
+        [TEACHERS_FIELD_IDS.email]: data.email,
+        [TEACHERS_FIELD_IDS.name]: data.name,
+        [TEACHERS_FIELD_IDS.phone]: data.phone,
+        [TEACHERS_FIELD_IDS.school_name]: data.schoolName,
+        [TEACHERS_FIELD_IDS.simplybook_booking_id]: data.simplybookBookingId,
+        [TEACHERS_FIELD_IDS.created_at]: new Date().toISOString(),
+        [TEACHERS_FIELD_IDS.school_address]: data.schoolAddress,
+        [TEACHERS_FIELD_IDS.school_phone]: data.schoolPhone,
+        [TEACHERS_FIELD_IDS.region]: data.regionRecordId ? [data.regionRecordId] : [],
+        [TEACHERS_FIELD_IDS.linked_events]: data.linkedEventId ? [data.linkedEventId] : [],
       });
 
       return this.transformTeacherRecord(record);
@@ -289,7 +289,7 @@ class TeacherService {
     simplybookBookingId?: string;
     schoolAddress?: string;
     schoolPhone?: string;
-    region?: string;
+    regionRecordId?: string;
     eventRecordId?: string;
   }): Promise<Teacher> {
     let teacher = await this.getTeacherByEmail(data.email);
@@ -304,7 +304,7 @@ class TeacherService {
         simplybookBookingId: data.simplybookBookingId,
         schoolAddress: data.schoolAddress,
         schoolPhone: data.schoolPhone,
-        region: data.region,
+        regionRecordId: data.regionRecordId,
         linkedEventId: data.eventRecordId,
       });
     } else if (data.eventRecordId) {
