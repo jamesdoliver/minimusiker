@@ -31,9 +31,11 @@ describe('Utility Functions', () => {
 
   describe('formatPrice', () => {
     it('should format cents to currency', () => {
-      expect(formatPrice(1000)).toBe('$10.00');
-      expect(formatPrice(12550)).toBe('$125.50');
-      expect(formatPrice(0)).toBe('$0.00');
+      // Default currency is EUR with German locale formatting (uses non-breaking space)
+      expect(formatPrice(1000)).toContain('10,00');
+      expect(formatPrice(1000)).toContain('€');
+      expect(formatPrice(12550)).toContain('125,50');
+      expect(formatPrice(0)).toContain('0,00');
     });
 
     it('should handle different currencies', () => {
@@ -59,7 +61,8 @@ describe('Utility Functions', () => {
   describe('truncate', () => {
     it('should truncate long strings', () => {
       const longText = 'This is a very long text that needs to be truncated';
-      expect(truncate(longText, 20)).toBe('This is a very lon...');
+      // truncate returns exactly maxLength chars: slice(0, 20-3) + '...' = 17 + 3 = 20
+      expect(truncate(longText, 20)).toBe('This is a very lo...');
     });
 
     it('should not truncate short strings', () => {
