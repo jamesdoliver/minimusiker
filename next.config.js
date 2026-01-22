@@ -98,6 +98,9 @@ const nextConfig = {
         destination: '/familie/:path*',
         permanent: true,
       },
+      // Fix broken email links where /e/ was stripped
+      { source: '/16', destination: '/e/16', permanent: true },
+      { source: '/24', destination: '/e/24', permanent: true },
     ];
   },
 };
