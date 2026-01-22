@@ -8,6 +8,12 @@ import TaskTypeBadge from './TaskTypeBadge';
 import TaskTypeFilter from './TaskTypeFilter';
 import InvoiceUploadButton from './InvoiceUploadButton';
 
+interface CompletionData {
+  amount?: number;
+  invoice_r2_key?: string;
+  notes?: string;
+}
+
 interface CompletedTasksViewProps {
   tasks: TaskWithEventDetails[];
   isLoading: boolean;
@@ -96,9 +102,14 @@ export default function CompletedTasksView({
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredTasks.map((task) => {
                 const isExpanded = expandedId === task.id;
-                const completionData = task.completion_data
-                  ? JSON.parse(task.completion_data)
-                  : {};
+                let completionData: CompletionData = {};
+                if (task.completion_data) {
+                  try {
+                    completionData = JSON.parse(task.completion_data) as CompletionData;
+                  } catch {
+                    console.error(`Failed to parse completion_data for task ${task.id}`);
+                  }
+                }
                 const hasInvoice = !!completionData.invoice_r2_key;
 
                 return (
