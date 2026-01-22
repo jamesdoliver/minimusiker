@@ -213,13 +213,19 @@ class ClothingOrdersService {
     const registrationsTable = base(REGISTRATIONS_TABLE_ID);
     const parentsTable = base(PARENTS_TABLE_ID);
 
-    // Get orders for this event
-    const orders = await ordersTable
+    // Get all orders and filter by event in code
+    // (SEARCH with ARRAYJOIN doesn't work reliably with linked record fields)
+    const allOrders = await ordersTable
       .select({
-        filterByFormula: `SEARCH('${eventRecordId}', ARRAYJOIN({${ORDERS_FIELD_IDS.event_id}}))`,
         returnFieldsByFieldId: true,
       })
       .all();
+
+    // Filter to orders linked to this event
+    const orders = allOrders.filter((order) => {
+      const eventIds = order.get(ORDERS_FIELD_IDS.event_id) as string[] | undefined;
+      return eventIds && eventIds.includes(eventRecordId);
+    });
 
     const orderDetails: ClothingOrderDetail[] = [];
 
