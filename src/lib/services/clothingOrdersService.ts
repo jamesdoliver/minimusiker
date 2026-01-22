@@ -46,16 +46,23 @@ class ClothingOrdersService {
     const eventsTable = base(EVENTS_TABLE_ID);
     const tasksTable = base(TASKS_TABLE_ID);
 
-    // Calculate visibility threshold (events within 21 days)
+    // Calculate date thresholds
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
     const visibilityThreshold = new Date(today);
     visibilityThreshold.setDate(today.getDate() + VISIBILITY_WINDOW_DAYS);
 
-    // Get all events within visibility window or past (for overdue)
+    const pastCutoff = new Date(today);
+    pastCutoff.setDate(today.getDate() - 7); // Allow 7 days past for overdue
+
+    // Get events in visibility window (including recently past for overdue)
     const events = await eventsTable
       .select({
-        filterByFormula: `IS_BEFORE({${EVENTS_FIELD_IDS.event_date}}, '${visibilityThreshold.toISOString().split('T')[0]}')`,
+        filterByFormula: `AND(
+          IS_ON_OR_BEFORE({${EVENTS_FIELD_IDS.event_date}}, '${visibilityThreshold.toISOString().split('T')[0]}'),
+          IS_ON_OR_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${pastCutoff.toISOString().split('T')[0]}')
+        )`,
       })
       .all();
 
