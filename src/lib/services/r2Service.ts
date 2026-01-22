@@ -1619,6 +1619,46 @@ class R2Service {
   // ========================================
 
   /**
+   * Upload a file to the assets bucket
+   * Generic method for uploading any file to the assets bucket
+   *
+   * @param key - The R2 key (path) for the file
+   * @param buffer - The file buffer
+   * @param contentType - The MIME type of the file
+   */
+  async uploadToAssetsBucket(
+    key: string,
+    buffer: Buffer,
+    contentType: string
+  ): Promise<UploadResult> {
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        Metadata: {
+          uploadDate: new Date().toISOString(),
+        },
+      });
+
+      await this.client.send(command);
+
+      return {
+        success: true,
+        key,
+      };
+    } catch (error) {
+      console.error('Error uploading to assets bucket:', error);
+      return {
+        success: false,
+        key,
+        error: error instanceof Error ? error.message : 'Unknown upload error',
+      };
+    }
+  }
+
+  /**
    * Generate a signed URL for the assets bucket
    */
   async generateSignedUrlForAssetsBucket(key: string, expiresIn: number = 3600): Promise<string> {
