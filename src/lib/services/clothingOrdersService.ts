@@ -4,8 +4,6 @@ import Airtable from 'airtable';
 import { getAirtableService } from './airtableService';
 import { getTaskService } from './taskService';
 import {
-  CLOTHING_VARIANTS,
-  CLOTHING_VARIANT_IDS,
   isClothingVariant,
   getClothingDetails,
   TSHIRT_SIZES,
