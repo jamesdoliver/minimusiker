@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import shopifyService from '@/lib/services/shopifyService';
 import { CheckoutLineItem, CheckoutCustomAttributes } from '@/lib/types/shop';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { EARLY_BIRD_DEADLINE_DAYS } from '@/lib/utils/eventTimeline';
+// Note: EARLY_BIRD_DEADLINE_DAYS was previously used here but is no longer needed
+// Early-bird discount now applies before event day (daysUntilEvent > 0)
 
 interface CheckoutRequest {
   lineItems: CheckoutLineItem[];
@@ -75,12 +76,12 @@ export async function POST(request: NextRequest) {
           const daysUntilEvent = Math.ceil(
             (eventDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           );
-          if (daysUntilEvent > EARLY_BIRD_DEADLINE_DAYS) {
+          // Early-bird discount only applies BEFORE the event day
+          if (daysUntilEvent > 0) {
             discountCodes.push('EARLYBIRD10');
             console.log('[create-checkout] Early-bird discount applied:', {
               eventDate: event.event_date,
               daysUntilEvent,
-              threshold: EARLY_BIRD_DEADLINE_DAYS,
             });
           }
         }

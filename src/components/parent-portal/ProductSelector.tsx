@@ -7,7 +7,7 @@ import { ParentSessionChild } from '@/types/airtable';
 import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/stock';
 import { useProducts } from '@/lib/hooks/useProducts';
 import { Product } from '@/lib/types/airtable';
-import { canOrderPersonalizedClothing } from '@/lib/utils/eventTimeline';
+import { canOrderPersonalizedClothing, getDaysUntilEvent } from '@/lib/utils/eventTimeline';
 import AudioProductCard from './AudioProductCard';
 import ClothingProductCard from './ClothingProductCard';
 
@@ -744,8 +744,11 @@ export default function ProductSelector({
           <span className="text-xs text-gray-500 font-medium">{t('optional')}</span>
         </div>
 
-        {/* Discount Banner */}
-        {selection.audioProducts.length > 0 && selection.clothing.length === 0 && eventDate && (
+        {/* Discount Banner - only show before event day */}
+        {selection.audioProducts.length > 0 &&
+         selection.clothing.length === 0 &&
+         eventDate &&
+         getDaysUntilEvent(eventDate) > 0 && (
           <div className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg">
             <p className="text-sm text-amber-800 font-medium flex items-center gap-2">
               <span className="text-lg">🎉</span>

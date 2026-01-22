@@ -15,6 +15,12 @@
 export const EARLY_BIRD_DEADLINE_DAYS = 19;
 
 /**
+ * Personalized clothing cutoff: available up to 4 days after event.
+ * Negative value means days AFTER the event.
+ */
+export const PERSONALIZED_CLOTHING_CUTOFF_DAYS = -4;
+
+/**
  * Event milestones with their timeline offsets (days relative to event)
  * Negative = before event, Positive = after event
  */
@@ -271,24 +277,19 @@ export function canOrderPersonalizedProducts(eventDate: string | Date): boolean 
 
 /**
  * Check if personalized clothing can still be ordered
- * Uses EARLY_BIRD_DEADLINE_DAYS (19 days) as the cutoff.
- * >19 days before event: personalized products available
- * ≤19 days before event: standard products only
+ * Personalized products available from any time before event up to 4 days after.
  *
  * @param eventDate - The event date
- * @returns true if more than 19 days before event (personalized available)
+ * @returns true if available (up to 4 days after event)
  */
 export function canOrderPersonalizedClothing(eventDate: string | Date | undefined): boolean {
   if (!eventDate) return false; // No event date = default to standard
 
   const daysUntil = getDaysUntilEvent(eventDate);
 
-  // Event in past or invalid
-  if (daysUntil < 0) return false;
-
-  // More than 19 days = personalized available
-  // 19 days or less = standard only
-  return daysUntil > EARLY_BIRD_DEADLINE_DAYS;
+  // Available from any time before event up to 4 days after
+  // daysUntil >= -4 means: event is in future, today, or up to 4 days ago
+  return daysUntil >= PERSONALIZED_CLOTHING_CUTOFF_DAYS;
 }
 
 /**
