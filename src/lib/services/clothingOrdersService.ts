@@ -50,18 +50,22 @@ class ClothingOrdersService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Events up to 21 days in the future (inclusive)
+    // Add 1 day to threshold so IS_BEFORE includes the boundary date
     const visibilityThreshold = new Date(today);
-    visibilityThreshold.setDate(today.getDate() + VISIBILITY_WINDOW_DAYS);
+    visibilityThreshold.setDate(today.getDate() + VISIBILITY_WINDOW_DAYS + 1);
 
+    // Events up to 7 days in the past (inclusive) for overdue orders
+    // Subtract 1 day from cutoff so IS_AFTER includes the boundary date
     const pastCutoff = new Date(today);
-    pastCutoff.setDate(today.getDate() - 7); // Allow 7 days past for overdue
+    pastCutoff.setDate(today.getDate() - 7 - 1);
 
     // Get events in visibility window (including recently past for overdue)
     const events = await eventsTable
       .select({
         filterByFormula: `AND(
-          IS_ON_OR_BEFORE({${EVENTS_FIELD_IDS.event_date}}, '${visibilityThreshold.toISOString().split('T')[0]}'),
-          IS_ON_OR_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${pastCutoff.toISOString().split('T')[0]}')
+          IS_BEFORE({${EVENTS_FIELD_IDS.event_date}}, '${visibilityThreshold.toISOString().split('T')[0]}'),
+          IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${pastCutoff.toISOString().split('T')[0]}')
         )`,
       })
       .all();
