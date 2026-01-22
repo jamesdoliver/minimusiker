@@ -304,6 +304,7 @@ export default function AdminTasks() {
           <CompletedTasksView
             tasks={completedTasks}
             isLoading={isLoadingCompleted}
+            onRefresh={() => fetchCompletedTasks(searchQuery)}
           />
         </>
       )}
