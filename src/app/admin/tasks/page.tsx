@@ -7,6 +7,7 @@ import TaskTypeTabs from '@/components/admin/tasks/TaskTypeTabs';
 import TaskCompletionModal from '@/components/admin/tasks/TaskCompletionModal';
 import CompletedTasksView from '@/components/admin/tasks/CompletedTasksView';
 import TaskSearchBar from '@/components/admin/tasks/TaskSearchBar';
+import ClothingOrdersView from '@/components/admin/tasks/ClothingOrdersView';
 import {
   TaskWithEventDetails,
   TaskFilterTab,
@@ -275,12 +276,16 @@ export default function AdminTasks() {
             />
           </div>
 
-          {/* Task Queue */}
-          <TaskQueue
-            tasks={filteredTasks}
-            isLoading={isLoading}
-            onComplete={handleCompleteClick}
-          />
+          {/* Show ClothingOrdersView for clothing tab, TaskQueue for others */}
+          {activeTab === 'clothing_order' ? (
+            <ClothingOrdersView isActive={activeTab === 'clothing_order'} />
+          ) : (
+            <TaskQueue
+              tasks={filteredTasks}
+              isLoading={isLoading}
+              onComplete={handleCompleteClick}
+            />
+          )}
         </>
       )}
 
