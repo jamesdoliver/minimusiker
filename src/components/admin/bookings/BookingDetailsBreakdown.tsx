@@ -25,6 +25,7 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
     hasUpdates: boolean;
   } | null>(null);
   const [isApplyingRefresh, setIsApplyingRefresh] = useState(false);
+  const [forceRefresh, setForceRefresh] = useState(false);
 
   // Generate QR code on mount
   useEffect(() => {
@@ -54,10 +55,11 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
   };
 
   // Refresh booking data from SimplyBook
-  const handleRefresh = async () => {
+  const handleRefresh = async (forceRefreshOverride?: boolean) => {
+    const useForceRefresh = forceRefreshOverride ?? forceRefresh;
     setIsRefreshing(true);
     try {
-      const response = await fetch(`/api/admin/bookings/${booking.id}/refresh?preview=true`, {
+      const response = await fetch(`/api/admin/bookings/${booking.id}/refresh?preview=true&forceRefresh=${useForceRefresh}`, {
         method: 'POST',
       });
 
@@ -91,7 +93,7 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
   const handleApplyRefresh = async () => {
     setIsApplyingRefresh(true);
     try {
-      const response = await fetch(`/api/admin/bookings/${booking.id}/refresh?preview=false`, {
+      const response = await fetch(`/api/admin/bookings/${booking.id}/refresh?preview=false&forceRefresh=${forceRefresh}`, {
         method: 'POST',
       });
 
@@ -298,7 +300,7 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
       {/* Actions Row */}
       <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end gap-3">
         <button
-          onClick={handleRefresh}
+          onClick={() => handleRefresh()}
           disabled={isRefreshing}
           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
         >
@@ -363,12 +365,19 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
           onClose={() => {
             setShowRefreshModal(false);
             setRefreshData(null);
+            setForceRefresh(false);
           }}
           onApply={handleApplyRefresh}
           isApplying={isApplyingRefresh}
           updates={refreshData.updates}
           stillMissing={refreshData.stillMissing}
           hasUpdates={refreshData.hasUpdates}
+          forceRefresh={forceRefresh}
+          onForceRefreshChange={(value) => {
+            setForceRefresh(value);
+            // Re-fetch preview with new forceRefresh value
+            handleRefresh(value);
+          }}
         />
       )}
 

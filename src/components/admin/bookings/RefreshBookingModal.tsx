@@ -22,6 +22,8 @@ interface RefreshBookingModalProps {
   updates: FieldUpdate[];
   stillMissing: MissingField[];
   hasUpdates: boolean;
+  forceRefresh: boolean;
+  onForceRefreshChange: (value: boolean) => void;
 }
 
 export default function RefreshBookingModal({
@@ -32,6 +34,8 @@ export default function RefreshBookingModal({
   updates,
   stillMissing,
   hasUpdates,
+  forceRefresh,
+  onForceRefreshChange,
 }: RefreshBookingModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -87,6 +91,22 @@ export default function RefreshBookingModal({
 
         {/* Content */}
         <div className="px-6 py-4 overflow-y-auto flex-1">
+          {/* Force Refresh Checkbox */}
+          <label className="flex items-start gap-3 p-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors">
+            <input
+              type="checkbox"
+              checked={forceRefresh}
+              onChange={(e) => onForceRefreshChange(e.target.checked)}
+              className="mt-0.5 h-4 w-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+            />
+            <div>
+              <span className="text-sm font-medium text-amber-800">Overwrite existing values</span>
+              <p className="text-xs text-amber-600 mt-0.5">
+                When enabled, all fields will be updated from SimplyBook, replacing any existing data.
+              </p>
+            </div>
+          </label>
+
           {hasUpdates ? (
             <>
               {/* Updates Section */}

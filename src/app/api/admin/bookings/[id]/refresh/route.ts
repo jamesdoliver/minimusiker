@@ -64,6 +64,7 @@ export async function POST(
     const { id: bookingId } = await params;
     const { searchParams } = new URL(request.url);
     const preview = searchParams.get('preview') !== 'false'; // Default to preview mode
+    const forceRefresh = searchParams.get('forceRefresh') === 'true';
 
     // Get booking from Airtable
     const airtableService = getAirtableService();
@@ -103,6 +104,15 @@ export async function POST(
       const hasNewValue = newValue !== undefined && newValue !== '' && newValue !== 0;
 
       if (isEmpty && hasNewValue) {
+        // Fill empty fields with new data
+        updates.push({
+          field: config.airtable,
+          label: config.label,
+          current: String(currentValue || ''),
+          new: String(newValue),
+        });
+      } else if (forceRefresh && hasNewValue && String(currentValue) !== String(newValue)) {
+        // Overwrite existing values when force refresh is enabled and values differ
         updates.push({
           field: config.airtable,
           label: config.label,
