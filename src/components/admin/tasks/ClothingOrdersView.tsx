@@ -5,6 +5,7 @@ import { ClothingOrderEvent } from '@/lib/types/clothingOrders';
 import ClothingOrderCard from './ClothingOrderCard';
 import ClothingOrderListModal from './ClothingOrderListModal';
 import ClothingOrderCompletionModal from './ClothingOrderCompletionModal';
+import PrintablesDownloadModal from './PrintablesDownloadModal';
 
 interface ClothingOrdersViewProps {
   isActive: boolean;  // Only fetch when this tab is active
@@ -17,6 +18,7 @@ export default function ClothingOrdersView({ isActive }: ClothingOrdersViewProps
   const [selectedEvent, setSelectedEvent] = useState<ClothingOrderEvent | null>(null);
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
+  const [downloadPrintablesEvent, setDownloadPrintablesEvent] = useState<ClothingOrderEvent | null>(null);
 
   const fetchClothingOrders = useCallback(async () => {
     setIsLoading(true);
@@ -51,6 +53,10 @@ export default function ClothingOrdersView({ isActive }: ClothingOrdersViewProps
   const handleMarkComplete = (event: ClothingOrderEvent) => {
     setSelectedEvent(event);
     setIsCompletionModalOpen(true);
+  };
+
+  const handleDownloadPrintables = (event: ClothingOrderEvent) => {
+    setDownloadPrintablesEvent(event);
   };
 
   const handleCompletionSuccess = () => {
@@ -113,6 +119,7 @@ export default function ClothingOrdersView({ isActive }: ClothingOrdersViewProps
             key={event.event_record_id}
             event={event}
             onViewOrders={handleViewOrders}
+            onDownloadPrintables={handleDownloadPrintables}
             onMarkComplete={handleMarkComplete}
           />
         ))}
@@ -140,6 +147,14 @@ export default function ClothingOrdersView({ isActive }: ClothingOrdersViewProps
             setSelectedEvent(null);
           }}
           onComplete={handleCompletionSuccess}
+        />
+      )}
+
+      {/* Printables Download Modal */}
+      {downloadPrintablesEvent && (
+        <PrintablesDownloadModal
+          event={downloadPrintablesEvent}
+          onClose={() => setDownloadPrintablesEvent(null)}
         />
       )}
     </>
