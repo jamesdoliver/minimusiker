@@ -16,7 +16,7 @@ interface LogoDesignControlsProps {
  *
  * Provides:
  * - School name textarea (pre-filled, multiline)
- * - Font size slider (40-90 range)
+ * - Font size slider (40-140 range, scaled by canvas)
  * - Reset position button
  *
  * Unlike DesignControls, this component:
@@ -31,6 +31,10 @@ export default function LogoDesignControls({
   onResetPosition,
   canvasScale,
 }: LogoDesignControlsProps) {
+  // Calculate scale factor for slider range (before handlers so they can use these values)
+  const scaledMin = canvasScale ? 40 * canvasScale : 40;
+  const scaledMax = canvasScale ? 140 * canvasScale : 140;
+
   // Handle text change
   const handleTextChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
@@ -56,16 +60,12 @@ export default function LogoDesignControls({
     (e: ChangeEvent<HTMLInputElement>) => {
       if (!textElement) return;
       const value = parseFloat(e.target.value);
-      if (!isNaN(value) && value >= 40 && value <= 90) {
+      if (!isNaN(value) && value >= scaledMin && value <= scaledMax) {
         onUpdateTextElement(textElement.id, { fontSize: value });
       }
     },
-    [textElement, onUpdateTextElement]
+    [textElement, onUpdateTextElement, scaledMin, scaledMax]
   );
-
-  // Calculate scale factor for slider range
-  const scaledMin = canvasScale ? 40 * canvasScale : 40;
-  const scaledMax = canvasScale ? 90 * canvasScale : 90;
 
   return (
     <div className="space-y-5">
