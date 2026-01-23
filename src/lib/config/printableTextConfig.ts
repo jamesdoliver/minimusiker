@@ -469,11 +469,12 @@ export function createTextElement(
 
 /**
  * Initialize editor state for a given item type
- * Starts with empty text elements - admin adds them as needed
+ * For t-shirt/hoodie: pre-populates with school name text element
+ * For other types: starts empty - admin adds text elements as needed
  */
 export function initializeEditorState(
   type: PrintableItemType,
-  _schoolName: string, // Kept for API compatibility but not used (admin types text)
+  schoolName: string,
   scale: number = 1
 ): PrintableEditorState {
   const config = getPrintableConfig(type);
@@ -482,9 +483,28 @@ export function initializeEditorState(
   }
 
   const result: PrintableEditorState = {
-    textElements: [], // Start empty - admin adds text elements
+    textElements: [],
     canvasScale: scale,
   };
+
+  // For t-shirt/hoodie, pre-create the school name text element
+  if (type === 'tshirt' || type === 'hoodie') {
+    result.textElements = [{
+      id: generateTextElementId(),
+      type: 'headline',
+      text: schoolName,
+      position: {
+        x: TSHIRT_HOODIE_TEXT_DEFAULTS.position.x * scale,
+        y: TSHIRT_HOODIE_TEXT_DEFAULTS.position.y * scale,
+      },
+      size: {
+        width: TSHIRT_HOODIE_TEXT_DEFAULTS.size.width * scale,
+        height: TSHIRT_HOODIE_TEXT_DEFAULTS.size.height * scale,
+      },
+      fontSize: TSHIRT_HOODIE_TEXT_DEFAULTS.fontSize * scale,
+      color: TSHIRT_HOODIE_TEXT_DEFAULTS.color,
+    }];
+  }
 
   // For back items with QR codes, set up QR position (in CSS pixels)
   if (config.qrDefaults) {
@@ -543,3 +563,23 @@ export function cssToPdfSize(
     height: cssHeight / scale,
   };
 }
+
+/**
+ * T-Shirt/Hoodie logo canvas dimensions (PNG source image)
+ * These are used for the visual editor, not the PDF output
+ */
+export const LOGO_CANVAS_DIMENSIONS = {
+  width: 1414,
+  height: 2000,
+};
+
+/**
+ * Default text element position for t-shirt/hoodie
+ * Values in CSS pixels relative to the 1414x2000 canvas
+ */
+export const TSHIRT_HOODIE_TEXT_DEFAULTS = {
+  position: { x: 141, y: 100 },
+  size: { width: 1131, height: 200 },
+  fontSize: 64,
+  color: '#3D7A7A',
+};

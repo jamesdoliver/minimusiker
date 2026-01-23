@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import PdfCanvas from './PdfCanvas';
+import LogoCanvas from './LogoCanvas';
 import DraggableText from './DraggableText';
 import DraggableQrCode from './DraggableQrCode';
 import DesignControls from './DesignControls';
+import LogoDesignControls from './LogoDesignControls';
 import {
   PrintableTextConfig,
   PrintableEditorState,
@@ -12,6 +14,7 @@ import {
   TextElementType,
   createTextElement,
   getFontFamilyForType,
+  TSHIRT_HOODIE_TEXT_DEFAULTS,
 } from '@/lib/config/printableTextConfig';
 
 interface PrintableEditorProps {
@@ -35,7 +38,7 @@ interface PrintableEditorProps {
  */
 export default function PrintableEditor({
   itemConfig,
-  schoolName,
+  schoolName: _schoolName, // Used for initialization, not directly in render
   accessCode,
   editorState,
   onEditorStateChange,
@@ -168,7 +171,7 @@ export default function PrintableEditor({
     [editorState, onEditorStateChange]
   );
 
-  // Handle reset to default (clear all text elements)
+  // Handle reset to default (clear all text elements for generic, reset position for logo)
   const handleResetToDefault = useCallback(() => {
     onEditorStateChange({
       ...editorState,
@@ -177,13 +180,31 @@ export default function PrintableEditor({
     setSelectedElementId(null);
   }, [editorState, onEditorStateChange]);
 
+  // Handle reset position for logo type (snap back to default position)
+  const handleResetLogoPosition = useCallback(() => {
+    if (!canvasDimensions || editorState.textElements.length === 0) return;
+    const scale = canvasDimensions.scale;
+    const element = editorState.textElements[0];
+    onEditorStateChange({
+      ...editorState,
+      textElements: [{
+        ...element,
+        position: {
+          x: TSHIRT_HOODIE_TEXT_DEFAULTS.position.x * scale,
+          y: TSHIRT_HOODIE_TEXT_DEFAULTS.position.y * scale,
+        },
+        size: {
+          width: TSHIRT_HOODIE_TEXT_DEFAULTS.size.width * scale,
+          height: TSHIRT_HOODIE_TEXT_DEFAULTS.size.height * scale,
+        },
+        fontSize: TSHIRT_HOODIE_TEXT_DEFAULTS.fontSize * scale,
+      }],
+    });
+  }, [canvasDimensions, editorState, onEditorStateChange]);
+
   const qrUrl = accessCode ? `minimusiker.app/e/${accessCode}` : undefined;
   const fontFamily = getFontFamilyForType(itemConfig.type);
-
-  // Get the selected element for controls
-  const selectedElement = editorState.textElements.find(
-    (el) => el.id === selectedElementId
-  );
+  const isLogoType = itemConfig.type === 'tshirt' || itemConfig.type === 'hoodie';
 
   return (
     <div className="flex gap-6 h-full min-h-0">
@@ -207,33 +228,50 @@ export default function PrintableEditor({
 
       {/* Left panel - Controls */}
       <div className="w-80 flex-shrink-0 overflow-y-auto p-4 border-r border-gray-200">
-        <DesignControls
-          itemName={itemConfig.name}
-          isBack={itemConfig.isBack}
-          templateType={itemConfig.type}
-          textElements={editorState.textElements}
-          selectedElementId={selectedElementId}
-          onSelectElement={setSelectedElementId}
-          onAddTextElement={handleAddTextElement}
-          onDeleteTextElement={handleDeleteTextElement}
-          onUpdateTextElement={handleUpdateTextElement}
-          onResetToDefault={handleResetToDefault}
-          hasQrCode={!!editorState.qrPosition}
-          qrPosition={editorState.qrPosition}
-          qrSize={editorState.qrPosition?.size}
-          canvasScale={canvasDimensions?.scale}
-        />
+        {isLogoType ? (
+          <LogoDesignControls
+            itemName={itemConfig.name}
+            textElement={editorState.textElements[0] || null}
+            onUpdateTextElement={handleUpdateTextElement}
+            onResetPosition={handleResetLogoPosition}
+            canvasScale={canvasDimensions?.scale}
+          />
+        ) : (
+          <DesignControls
+            itemName={itemConfig.name}
+            isBack={itemConfig.isBack}
+            templateType={itemConfig.type}
+            textElements={editorState.textElements}
+            selectedElementId={selectedElementId}
+            onSelectElement={setSelectedElementId}
+            onAddTextElement={handleAddTextElement}
+            onDeleteTextElement={handleDeleteTextElement}
+            onUpdateTextElement={handleUpdateTextElement}
+            onResetToDefault={handleResetToDefault}
+            hasQrCode={!!editorState.qrPosition}
+            qrPosition={editorState.qrPosition}
+            qrSize={editorState.qrPosition?.size}
+            canvasScale={canvasDimensions?.scale}
+          />
+        )}
       </div>
 
       {/* Right panel - Canvas with overlays */}
       <div className="flex-1 overflow-auto p-4 bg-gray-50 flex items-start justify-center">
         <div className="relative w-full max-w-2xl">
-          {/* PDF Canvas background */}
-          <PdfCanvas
-            templateType={itemConfig.type}
-            onLoad={handleCanvasLoad}
-            onError={handleCanvasError}
-          />
+          {/* Canvas background - Logo or PDF */}
+          {isLogoType ? (
+            <LogoCanvas
+              onLoad={handleCanvasLoad}
+              onError={handleCanvasError}
+            />
+          ) : (
+            <PdfCanvas
+              templateType={itemConfig.type}
+              onLoad={handleCanvasLoad}
+              onError={handleCanvasError}
+            />
+          )}
 
           {/* Overlay container - positioned over the canvas */}
           {canvasDimensions && templateExists && (
@@ -254,11 +292,11 @@ export default function PrintableEditor({
                   size={element.size}
                   color={element.color}
                   fontFamily={fontFamily}
-                  isSelected={element.id === selectedElementId}
-                  elementType={element.type}
+                  isSelected={isLogoType || element.id === selectedElementId}
+                  elementType={isLogoType ? undefined : element.type}
                   onPositionChange={(pos) => handleTextPositionChange(element.id, pos)}
                   onSizeChange={(size) => handleTextSizeChange(element.id, size)}
-                  onSelect={() => setSelectedElementId(element.id)}
+                  onSelect={isLogoType ? undefined : () => setSelectedElementId(element.id)}
                   canvasWidth={canvasDimensions.width}
                   canvasHeight={canvasDimensions.height}
                 />
