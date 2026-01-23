@@ -184,9 +184,11 @@ export async function POST(request: NextRequest) {
     );
 
     // Step 5: Generate session data
+    // Use fallback for eventType to prevent double-underscore event IDs when Events table has empty event_type
+    const eventType = eventDetails.eventType || 'minimusiker';
     const eventId = generateEventId(
       eventDetails.schoolName,
-      eventDetails.eventType,
+      eventType,
       eventDetails.bookingDate
     );
     const schoolId = generateSchoolId(eventDetails.schoolName);
@@ -199,7 +201,7 @@ export async function POST(request: NextRequest) {
       class: eventDetails.className,
       eventId,
       schoolName: eventDetails.schoolName,
-      eventType: eventDetails.eventType,
+      eventType,
       bookingDate: eventDetails.bookingDate,
     }));
 
