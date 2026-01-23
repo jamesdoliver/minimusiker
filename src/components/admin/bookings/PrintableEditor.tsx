@@ -219,7 +219,7 @@ export default function PrintableEditor({
         }
         @font-face {
           font-family: 'Springwood Display';
-          src: url('/api/admin/fonts/springwood-display') format('opentype');
+          src: url('/images/printable_blank_logo/springwood-display.otf') format('opentype');
           font-weight: normal;
           font-style: normal;
           font-display: swap;
