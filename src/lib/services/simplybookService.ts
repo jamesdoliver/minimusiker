@@ -286,9 +286,10 @@ class SimplybookService {
     // Extract booking date from start_date_time or start_date
     const bookingDate = booking.start_date || booking.start_date_time?.split(' ')[0] || '';
 
-    // School name: prefer 'client' field (where SimplyBook stores it), then additional_fields, then client_name
-    const schoolNameFromFields = findField(['name', 'schule', 'school', 'einrichtung']);
-    const schoolName = booking.client || schoolNameFromFields || booking.client_name || '';
+    // School name: prefer 'client' field, then 'client_name' (institution name), then additional_fields
+    // Note: 'einrichtung' keyword removed from intake search as it matches "Anzahl KINDER in eurer Einrichtung"
+    const schoolNameFromFields = findField(['schule', 'school', 'name der einrichtung', 'schulname']);
+    const schoolName = booking.client || booking.client_name || schoolNameFromFields || '';
 
     // Extract region from unit_name (e.g., "Minimusiker Köln/Bonn" -> "Köln/Bonn")
     let region: string | undefined;

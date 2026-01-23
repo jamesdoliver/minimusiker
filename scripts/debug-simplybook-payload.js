@@ -127,7 +127,7 @@ function mapIntakeFields(booking) {
 
   // Track all field extractions
   const extractions = {
-    schoolName: findField(['name', 'schule', 'school', 'einrichtung']),
+    schoolName: findField(['schule', 'school', 'name der einrichtung', 'schulname']),
     contactPerson: findField(['ansprechpartner', 'ansprechperson', 'contact person', 'contact', 'kontakt']),
     contactEmail: findField(['email', 'e-mail']),
     phone: findField(['telefon', 'phone', 'tel']),
@@ -144,7 +144,7 @@ function mapIntakeFields(booking) {
   return {
     extractions,
     mappedData: {
-      schoolName: booking.client || extractions.schoolName.value || booking.client_name || '',
+      schoolName: booking.client || booking.client_name || extractions.schoolName.value || '',
       contactPerson: extractions.contactPerson.value || booking.client_name || '',
       contactEmail: booking.client_email || extractions.contactEmail.value || '',
       phone: booking.client_phone || extractions.phone.value || undefined,
@@ -156,7 +156,7 @@ function mapIntakeFields(booking) {
       costCategory: numberOfChildren > 150 ? '>150 children' : '<150 children',
     },
     fallbacks: {
-      schoolName: { client: booking.client, client_name: booking.client_name },
+      schoolName: { client: booking.client, client_name: booking.client_name, intake_form: extractions.schoolName.value },
       contactPerson: { client_name: booking.client_name },
       contactEmail: { client_email: booking.client_email },
       phone: { client_phone: booking.client_phone },
