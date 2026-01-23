@@ -47,6 +47,9 @@ export default function ConfirmPrintablesModal({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
+  // Preview download state
+  const [isDownloading, setIsDownloading] = useState(false);
+
   // Current item config
   const currentItem = PRINTABLE_ITEMS[currentStep];
   const currentEditorState = itemEditorStates[currentItem.type];
@@ -138,6 +141,50 @@ export default function ConfirmPrintablesModal({
     }
   };
 
+  // Handle download preview of current item
+  const handleDownloadPreview = async () => {
+    setIsDownloading(true);
+    setGenerationError(null);
+
+    try {
+      const response = await fetch('/api/admin/printables/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: booking.code,
+          schoolName: booking.schoolName,
+          eventDate: booking.bookingDate,
+          accessCode: booking.accessCode,
+          item: {
+            type: currentItem.type,
+            textElements: currentEditorState.textElements,
+            qrPosition: currentEditorState.qrPosition,
+            canvasScale: currentEditorState.canvasScale,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to generate preview');
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.url) {
+        // Open the signed URL in a new tab for download
+        window.open(result.url, '_blank');
+      } else {
+        throw new Error('No preview URL returned');
+      }
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : 'Failed to generate preview. Please try again.');
+      console.error('Preview error:', error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   // Check if all items are confirmed
   const allItemsConfirmed = confirmedItems.size === TOTAL_PRINTABLE_ITEMS;
 
@@ -211,21 +258,49 @@ export default function ConfirmPrintablesModal({
           )}
 
           <div className="flex items-center justify-between">
-            {/* Back button */}
-            <button
-              onClick={handleBack}
-              disabled={currentStep === 0}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                currentStep === 0
-                  ? 'text-gray-400 cursor-not-allowed'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back
-            </button>
+            {/* Left side buttons */}
+            <div className="flex items-center gap-2">
+              {/* Back button */}
+              <button
+                onClick={handleBack}
+                disabled={currentStep === 0}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  currentStep === 0
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back
+              </button>
+
+              {/* Download Preview button */}
+              <button
+                onClick={handleDownloadPreview}
+                disabled={isDownloading}
+                className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Download preview PDF"
+              >
+                {isDownloading ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span className="sr-only">Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span className="hidden sm:inline">Preview</span>
+                  </>
+                )}
+              </button>
+            </div>
 
             {/* Right side buttons */}
             <div className="flex items-center gap-3">

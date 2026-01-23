@@ -349,6 +349,117 @@ class PrintableService {
   }
 
   /**
+   * Generate a single printable preview and return the PDF buffer
+   * Used by the preview API to let admins download previews before confirming
+   *
+   * @param eventId - The event ID
+   * @param schoolName - The school name (used as fallback)
+   * @param eventDate - The event date (ISO string)
+   * @param itemConfig - Single item config with custom positions from the editor
+   * @param logoBuffer - Optional logo image buffer for minicard/cd-jacket
+   * @param qrCodeUrl - Optional URL for QR code
+   * @returns Object with success status, PDF buffer, and optional error
+   */
+  async generateSinglePrintablePreview(
+    eventId: string,
+    schoolName: string,
+    eventDate: string,
+    itemConfig: PrintableItemConfig,
+    logoBuffer?: Buffer,
+    qrCodeUrl?: string
+  ): Promise<{ success: boolean; pdfBuffer?: Buffer; error?: string }> {
+    const type = itemConfig.type as PrintableType;
+
+    // Generate QR code buffer if URL is provided
+    let qrCodeBuffer: Buffer | undefined;
+    if (qrCodeUrl) {
+      try {
+        qrCodeBuffer = await this.generateQrCodeBuffer(qrCodeUrl);
+      } catch (error) {
+        console.warn('Failed to generate QR code for preview:', error);
+      }
+    }
+
+    try {
+      // Skip back items with missing QR code
+      if (printableIsBack(type) && !qrCodeBuffer) {
+        return {
+          success: false,
+          error: 'No QR code available for back side',
+        };
+      }
+
+      // Fetch the template
+      const templateBuffer = await this.r2Service.getTemplate(type);
+      if (!templateBuffer) {
+        return {
+          success: false,
+          error: `Template not found: ${type}. Please upload template to R2.`,
+        };
+      }
+
+      // Load the PDF
+      const pdfDoc = await PDFDocument.load(templateBuffer);
+
+      // For back items - only add QR code at custom position
+      if (printableIsBack(type)) {
+        if (qrCodeBuffer && itemConfig.qrPosition) {
+          await this.addQrCodeAtPosition(
+            pdfDoc,
+            qrCodeBuffer,
+            itemConfig.qrPosition,
+            type,
+            qrCodeUrl
+          );
+        }
+      } else {
+        // For front items - add all text elements
+        for (const textElement of itemConfig.textElements) {
+          await this.addTextElementToPdf(pdfDoc, textElement, type);
+        }
+
+        // Add QR code if this item has one (front items with QR)
+        if (qrCodeBuffer && itemConfig.qrPosition) {
+          await this.addQrCodeAtPosition(
+            pdfDoc,
+            qrCodeBuffer,
+            itemConfig.qrPosition,
+            type,
+            qrCodeUrl
+          );
+        }
+      }
+
+      // Add logo if this type requires it
+      if (printableRequiresLogo(type) && logoBuffer) {
+        const config = PRINTABLE_CONFIGS[type];
+        if (config?.logo) {
+          await this.addImageToPdf(pdfDoc, logoBuffer, config.logo);
+        }
+      }
+
+      // Add bleed margins
+      const bleedMm = this.getBleedForType(type);
+      const finalDoc = await this.addBleedToDocument(pdfDoc, bleedMm);
+
+      // Save and return buffer
+      const pdfBytes = await finalDoc.save();
+      const pdfBuffer = Buffer.from(pdfBytes);
+
+      return {
+        success: true,
+        pdfBuffer,
+      };
+    } catch (error) {
+      console.error(`Error generating preview for ${type}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
    * Add a single text element to PDF (Phase 4)
    * Used by generateAllPrintablesWithConfigs to render each text element
    * with its specific styling (position, size, color, font)
