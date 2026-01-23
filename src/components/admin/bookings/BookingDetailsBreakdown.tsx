@@ -6,6 +6,7 @@ import QRCode from 'qrcode';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
 import ConfirmPrintablesModal from './ConfirmPrintablesModal';
 import RefreshBookingModal from './RefreshBookingModal';
+import OrderOverviewModal from './OrderOverviewModal';
 
 interface BookingDetailsBreakdownProps {
   booking: BookingWithDetails;
@@ -13,6 +14,7 @@ interface BookingDetailsBreakdownProps {
 
 export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreakdownProps) {
   const [showPrintablesModal, setShowPrintablesModal] = useState(false);
+  const [showOrdersModal, setShowOrdersModal] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -326,6 +328,15 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
           </svg>
           Confirm Printables
         </button>
+        <button
+          onClick={() => setShowOrdersModal(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+          Order Overview
+        </button>
         <Link
           href={`/admin/events/${booking.code}`}
           className="inline-flex items-center gap-2 px-4 py-2 bg-[#94B8B3] text-white rounded-lg hover:bg-[#7da39e] transition-colors"
@@ -360,6 +371,15 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
           hasUpdates={refreshData.hasUpdates}
         />
       )}
+
+      {/* Order Overview Modal */}
+      <OrderOverviewModal
+        isOpen={showOrdersModal}
+        onClose={() => setShowOrdersModal(false)}
+        eventId={booking.code}
+        schoolName={booking.schoolName}
+        eventDate={booking.bookingDate}
+      />
     </div>
   );
 }
