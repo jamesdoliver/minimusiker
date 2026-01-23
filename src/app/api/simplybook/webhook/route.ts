@@ -143,7 +143,7 @@ export async function POST(request: Request) {
         booking.client_name || booking.client || '',
         mappedData.bookingDate,
         staffId || undefined,
-        booking.event_name, // SimplyBook service type (Minimusikertag, Minimusikertag PLUS, etc.)
+        booking.event_name || 'MiniMusiker', // SimplyBook service type, default to MiniMusiker if not provided
         mappedData.address, // School address
         mappedData.phone // School phone
       );

@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
           if (!event) {
             const schoolName = booking.schoolName || booking.schoolContactName || 'Unknown School';
             const eventDate = booking.startDate || new Date().toISOString().split('T')[0];
-            const eventId = generateEventId(schoolName, 'minimusiker', eventDate);
+            const eventId = generateEventId(schoolName, 'MiniMusiker', eventDate);
 
             console.log(`Creating Event for booking ${booking.id} (${schoolName})`);
             event = await airtableService.createEventFromBooking(

@@ -185,7 +185,8 @@ export async function POST(request: NextRequest) {
 
     // Step 5: Generate session data
     // Use fallback for eventType to prevent double-underscore event IDs when Events table has empty event_type
-    const eventType = eventDetails.eventType || 'minimusiker';
+    // Must match the casing used in SimplyBook webhook ('MiniMusiker') to ensure consistent hash
+    const eventType = eventDetails.eventType || 'MiniMusiker';
     const eventId = generateEventId(
       eventDetails.schoolName,
       eventType,
