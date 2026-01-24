@@ -42,6 +42,17 @@ import {
   TEACHER_RESOURCES_TABLE_ID,
   TEACHER_RESOURCES_FIELD_NAMES,
 } from '@/lib/types/teacher-resources';
+import {
+  EmailTemplate,
+  EmailLog,
+  CreateEmailTemplateInput,
+  UpdateEmailTemplateInput,
+  CreateEmailLogInput,
+  EMAIL_TEMPLATES_TABLE_ID,
+  EMAIL_TEMPLATES_FIELD_IDS,
+  EMAIL_LOGS_TABLE_ID,
+  EMAIL_LOGS_FIELD_IDS,
+} from '@/lib/types/email-automation';
 
 // Single table name in Airtable
 export const TABLE_NAME = 'parent_journey_table';
@@ -55,6 +66,10 @@ class AirtableService {
   private classesTable: Table<FieldSet> | null = null;
   private parentsTable: Table<FieldSet> | null = null;
   private registrationsTable: Table<FieldSet> | null = null;
+
+  // Email automation tables (lazy initialized)
+  private emailTemplatesTable: Table<FieldSet> | null = null;
+  private emailLogsTable: Table<FieldSet> | null = null;
 
   private constructor() {
     // Configure with Personal Access Token (PAT)
@@ -94,6 +109,23 @@ class AirtableService {
       this.parentsTable = this.base(PARENTS_TABLE_ID);
       this.registrationsTable = this.base(REGISTRATIONS_TABLE_ID);
     }
+  }
+
+  /**
+   * Ensure email automation tables are initialized (lazy initialization)
+   * Returns true if tables are properly configured, false otherwise
+   */
+  private ensureEmailTablesInitialized(): boolean {
+    if (!EMAIL_TEMPLATES_TABLE_ID || !EMAIL_LOGS_TABLE_ID) {
+      console.warn('Email automation tables not configured. Set EMAIL_TEMPLATES_TABLE_ID and EMAIL_LOGS_TABLE_ID environment variables.');
+      return false;
+    }
+
+    if (!this.emailTemplatesTable) {
+      this.emailTemplatesTable = this.base(EMAIL_TEMPLATES_TABLE_ID);
+      this.emailLogsTable = this.base(EMAIL_LOGS_TABLE_ID);
+    }
+    return true;
   }
 
   /**
@@ -4871,6 +4903,434 @@ class AirtableService {
     } catch (error) {
       console.error('Error fetching teacher resource by key:', error);
       return null;
+    }
+  }
+
+  // ==========================================================================
+  // EMAIL AUTOMATION HELPER METHODS
+  // ==========================================================================
+
+  /**
+   * Get all events from the normalized Events table
+   */
+  async getAllEvents(): Promise<Event[]> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.eventsTable) {
+      console.warn('Events table not available - USE_NORMALIZED_TABLES may not be enabled');
+      return [];
+    }
+
+    try {
+      const records = await this.eventsTable.select({
+        returnFieldsByFieldId: true,
+      }).all();
+
+      return records.map((record) => ({
+        id: record.id,
+        event_id: (record.fields[EVENTS_FIELD_IDS.event_id] as string) || '',
+        school_name: (record.fields[EVENTS_FIELD_IDS.school_name] as string) || '',
+        event_date: (record.fields[EVENTS_FIELD_IDS.event_date] as string) || '',
+        event_type: record.fields[EVENTS_FIELD_IDS.event_type] as string | undefined,
+        assigned_staff: record.fields[EVENTS_FIELD_IDS.assigned_staff] as string[] | undefined,
+        assigned_engineer: record.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[] | undefined,
+        created_at: (record.fields[EVENTS_FIELD_IDS.created_at] as string) || '',
+        legacy_booking_id: record.fields[EVENTS_FIELD_IDS.legacy_booking_id] as string | undefined,
+        simplybook_booking: record.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[] | undefined,
+      }));
+    } catch (error) {
+      console.error('Error fetching all events:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get event by Airtable record ID (public wrapper for queryEventById)
+   */
+  async getEventByRecordId(recordId: string): Promise<Event | null> {
+    return this.queryEventById(recordId);
+  }
+
+  /**
+   * Get classes linked to an event by event record ID
+   */
+  async getClassesByEventId(eventRecordId: string): Promise<Class[]> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.classesTable) return [];
+
+    try {
+      // Fetch all classes and filter by event_id (linked record)
+      const records = await this.classesTable.select({
+        returnFieldsByFieldId: true,
+      }).all();
+
+      const filteredRecords = records.filter((record) => {
+        const eventIds = record.fields[CLASSES_FIELD_IDS.event_id] as string[] | undefined;
+        return eventIds && eventIds.includes(eventRecordId);
+      });
+
+      return filteredRecords.map((record) => ({
+        id: record.id,
+        class_id: (record.fields[CLASSES_FIELD_IDS.class_id] as string) || '',
+        event_id: record.fields[CLASSES_FIELD_IDS.event_id] as string[],
+        class_name: (record.fields[CLASSES_FIELD_IDS.class_name] as string) || '',
+        main_teacher: record.fields[CLASSES_FIELD_IDS.main_teacher] as string | undefined,
+        other_teachers: record.fields[CLASSES_FIELD_IDS.other_teachers] as string | undefined,
+        total_children: (record.fields[CLASSES_FIELD_IDS.total_children] as number) || 0,
+        created_at: (record.fields[CLASSES_FIELD_IDS.created_at] as string) || '',
+        legacy_booking_id: record.fields[CLASSES_FIELD_IDS.legacy_booking_id] as string | undefined,
+      }));
+    } catch (error) {
+      console.error('Error fetching classes by event ID:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get class by Airtable record ID (public wrapper for queryClassById)
+   */
+  async getClassByRecordId(recordId: string): Promise<Class | null> {
+    return this.queryClassById(recordId);
+  }
+
+  /**
+   * Get registrations linked to an event by event record ID
+   */
+  async getRegistrationsByEventId(eventRecordId: string): Promise<Registration[]> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.registrationsTable) return [];
+
+    try {
+      const records = await this.registrationsTable.select({
+        returnFieldsByFieldId: true,
+      }).all();
+
+      const filteredRecords = records.filter((record) => {
+        const eventIds = record.fields[REGISTRATIONS_FIELD_IDS.event_id] as string[] | undefined;
+        return eventIds && eventIds.includes(eventRecordId);
+      });
+
+      return filteredRecords.map((record) => ({
+        id: record.id,
+        Id: (record.fields[REGISTRATIONS_FIELD_IDS.Id] as number) || 0,
+        event_id: record.fields[REGISTRATIONS_FIELD_IDS.event_id] as string[],
+        parent_id: record.fields[REGISTRATIONS_FIELD_IDS.parent_id] as string[],
+        class_id: record.fields[REGISTRATIONS_FIELD_IDS.class_id] as string[],
+        registered_child: (record.fields[REGISTRATIONS_FIELD_IDS.registered_child] as string) || '',
+        child_id: (record.fields[REGISTRATIONS_FIELD_IDS.child_id] as string) || '',
+        registered_complete: (record.fields[REGISTRATIONS_FIELD_IDS.registered_complete] as boolean) || false,
+        order_number: record.fields[REGISTRATIONS_FIELD_IDS.order_number] as string | undefined,
+        legacy_record: record.fields[REGISTRATIONS_FIELD_IDS.legacy_record] as string | undefined,
+        registration_date: record.fields[REGISTRATIONS_FIELD_IDS.registration_date] as string | undefined,
+        registration_status: record.fields[REGISTRATIONS_FIELD_IDS.registration_status] as string | undefined,
+      }));
+    } catch (error) {
+      console.error('Error fetching registrations by event ID:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get parent by Airtable record ID
+   */
+  async getParentByRecordId(recordId: string): Promise<Parent | null> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.parentsTable) return null;
+
+    try {
+      const records = await this.parentsTable.select({
+        filterByFormula: `RECORD_ID() = '${recordId}'`,
+        maxRecords: 1,
+        returnFieldsByFieldId: true,
+      }).firstPage();
+
+      if (records.length === 0) return null;
+
+      const record = records[0];
+      return {
+        id: record.id,
+        parents_id: (record.fields[PARENTS_FIELD_IDS.parents_id] as string) || '',
+        parent_id: (record.fields[PARENTS_FIELD_IDS.parent_id] as string) || '',
+        parent_email: (record.fields[PARENTS_FIELD_IDS.parent_email] as string) || '',
+        parent_first_name: (record.fields[PARENTS_FIELD_IDS.parent_first_name] as string) || '',
+        parent_telephone: (record.fields[PARENTS_FIELD_IDS.parent_telephone] as string) || '',
+        email_campaigns: record.fields[PARENTS_FIELD_IDS.email_campaigns] as 'yes' | 'no' | undefined,
+        created_at: (record.fields[PARENTS_FIELD_IDS.created_at] as string) || '',
+      };
+    } catch (error) {
+      console.error('Error fetching parent by record ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get person (staff) by Airtable record ID from Personen table
+   */
+  async getPersonById(personId: string): Promise<{ id: string; staff_name: string; email?: string } | null> {
+    try {
+      const records = await this.base(PERSONEN_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${personId}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (records.length === 0) return null;
+
+      const record = records[0];
+      return {
+        id: record.id,
+        staff_name: (record.fields[PERSONEN_FIELD_IDS.staff_name] as string) || '',
+        email: record.fields[PERSONEN_FIELD_IDS.email] as string | undefined,
+      };
+    } catch (error) {
+      console.error('Error fetching person by ID:', error);
+      return null;
+    }
+  }
+
+  // ==========================================================================
+  // EMAIL AUTOMATION METHODS
+  // ==========================================================================
+
+  /**
+   * Transform an Airtable email template record to our EmailTemplate type
+   */
+  private transformEmailTemplateRecord(record: Airtable.Record<FieldSet>): EmailTemplate {
+    return {
+      id: record.id,
+      name: (record.get(EMAIL_TEMPLATES_FIELD_IDS.name) as string) || '',
+      audience: (record.get(EMAIL_TEMPLATES_FIELD_IDS.audience) as 'teacher' | 'parent' | 'both') || 'both',
+      triggerDays: (record.get(EMAIL_TEMPLATES_FIELD_IDS.trigger_days) as number) || 0,
+      subject: (record.get(EMAIL_TEMPLATES_FIELD_IDS.email_subject) as string) || '',
+      bodyHtml: (record.get(EMAIL_TEMPLATES_FIELD_IDS.email_body_html) as string) || '',
+      active: (record.get(EMAIL_TEMPLATES_FIELD_IDS.active) as boolean) || false,
+    };
+  }
+
+  /**
+   * Transform an Airtable email log record to our EmailLog type
+   */
+  private transformEmailLogRecord(record: Airtable.Record<FieldSet>): EmailLog {
+    // event_id is a linked record, extract the first record ID or use as string
+    const eventIdField = record.get(EMAIL_LOGS_FIELD_IDS.event_id);
+    const eventId = Array.isArray(eventIdField) ? eventIdField[0] : (eventIdField as string) || '';
+
+    return {
+      id: record.id,
+      templateName: (record.get(EMAIL_LOGS_FIELD_IDS.template_name) as string) || '',
+      eventId,
+      recipientEmail: (record.get(EMAIL_LOGS_FIELD_IDS.recipient_email) as string) || '',
+      recipientType: (record.get(EMAIL_LOGS_FIELD_IDS.recipient_type) as 'teacher' | 'parent') || 'parent',
+      sentAt: (record.get(EMAIL_LOGS_FIELD_IDS.sent_at) as string) || '',
+      status: (record.get(EMAIL_LOGS_FIELD_IDS.status) as 'sent' | 'failed' | 'skipped') || 'failed',
+      errorMessage: (record.get(EMAIL_LOGS_FIELD_IDS.error_message) as string) || undefined,
+      resendMessageId: (record.get(EMAIL_LOGS_FIELD_IDS.resend_message_id) as string) || undefined,
+    };
+  }
+
+  /**
+   * Get all active email templates
+   */
+  async getActiveEmailTemplates(): Promise<EmailTemplate[]> {
+    if (!this.ensureEmailTablesInitialized()) return [];
+
+    try {
+      const records = await this.emailTemplatesTable!.select({
+        filterByFormula: `{${EMAIL_TEMPLATES_FIELD_IDS.active}} = TRUE()`,
+      }).all();
+
+      return records.map((record) => this.transformEmailTemplateRecord(record));
+    } catch (error) {
+      console.error('Error fetching active email templates:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all email templates (including inactive)
+   */
+  async getAllEmailTemplates(): Promise<EmailTemplate[]> {
+    if (!this.ensureEmailTablesInitialized()) return [];
+
+    try {
+      const records = await this.emailTemplatesTable!.select({}).all();
+      return records.map((record) => this.transformEmailTemplateRecord(record));
+    } catch (error) {
+      console.error('Error fetching all email templates:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get a single email template by Airtable record ID
+   */
+  async getEmailTemplateById(id: string): Promise<EmailTemplate | null> {
+    if (!this.ensureEmailTablesInitialized()) return null;
+
+    try {
+      const record = await this.emailTemplatesTable!.find(id);
+      return this.transformEmailTemplateRecord(record);
+    } catch (error) {
+      console.error('Error fetching email template by ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create a new email template
+   */
+  async createEmailTemplate(data: CreateEmailTemplateInput): Promise<EmailTemplate | null> {
+    if (!this.ensureEmailTablesInitialized()) return null;
+
+    try {
+      const record = await this.emailTemplatesTable!.create({
+        [EMAIL_TEMPLATES_FIELD_IDS.name]: data.name,
+        [EMAIL_TEMPLATES_FIELD_IDS.audience]: data.audience,
+        [EMAIL_TEMPLATES_FIELD_IDS.trigger_days]: data.triggerDays,
+        [EMAIL_TEMPLATES_FIELD_IDS.email_subject]: data.subject,
+        [EMAIL_TEMPLATES_FIELD_IDS.email_body_html]: data.bodyHtml,
+        [EMAIL_TEMPLATES_FIELD_IDS.active]: data.active ?? true,
+      });
+
+      return this.transformEmailTemplateRecord(record);
+    } catch (error) {
+      console.error('Error creating email template:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update an existing email template
+   */
+  async updateEmailTemplate(id: string, data: UpdateEmailTemplateInput): Promise<EmailTemplate | null> {
+    if (!this.ensureEmailTablesInitialized()) return null;
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fields: any = {};
+
+      if (data.name !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.name] = data.name;
+      if (data.audience !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.audience] = data.audience;
+      if (data.triggerDays !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.trigger_days] = data.triggerDays;
+      if (data.subject !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.email_subject] = data.subject;
+      if (data.bodyHtml !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.email_body_html] = data.bodyHtml;
+      if (data.active !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.active] = data.active;
+
+      const record = await this.emailTemplatesTable!.update(id, fields);
+      return this.transformEmailTemplateRecord(record);
+    } catch (error) {
+      console.error('Error updating email template:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Delete an email template
+   */
+  async deleteEmailTemplate(id: string): Promise<boolean> {
+    if (!this.ensureEmailTablesInitialized()) return false;
+
+    try {
+      await this.emailTemplatesTable!.destroy(id);
+      return true;
+    } catch (error) {
+      console.error('Error deleting email template:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Create an email log entry
+   */
+  async createEmailLog(data: CreateEmailLogInput): Promise<EmailLog | null> {
+    if (!this.ensureEmailTablesInitialized()) return null;
+
+    try {
+      const record = await this.emailLogsTable!.create({
+        [EMAIL_LOGS_FIELD_IDS.template_name]: data.templateName,
+        [EMAIL_LOGS_FIELD_IDS.event_id]: data.eventId,
+        [EMAIL_LOGS_FIELD_IDS.recipient_email]: data.recipientEmail,
+        [EMAIL_LOGS_FIELD_IDS.recipient_type]: data.recipientType,
+        [EMAIL_LOGS_FIELD_IDS.sent_at]: new Date().toISOString(),
+        [EMAIL_LOGS_FIELD_IDS.status]: data.status,
+        [EMAIL_LOGS_FIELD_IDS.error_message]: data.errorMessage || '',
+        [EMAIL_LOGS_FIELD_IDS.resend_message_id]: data.resendMessageId || '',
+      });
+
+      return this.transformEmailLogRecord(record);
+    } catch (error) {
+      console.error('Error creating email log:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get recent email logs with optional pagination
+   */
+  async getRecentEmailLogs(limit: number = 100): Promise<EmailLog[]> {
+    if (!this.ensureEmailTablesInitialized()) return [];
+
+    try {
+      const records = await this.emailLogsTable!.select({
+        maxRecords: limit,
+        sort: [{ field: EMAIL_LOGS_FIELD_IDS.sent_at, direction: 'desc' }],
+      }).all();
+
+      return records.map((record) => this.transformEmailLogRecord(record));
+    } catch (error) {
+      console.error('Error fetching recent email logs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if an email has already been sent for a specific template/event/recipient combination
+   * Used to prevent duplicate emails
+   */
+  async hasEmailBeenSent(templateName: string, eventId: string, recipientEmail: string): Promise<boolean> {
+    if (!this.ensureEmailTablesInitialized()) return false;
+
+    try {
+      const formula = `AND(
+        {${EMAIL_LOGS_FIELD_IDS.template_name}} = '${templateName.replace(/'/g, "\\'")}',
+        {${EMAIL_LOGS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}',
+        {${EMAIL_LOGS_FIELD_IDS.recipient_email}} = '${recipientEmail.replace(/'/g, "\\'")}',
+        {${EMAIL_LOGS_FIELD_IDS.status}} = 'sent'
+      )`;
+
+      const records = await this.emailLogsTable!.select({
+        filterByFormula: formula,
+        maxRecords: 1,
+      }).firstPage();
+
+      return records.length > 0;
+    } catch (error) {
+      console.error('Error checking if email has been sent:', error);
+      return false; // Return false to allow email attempt if check fails
+    }
+  }
+
+  /**
+   * Get email logs for a specific event
+   */
+  async getEmailLogsForEvent(eventId: string): Promise<EmailLog[]> {
+    if (!this.ensureEmailTablesInitialized()) return [];
+
+    try {
+      const records = await this.emailLogsTable!.select({
+        filterByFormula: `{${EMAIL_LOGS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+        sort: [{ field: EMAIL_LOGS_FIELD_IDS.sent_at, direction: 'desc' }],
+      }).all();
+
+      return records.map((record) => this.transformEmailLogRecord(record));
+    } catch (error) {
+      console.error('Error fetching email logs for event:', error);
+      return [];
     }
   }
 }
