@@ -17,12 +17,42 @@ interface ConfirmPrintablesModalProps {
   booking: BookingWithDetails;
 }
 
+// Health check response type
+interface HealthCheckResult {
+  healthy: boolean;
+  bucketAccessible: boolean;
+  templatesFound: string[];
+  templatesMissing: string[];
+  fontsFound: string[];
+  fontsMissing: string[];
+  errors: string[];
+}
+
+// Generation result types
+interface GenerationResultItem {
+  type: string;
+  key?: string;
+  error?: string;
+}
+
+interface GenerationResult {
+  success: boolean;
+  partialSuccess: boolean;
+  eventId: string;
+  audioFolderCreated: boolean;
+  results: {
+    succeeded: GenerationResultItem[];
+    failed: GenerationResultItem[];
+    skipped: { type: string; reason: string }[];
+  };
+  errors: string[];
+}
+
 // Initialize empty editor states for all items
-// Note: schoolName is passed for API compatibility but not used (admin types text manually)
 function initializeAllItemsEditorState(schoolName: string): Record<PrintableItemType, PrintableEditorState> {
   const result: Record<PrintableItemType, PrintableEditorState> = {} as Record<PrintableItemType, PrintableEditorState>;
   PRINTABLE_ITEMS.forEach((item) => {
-    result[item.type] = initializeEditorState(item.type, schoolName, 1); // Scale will be updated when canvas loads
+    result[item.type] = initializeEditorState(item.type, schoolName, 1);
   });
   return result;
 }
@@ -43,9 +73,15 @@ export default function ConfirmPrintablesModal({
   // Track which items have been confirmed
   const [confirmedItems, setConfirmedItems] = useState<Set<PrintableItemType>>(new Set());
 
+  // Health check state
+  const [healthCheck, setHealthCheck] = useState<HealthCheckResult | null>(null);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [healthError, setHealthError] = useState<string | null>(null);
+
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [generationResult, setGenerationResult] = useState<GenerationResult | null>(null);
 
   // Preview download state
   const [isDownloading, setIsDownloading] = useState(false);
@@ -54,7 +90,7 @@ export default function ConfirmPrintablesModal({
   const currentItem = PRINTABLE_ITEMS[currentStep];
   const currentEditorState = itemEditorStates[currentItem.type];
 
-  // Reset state when modal opens
+  // Run health check when modal opens
   useEffect(() => {
     if (isOpen) {
       setCurrentStep(0);
@@ -62,8 +98,37 @@ export default function ConfirmPrintablesModal({
       setConfirmedItems(new Set());
       setIsGenerating(false);
       setGenerationError(null);
+      setGenerationResult(null);
+      setHealthCheck(null);
+      setHealthError(null);
+
+      // Run health check
+      checkHealth();
     }
   }, [isOpen, booking.schoolName]);
+
+  // Health check function
+  const checkHealth = async () => {
+    setIsCheckingHealth(true);
+    setHealthError(null);
+
+    try {
+      const response = await fetch('/api/admin/printables/health');
+      if (!response.ok) {
+        throw new Error('Failed to check printables health');
+      }
+      const result = await response.json();
+      setHealthCheck(result);
+
+      if (!result.healthy) {
+        setHealthError(`Missing assets: ${result.errors.join(', ')}`);
+      }
+    } catch (error) {
+      setHealthError(error instanceof Error ? error.message : 'Health check failed');
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  };
 
   // Update editor state for current item
   const updateCurrentItemEditorState = useCallback(
@@ -96,9 +161,9 @@ export default function ConfirmPrintablesModal({
   const handleGenerateAll = async () => {
     setIsGenerating(true);
     setGenerationError(null);
+    setGenerationResult(null);
 
     try {
-      // Call the printables generation API with dynamic positions
       const response = await fetch('/api/admin/printables/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -106,12 +171,11 @@ export default function ConfirmPrintablesModal({
           eventId: booking.code,
           schoolName: booking.schoolName,
           eventDate: booking.bookingDate,
-          // Pass editor states with text elements and QR positions
           items: PRINTABLE_ITEMS.map(item => {
             const state = itemEditorStates[item.type];
             return {
               type: item.type,
-              textElements: state.textElements, // Array of text elements
+              textElements: state.textElements,
               qrPosition: state.qrPosition,
               canvasScale: state.canvasScale,
             };
@@ -119,23 +183,92 @@ export default function ConfirmPrintablesModal({
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to generate printables');
-      }
-
       const result = await response.json();
+      setGenerationResult(result);
 
-      if (!result.success && result.errors?.length > 0) {
-        // Partial success - show warnings but still close
-        console.warn('Some printables failed:', result.errors);
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to generate printables');
       }
 
-      // Close modal on success
-      onClose();
+      // If fully successful (no failures), close modal after short delay
+      if (result.success && !result.partialSuccess) {
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      }
     } catch (error) {
       setGenerationError(error instanceof Error ? error.message : 'Failed to generate printables. Please try again.');
       console.error('Generation error:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Handle retry failed items
+  const handleRetryFailed = async () => {
+    if (!generationResult) return;
+
+    setIsGenerating(true);
+    setGenerationError(null);
+
+    // Get the types that failed
+    const failedTypes = generationResult.results.failed.map(f => f.type);
+
+    try {
+      const response = await fetch('/api/admin/printables/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: booking.code,
+          schoolName: booking.schoolName,
+          eventDate: booking.bookingDate,
+          // Only send failed items for retry
+          items: PRINTABLE_ITEMS
+            .filter(item => failedTypes.includes(item.type))
+            .map(item => {
+              const state = itemEditorStates[item.type];
+              return {
+                type: item.type,
+                textElements: state.textElements,
+                qrPosition: state.qrPosition,
+                canvasScale: state.canvasScale,
+              };
+            }),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Retry failed');
+      }
+
+      // Merge results with previous successful items
+      const newResult: GenerationResult = {
+        ...result,
+        results: {
+          succeeded: [
+            ...generationResult.results.succeeded,
+            ...result.results.succeeded,
+          ],
+          failed: result.results.failed,
+          skipped: [
+            ...generationResult.results.skipped,
+            ...result.results.skipped,
+          ],
+        },
+      };
+
+      setGenerationResult(newResult);
+
+      // If now fully successful, close modal
+      if (newResult.results.failed.length === 0) {
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      }
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : 'Retry failed. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -172,7 +305,6 @@ export default function ConfirmPrintablesModal({
       const result = await response.json();
 
       if (result.success && result.url) {
-        // Open the signed URL in a new tab for download
         window.open(result.url, '_blank');
       } else {
         throw new Error('No preview URL returned');
@@ -190,6 +322,9 @@ export default function ConfirmPrintablesModal({
 
   // Check if on last step
   const isLastStep = currentStep === TOTAL_PRINTABLE_ITEMS - 1;
+
+  // Check if health check passed
+  const healthOk = healthCheck?.healthy ?? false;
 
   if (!isOpen) return null;
 
@@ -212,6 +347,36 @@ export default function ConfirmPrintablesModal({
             </svg>
           </button>
         </div>
+
+        {/* Health check warning */}
+        {(isCheckingHealth || healthError) && (
+          <div className={`px-6 py-3 ${healthError ? 'bg-red-50' : 'bg-blue-50'}`}>
+            {isCheckingHealth ? (
+              <div className="flex items-center gap-2 text-blue-700 text-sm">
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Checking templates and assets...
+              </div>
+            ) : healthError ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-red-700 text-sm">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  {healthError}
+                </div>
+                <button
+                  onClick={checkHealth}
+                  className="text-sm text-red-700 hover:text-red-800 underline"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {/* Progress stepper */}
         <div className="px-6 py-3 border-b border-gray-100 bg-gray-50">
@@ -237,6 +402,103 @@ export default function ConfirmPrintablesModal({
             </div>
           </div>
         </div>
+
+        {/* Generation Results Display */}
+        {generationResult && (
+          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div className="space-y-3">
+              {/* Summary */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-700">Generation Results</h3>
+                {generationResult.partialSuccess && (
+                  <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full">
+                    Partial Success
+                  </span>
+                )}
+                {generationResult.success && !generationResult.partialSuccess && (
+                  <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">
+                    All Succeeded
+                  </span>
+                )}
+              </div>
+
+              {/* Results grid */}
+              <div className="flex flex-wrap gap-2">
+                {/* Succeeded items */}
+                {generationResult.results.succeeded.map((item) => (
+                  <div
+                    key={item.type}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {item.type}
+                  </div>
+                ))}
+
+                {/* Failed items */}
+                {generationResult.results.failed.map((item) => (
+                  <div
+                    key={item.type}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded text-xs"
+                    title={item.error}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    {item.type}
+                  </div>
+                ))}
+
+                {/* Skipped items */}
+                {generationResult.results.skipped.map((item) => (
+                  <div
+                    key={item.type}
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs"
+                    title={item.reason}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" />
+                    </svg>
+                    {item.type}
+                  </div>
+                ))}
+              </div>
+
+              {/* Retry button for failed items */}
+              {generationResult.results.failed.length > 0 && (
+                <button
+                  onClick={handleRetryFailed}
+                  disabled={isGenerating}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isGenerating ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Retrying...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Retry {generationResult.results.failed.length} Failed Items
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Close button for full success */}
+              {generationResult.success && !generationResult.partialSuccess && (
+                <p className="text-sm text-green-600">All printables generated successfully. Closing...</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Main content - PrintableEditor */}
         <div className="flex-1 overflow-auto min-h-0">
@@ -342,7 +604,8 @@ export default function ConfirmPrintablesModal({
               {allItemsConfirmed && (
                 <button
                   onClick={handleGenerateAll}
-                  disabled={isGenerating}
+                  disabled={isGenerating || !healthOk}
+                  title={!healthOk ? 'Fix missing assets before generating' : undefined}
                   className="inline-flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isGenerating ? (

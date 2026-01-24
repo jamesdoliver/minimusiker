@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getPrintableService, PrintableItemConfig, TextElementConfig } from '@/lib/services/printableService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getR2Service } from '@/lib/services/r2Service';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import {
   PrintableItemType,
@@ -77,6 +78,29 @@ export async function POST(request: NextRequest) {
     // Get services
     const printableService = getPrintableService();
     const airtableService = getAirtableService();
+    const r2Service = getR2Service();
+
+    // Pre-flight health check - verify templates and fonts are available
+    const healthCheck = await r2Service.checkAssetsHealth();
+    if (!healthCheck.healthy) {
+      console.error('[printables/generate] Health check failed:', healthCheck.errors);
+
+      // Check what's specifically missing
+      const missingTemplates = healthCheck.templatesMissing;
+      const missingFonts = healthCheck.fontsMissing;
+
+      return NextResponse.json({
+        success: false,
+        partialSuccess: false,
+        error: 'Pre-flight check failed: missing required assets',
+        healthCheck: {
+          bucketAccessible: healthCheck.bucketAccessible,
+          missingTemplates,
+          missingFonts,
+        },
+        errors: healthCheck.errors,
+      }, { status: 400 });
+    }
 
     // Determine the actual event_id
     // If passedEventId looks like a SimplyBook ID (numeric), generate the proper event_id
@@ -187,26 +211,70 @@ export async function POST(request: NextRequest) {
       qrCodeUrl
     );
 
-    // Log generation status
-    console.log(`[printables/generate] Generated ${result.results.filter(r => r.success).length}/${result.results.length} printables for event ${eventId}`);
+    // Categorize results
+    const succeeded = result.results.filter(r => r.success);
+    const failed = result.results.filter(r => !r.success);
+    const skipped: { type: string; reason: string }[] = [];
 
-    // Return results
+    // Check for skipped back items (no QR code)
+    if (!qrCodeUrl) {
+      const backTypes = ['flyer1-back', 'flyer2-back', 'flyer3-back'];
+      for (const failedItem of failed) {
+        if (backTypes.includes(failedItem.type) && failedItem.error?.includes('No QR code')) {
+          skipped.push({ type: failedItem.type, reason: 'No QR code available' });
+        }
+      }
+    }
+
+    // Determine success status
+    const anySucceeded = succeeded.length > 0;
+    const allSucceeded = failed.length === 0;
+    const partialSuccess = anySucceeded && !allSucceeded;
+
+    // Log generation status
+    console.log(`[printables/generate] Generated ${succeeded.length}/${result.results.length} printables for event ${eventId}`);
+
+    // Create audio folder structure after successful printable uploads
+    let audioFolderCreated = false;
+    if (anySucceeded) {
+      const folderResult = await r2Service.createAudioFolderStructure(eventId);
+      audioFolderCreated = folderResult.success;
+      if (!folderResult.success) {
+        console.warn(`[printables/generate] Failed to create audio folder: ${folderResult.error}`);
+      }
+    }
+
+    // Return improved response structure
     return NextResponse.json({
-      success: result.success,
-      eventId: result.eventId,
+      success: anySucceeded,
+      partialSuccess,
+      eventId,
       accessCode: accessCode || null,
       qrCodeIncluded: !!qrCodeUrl,
-      generated: result.results.filter(r => r.success).map(r => ({
-        type: r.type,
-        key: r.key,
-      })),
+      audioFolderCreated,
+      results: {
+        succeeded: succeeded.map(r => ({
+          type: r.type,
+          key: r.key,
+        })),
+        failed: failed.filter(f => !skipped.some(s => s.type === f.type)).map(r => ({
+          type: r.type,
+          error: r.error || 'Unknown error',
+        })),
+        skipped,
+      },
       errors: result.errors,
     });
 
   } catch (error) {
     console.error('Error generating printables:', error);
     return NextResponse.json(
-      { error: 'Failed to generate printables', details: error instanceof Error ? error.message : 'Unknown error' },
+      {
+        success: false,
+        partialSuccess: false,
+        error: 'Failed to generate printables',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
       { status: 500 }
     );
   }

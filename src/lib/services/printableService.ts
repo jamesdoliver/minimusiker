@@ -191,8 +191,11 @@ class PrintableService {
       }
     }
 
+    // Success is true if ANY items succeeded (partial success is still success)
+    const anySucceeded = results.some(r => r.success);
+
     return {
-      success: errors.length === 0,
+      success: anySucceeded,
       eventId,
       results,
       errors,
@@ -340,8 +343,11 @@ class PrintableService {
       }
     }
 
+    // Success is true if ANY items succeeded (partial success is still success)
+    const anySucceeded = results.some(r => r.success);
+
     return {
-      success: errors.length === 0,
+      success: anySucceeded,
       eventId,
       results,
       errors,

@@ -177,8 +177,15 @@ class R2Service {
       throw new Error('R2 configuration is incomplete. Please check environment variables.');
     }
 
-    // New assets bucket - falls back to main bucket if not configured
-    const assetsBucketName = process.env.R2_ASSETS_BUCKET_NAME || bucketName;
+    // Assets bucket is required for printables - no silent fallback
+    const assetsBucketName = process.env.R2_ASSETS_BUCKET_NAME;
+    if (!assetsBucketName) {
+      throw new Error(
+        'R2_ASSETS_BUCKET_NAME environment variable is not set. ' +
+        'This is required for printables generation. ' +
+        'Expected bucket: minimusiker-assets'
+      );
+    }
 
     this.client = new S3Client({
       region: 'auto',
@@ -199,6 +206,114 @@ class R2Service {
    */
   getAssetsBucketName(): string {
     return this.assetsBucketName;
+  }
+
+  /**
+   * Health check for the assets bucket - verifies bucket access, templates, and fonts
+   * Used before printable generation to provide clear error messages
+   */
+  async checkAssetsHealth(): Promise<{
+    healthy: boolean;
+    bucketAccessible: boolean;
+    bucketName: string;
+    templatesFound: string[];
+    templatesMissing: string[];
+    fontsFound: string[];
+    fontsMissing: string[];
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+    const templatesFound: string[] = [];
+    const templatesMissing: string[] = [];
+    const fontsFound: string[] = [];
+    const fontsMissing: string[] = [];
+    let bucketAccessible = false;
+
+    // Check bucket accessibility by attempting to list (or head) a known path
+    try {
+      // Try to check if templates folder exists by checking for any template
+      const testTemplateKey = `${R2_PATHS.TEMPLATES}/${TEMPLATE_FILENAMES['flyer1']}`;
+      const command = new HeadObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: testTemplateKey,
+      });
+      await this.client.send(command);
+      bucketAccessible = true;
+    } catch (error: unknown) {
+      // If it's a 404, the bucket is accessible but the file doesn't exist
+      if (error && typeof error === 'object' && 'name' in error && error.name === 'NotFound') {
+        bucketAccessible = true;
+      } else if (error && typeof error === 'object' && '$metadata' in error) {
+        // AWS SDK error with metadata - check status code
+        const awsError = error as { $metadata?: { httpStatusCode?: number } };
+        if (awsError.$metadata?.httpStatusCode === 404) {
+          bucketAccessible = true;
+        } else {
+          bucketAccessible = false;
+          errors.push(`Bucket access error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      } else {
+        bucketAccessible = false;
+        errors.push(`Bucket access error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    // Check all templates
+    const allTemplateTypes: TemplateType[] = [
+      'flyer1', 'flyer1-back',
+      'flyer2', 'flyer2-back',
+      'flyer3', 'flyer3-back',
+      'button',
+      'tshirt-print', 'hoodie-print',
+      'minicard', 'cd-jacket',
+      'mock-tshirt', 'mock-hoodie',
+    ];
+
+    for (const templateType of allTemplateTypes) {
+      const filename = TEMPLATE_FILENAMES[templateType];
+      const key = `${R2_PATHS.TEMPLATES}/${filename}`;
+      const exists = await this.fileExistsInAssetsBucket(key);
+      if (exists) {
+        templatesFound.push(templateType);
+      } else {
+        templatesMissing.push(templateType);
+      }
+    }
+
+    if (templatesMissing.length > 0) {
+      errors.push(`Missing templates: ${templatesMissing.join(', ')}`);
+    }
+
+    // Check all fonts
+    const allFontNames: FontName[] = ['fredoka', 'springwood-display'];
+
+    for (const fontName of allFontNames) {
+      const filename = FONT_FILENAMES[fontName];
+      const key = `${R2_PATHS.FONTS}/${filename}`;
+      const exists = await this.fileExistsInAssetsBucket(key);
+      if (exists) {
+        fontsFound.push(fontName);
+      } else {
+        fontsMissing.push(fontName);
+      }
+    }
+
+    if (fontsMissing.length > 0) {
+      errors.push(`Missing fonts: ${fontsMissing.join(', ')}`);
+    }
+
+    const healthy = bucketAccessible && templatesMissing.length === 0 && fontsMissing.length === 0;
+
+    return {
+      healthy,
+      bucketAccessible,
+      bucketName: this.assetsBucketName,
+      templatesFound,
+      templatesMissing,
+      fontsFound,
+      fontsMissing,
+      errors,
+    };
   }
 
   /**
@@ -937,6 +1052,51 @@ class R2Service {
   }
 
   /**
+   * Create the audio folder structure for an event
+   * Creates a .gitkeep file in events/{eventId}/classes/ to initialize the folder
+   *
+   * @param eventId - The event ID
+   * @returns Object with success status and created path
+   */
+  async createAudioFolderStructure(eventId: string): Promise<{
+    success: boolean;
+    classesPath: string;
+    error?: string;
+  }> {
+    const classesPath = `${R2_PATHS.EVENT_CLASSES(eventId)}/.gitkeep`;
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: classesPath,
+        Body: Buffer.from('# Placeholder for audio files\n'),
+        ContentType: 'text/plain',
+        Metadata: {
+          eventId,
+          purpose: 'folder-structure-initialization',
+          createdAt: new Date().toISOString(),
+        },
+      });
+
+      await this.client.send(command);
+
+      console.log(`[R2Service] Created audio folder structure for event ${eventId}`);
+
+      return {
+        success: true,
+        classesPath,
+      };
+    } catch (error) {
+      console.error(`[R2Service] Error creating audio folder structure for event ${eventId}:`, error);
+      return {
+        success: false,
+        classesPath,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
    * Copy a file within the assets bucket
    * Used for copying logos to event folders
    */
@@ -1271,7 +1431,15 @@ class R2Service {
   // ========================================
 
   /**
+   * Helper method to sleep for a given number of milliseconds
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
    * Upload a generated printable PDF to an event's printables folder
+   * Includes retry logic with exponential backoff (3 retries: 1s, 2s, 4s)
    *
    * @param eventId - The event ID
    * @param printableType - The type of printable
@@ -1299,33 +1467,59 @@ class R2Service {
       key = `${R2_PATHS.EVENT_PRINTABLES(eventId)}/${PRINTABLE_FILENAMES[printableType]}`;
     }
 
-    try {
-      const command = new PutObjectCommand({
-        Bucket: this.assetsBucketName,
-        Key: key,
-        Body: buffer,
-        ContentType: 'application/pdf',
-        Metadata: {
-          eventId,
-          printableType,
-          generatedAt: new Date().toISOString(),
-        },
-      });
+    const maxRetries = 3;
+    const baseDelayMs = 1000; // 1 second
+    let lastError: Error | null = null;
 
-      await this.client.send(command);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const command = new PutObjectCommand({
+          Bucket: this.assetsBucketName,
+          Key: key,
+          Body: buffer,
+          ContentType: 'application/pdf',
+          Metadata: {
+            eventId,
+            printableType,
+            generatedAt: new Date().toISOString(),
+          },
+        });
 
-      return {
-        success: true,
-        key,
-      };
-    } catch (error) {
-      console.error(`Error uploading printable ${printableType} for event ${eventId}:`, error);
-      return {
-        success: false,
-        key,
-        error: error instanceof Error ? error.message : 'Unknown upload error',
-      };
+        await this.client.send(command);
+
+        if (attempt > 1) {
+          console.log(`[R2Service] Upload succeeded on attempt ${attempt} for ${printableType}`);
+        }
+
+        return {
+          success: true,
+          key,
+        };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown upload error');
+        console.warn(
+          `[R2Service] Upload attempt ${attempt}/${maxRetries} failed for ${printableType}: ${lastError.message}`
+        );
+
+        // Don't sleep after the last attempt
+        if (attempt < maxRetries) {
+          const delayMs = baseDelayMs * Math.pow(2, attempt - 1); // 1s, 2s, 4s
+          console.log(`[R2Service] Retrying in ${delayMs}ms...`);
+          await this.sleep(delayMs);
+        }
+      }
     }
+
+    // All retries exhausted
+    console.error(
+      `[R2Service] All ${maxRetries} upload attempts failed for ${printableType} (event: ${eventId}): ${lastError?.message}`
+    );
+
+    return {
+      success: false,
+      key,
+      error: `Upload failed after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`,
+    };
   }
 
   /**
