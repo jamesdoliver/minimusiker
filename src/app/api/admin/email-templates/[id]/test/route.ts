@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendTestEmail, getPreviewTemplateData, substituteTemplateVariables } from '@/lib/services/emailAutomationService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getCampaignEmailTemplate } from '@/lib/services/resendService';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,7 +97,9 @@ export async function GET(
     // Generate preview with sample data
     const previewData = getPreviewTemplateData();
     const previewSubject = substituteTemplateVariables(template.subject, previewData);
-    const previewBody = substituteTemplateVariables(template.bodyHtml, previewData);
+    const previewBodyRaw = substituteTemplateVariables(template.bodyHtml, previewData);
+    // Wrap preview body in branded template (WYSIWYG)
+    const previewBody = getCampaignEmailTemplate(previewBodyRaw);
 
     return NextResponse.json({
       success: true,
