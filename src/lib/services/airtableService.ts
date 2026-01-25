@@ -5142,6 +5142,7 @@ class AirtableService {
     try {
       const records = await this.emailTemplatesTable!.select({
         filterByFormula: `{${EMAIL_TEMPLATES_FIELD_IDS.active}} = TRUE()`,
+        returnFieldsByFieldId: true,
       }).all();
 
       return records.map((record) => this.transformEmailTemplateRecord(record));
@@ -5158,7 +5159,9 @@ class AirtableService {
     if (!this.ensureEmailTablesInitialized()) return [];
 
     try {
-      const records = await this.emailTemplatesTable!.select({}).all();
+      const records = await this.emailTemplatesTable!.select({
+        returnFieldsByFieldId: true,
+      }).all();
       return records.map((record) => this.transformEmailTemplateRecord(record));
     } catch (error) {
       console.error('Error fetching all email templates:', error);
@@ -5173,8 +5176,14 @@ class AirtableService {
     if (!this.ensureEmailTablesInitialized()) return null;
 
     try {
-      const record = await this.emailTemplatesTable!.find(id);
-      return this.transformEmailTemplateRecord(record);
+      const records = await this.emailTemplatesTable!.select({
+        filterByFormula: `RECORD_ID() = '${id}'`,
+        maxRecords: 1,
+        returnFieldsByFieldId: true,
+      }).firstPage();
+
+      if (records.length === 0) return null;
+      return this.transformEmailTemplateRecord(records[0]);
     } catch (error) {
       console.error('Error fetching email template by ID:', error);
       return null;
@@ -5279,6 +5288,7 @@ class AirtableService {
       const records = await this.emailLogsTable!.select({
         maxRecords: limit,
         sort: [{ field: EMAIL_LOGS_FIELD_IDS.sent_at, direction: 'desc' }],
+        returnFieldsByFieldId: true,
       }).all();
 
       return records.map((record) => this.transformEmailLogRecord(record));
@@ -5306,6 +5316,7 @@ class AirtableService {
       const records = await this.emailLogsTable!.select({
         filterByFormula: formula,
         maxRecords: 1,
+        returnFieldsByFieldId: true,
       }).firstPage();
 
       return records.length > 0;
@@ -5325,6 +5336,7 @@ class AirtableService {
       const records = await this.emailLogsTable!.select({
         filterByFormula: `{${EMAIL_LOGS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
         sort: [{ field: EMAIL_LOGS_FIELD_IDS.sent_at, direction: 'desc' }],
+        returnFieldsByFieldId: true,
       }).all();
 
       return records.map((record) => this.transformEmailLogRecord(record));
