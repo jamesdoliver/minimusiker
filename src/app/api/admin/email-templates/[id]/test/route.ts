@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
  *
  * Body:
  * - email: string (required) - Email address to send test to
- * - customData: object (optional) - Custom template data to override defaults
+ * - eventId: string (optional) - Event record ID to use real event data instead of preview data
  */
 export async function POST(
   request: NextRequest,
@@ -44,8 +44,8 @@ export async function POST(
       );
     }
 
-    // Send test email
-    const result = await sendTestEmail(id, body.email);
+    // Send test email (optionally with real event data)
+    const result = await sendTestEmail(id, body.email, body.eventId);
 
     if (!result.success) {
       return NextResponse.json(

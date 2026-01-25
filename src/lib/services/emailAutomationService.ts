@@ -577,11 +577,15 @@ export function getPreviewTemplateData(): TemplateData {
 
 /**
  * Test send a template to a specific email address
+ * @param templateId - The template record ID
+ * @param testEmail - The email address to send the test to
+ * @param eventId - Optional event ID (e.g., "evt_test_school_minimusiker_...") to use real event data instead of preview data
  */
 export async function sendTestEmail(
   templateId: string,
-  testEmail: string
-): Promise<{ success: boolean; messageId?: string; error?: string; previewData?: TemplateData }> {
+  testEmail: string,
+  eventId?: string
+): Promise<{ success: boolean; messageId?: string; error?: string; previewData?: Partial<TemplateData> }> {
   const airtable = getAirtableService();
 
   try {
@@ -591,9 +595,31 @@ export async function sendTestEmail(
       return { success: false, error: 'Template not found' };
     }
 
-    const previewData = getPreviewTemplateData();
-    const subject = substituteTemplateVariables(template.subject, previewData);
-    const bodyHtml = substituteTemplateVariables(template.bodyHtml, previewData);
+    let templateData: Partial<TemplateData>;
+
+    if (eventId) {
+      // Use real event data - lookup by eventId
+      const event = await airtable.getEventByEventId(eventId);
+      if (!event) {
+        return { success: false, error: 'Event not found' };
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
+      templateData = {
+        school_name: event.school_name || '',
+        event_date: formatDateGerman(event.event_date || ''),
+        event_type: event.event_type || 'Minimusikertag',
+        teacher_portal_link: `${baseUrl}/teacher`,
+        parent_portal_link: `${baseUrl}/parent`,
+        event_link: `${baseUrl}/parent`,
+      };
+    } else {
+      // Use default preview data
+      templateData = getPreviewTemplateData();
+    }
+
+    const subject = substituteTemplateVariables(template.subject, templateData);
+    const bodyHtml = substituteTemplateVariables(template.bodyHtml, templateData);
 
     const result = await sendCampaignEmail(testEmail, subject, bodyHtml);
 
@@ -601,7 +627,7 @@ export async function sendTestEmail(
       success: result.success,
       messageId: result.messageId,
       error: result.error,
-      previewData,
+      previewData: templateData,
     };
   } catch (error) {
     return {
