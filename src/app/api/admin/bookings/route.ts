@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import Airtable from 'airtable';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { SchoolBooking } from '@/lib/types/airtable';
+import { SchoolBooking, TEAMS_REGIONEN_TABLE_ID } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 
@@ -31,7 +32,11 @@ export interface BookingWithDetails {
 /**
  * Transform SchoolBooking (Airtable) to BookingWithDetails (API response)
  */
-function transformToBookingWithDetails(booking: SchoolBooking): BookingWithDetails {
+function transformToBookingWithDetails(
+  booking: SchoolBooking,
+  regionMap: Map<string, string>
+): BookingWithDetails {
+  const regionId = Array.isArray(booking.region) ? booking.region[0] : booking.region;
   return {
     id: booking.id,
     code: booking.simplybookId,
@@ -41,7 +46,7 @@ function transformToBookingWithDetails(booking: SchoolBooking): BookingWithDetai
     phone: booking.schoolPhone,
     address: booking.schoolAddress,
     postalCode: booking.schoolPostalCode,
-    region: Array.isArray(booking.region) ? booking.region[0] : booking.region,
+    region: regionId ? (regionMap.get(regionId) || regionId) : undefined,
     numberOfChildren: booking.estimatedChildren || 0,
     costCategory: booking.schoolSizeCategory || '<150 children',
     bookingDate: booking.startDate || '',
@@ -50,6 +55,35 @@ function transformToBookingWithDetails(booking: SchoolBooking): BookingWithDetai
     endTime: booking.endTime,
     eventName: 'MiniMusiker Day',
   };
+}
+
+/**
+ * Fetch region names for a list of region IDs
+ * Uses batch lookup to minimize API calls
+ */
+async function fetchRegionNames(regionIds: string[]): Promise<Map<string, string>> {
+  const regionMap = new Map<string, string>();
+  const uniqueIds = [...new Set(regionIds.filter(Boolean))];
+
+  if (uniqueIds.length === 0) return regionMap;
+
+  // Fetch all regions in a single batch using OR formula
+  const filterFormula = `OR(${uniqueIds.map(id => `RECORD_ID()='${id}'`).join(',')})`;
+
+  const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID!);
+  const records = await base(TEAMS_REGIONEN_TABLE_ID)
+    .select({ filterByFormula: filterFormula })
+    .all();
+
+  // Note: .select() returns field names, not IDs
+  for (const record of records) {
+    const name = record.fields['Name'] as string | undefined;
+    if (name) {
+      regionMap.set(record.id, name);
+    }
+  }
+
+  return regionMap;
 }
 
 /**
@@ -76,10 +110,16 @@ export async function GET(request: NextRequest) {
     const airtableService = getAirtableService();
     const airtableBookings = await airtableService.getFutureBookings();
 
+    // Extract all region IDs and fetch names
+    const allRegionIds = airtableBookings
+      .map(b => Array.isArray(b.region) ? b.region[0] : b.region)
+      .filter((id): id is string => Boolean(id));
+    const regionMap = await fetchRegionNames(allRegionIds);
+
     // Transform to API format and fetch/create Events with access codes
     const bookingsWithAccessCodes: BookingWithDetails[] = await Promise.all(
       airtableBookings.map(async (booking) => {
-        const baseBooking = transformToBookingWithDetails(booking);
+        const baseBooking = transformToBookingWithDetails(booking, regionMap);
 
         // Fetch the linked Event to get access_code
         try {
