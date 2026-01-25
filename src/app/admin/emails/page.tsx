@@ -75,6 +75,8 @@ export default function AdminEmails() {
   const [dryRunData, setDryRunData] = useState<DryRunData | null>(null);
   const [isDryRunLoading, setIsDryRunLoading] = useState(false);
   const [isDryRunModalOpen, setIsDryRunModalOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -162,6 +164,27 @@ export default function AdminEmails() {
     setIsDryRunModalOpen(false);
     setDryRunData(null);
   }, []);
+
+  const handleDelete = async (templateId: string) => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/admin/email-templates/${templateId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (response.ok) {
+        fetchTemplates();
+      } else {
+        const errorData = await response.json();
+        console.error('Delete failed:', errorData.error);
+      }
+    } catch (err) {
+      console.error('Error deleting template:', err);
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmId(null);
+    }
+  };
 
   useEffect(() => {
     fetchTemplates();
@@ -318,7 +341,7 @@ export default function AdminEmails() {
                   Betreff: {template.subject}
                 </p>
               </Link>
-              <div className="mt-3 pt-3 border-t border-gray-100">
+              <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -328,6 +351,16 @@ export default function AdminEmails() {
                   className="text-xs text-primary hover:text-primary/80 font-medium"
                 >
                   Dry Run
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDeleteConfirmId(template.id);
+                  }}
+                  className="text-xs text-red-600 hover:text-red-800 font-medium"
+                >
+                  Löschen
                 </button>
               </div>
             </div>
@@ -436,6 +469,50 @@ export default function AdminEmails() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <div
+              className="fixed inset-0 bg-black/30"
+              onClick={() => setDeleteConfirmId(null)}
+            />
+            <div className="relative w-full max-w-md transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all">
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Vorlage löschen?
+                </h3>
+                <p className="text-gray-600 mb-2">
+                  Diese Aktion kann nicht rückgängig gemacht werden.
+                </p>
+                <p className="text-sm text-gray-500 mb-4">
+                  Vorlage:{' '}
+                  <span className="font-medium text-gray-700">
+                    {templatesData?.templates.find((t) => t.id === deleteConfirmId)?.name}
+                  </span>
+                </p>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setDeleteConfirmId(null)}
+                    disabled={isDeleting}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    onClick={() => handleDelete(deleteConfirmId)}
+                    disabled={isDeleting}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Löscht...' : 'Löschen'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dry Run Modal */}
       {isDryRunModalOpen && (

@@ -39,7 +39,8 @@ export default function EmailTemplateEdit({ params }: PageProps) {
   const [showPreview, setShowPreview] = useState(false);
 
   const fetchTemplate = useCallback(async () => {
-    if (isNewTemplate) return;
+    // Check directly against id to avoid stale closure issues during navigation
+    if (id === 'new') return;
 
     try {
       setIsLoading(true);
@@ -64,7 +65,7 @@ export default function EmailTemplateEdit({ params }: PageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [id, isNewTemplate]);
+  }, [id]);
 
   useEffect(() => {
     fetchTemplate();
