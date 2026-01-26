@@ -4,6 +4,8 @@ import { useState, Fragment } from 'react';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
 import BookingStatusBadge from './BookingStatusBadge';
 import BookingDetailsBreakdown from './BookingDetailsBreakdown';
+import StatusCircle from './StatusCircle';
+import EventTypeCircles from './EventTypeCircles';
 
 interface BookingsTableProps {
   bookings: BookingWithDetails[];
@@ -95,10 +97,10 @@ export default function BookingsTable({ bookings }: BookingsTableProps) {
                 Children
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Category
+                Status
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
+                Event Type
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Booking Date
@@ -137,10 +139,14 @@ export default function BookingsTable({ bookings }: BookingsTableProps) {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <CategoryBadge category={booking.costCategory} />
+                      <StatusCircle status={booking.eventStatus} />
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <BookingStatusBadge status={booking.status} />
+                      <EventTypeCircles
+                        isPlus={booking.isPlus}
+                        isKita={booking.isKita}
+                        isSchulsong={booking.isSchulsong}
+                      />
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900">{formatDate(booking.bookingDate)}</div>

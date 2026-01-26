@@ -19,7 +19,14 @@ interface EventDetailWithBooking extends SchoolEventDetail {
     status?: string;
     costCategory?: string;
   };
+  // Event status and type fields
+  eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled';
+  isPlus?: boolean;
+  isKita?: boolean;
+  isSchulsong?: boolean;
 }
+
+type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EventBadge from '@/components/admin/EventBadge';
 import StatsPill from '@/components/admin/StatsPill';
@@ -115,6 +122,14 @@ export default function EventDetailPage() {
   const [editedDate, setEditedDate] = useState('');
   const [isUpdatingDate, setIsUpdatingDate] = useState(false);
 
+  // Event status and type state
+  const [eventStatus, setEventStatus] = useState<EventStatus | undefined>(undefined);
+  const [isPlus, setIsPlus] = useState(false);
+  const [isKita, setIsKita] = useState(false);
+  const [isSchulsong, setIsSchulsong] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isUpdatingToggles, setIsUpdatingToggles] = useState<string | null>(null); // Track which toggle is updating
+
   const eventId = params.eventId as string;
 
   useEffect(() => {
@@ -140,6 +155,13 @@ export default function EventDetailPage() {
       if (data.data?.assignedStaffId) {
         setSelectedStaffId(data.data.assignedStaffId);
       }
+      // Set initial event status and type values
+      if (data.data?.eventStatus) {
+        setEventStatus(data.data.eventStatus);
+      }
+      setIsPlus(data.data?.isPlus || false);
+      setIsKita(data.data?.isKita || false);
+      setIsSchulsong(data.data?.isSchulsong || false);
     } catch (err) {
       console.error('Error fetching event detail:', err);
       setError(err instanceof Error ? err.message : 'Failed to load event details');
@@ -227,6 +249,72 @@ export default function EventDetailPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to update date');
     } finally {
       setIsUpdatingDate(false);
+    }
+  };
+
+  // Event status update handler
+  const handleStatusChange = async (newStatus: EventStatus) => {
+    setIsUpdatingStatus(true);
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update status');
+      }
+
+      setEventStatus(newStatus);
+      toast.success(`Status updated to ${newStatus}`);
+    } catch (err) {
+      console.error('Error updating status:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update status');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // Event type toggle handlers
+  const handleToggleChange = async (
+    field: 'is_plus' | 'is_kita' | 'is_schulsong',
+    value: boolean
+  ) => {
+    setIsUpdatingToggles(field);
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update setting');
+      }
+
+      // Update local state
+      if (field === 'is_plus') {
+        setIsPlus(value);
+      } else if (field === 'is_kita') {
+        setIsKita(value);
+      } else if (field === 'is_schulsong') {
+        setIsSchulsong(value);
+      }
+
+      const labelMap = {
+        is_plus: 'Minimusikertag PLUS',
+        is_kita: 'Kita',
+        is_schulsong: 'Schulsong',
+      };
+      toast.success(`${labelMap[field]} ${value ? 'enabled' : 'disabled'}`);
+    } catch (err) {
+      console.error('Error updating toggle:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update setting');
+    } finally {
+      setIsUpdatingToggles(null);
     }
   };
 
@@ -557,6 +645,126 @@ export default function EventDetailPage() {
           {assignError && (
             <p className="mt-2 text-sm text-red-600">{assignError}</p>
           )}
+        </div>
+
+        {/* Event Status & Type Section */}
+        <div className="mt-6 pt-6 border-t border-gray-100">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Status Dropdown */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Event Status</h3>
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-4 h-4 rounded-full ${
+                    eventStatus === 'Confirmed'
+                      ? 'bg-green-500'
+                      : eventStatus === 'On Hold'
+                      ? 'bg-red-500'
+                      : eventStatus === 'Cancelled'
+                      ? 'bg-gray-400'
+                      : 'bg-gray-300'
+                  }`}
+                />
+                <select
+                  value={eventStatus || ''}
+                  onChange={(e) => handleStatusChange(e.target.value as EventStatus)}
+                  disabled={isUpdatingStatus}
+                  className="block w-40 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#94B8B3] focus:border-transparent disabled:opacity-50"
+                >
+                  <option value="">No status</option>
+                  <option value="Confirmed">Confirmed</option>
+                  <option value="On Hold">On Hold</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+                {isUpdatingStatus && <LoadingSpinner size="sm" />}
+              </div>
+            </div>
+
+            {/* Event Type Toggles */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type</h3>
+              <div className="space-y-3">
+                {/* Minimusikertag PLUS Toggle */}
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={isPlus}
+                      onChange={(e) =>
+                        handleToggleChange('is_plus', e.target.checked)
+                      }
+                      disabled={isUpdatingToggles === 'is_plus'}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 peer-disabled:opacity-50 transition-colors" />
+                    <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+                  </div>
+                  <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                    Minimusikertag PLUS
+                  </span>
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                    style={{ backgroundColor: '#93c5fd', color: '#1e40af' }}
+                  >
+                    {isPlus ? '+' : 'M'}
+                  </div>
+                  {isUpdatingToggles === 'is_plus' && (
+                    <LoadingSpinner size="sm" />
+                  )}
+                </label>
+
+                {/* Kita Toggle */}
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={isKita}
+                      onChange={(e) => handleToggleChange('is_kita', e.target.checked)}
+                      disabled={isUpdatingToggles === 'is_kita'}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-violet-500 peer-disabled:opacity-50 transition-colors" />
+                    <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+                  </div>
+                  <span className="text-sm text-gray-700 group-hover:text-gray-900">Kita</span>
+                  {isKita && (
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                      style={{ backgroundColor: '#c4b5fd', color: '#5b21b6' }}
+                    >
+                      K
+                    </div>
+                  )}
+                  {isUpdatingToggles === 'is_kita' && <LoadingSpinner size="sm" />}
+                </label>
+
+                {/* Schulsong Toggle */}
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={isSchulsong}
+                      onChange={(e) => handleToggleChange('is_schulsong', e.target.checked)}
+                      disabled={isUpdatingToggles === 'is_schulsong'}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-orange-500 peer-disabled:opacity-50 transition-colors" />
+                    <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+                  </div>
+                  <span className="text-sm text-gray-700 group-hover:text-gray-900">Schulsong</span>
+                  {isSchulsong && (
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                      style={{ backgroundColor: '#fdba74', color: '#9a3412' }}
+                    >
+                      S
+                    </div>
+                  )}
+                  {isUpdatingToggles === 'is_schulsong' && <LoadingSpinner size="sm" />}
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Registration Progress */}

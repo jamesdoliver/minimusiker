@@ -4576,6 +4576,57 @@ class AirtableService {
   }
 
   /**
+   * Update Event status and event type toggle fields
+   * @param eventRecordId - The Airtable record ID of the event
+   * @param updates - Object containing fields to update
+   */
+  async updateEventFields(
+    eventRecordId: string,
+    updates: {
+      status?: 'Confirmed' | 'On Hold' | 'Cancelled' | null;
+      is_plus?: boolean;
+      is_kita?: boolean;
+      is_schulsong?: boolean;
+    }
+  ): Promise<Event> {
+    try {
+      const updateFields: Record<string, any> = {};
+
+      if (updates.status !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.status] = updates.status;
+      }
+      if (updates.is_plus !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.is_plus] = updates.is_plus;
+      }
+      if (updates.is_kita !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.is_kita] = updates.is_kita;
+      }
+      if (updates.is_schulsong !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.is_schulsong] = updates.is_schulsong;
+      }
+
+      if (Object.keys(updateFields).length === 0) {
+        // No updates provided, just return the current event
+        const event = await this.getEventById(eventRecordId);
+        if (!event) {
+          throw new Error('Event not found');
+        }
+        return event;
+      }
+
+      const updatedRecord = await this.base(EVENTS_TABLE_ID).update(eventRecordId, updateFields);
+      console.log(`Updated Event ${eventRecordId} fields:`, Object.keys(updates));
+
+      return this.transformEventRecord(updatedRecord);
+    } catch (error) {
+      console.error('Error updating Event fields:', error);
+      throw new Error(
+        `Failed to update Event fields: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
    * Get logo URL for an Einrichtung (school)
    * Returns the logo_url field if it exists
    */
@@ -4656,6 +4707,10 @@ class AirtableService {
           EVENTS_FIELD_IDS.legacy_booking_id,
           EVENTS_FIELD_IDS.simplybook_booking,
           EVENTS_FIELD_IDS.access_code,
+          EVENTS_FIELD_IDS.status,
+          EVENTS_FIELD_IDS.is_plus,
+          EVENTS_FIELD_IDS.is_kita,
+          EVENTS_FIELD_IDS.is_schulsong,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -4697,6 +4752,11 @@ class AirtableService {
       legacy_booking_id: record.get('legacy_booking_id') as string | undefined,
       simplybook_booking: record.get('simplybook_booking') as string[] | undefined,
       access_code: record.get('access_code') as number | undefined,
+      // Status & Event Type fields for admin booking view
+      status: record.get('status') as Event['status'] | undefined,
+      is_plus: record.get('is_plus') as boolean | undefined,
+      is_kita: record.get('is_kita') as boolean | undefined,
+      is_schulsong: record.get('is_schulsong') as boolean | undefined,
     };
   }
 

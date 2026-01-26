@@ -95,9 +95,54 @@ export async function GET(
       };
     }
 
+    // Fetch Event record to get status and type fields
+    const airtableService = getAirtableService();
+    let eventStatusAndType: {
+      eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled';
+      isPlus?: boolean;
+      isKita?: boolean;
+      isSchulsong?: boolean;
+    } = {};
+
+    try {
+      // Try to find Event record by event_id or legacy_booking_id
+      let eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+
+      // Fallback: resolve via SimplyBook booking link
+      if (!eventRecordId) {
+        const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+        if (booking) {
+          const linkedEvent = await airtableService.getEventBySchoolBookingId(booking.id);
+          if (linkedEvent) {
+            eventRecordId = linkedEvent.id;
+          }
+        }
+      }
+
+      if (eventRecordId) {
+        const eventRecord = await airtableService.getEventById(eventRecordId);
+        if (eventRecord) {
+          // Determine if this is a Kita event based on event_type or is_kita flag
+          const isKitaFromEventType = eventRecord.event_type === 'Minimusikertag Kita';
+
+          eventStatusAndType = {
+            eventStatus: eventRecord.status,
+            isPlus: eventRecord.is_plus,
+            isKita: eventRecord.is_kita || isKitaFromEventType,
+            isSchulsong: eventRecord.is_schulsong,
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch Event status/type fields:', err);
+    }
+
     return NextResponse.json({
       success: true,
-      data: eventDetail,
+      data: {
+        ...eventDetail,
+        ...eventStatusAndType,
+      },
     });
   } catch (error) {
     console.error('Error fetching event detail:', error);
@@ -113,7 +158,7 @@ export async function GET(
 
 /**
  * PATCH /api/admin/events/[eventId]
- * Update event details (currently supports event_date)
+ * Update event details (supports event_date, status, and event type toggles)
  */
 export async function PATCH(
   request: NextRequest,
@@ -132,21 +177,41 @@ export async function PATCH(
     const eventId = decodeURIComponent(params.eventId);
     const body = await request.json();
 
-    // Validate request body
-    if (!body.event_date) {
+    // Check if any valid field is provided
+    const hasDateUpdate = body.event_date !== undefined;
+    const hasStatusUpdate = body.status !== undefined;
+    const hasEventTypeUpdates =
+      body.is_plus !== undefined ||
+      body.is_kita !== undefined ||
+      body.is_schulsong !== undefined;
+
+    if (!hasDateUpdate && !hasStatusUpdate && !hasEventTypeUpdates) {
       return NextResponse.json(
-        { success: false, error: 'event_date is required' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, is_plus, is_kita, is_schulsong' },
         { status: 400 }
       );
     }
 
-    // Validate date format (YYYY-MM-DD)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(body.event_date)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid date format. Expected YYYY-MM-DD' },
-        { status: 400 }
-      );
+    // Validate date format if provided
+    if (hasDateUpdate) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(body.event_date)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid date format. Expected YYYY-MM-DD' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate status if provided (empty string clears the status)
+    if (hasStatusUpdate && body.status !== '') {
+      const validStatuses = ['Confirmed', 'On Hold', 'Cancelled'];
+      if (!validStatuses.includes(body.status)) {
+        return NextResponse.json(
+          { success: false, error: `Invalid status. Expected one of: ${validStatuses.join(', ')} (or empty string to clear)` },
+          { status: 400 }
+        );
+      }
     }
 
     const airtableService = getAirtableService();
@@ -179,48 +244,78 @@ export async function PATCH(
       );
     }
 
-    // Get old date for activity logging
+    // Get existing event for activity logging
     const existingEvent = await airtableService.getEventById(eventRecordId);
-    const oldDate = existingEvent?.event_date || 'Unknown';
 
-    // Update the event date
-    const result = await airtableService.updateEventDate(eventRecordId, body.event_date);
-
-    // Log activity (fire-and-forget)
-    getActivityService().logActivity({
-      eventRecordId,
-      activityType: 'date_changed',
-      description: ActivityService.generateDescription('date_changed', {
-        oldDate,
-        newDate: body.event_date,
-      }),
-      actorEmail: admin.email,
-      actorType: 'admin',
-      metadata: { oldDate, newDate: body.event_date },
-    });
-
-    // Recalculate task deadlines for pending tasks
+    let dateResult: { message: string; bookingUpdated: boolean } | null = null;
     let tasksRecalculated = 0;
-    if (body.recalculate_tasks !== false) {
-      // Default to recalculating unless explicitly disabled
-      try {
-        const taskService = getTaskService();
-        const taskResult = await taskService.recalculateDeadlinesForEvent(
-          eventRecordId,
-          body.event_date
-        );
-        tasksRecalculated = taskResult.updatedCount;
-      } catch (taskError) {
-        console.error('Warning: Could not recalculate task deadlines:', taskError);
-        // Don't fail the request - the main update succeeded
+
+    // Handle date update
+    if (hasDateUpdate) {
+      const oldDate = existingEvent?.event_date || 'Unknown';
+      dateResult = await airtableService.updateEventDate(eventRecordId, body.event_date);
+
+      // Log activity for date change
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'date_changed',
+        description: ActivityService.generateDescription('date_changed', {
+          oldDate,
+          newDate: body.event_date,
+        }),
+        actorEmail: admin.email,
+        actorType: 'admin',
+        metadata: { oldDate, newDate: body.event_date },
+      });
+
+      // Recalculate task deadlines for pending tasks
+      if (body.recalculate_tasks !== false) {
+        try {
+          const taskService = getTaskService();
+          const taskResult = await taskService.recalculateDeadlinesForEvent(
+            eventRecordId,
+            body.event_date
+          );
+          tasksRecalculated = taskResult.updatedCount;
+        } catch (taskError) {
+          console.error('Warning: Could not recalculate task deadlines:', taskError);
+        }
       }
+    }
+
+    // Handle status and event type toggle updates
+    let updatedEvent = existingEvent;
+    if (hasStatusUpdate || hasEventTypeUpdates) {
+      const fieldUpdates: {
+        status?: 'Confirmed' | 'On Hold' | 'Cancelled' | null;
+        is_plus?: boolean;
+        is_kita?: boolean;
+        is_schulsong?: boolean;
+      } = {};
+
+      if (hasStatusUpdate) {
+        // Empty string means clear the status
+        fieldUpdates.status = body.status === '' ? null : body.status;
+      }
+      if (body.is_plus !== undefined) {
+        fieldUpdates.is_plus = body.is_plus;
+      }
+      if (body.is_kita !== undefined) {
+        fieldUpdates.is_kita = body.is_kita;
+      }
+      if (body.is_schulsong !== undefined) {
+        fieldUpdates.is_schulsong = body.is_schulsong;
+      }
+
+      updatedEvent = await airtableService.updateEventFields(eventRecordId, fieldUpdates);
     }
 
     return NextResponse.json({
       success: true,
-      message: result.message,
-      bookingUpdated: result.bookingUpdated,
+      message: dateResult?.message || 'Event updated successfully',
+      bookingUpdated: dateResult?.bookingUpdated || false,
       tasksRecalculated,
+      data: updatedEvent,
     });
   } catch (error) {
     console.error('Error updating event:', error);

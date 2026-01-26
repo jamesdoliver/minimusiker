@@ -27,6 +27,12 @@ export interface BookingWithDetails {
   eventName?: string;
   accessCode?: number;         // From linked Event
   shortUrl?: string;           // Computed: "minimusiker.app/e/{accessCode}"
+  // Event status and type fields for admin booking view
+  eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled';  // Status traffic light
+  isPlus?: boolean;               // Shows '+' instead of 'M'
+  isKita?: boolean;               // Shows 'K' circle (or derived from event_type)
+  isSchulsong?: boolean;          // Shows 'S' circle
+  eventType?: string;             // Original event_type for backwards compatibility
 }
 
 /**
@@ -116,12 +122,12 @@ export async function GET(request: NextRequest) {
       .filter((id): id is string => Boolean(id));
     const regionMap = await fetchRegionNames(allRegionIds);
 
-    // Transform to API format and fetch/create Events with access codes
+    // Transform to API format and fetch/create Events with access codes and status fields
     const bookingsWithAccessCodes: BookingWithDetails[] = await Promise.all(
       airtableBookings.map(async (booking) => {
         const baseBooking = transformToBookingWithDetails(booking, regionMap);
 
-        // Fetch the linked Event to get access_code
+        // Fetch the linked Event to get access_code and status fields
         try {
           let event = await airtableService.getEventBySchoolBookingId(booking.id);
 
@@ -140,11 +146,20 @@ export async function GET(request: NextRequest) {
             );
           }
 
-          if (event?.access_code) {
+          if (event) {
+            // Determine if this is a Kita event based on event_type or is_kita flag
+            const isKitaFromEventType = event.event_type === 'Minimusikertag Kita';
+
             return {
               ...baseBooking,
               accessCode: event.access_code,
-              shortUrl: `minimusiker.app/e/${event.access_code}`,
+              shortUrl: event.access_code ? `minimusiker.app/e/${event.access_code}` : undefined,
+              // Event status and type fields
+              eventStatus: event.status,
+              isPlus: event.is_plus,
+              isKita: event.is_kita || isKitaFromEventType, // Support legacy event_type
+              isSchulsong: event.is_schulsong,
+              eventType: event.event_type,
             };
           }
         } catch (error) {

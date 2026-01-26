@@ -479,6 +479,9 @@ export interface SchoolBooking {
 // Type for portal status values
 export type PortalStatus = 'pending_setup' | 'classes_added' | 'ready';
 
+// Type for event status values (admin booking view)
+export type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled';
+
 // Einrichtung (School/Institution) record
 export interface Einrichtung {
   id: string;
@@ -523,6 +526,11 @@ export const EVENTS_FIELD_IDS = {
   school_phone: 'fldLPXOAWpGyYXoIT',    // School phone (synced from booking)
   teachers: 'fldivuUPiW6Q09vce',        // Linked record → Teachers
   classes: 'fld08ht43r8rknIPI',         // Linked record → Classes (reverse lookup from Classes.event_id)
+  // Status & Event Type fields for admin booking view
+  status: 'fld636QqQuc5Uwyec',              // Single select: Confirmed, On Hold, Cancelled
+  is_plus: 'fldMFQPU0v0SEmGqJ',             // Checkbox - shows '+' instead of 'M' in event type circles
+  is_kita: 'flddRbQV0qoqR3KIr',             // Checkbox - shows 'K' circle
+  is_schulsong: 'fld2ml1yiecD1a5ms',         // Checkbox - shows 'S' circle
 } as const;
 
 // Classes Table - 1 row per class
@@ -648,6 +656,11 @@ export interface Event {
   school_address?: string;
   school_phone?: string;
   teachers?: string[];                  // Linked record IDs → Teachers
+  // Status & Event Type fields for admin booking view
+  status?: EventStatus;                 // Confirmed, On Hold, or Cancelled
+  is_plus?: boolean;                    // Shows '+' instead of 'M' in event type circles
+  is_kita?: boolean;                    // Shows 'K' circle (or derived from event_type='Minimusikertag Kita')
+  is_schulsong?: boolean;               // Shows 'S' circle
 }
 
 /**
