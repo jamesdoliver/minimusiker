@@ -26,6 +26,7 @@ const PdfCanvasInner = dynamic(
 
 interface PdfCanvasProps {
   templateType: PrintableItemType;
+  pdfDimensions: { width: number; height: number };
   onLoad?: (dimensions: { width: number; height: number; scale: number }) => void;
   onError?: (error: string) => void;
   className?: string;
@@ -46,6 +47,7 @@ interface CanvasState {
  */
 export default function PdfCanvas({
   templateType,
+  pdfDimensions,
   onLoad,
   onError,
   className = '',
@@ -219,6 +221,7 @@ export default function PdfCanvas({
       <PdfCanvasInner
         pdfUrl={state.pdfUrl!}
         containerWidth={containerWidth}
+        pdfDimensions={pdfDimensions}
         onLoad={onLoad}
         onError={handleInnerError}
       />

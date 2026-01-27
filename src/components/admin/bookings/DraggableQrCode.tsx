@@ -8,6 +8,7 @@ interface DraggableQrCodeProps {
   size: number;
   onPositionChange: (position: { x: number; y: number }) => void;
   onSizeChange: (size: number) => void;
+  onResize?: (position: { x: number; y: number }, size: number) => void;
   canvasWidth: number;
   canvasHeight: number;
   qrUrl?: string;
@@ -26,6 +27,7 @@ export default function DraggableQrCode({
   size,
   onPositionChange,
   onSizeChange,
+  onResize,
   canvasWidth,
   canvasHeight,
   qrUrl,
@@ -44,14 +46,19 @@ export default function DraggableQrCode({
       _direction: unknown,
       ref: HTMLElement,
       _delta: unknown,
-      position: { x: number; y: number }
+      newPosition: { x: number; y: number }
     ) => {
       // Keep square aspect ratio - use the smaller dimension
       const newSize = Math.min(ref.offsetWidth, ref.offsetHeight);
-      onSizeChange(newSize);
-      onPositionChange(position);
+      // Use combined callback to avoid stale closure race condition
+      if (onResize) {
+        onResize(newPosition, newSize);
+      } else {
+        onSizeChange(newSize);
+        onPositionChange(newPosition);
+      }
     },
-    [onSizeChange, onPositionChange]
+    [onSizeChange, onPositionChange, onResize]
   );
 
   return (
@@ -114,7 +121,7 @@ export default function DraggableQrCode({
         <div className="relative w-full h-full p-2">
           <QrPlaceholder />
           {qrUrl && (
-            <div className="absolute bottom-0 left-0 right-0 text-center bg-white/90 py-0.5 text-[8px] text-gray-500 truncate px-1">
+            <div className="absolute -bottom-4 left-0 right-0 text-center bg-white/90 py-0.5 text-[8px] text-gray-500 truncate px-1">
               {qrUrl}
             </div>
           )}

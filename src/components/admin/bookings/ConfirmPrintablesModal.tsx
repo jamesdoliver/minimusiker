@@ -49,10 +49,10 @@ interface GenerationResult {
 }
 
 // Initialize empty editor states for all items
-function initializeAllItemsEditorState(schoolName: string): Record<PrintableItemType, PrintableEditorState> {
+function initializeAllItemsEditorState(schoolName: string, eventDate?: string): Record<PrintableItemType, PrintableEditorState> {
   const result: Record<PrintableItemType, PrintableEditorState> = {} as Record<PrintableItemType, PrintableEditorState>;
   PRINTABLE_ITEMS.forEach((item) => {
-    result[item.type] = initializeEditorState(item.type, schoolName, 1);
+    result[item.type] = initializeEditorState(item.type, schoolName, 1, eventDate);
   });
   return result;
 }
@@ -67,7 +67,7 @@ export default function ConfirmPrintablesModal({
 
   // Editor state for each item type
   const [itemEditorStates, setItemEditorStates] = useState<Record<PrintableItemType, PrintableEditorState>>(() =>
-    initializeAllItemsEditorState(booking.schoolName)
+    initializeAllItemsEditorState(booking.schoolName, booking.bookingDate)
   );
 
   // Track which items have been confirmed
@@ -94,7 +94,7 @@ export default function ConfirmPrintablesModal({
   useEffect(() => {
     if (isOpen) {
       setCurrentStep(0);
-      setItemEditorStates(initializeAllItemsEditorState(booking.schoolName));
+      setItemEditorStates(initializeAllItemsEditorState(booking.schoolName, booking.bookingDate));
       setConfirmedItems(new Set());
       setIsGenerating(false);
       setGenerationError(null);
@@ -501,11 +501,12 @@ export default function ConfirmPrintablesModal({
         )}
 
         {/* Main content - PrintableEditor */}
-        <div className="flex-1 overflow-auto min-h-0">
+        <div className="flex-1 overflow-hidden min-h-0">
           <PrintableEditor
             itemConfig={currentItem}
             schoolName={booking.schoolName}
             accessCode={booking.accessCode}
+            eventDate={booking.bookingDate}
             editorState={currentEditorState}
             onEditorStateChange={updateCurrentItemEditorState}
           />

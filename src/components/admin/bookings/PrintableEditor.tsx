@@ -15,12 +15,17 @@ import {
   createTextElement,
   getFontFamilyForType,
   TSHIRT_HOODIE_TEXT_DEFAULTS,
+  FLYER_TEXT_DEFAULTS,
+  TEXT_ELEMENT_STYLES,
+  generateTextElementId,
 } from '@/lib/config/printableTextConfig';
+import type { FlyerFrontType } from '@/lib/config/printableTextConfig';
 
 interface PrintableEditorProps {
   itemConfig: PrintableTextConfig;
   schoolName: string;
   accessCode?: string | number;
+  eventDate?: string;
   editorState: PrintableEditorState;
   onEditorStateChange: (state: PrintableEditorState) => void;
 }
@@ -36,10 +41,13 @@ interface PrintableEditorProps {
  *
  * All coordinates stored in CSS pixels during editing - converted to PDF at generation time.
  */
+const FLYER_FRONT_TYPES: FlyerFrontType[] = ['flyer1', 'flyer2', 'flyer3'];
+
 export default function PrintableEditor({
   itemConfig,
-  schoolName: _schoolName, // Used for initialization, not directly in render
+  schoolName,
   accessCode,
+  eventDate,
   editorState,
   onEditorStateChange,
 }: PrintableEditorProps) {
@@ -171,14 +179,59 @@ export default function PrintableEditor({
     [editorState, onEditorStateChange]
   );
 
-  // Handle reset to default (clear all text elements for generic, reset position for logo)
+  // Handle QR resize - combined position + size update to avoid stale closure race
+  const handleQrResize = useCallback(
+    (position: { x: number; y: number }, size: number) => {
+      if (!editorState.qrPosition) return;
+      onEditorStateChange({
+        ...editorState,
+        qrPosition: { x: position.x, y: position.y, size },
+      });
+    },
+    [editorState, onEditorStateChange]
+  );
+
+  // Handle reset to default (re-create flyer defaults for flyer fronts, clear all for others)
   const handleResetToDefault = useCallback(() => {
-    onEditorStateChange({
-      ...editorState,
-      textElements: [],
-    });
+    const type = itemConfig.type;
+    if (FLYER_FRONT_TYPES.includes(type as FlyerFrontType) && canvasDimensions) {
+      const flyerType = type as FlyerFrontType;
+      const flyerDefaults = FLYER_TEXT_DEFAULTS[flyerType];
+      const styles = TEXT_ELEMENT_STYLES[flyerType];
+      const scale = canvasDimensions.scale;
+      const elementTypes: ('headline' | 'subline' | 'calendar')[] = ['headline', 'subline', 'calendar'];
+
+      const newElements: TextElement[] = elementTypes.map((elType) => {
+        const def = flyerDefaults[elType];
+        return {
+          id: generateTextElementId(),
+          type: elType as TextElementType,
+          text: def.defaultText(schoolName, eventDate),
+          position: {
+            x: def.position.x * scale,
+            y: def.position.y * scale,
+          },
+          size: {
+            width: def.size.width * scale,
+            height: def.size.height * scale,
+          },
+          fontSize: def.fontSize * scale,
+          color: styles[elType].color,
+        };
+      });
+
+      onEditorStateChange({
+        ...editorState,
+        textElements: newElements,
+      });
+    } else {
+      onEditorStateChange({
+        ...editorState,
+        textElements: [],
+      });
+    }
     setSelectedElementId(null);
-  }, [editorState, onEditorStateChange]);
+  }, [editorState, onEditorStateChange, itemConfig.type, canvasDimensions, schoolName, eventDate]);
 
   // Handle reset position for logo type (snap back to default position)
   const handleResetLogoPosition = useCallback(() => {
@@ -257,7 +310,7 @@ export default function PrintableEditor({
       </div>
 
       {/* Right panel - Canvas with overlays */}
-      <div className="flex-1 overflow-auto p-4 bg-gray-50 flex items-start justify-center">
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50 flex items-start justify-center">
         <div className="relative w-full max-w-2xl">
           {/* Canvas background - Logo or PDF */}
           {isLogoType ? (
@@ -268,6 +321,7 @@ export default function PrintableEditor({
           ) : (
             <PdfCanvas
               templateType={itemConfig.type}
+              pdfDimensions={itemConfig.pdfDimensions}
               onLoad={handleCanvasLoad}
               onError={handleCanvasError}
             />
@@ -309,6 +363,7 @@ export default function PrintableEditor({
                   size={editorState.qrPosition.size}
                   onPositionChange={handleQrPositionChange}
                   onSizeChange={handleQrSizeChange}
+                  onResize={handleQrResize}
                   canvasWidth={canvasDimensions.width}
                   canvasHeight={canvasDimensions.height}
                   qrUrl={qrUrl}

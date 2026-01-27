@@ -470,12 +470,14 @@ export function createTextElement(
 /**
  * Initialize editor state for a given item type
  * For t-shirt/hoodie: pre-populates with school name text element
+ * For flyer fronts: pre-populates with headline, subline, and calendar text elements
  * For other types: starts empty - admin adds text elements as needed
  */
 export function initializeEditorState(
   type: PrintableItemType,
   schoolName: string,
-  scale: number = 1
+  scale: number = 1,
+  eventDate?: string
 ): PrintableEditorState {
   const config = getPrintableConfig(type);
   if (!config) {
@@ -504,6 +506,32 @@ export function initializeEditorState(
       fontSize: TSHIRT_HOODIE_TEXT_DEFAULTS.fontSize * scale,
       color: TSHIRT_HOODIE_TEXT_DEFAULTS.color,
     }];
+  }
+
+  // For flyer fronts, pre-create headline, subline, and calendar text elements
+  if (isFlyerFront(type)) {
+    const flyerDefaults = FLYER_TEXT_DEFAULTS[type];
+    const styles = TEXT_ELEMENT_STYLES[type];
+    const elementTypes: ('headline' | 'subline' | 'calendar')[] = ['headline', 'subline', 'calendar'];
+
+    result.textElements = elementTypes.map((elType) => {
+      const def = flyerDefaults[elType];
+      return {
+        id: generateTextElementId(),
+        type: elType as TextElementType,
+        text: def.defaultText(schoolName, eventDate),
+        position: {
+          x: def.position.x * scale,
+          y: def.position.y * scale,
+        },
+        size: {
+          width: def.size.width * scale,
+          height: def.size.height * scale,
+        },
+        fontSize: def.fontSize * scale,
+        color: styles[elType].color,
+      };
+    });
   }
 
   // For back items with QR codes, set up QR position (in CSS pixels)
@@ -562,6 +590,43 @@ export function cssToPdfSize(
     width: cssWidth / scale,
     height: cssHeight / scale,
   };
+}
+
+/**
+ * Flyer front text element defaults (position/size in PDF points)
+ * Pre-populated when the editor initializes for flyer front types
+ */
+export type FlyerFrontType = 'flyer1' | 'flyer2' | 'flyer3';
+
+interface FlyerTextElementDefault {
+  position: { x: number; y: number }; // PDF points (CSS top-left origin)
+  size: { width: number; height: number }; // PDF points
+  fontSize: number; // PDF points
+  defaultText: (schoolName: string, eventDate?: string) => string;
+}
+
+export const FLYER_TEXT_DEFAULTS: Record<FlyerFrontType, Record<'headline' | 'subline' | 'calendar', FlyerTextElementDefault>> = {
+  flyer1: {
+    headline: { position: { x: 300, y: 30 }, size: { width: 260, height: 50 }, fontSize: 35, defaultText: (schoolName) => schoolName },
+    subline:  { position: { x: 300, y: 90 }, size: { width: 260, height: 35 }, fontSize: 18, defaultText: () => 'Minimusikertag' },
+    calendar: { position: { x: 300, y: 135 }, size: { width: 260, height: 35 }, fontSize: 18, defaultText: (_, eventDate) => eventDate || '' },
+  },
+  flyer2: {
+    headline: { position: { x: 300, y: 30 }, size: { width: 260, height: 50 }, fontSize: 35, defaultText: (schoolName) => schoolName },
+    subline:  { position: { x: 300, y: 90 }, size: { width: 260, height: 35 }, fontSize: 18, defaultText: () => 'Minimusikertag' },
+    calendar: { position: { x: 300, y: 135 }, size: { width: 260, height: 35 }, fontSize: 18, defaultText: (_, eventDate) => eventDate || '' },
+  },
+  flyer3: {
+    headline: { position: { x: 60, y: 50 }, size: { width: 300, height: 60 }, fontSize: 35, defaultText: (schoolName) => schoolName },
+    subline:  { position: { x: 60, y: 120 }, size: { width: 300, height: 40 }, fontSize: 18, defaultText: () => 'Minimusikertag' },
+    calendar: { position: { x: 60, y: 170 }, size: { width: 300, height: 40 }, fontSize: 18, defaultText: (_, eventDate) => eventDate || '' },
+  },
+};
+
+const FLYER_FRONT_TYPES: FlyerFrontType[] = ['flyer1', 'flyer2', 'flyer3'];
+
+function isFlyerFront(type: PrintableItemType): type is FlyerFrontType {
+  return FLYER_FRONT_TYPES.includes(type as FlyerFrontType);
 }
 
 /**

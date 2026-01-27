@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 interface PdfCanvasInnerProps {
   pdfUrl: string;
   containerWidth: number;
+  pdfDimensions: { width: number; height: number };
   onLoad?: (dimensions: { width: number; height: number; scale: number }) => void;
   onError?: (error: string) => void;
 }
@@ -16,6 +17,7 @@ interface PdfCanvasInnerProps {
 export default function PdfCanvasInner({
   pdfUrl,
   containerWidth,
+  pdfDimensions,
   onLoad,
   onError,
 }: PdfCanvasInnerProps) {
@@ -23,10 +25,9 @@ export default function PdfCanvasInner({
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Calculate height based on A4 aspect ratio as default
-  // The actual PDF dimensions will come from the parent component's config
-  const aspectRatio = 1.414; // A4 ratio (297/210)
-  const height = containerWidth * aspectRatio;
+  // Calculate height from actual PDF dimensions
+  const scale = containerWidth / pdfDimensions.width;
+  const height = pdfDimensions.height * scale;
 
   useEffect(() => {
     // Reset state when URL changes
@@ -36,9 +37,8 @@ export default function PdfCanvasInner({
 
   const handleLoad = () => {
     setLoaded(true);
-    // Since we can't get exact dimensions from the native viewer,
-    // use standard A4 dimensions as approximation
-    // The parent component should provide actual PDF dimensions from config
+    // Report scale=1 so CSS positions (initialized at scale=1) map directly to PDF points
+    // during generation. The real scale is only used for computing correct display height.
     onLoad?.({
       width: containerWidth,
       height: height,
