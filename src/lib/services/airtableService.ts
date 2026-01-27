@@ -4081,6 +4081,9 @@ class AirtableService {
       today.setHours(0, 0, 0, 0);
 
       const futureRecords = allRecords.filter(record => {
+        const status = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status] as string | undefined;
+        if (status === 'deleted') return false;
+
         const startDateStr = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.start_date] as string | undefined;
         if (!startDateStr) return false;
 
@@ -4639,6 +4642,44 @@ class AirtableService {
         `Failed to update Event fields: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
+  }
+
+  /**
+   * Soft-delete an event by setting Event status to "Deleted" and SchoolBooking status to "deleted"
+   */
+  async softDeleteEvent(eventRecordId: string): Promise<{
+    eventId: string;
+    schoolName: string;
+    bookingRecordId?: string;
+  }> {
+    // 1. Fetch Event record to get linked booking
+    const eventRecord = await this.getEventById(eventRecordId);
+    if (!eventRecord) {
+      throw new Error('Event not found');
+    }
+    const eventId = eventRecord.event_id || '';
+    const schoolName = eventRecord.school_name || '';
+    const linkedBookingIds = eventRecord.simplybook_booking;
+
+    // 2. Update Event status to "Deleted"
+    await this.base(EVENTS_TABLE_ID).update(eventRecordId, {
+      [EVENTS_FIELD_IDS.status]: 'Deleted',
+    });
+
+    // 3. Update linked SchoolBooking status to "deleted"
+    let bookingRecordId: string | undefined;
+    if (linkedBookingIds?.length) {
+      bookingRecordId = linkedBookingIds[0];
+      try {
+        await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecordId, {
+          [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status]: 'deleted',
+        });
+      } catch (err) {
+        console.error('Warning: Could not soft-delete linked SchoolBooking:', err);
+      }
+    }
+
+    return { eventId, schoolName, bookingRecordId };
   }
 
   /**

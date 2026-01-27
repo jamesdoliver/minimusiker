@@ -20,13 +20,13 @@ interface EventDetailWithBooking extends SchoolEventDetail {
     costCategory?: string;
   };
   // Event status and type fields
-  eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled';
+  eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted';
   isPlus?: boolean;
   isKita?: boolean;
   isSchulsong?: boolean;
 }
 
-type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled';
+type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EventBadge from '@/components/admin/EventBadge';
 import StatsPill from '@/components/admin/StatsPill';

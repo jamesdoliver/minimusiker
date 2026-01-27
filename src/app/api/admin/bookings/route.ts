@@ -21,14 +21,14 @@ export interface BookingWithDetails {
   numberOfChildren: number;
   costCategory: '>150 children' | '<150 children';
   bookingDate: string;
-  status: 'confirmed' | 'pending' | 'cancelled' | 'hold' | 'no_region';
+  status: 'confirmed' | 'pending' | 'cancelled' | 'hold' | 'no_region' | 'deleted';
   startTime?: string;
   endTime?: string;
   eventName?: string;
   accessCode?: number;         // From linked Event
   shortUrl?: string;           // Computed: "minimusiker.app/e/{accessCode}"
   // Event status and type fields for admin booking view
-  eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled';  // Status traffic light
+  eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted';  // Status traffic light
   isPlus?: boolean;               // Shows '+' instead of 'M'
   isKita?: boolean;               // Shows 'K' circle (or derived from event_type)
   isSchulsong?: boolean;          // Shows 'S' circle

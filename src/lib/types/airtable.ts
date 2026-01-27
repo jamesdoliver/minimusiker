@@ -459,7 +459,7 @@ export interface SchoolBooking {
   city?: string;
   estimatedChildren?: number;
   schoolSizeCategory?: '>150 children' | '<150 children';
-  simplybookStatus: 'confirmed' | 'hold' | 'no_region';
+  simplybookStatus: 'confirmed' | 'hold' | 'no_region' | 'deleted';
   parentJourneyBookings?: string[];  // Linked record IDs
   einrichtung?: string[];            // Linked record IDs
   mainContactPerson?: string[];      // Linked record IDs (Personen/Staff)
@@ -480,7 +480,7 @@ export interface SchoolBooking {
 export type PortalStatus = 'pending_setup' | 'classes_added' | 'ready';
 
 // Type for event status values (admin booking view)
-export type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled';
+export type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted';
 
 // Einrichtung (School/Institution) record
 export interface Einrichtung {
@@ -878,7 +878,8 @@ export type EventActivityType =
   | 'song_updated'
   | 'song_deleted'
   | 'tasks_generated'
-  | 'booking_status_changed';
+  | 'booking_status_changed'
+  | 'event_deleted';
 
 export type ActorType = 'teacher' | 'admin' | 'system';
 
