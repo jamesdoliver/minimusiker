@@ -37,10 +37,12 @@ export default function PdfCanvasInner({
 
   const handleLoad = () => {
     setLoaded(true);
+    // Report scale=1 so CSS positions (initialized at scale=1) map directly to PDF points
+    // during generation. The real scale is only used for computing correct display height.
     onLoad?.({
       width: containerWidth,
       height: height,
-      scale: scale,
+      scale: 1,
     });
   };
 
