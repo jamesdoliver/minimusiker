@@ -3,14 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import { EmailTemplate, EmailLog } from '@/lib/types/email-automation';
+import { EmailTemplate, EmailLog, Audience } from '@/lib/types/email-automation';
 
 interface TemplatesData {
   templates: EmailTemplate[];
   grouped: {
     teacher: EmailTemplate[];
     parent: EmailTemplate[];
-    both: EmailTemplate[];
+    'non-buyer': EmailTemplate[];
   };
   total: number;
 }
@@ -63,18 +63,20 @@ interface DryRunData {
     id: string;
     name: string;
     triggerDays: number;
-    audience: 'teacher' | 'parent' | 'both';
+    audience: Audience;
   };
   matchingEvents: DryRunEventMatch[];
   recipients: {
     teachers: DryRunTeacherRecipient[];
     parents: DryRunParentRecipient[];
+    nonBuyers: DryRunParentRecipient[];
   };
   summary: {
     totalEvents: number;
     totalRecipients: number;
     teacherCount: number;
     parentCount: number;
+    nonBuyerCount: number;
   };
 }
 
@@ -415,11 +417,20 @@ export default function AdminEmails() {
                   ? 'bg-primary'
                   : 'bg-amber-500';
 
-                const audienceBadge = template.audience === 'teacher'
-                  ? { label: 'Lehrer', cls: 'bg-purple-100 text-purple-700' }
-                  : template.audience === 'parent'
-                  ? { label: 'Eltern', cls: 'bg-orange-100 text-orange-700' }
-                  : { label: 'Beide', cls: 'bg-blue-100 text-blue-700' };
+                // Build audience badges
+                const audienceBadges: { label: string; cls: string }[] = [];
+                const aud = template.audience;
+                const hasTeacher = aud.includes('teacher');
+                const hasParent = aud.includes('parent');
+                const hasNonBuyer = aud.includes('non-buyer');
+
+                if (hasTeacher && hasParent && !hasNonBuyer) {
+                  audienceBadges.push({ label: 'Beide', cls: 'bg-blue-100 text-blue-700' });
+                } else {
+                  if (hasTeacher) audienceBadges.push({ label: 'Lehrer', cls: 'bg-purple-100 text-purple-700' });
+                  if (hasParent) audienceBadges.push({ label: 'Eltern', cls: 'bg-orange-100 text-orange-700' });
+                }
+                if (hasNonBuyer) audienceBadges.push({ label: 'Non-Buyers', cls: 'bg-amber-100 text-amber-700' });
 
                 items.push(
                   <div key={template.id} className="relative flex items-start py-2 group">
@@ -442,9 +453,11 @@ export default function AdminEmails() {
                               <h3 className="text-sm font-medium text-gray-900">
                                 {template.name}
                               </h3>
-                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${audienceBadge.cls}`}>
-                                {audienceBadge.label}
-                              </span>
+                              {audienceBadges.map((badge) => (
+                                <span key={badge.label} className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${badge.cls}`}>
+                                  {badge.label}
+                                </span>
+                              ))}
                             </div>
                             <p className="mt-1 text-xs text-gray-600 truncate">
                               Betreff: {template.subject}
@@ -804,14 +817,14 @@ export default function AdminEmails() {
                         Trigger: {formatTriggerDays(dryRunData.template.triggerDays)}
                         {' | '}
                         Zielgruppe:{' '}
-                        {dryRunData.template.audience === 'teacher' && 'Lehrer'}
-                        {dryRunData.template.audience === 'parent' && 'Eltern'}
-                        {dryRunData.template.audience === 'both' && 'Lehrer & Eltern'}
+                        {dryRunData.template.audience.map(a =>
+                          a === 'teacher' ? 'Lehrer' : a === 'parent' ? 'Eltern' : 'Non-Buyers'
+                        ).join(', ')}
                       </p>
                     </div>
 
                     {/* Summary Stats */}
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className={`grid gap-3 ${dryRunData.summary.nonBuyerCount > 0 ? 'grid-cols-5' : 'grid-cols-4'}`}>
                       <div className="bg-blue-50 rounded-lg p-3 text-center">
                         <p className="text-2xl font-bold text-blue-700">
                           {dryRunData.summary.totalEvents}
@@ -836,6 +849,14 @@ export default function AdminEmails() {
                         </p>
                         <p className="text-xs text-orange-600">Eltern</p>
                       </div>
+                      {dryRunData.summary.nonBuyerCount > 0 && (
+                        <div className="bg-amber-50 rounded-lg p-3 text-center">
+                          <p className="text-2xl font-bold text-amber-700">
+                            {dryRunData.summary.nonBuyerCount}
+                          </p>
+                          <p className="text-xs text-amber-600">Non-Buyers</p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Matching Events */}

@@ -15,8 +15,9 @@ import {
   EmailSendResult,
   EventThresholdMatch,
   CreateEmailLogInput,
+  Audience,
 } from '@/lib/types/email-automation';
-import { Event, Class, Parent, Registration, EVENTS_TABLE_ID, EVENTS_FIELD_IDS } from '@/lib/types/airtable';
+import { Event, Class, Parent, Registration, EVENTS_TABLE_ID, EVENTS_FIELD_IDS, ORDERS_TABLE_ID, ORDERS_FIELD_IDS } from '@/lib/types/airtable';
 
 // Constants
 const RATE_LIMIT_DELAY_MS = 500; // 500ms delay between emails to respect Resend rate limits
@@ -328,27 +329,77 @@ async function getParentRecipientsForEvent(
 }
 
 /**
+ * Get emails of parents who have at least one paid order for an event
+ */
+async function getPaidParentEmailsForEvent(eventId: string): Promise<Set<string>> {
+  const Airtable = (await import('airtable')).default;
+  const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
+    .base(process.env.AIRTABLE_BASE_ID!);
+
+  const paidEmails = new Set<string>();
+  const orders = await base(ORDERS_TABLE_ID)
+    .select({
+      filterByFormula: `AND({${ORDERS_FIELD_IDS.booking_id}} = "${eventId}", {${ORDERS_FIELD_IDS.payment_status}} = "paid")`,
+      fields: [ORDERS_FIELD_IDS.parent_id],
+    })
+    .all();
+
+  const airtable = getAirtableService();
+  for (const order of orders) {
+    const parentRecordIds = order.get(ORDERS_FIELD_IDS.parent_id) as string[] | undefined;
+    if (parentRecordIds?.[0]) {
+      const parent = await airtable.getParentByRecordId(parentRecordIds[0]);
+      if (parent?.parent_email) paidEmails.add(parent.parent_email.toLowerCase());
+    }
+  }
+  return paidEmails;
+}
+
+/**
+ * Get non-buyer recipients for an event (parents registered but without paid orders)
+ */
+async function getNonBuyerRecipientsForEvent(
+  eventId: string,
+  eventRecordId: string,
+  eventData: EventThresholdMatch
+): Promise<EmailRecipient[]> {
+  const allParents = await getParentRecipientsForEvent(eventId, eventRecordId, eventData);
+  const paidEmails = await getPaidParentEmailsForEvent(eventId);
+  return allParents.filter(p => !paidEmails.has(p.email.toLowerCase()));
+}
+
+/**
  * Get all recipients for an event based on audience type
  */
 export async function getRecipientsForEvent(
   eventId: string,
   eventRecordId: string,
   eventData: EventThresholdMatch,
-  audience: 'teacher' | 'parent' | 'both'
+  audience: Audience
 ): Promise<EmailRecipient[]> {
   const recipients: EmailRecipient[] = [];
 
-  if (audience === 'teacher' || audience === 'both') {
-    const teachers = await getTeacherRecipientsForEvent(eventId, eventRecordId, eventData);
-    recipients.push(...teachers);
+  if (audience.includes('teacher')) {
+    recipients.push(...await getTeacherRecipientsForEvent(eventId, eventRecordId, eventData));
   }
 
-  if (audience === 'parent' || audience === 'both') {
-    const parents = await getParentRecipientsForEvent(eventId, eventRecordId, eventData);
-    recipients.push(...parents);
+  if (audience.includes('parent')) {
+    recipients.push(...await getParentRecipientsForEvent(eventId, eventRecordId, eventData));
   }
 
-  return recipients;
+  if (audience.includes('non-buyer')) {
+    recipients.push(...await getNonBuyerRecipientsForEvent(eventId, eventRecordId, eventData));
+  }
+
+  // Deduplicate by email+eventId to avoid double-sending
+  // (e.g., if both 'parent' and 'non-buyer' are selected, non-buyers are a subset of parents)
+  const seen = new Set<string>();
+  return recipients.filter(r => {
+    const key = `${r.email.toLowerCase()}:${r.eventId}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // =============================================================================
@@ -496,7 +547,7 @@ export async function processEmailAutomation(
       try {
         result.templatesProcessed++;
         console.log(
-          `[Email Automation] Template: ${template.name} (trigger: ${template.triggerDays} days, audience: ${template.audience})`
+          `[Email Automation] Template: ${template.name} (trigger: ${template.triggerDays} days, audience: ${template.audience.join(', ')})`
         );
 
         // Get events matching this template's trigger threshold

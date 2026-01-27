@@ -18,7 +18,7 @@ export const EMAIL_LOGS_TABLE_ID = 'tblxLemlKY8p8cIwS';
 
 export const EMAIL_TEMPLATES_FIELD_IDS = {
   name: 'fldJnr0LjUf1fG3aK',                     // Single line text
-  audience: 'fldnmFNebIrstXsWT',                 // Single select: teacher, parent, both
+  audience: 'fldnmFNebIrstXsWT',                 // Multi select: teacher, parent, non-buyer
   trigger_days: 'fldqvR1BPJg3oSEFN',             // Number (negative = before, positive = after)
   trigger_hour: 'fldZdp0R50gmHwLl2',             // Number (0-23, German time hour)
   email_subject: 'fldmkqyWITt9y8462',            // Single line text with {{variables}}
@@ -42,6 +42,13 @@ export const EMAIL_LOGS_FIELD_IDS = {
 } as const;
 
 // =============================================================================
+// Audience Types
+// =============================================================================
+
+export type AudienceValue = 'teacher' | 'parent' | 'non-buyer';
+export type Audience = AudienceValue[];
+
+// =============================================================================
 // Core Interfaces
 // =============================================================================
 
@@ -51,7 +58,7 @@ export const EMAIL_LOGS_FIELD_IDS = {
 export interface EmailTemplate {
   id: string;                                    // Airtable record ID
   name: string;                                  // Human-readable name
-  audience: 'teacher' | 'parent' | 'both';       // Who receives this email
+  audience: Audience;                             // Who receives this email
   triggerDays: number;                           // Days relative to event (negative = before)
   triggerHour: number;                           // Hour of day to send (0-23 in Europe/Berlin time)
   subject: string;                               // Email subject with {{variables}}
@@ -83,7 +90,7 @@ export interface EmailLog {
  */
 export interface CreateEmailTemplateInput {
   name: string;
-  audience: 'teacher' | 'parent' | 'both';
+  audience: Audience;
   triggerDays: number;
   triggerHour?: number;                          // defaults to 7
   subject: string;
@@ -96,7 +103,7 @@ export interface CreateEmailTemplateInput {
  */
 export interface UpdateEmailTemplateInput {
   name?: string;
-  audience?: 'teacher' | 'parent' | 'both';
+  audience?: Audience;
   triggerDays?: number;
   triggerHour?: number;
   subject?: string;

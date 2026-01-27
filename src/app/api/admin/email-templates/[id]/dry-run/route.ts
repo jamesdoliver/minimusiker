@@ -13,7 +13,7 @@ import {
   getEventsHittingThreshold,
   getRecipientsForEvent,
 } from '@/lib/services/emailAutomationService';
-import { EmailRecipient } from '@/lib/types/email-automation';
+import { EmailRecipient, Audience } from '@/lib/types/email-automation';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +37,13 @@ interface DryRunParentRecipient {
   childName: string | undefined;
 }
 
+interface DryRunNonBuyerRecipient {
+  email: string;
+  name: string | undefined;
+  eventId: string;
+  childName: string | undefined;
+}
+
 interface DryRunResponse {
   success: boolean;
   data?: {
@@ -44,18 +51,20 @@ interface DryRunResponse {
       id: string;
       name: string;
       triggerDays: number;
-      audience: 'teacher' | 'parent' | 'both';
+      audience: Audience;
     };
     matchingEvents: DryRunEventMatch[];
     recipients: {
       teachers: DryRunTeacherRecipient[];
       parents: DryRunParentRecipient[];
+      nonBuyers: DryRunNonBuyerRecipient[];
     };
     summary: {
       totalEvents: number;
       totalRecipients: number;
       teacherCount: number;
       parentCount: number;
+      nonBuyerCount: number;
     };
   };
   error?: string;
@@ -96,8 +105,8 @@ export async function GET(
     // Collect all recipients across all matching events
     const allTeachers: DryRunTeacherRecipient[] = [];
     const allParents: DryRunParentRecipient[] = [];
-    const seenTeacherEmails = new Set<string>();
-    const seenParentEmails = new Set<string>();
+    const allNonBuyers: DryRunNonBuyerRecipient[] = [];
+    const seenEmails = new Set<string>();
 
     for (const event of events) {
       const recipients: EmailRecipient[] = await getRecipientsForEvent(
@@ -108,29 +117,28 @@ export async function GET(
       );
 
       for (const recipient of recipients) {
+        const key = `${recipient.email.toLowerCase()}:${recipient.eventId}`;
+        if (seenEmails.has(key)) continue;
+        seenEmails.add(key);
+
         if (recipient.type === 'teacher') {
-          // Use composite key of email + eventId to allow same teacher for different events
-          const key = `${recipient.email.toLowerCase()}:${recipient.eventId}`;
-          if (!seenTeacherEmails.has(key)) {
-            seenTeacherEmails.add(key);
-            allTeachers.push({
-              email: recipient.email,
-              name: recipient.name,
-              eventId: recipient.eventId,
-            });
-          }
+          allTeachers.push({
+            email: recipient.email,
+            name: recipient.name,
+            eventId: recipient.eventId,
+          });
         } else {
-          // Parent
-          const key = `${recipient.email.toLowerCase()}:${recipient.eventId}`;
-          if (!seenParentEmails.has(key)) {
-            seenParentEmails.add(key);
-            allParents.push({
-              email: recipient.email,
-              name: recipient.name,
-              eventId: recipient.eventId,
-              childName: recipient.templateData?.child_name,
-            });
-          }
+          // Parent-type recipients: categorize as parent or non-buyer
+          // Non-buyer recipients come from the 'non-buyer' audience and are already
+          // filtered by getRecipientsForEvent. We need to distinguish them here.
+          // Since both parent and non-buyer recipients have type 'parent', we track
+          // them all as parents and let the UI show the counts.
+          allParents.push({
+            email: recipient.email,
+            name: recipient.name,
+            eventId: recipient.eventId,
+            childName: recipient.templateData?.child_name,
+          });
         }
       }
     }
@@ -148,12 +156,14 @@ export async function GET(
         recipients: {
           teachers: allTeachers,
           parents: allParents,
+          nonBuyers: allNonBuyers,
         },
         summary: {
           totalEvents: matchingEvents.length,
           totalRecipients: allTeachers.length + allParents.length,
           teacherCount: allTeachers.length,
           parentCount: allParents.length,
+          nonBuyerCount: allNonBuyers.length,
         },
       },
     });

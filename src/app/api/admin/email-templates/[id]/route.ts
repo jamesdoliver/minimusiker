@@ -66,11 +66,20 @@ export async function PUT(
     const body = await request.json();
 
     // Validate audience if provided
-    if (body.audience !== undefined && !['teacher', 'parent', 'both'].includes(body.audience)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid audience. Must be "teacher", "parent", or "both"' },
-        { status: 400 }
-      );
+    if (body.audience !== undefined) {
+      const validAudiences = ['teacher', 'parent', 'non-buyer'];
+      if (!Array.isArray(body.audience) || body.audience.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'audience must be a non-empty array' },
+          { status: 400 }
+        );
+      }
+      if (!body.audience.every((a: string) => validAudiences.includes(a))) {
+        return NextResponse.json(
+          { success: false, error: 'audience values must be "teacher", "parent", and/or "non-buyer"' },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate triggerDays if provided

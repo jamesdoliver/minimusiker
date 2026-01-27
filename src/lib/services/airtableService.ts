@@ -45,6 +45,7 @@ import {
 import {
   EmailTemplate,
   EmailLog,
+  Audience,
   CreateEmailTemplateInput,
   UpdateEmailTemplateInput,
   CreateEmailLogInput,
@@ -5189,10 +5190,24 @@ class AirtableService {
    * Transform an Airtable email template record to our EmailTemplate type
    */
   private transformEmailTemplateRecord(record: Airtable.Record<FieldSet>): EmailTemplate {
+    // Multi-select returns string[]. Handle legacy single-select values.
+    const rawAudience = record.get(EMAIL_TEMPLATES_FIELD_IDS.audience);
+    let audience: Audience;
+    if (Array.isArray(rawAudience)) {
+      audience = rawAudience.filter(v => ['teacher', 'parent', 'non-buyer'].includes(v)) as Audience;
+      if (audience.length === 0) audience = ['teacher', 'parent'];
+    } else if (rawAudience === 'both') {
+      audience = ['teacher', 'parent'];
+    } else if (rawAudience === 'teacher' || rawAudience === 'parent') {
+      audience = [rawAudience];
+    } else {
+      audience = ['teacher', 'parent'];
+    }
+
     return {
       id: record.id,
       name: (record.get(EMAIL_TEMPLATES_FIELD_IDS.name) as string) || '',
-      audience: (record.get(EMAIL_TEMPLATES_FIELD_IDS.audience) as 'teacher' | 'parent' | 'both') || 'both',
+      audience,
       triggerDays: (record.get(EMAIL_TEMPLATES_FIELD_IDS.trigger_days) as number) || 0,
       triggerHour: (record.get(EMAIL_TEMPLATES_FIELD_IDS.trigger_hour) as number) ?? 7,
       subject: (record.get(EMAIL_TEMPLATES_FIELD_IDS.email_subject) as string) || '',

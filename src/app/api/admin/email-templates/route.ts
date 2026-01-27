@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { CreateEmailTemplateInput } from '@/lib/types/email-automation';
+import { CreateEmailTemplateInput, AudienceValue } from '@/lib/types/email-automation';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const activeOnly = searchParams.get('activeOnly') === 'true';
-    const audienceFilter = searchParams.get('audience') as 'teacher' | 'parent' | 'both' | null;
+    const audienceFilter = searchParams.get('audience') as AudienceValue | null;
 
     const airtable = getAirtableService();
 
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by audience if specified
     if (audienceFilter) {
-      templates = templates.filter((t) => t.audience === audienceFilter || t.audience === 'both');
+      templates = templates.filter((t) => t.audience.includes(audienceFilter));
     }
 
     // Sort by triggerDays (most negative first, i.e., earliest before event)
@@ -41,9 +41,9 @@ export async function GET(request: NextRequest) {
 
     // Group by audience for UI convenience
     const grouped = {
-      teacher: templates.filter((t) => t.audience === 'teacher'),
-      parent: templates.filter((t) => t.audience === 'parent'),
-      both: templates.filter((t) => t.audience === 'both'),
+      teacher: templates.filter((t) => t.audience.includes('teacher')),
+      parent: templates.filter((t) => t.audience.includes('parent')),
+      'non-buyer': templates.filter((t) => t.audience.includes('non-buyer')),
     };
 
     return NextResponse.json({
@@ -91,9 +91,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate audience
-    if (!['teacher', 'parent', 'both'].includes(body.audience)) {
+    const validAudiences = ['teacher', 'parent', 'non-buyer'];
+    if (!Array.isArray(body.audience) || body.audience.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Invalid audience. Must be "teacher", "parent", or "both"' },
+        { success: false, error: 'audience must be a non-empty array' },
+        { status: 400 }
+      );
+    }
+    if (!body.audience.every((a: string) => validAudiences.includes(a))) {
+      return NextResponse.json(
+        { success: false, error: 'audience values must be "teacher", "parent", and/or "non-buyer"' },
         { status: 400 }
       );
     }

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import { EmailTemplate, TemplateData } from '@/lib/types/email-automation';
+import { EmailTemplate, TemplateData, AudienceValue } from '@/lib/types/email-automation';
 
 interface PageProps {
   params: { id: string };
@@ -17,7 +17,7 @@ export default function EmailTemplateEdit({ params }: PageProps) {
 
   const [template, setTemplate] = useState<Partial<EmailTemplate>>({
     name: '',
-    audience: 'parent',
+    audience: ['parent'],
     triggerDays: -7,
     triggerHour: 7,
     subject: '',
@@ -287,20 +287,45 @@ export default function EmailTemplateEdit({ params }: PageProps) {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Zielgruppe
           </label>
-          <select
-            value={template.audience || 'parent'}
-            onChange={(e) =>
-              setTemplate({
-                ...template,
-                audience: e.target.value as 'teacher' | 'parent' | 'both',
-              })
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-          >
-            <option value="teacher">Lehrer</option>
-            <option value="parent">Eltern</option>
-            <option value="both">Lehrer & Eltern</option>
-          </select>
+          <div className="space-y-2">
+            {([
+              { value: 'teacher' as AudienceValue, label: 'Lehrer' },
+              { value: 'parent' as AudienceValue, label: 'Eltern' },
+              { value: 'non-buyer' as AudienceValue, label: 'Non-Buyers' },
+            ]).map(({ value, label }) => {
+              const currentAudience = template.audience || ['parent'];
+              const isChecked = currentAudience.includes(value);
+              return (
+                <label key={value} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      let next: AudienceValue[];
+                      if (e.target.checked) {
+                        next = [...currentAudience, value];
+                      } else {
+                        next = currentAudience.filter((v) => v !== value);
+                      }
+                      // Prevent unchecking the last checkbox
+                      if (next.length === 0) return;
+                      setTemplate({ ...template, audience: next });
+                    }}
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">{label}</span>
+                  {value === 'non-buyer' && (
+                    <span className="ml-2 text-xs text-gray-400">
+                      Eltern, die registriert aber noch nicht bestellt haben.
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            Mindestens eine Zielgruppe muss ausgewählt sein.
+          </p>
         </div>
 
         {/* Trigger Days */}
