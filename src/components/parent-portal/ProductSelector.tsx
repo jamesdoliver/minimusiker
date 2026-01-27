@@ -7,7 +7,7 @@ import { ParentSessionChild } from '@/types/airtable';
 import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/stock';
 import { useProducts } from '@/lib/hooks/useProducts';
 import { Product } from '@/lib/types/airtable';
-import { canOrderPersonalizedClothing, getDaysUntilEvent } from '@/lib/utils/eventTimeline';
+import { canOrderPersonalizedClothing, getDaysUntilEvent, SCHULSONG_CLOTHING_CUTOFF_DAYS } from '@/lib/utils/eventTimeline';
 import AudioProductCard from './AudioProductCard';
 import ClothingProductCard from './ClothingProductCard';
 
@@ -44,6 +44,7 @@ interface ProductSelectorProps {
   parentEmail?: string;
   schoolName: string;
   children?: ParentSessionChild[];
+  isSchulsongOnly?: boolean;
   onCheckout?: (selection: ProductSelection, total: number) => void;
 }
 
@@ -437,6 +438,7 @@ export default function ProductSelector({
   parentEmail,
   schoolName,
   children = [],
+  isSchulsongOnly = false,
   onCheckout,
 }: ProductSelectorProps) {
   const t = useTranslations('productSelector');
@@ -446,8 +448,12 @@ export default function ProductSelector({
   });
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Determine if personalized products should be shown (>19 days before event)
-  const showPersonalized = canOrderPersonalizedClothing(eventDate);
+  // Determine if personalized products should be shown
+  // Schulsong-only events get an extended deadline (-7 days instead of -4)
+  const showPersonalized = canOrderPersonalizedClothing(
+    eventDate,
+    isSchulsongOnly ? SCHULSONG_CLOTHING_CUTOFF_DAYS : undefined
+  );
 
   // Select the appropriate clothing products based on time until event
   const activeClothingProducts = showPersonalized
@@ -702,7 +708,8 @@ export default function ProductSelector({
         </p>
       </div>
 
-      {/* Audio Section - Multi-select */}
+      {/* Audio Section - Multi-select (hidden for schulsong-only events) */}
+      {!isSchulsongOnly && (
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-4">
           <span className="flex items-center justify-center w-7 h-7 bg-sage-600 text-white text-sm font-bold rounded-full">
@@ -730,22 +737,24 @@ export default function ProductSelector({
           ))}
         </div>
       </div>
+      )}
 
       {/* Divider */}
-      <div className="border-t border-sage-200 my-8" />
+      {!isSchulsongOnly && <div className="border-t border-sage-200 my-8" />}
 
       {/* Clothing Section */}
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-2">
           <span className="flex items-center justify-center w-7 h-7 bg-sage-600 text-white text-sm font-bold rounded-full">
-            2
+            {isSchulsongOnly ? '1' : '2'}
           </span>
           <h3 className="text-lg font-bold text-gray-900">{t('addClothing')}</h3>
           <span className="text-xs text-gray-500 font-medium">{t('optional')}</span>
         </div>
 
-        {/* Discount Banner - only show before event day */}
-        {selection.audioProducts.length > 0 &&
+        {/* Discount Banner - only show before event day (not applicable for schulsong-only) */}
+        {!isSchulsongOnly &&
+         selection.audioProducts.length > 0 &&
          selection.clothing.length === 0 &&
          eventDate &&
          getDaysUntilEvent(eventDate) > 0 && (

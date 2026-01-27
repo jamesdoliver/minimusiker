@@ -6,6 +6,7 @@ interface EventTypeCirclesProps {
   isPlus?: boolean;
   isKita?: boolean;
   isSchulsong?: boolean;
+  isMinimusikertag?: boolean;
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -26,6 +27,7 @@ export default function EventTypeCircles({
   isPlus = false,
   isKita = false,
   isSchulsong = false,
+  isMinimusikertag = true,
   size = 'md',
 }: EventTypeCirclesProps) {
   const [hoveredCircle, setHoveredCircle] = useState<number | null>(null);
@@ -33,13 +35,15 @@ export default function EventTypeCircles({
   // Build array of circles to display
   const circles: CircleConfig[] = [];
 
-  // Circle 1: Always shows - 'M' by default, '+' if is_minimusikertag_plus
-  circles.push({
-    letter: isPlus ? '+' : 'M',
-    bgColor: '#93c5fd', // blue-300
-    textColor: '#1e40af', // blue-800
-    label: isPlus ? 'Minimusikertag PLUS' : 'Minimusikertag',
-  });
+  // Circle 1: Only show M/+ circle when isMinimusikertag is true
+  if (isMinimusikertag) {
+    circles.push({
+      letter: isPlus ? '+' : 'M',
+      bgColor: '#93c5fd', // blue-300
+      textColor: '#1e40af', // blue-800
+      label: isPlus ? 'Minimusikertag PLUS' : 'Minimusikertag',
+    });
+  }
 
   // Circle 2: Shows 'K' if is_kita=true
   if (isKita) {

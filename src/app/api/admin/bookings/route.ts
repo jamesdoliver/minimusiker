@@ -32,6 +32,7 @@ export interface BookingWithDetails {
   isPlus?: boolean;               // Shows '+' instead of 'M'
   isKita?: boolean;               // Shows 'K' circle (or derived from event_type)
   isSchulsong?: boolean;          // Shows 'S' circle
+  isMinimusikertag?: boolean;     // true = full event, false = schulsong-only
   eventType?: string;             // Original event_type for backwards compatibility
 }
 
@@ -159,6 +160,7 @@ export async function GET(request: NextRequest) {
               isPlus: event.is_plus,
               isKita: event.is_kita || isKitaFromEventType, // Support legacy event_type
               isSchulsong: event.is_schulsong,
+              isMinimusikertag: event.is_minimusikertag === true,
               eventType: event.event_type,
             };
           }

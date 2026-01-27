@@ -102,6 +102,7 @@ export async function GET(
       isPlus?: boolean;
       isKita?: boolean;
       isSchulsong?: boolean;
+      isMinimusikertag?: boolean;
     } = {};
 
     try {
@@ -130,6 +131,7 @@ export async function GET(
             isPlus: eventRecord.is_plus,
             isKita: eventRecord.is_kita || isKitaFromEventType,
             isSchulsong: eventRecord.is_schulsong,
+            isMinimusikertag: eventRecord.is_minimusikertag === true,
           };
         }
       }
@@ -183,11 +185,12 @@ export async function PATCH(
     const hasEventTypeUpdates =
       body.is_plus !== undefined ||
       body.is_kita !== undefined ||
-      body.is_schulsong !== undefined;
+      body.is_schulsong !== undefined ||
+      body.is_minimusikertag !== undefined;
 
     if (!hasDateUpdate && !hasStatusUpdate && !hasEventTypeUpdates) {
       return NextResponse.json(
-        { success: false, error: 'No valid fields to update. Supported: event_date, status, is_plus, is_kita, is_schulsong' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, is_plus, is_kita, is_schulsong, is_minimusikertag' },
         { status: 400 }
       );
     }
@@ -291,6 +294,7 @@ export async function PATCH(
         is_plus?: boolean;
         is_kita?: boolean;
         is_schulsong?: boolean;
+        is_minimusikertag?: boolean;
       } = {};
 
       if (hasStatusUpdate) {
@@ -305,6 +309,9 @@ export async function PATCH(
       }
       if (body.is_schulsong !== undefined) {
         fieldUpdates.is_schulsong = body.is_schulsong;
+      }
+      if (body.is_minimusikertag !== undefined) {
+        fieldUpdates.is_minimusikertag = body.is_minimusikertag;
       }
 
       updatedEvent = await airtableService.updateEventFields(eventRecordId, fieldUpdates);

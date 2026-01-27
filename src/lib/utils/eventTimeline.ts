@@ -21,6 +21,12 @@ export const EARLY_BIRD_DEADLINE_DAYS = 19;
 export const PERSONALIZED_CLOTHING_CUTOFF_DAYS = -4;
 
 /**
+ * Schulsong-only clothing cutoff: available up to 7 days after event.
+ * Extended window since schulsong-only events don't have audio products.
+ */
+export const SCHULSONG_CLOTHING_CUTOFF_DAYS = -7;
+
+/**
  * Event milestones with their timeline offsets (days relative to event)
  * Negative = before event, Positive = after event
  */
@@ -282,14 +288,17 @@ export function canOrderPersonalizedProducts(eventDate: string | Date): boolean 
  * @param eventDate - The event date
  * @returns true if available (up to 4 days after event)
  */
-export function canOrderPersonalizedClothing(eventDate: string | Date | undefined): boolean {
+export function canOrderPersonalizedClothing(
+  eventDate: string | Date | undefined,
+  cutoffDays: number = PERSONALIZED_CLOTHING_CUTOFF_DAYS
+): boolean {
   if (!eventDate) return false; // No event date = default to standard
 
   const daysUntil = getDaysUntilEvent(eventDate);
 
-  // Available from any time before event up to 4 days after
-  // daysUntil >= -4 means: event is in future, today, or up to 4 days ago
-  return daysUntil >= PERSONALIZED_CLOTHING_CUTOFF_DAYS;
+  // Available from any time before event up to N days after
+  // e.g. daysUntil >= -4 means: event is in future, today, or up to 4 days ago
+  return daysUntil >= cutoffDays;
 }
 
 /**

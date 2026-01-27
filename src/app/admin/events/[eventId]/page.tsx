@@ -127,6 +127,7 @@ export default function EventDetailPage() {
   const [isPlus, setIsPlus] = useState(false);
   const [isKita, setIsKita] = useState(false);
   const [isSchulsong, setIsSchulsong] = useState(false);
+  const [isMinimusikertag, setIsMinimusikertag] = useState(true);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdatingToggles, setIsUpdatingToggles] = useState<string | null>(null); // Track which toggle is updating
 
@@ -162,6 +163,7 @@ export default function EventDetailPage() {
       setIsPlus(data.data?.isPlus || false);
       setIsKita(data.data?.isKita || false);
       setIsSchulsong(data.data?.isSchulsong || false);
+      setIsMinimusikertag(data.data?.isMinimusikertag === true);
     } catch (err) {
       console.error('Error fetching event detail:', err);
       setError(err instanceof Error ? err.message : 'Failed to load event details');
@@ -279,7 +281,7 @@ export default function EventDetailPage() {
 
   // Event type toggle handlers
   const handleToggleChange = async (
-    field: 'is_plus' | 'is_kita' | 'is_schulsong',
+    field: 'is_plus' | 'is_kita' | 'is_schulsong' | 'is_minimusikertag',
     value: boolean
   ) => {
     setIsUpdatingToggles(field);
@@ -302,12 +304,15 @@ export default function EventDetailPage() {
         setIsKita(value);
       } else if (field === 'is_schulsong') {
         setIsSchulsong(value);
+      } else if (field === 'is_minimusikertag') {
+        setIsMinimusikertag(value);
       }
 
       const labelMap = {
         is_plus: 'Minimusikertag PLUS',
         is_kita: 'Kita',
         is_schulsong: 'Schulsong',
+        is_minimusikertag: 'Minimusikertag',
       };
       toast.success(`${labelMap[field]} ${value ? 'enabled' : 'disabled'}`);
     } catch (err) {
@@ -684,6 +689,37 @@ export default function EventDetailPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type</h3>
               <div className="space-y-3">
+                {/* Minimusikertag Toggle */}
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={isMinimusikertag}
+                      onChange={(e) =>
+                        handleToggleChange('is_minimusikertag', e.target.checked)
+                      }
+                      disabled={isUpdatingToggles === 'is_minimusikertag'}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-green-500 peer-disabled:opacity-50 transition-colors" />
+                    <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform flex items-center justify-center">
+                      <span className="text-[8px] font-bold" style={{ color: '#166534' }}>M</span>
+                    </div>
+                  </div>
+                  <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                    Minimusikertag
+                  </span>
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                    style={{ backgroundColor: '#86efac', color: '#166534' }}
+                  >
+                    M
+                  </div>
+                  {isUpdatingToggles === 'is_minimusikertag' && (
+                    <LoadingSpinner size="sm" />
+                  )}
+                </label>
+
                 {/* Minimusikertag PLUS Toggle */}
                 <label className="flex items-center gap-3 cursor-pointer group">
                   <div className="relative">

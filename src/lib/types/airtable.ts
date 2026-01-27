@@ -531,6 +531,7 @@ export const EVENTS_FIELD_IDS = {
   is_plus: 'fldMFQPU0v0SEmGqJ',             // Checkbox - shows '+' instead of 'M' in event type circles
   is_kita: 'flddRbQV0qoqR3KIr',             // Checkbox - shows 'K' circle
   is_schulsong: 'fld2ml1yiecD1a5ms',         // Checkbox - shows 'S' circle
+  is_minimusikertag: 'fld2GuudFY4Rk6f8i',     // Checkbox - true = full event, false = schulsong-only
 } as const;
 
 // Classes Table - 1 row per class
@@ -661,6 +662,7 @@ export interface Event {
   is_plus?: boolean;                    // Shows '+' instead of 'M' in event type circles
   is_kita?: boolean;                    // Shows 'K' circle (or derived from event_type='Minimusikertag Kita')
   is_schulsong?: boolean;               // Shows 'S' circle
+  is_minimusikertag?: boolean;          // true = full event, false = schulsong-only
 }
 
 /**

@@ -4578,6 +4578,7 @@ class AirtableService {
       is_plus?: boolean;
       is_kita?: boolean;
       is_schulsong?: boolean;
+      is_minimusikertag?: boolean;
     }
   ): Promise<Event> {
     try {
@@ -4594,6 +4595,9 @@ class AirtableService {
       }
       if (updates.is_schulsong !== undefined) {
         updateFields[EVENTS_FIELD_IDS.is_schulsong] = updates.is_schulsong;
+      }
+      if (updates.is_minimusikertag !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.is_minimusikertag] = updates.is_minimusikertag;
       }
 
       if (Object.keys(updateFields).length === 0) {
@@ -4786,6 +4790,7 @@ class AirtableService {
       is_plus: record.get('is_plus') as boolean | undefined,
       is_kita: record.get('is_kita') as boolean | undefined,
       is_schulsong: record.get('is_schulsong') as boolean | undefined,
+      is_minimusikertag: record.get('is_minimusikertag') as boolean | undefined,
     };
   }
 

@@ -57,6 +57,7 @@ function ParentPortalContent() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [groups, setGroups] = useState<ParentGroup[]>([]);
   const [groupAudioStatuses, setGroupAudioStatuses] = useState<Record<string, AudioStatus>>({});
+  const [isSchulsongOnly, setIsSchulsongOnly] = useState(false);
 
   useEffect(() => {
     verifySessionAndLoadData();
@@ -161,6 +162,29 @@ function ParentPortalContent() {
       setAudioStatus(null);
     }
   }, [session, eventId, classId, fetchAudioStatus]);
+
+  // Fetch schulsong status to determine if this is a schulsong-only event
+  useEffect(() => {
+    if (!session || !eventId) return;
+
+    const fetchSchulsongStatus = async () => {
+      try {
+        const response = await fetch(
+          `/api/parent/schulsong-status?eventId=${encodeURIComponent(eventId)}`,
+          { credentials: 'include' }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          // Schulsong-only = has schulsong but is NOT a minimusikertag
+          setIsSchulsongOnly(data.isSchulsong === true && !data.isMinimusikertag);
+        }
+      } catch (err) {
+        console.error('Error fetching schulsong status:', err);
+      }
+    };
+
+    fetchSchulsongStatus();
+  }, [session, eventId]);
 
   // Fetch groups for the current class
   const fetchGroups = useCallback(async (clsId: string, evtId: string) => {
@@ -456,8 +480,8 @@ function ParentPortalContent() {
       {/* Schulsong Section - Free school song with waveform player */}
       {eventId && <SchulsongSection eventId={eventId} />}
 
-      {/* Audio Preview Section - Full width, only show when audio is available */}
-      {!isLoadingAudio && audioStatus?.hasAudio && audioStatus.audioUrl && (
+      {/* Audio Preview Section - Full width, only show when audio is available (hidden for schulsong-only events) */}
+      {!isSchulsongOnly && !isLoadingAudio && audioStatus?.hasAudio && audioStatus.audioUrl && (
         <section className="bg-white py-12">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-white rounded-xl shadow-lg p-6">
@@ -524,8 +548,8 @@ function ParentPortalContent() {
         </section>
       )}
 
-      {/* Group Audio Sections - Show audio for groups the class belongs to */}
-      {groups.filter(g => groupAudioStatuses[g.groupId]?.hasAudio).map((group) => {
+      {/* Group Audio Sections - Show audio for groups the class belongs to (hidden for schulsong-only events) */}
+      {!isSchulsongOnly && groups.filter(g => groupAudioStatuses[g.groupId]?.hasAudio).map((group) => {
         const groupAudio = groupAudioStatuses[group.groupId];
         if (!groupAudio?.hasAudio || !groupAudio.audioUrl) return null;
 
@@ -583,6 +607,7 @@ function ParentPortalContent() {
             parentEmail={session.email}
             schoolName={schoolName}
             children={children}
+            isSchulsongOnly={isSchulsongOnly}
           />
         </section>
 

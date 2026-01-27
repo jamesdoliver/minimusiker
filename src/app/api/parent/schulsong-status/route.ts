@@ -42,14 +42,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check if event has schulsong enabled
+    // Fetch the full event to get both is_schulsong and is_minimusikertag
     const airtableService = getAirtableService();
-    const isSchulsong = await airtableService.getEventIsSchulsong(eventId);
+    const event = await airtableService.getEventByEventId(eventId);
+    const isSchulsong = event?.is_schulsong === true;
+    const isMinimusikertag = event?.is_minimusikertag === true;
 
     if (!isSchulsong) {
       return NextResponse.json({
         success: true,
         isSchulsong: false,
+        isMinimusikertag,
       });
     }
 
@@ -61,6 +64,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         isSchulsong: true,
+        isMinimusikertag,
         hasAudio: false,
       });
     }
@@ -85,6 +89,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         isSchulsong: true,
+        isMinimusikertag,
         hasAudio: false,
       });
     }
@@ -92,6 +97,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       isSchulsong: true,
+      isMinimusikertag,
       hasAudio: true,
       audioUrl,
       downloadUrl,
