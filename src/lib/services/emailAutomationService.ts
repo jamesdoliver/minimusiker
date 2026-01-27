@@ -341,6 +341,7 @@ async function getPaidParentEmailsForEvent(eventId: string): Promise<Set<string>
     .select({
       filterByFormula: `AND({${ORDERS_FIELD_IDS.booking_id}} = "${eventId}", {${ORDERS_FIELD_IDS.payment_status}} = "paid")`,
       fields: [ORDERS_FIELD_IDS.parent_id],
+      returnFieldsByFieldId: true,
     })
     .all();
 
