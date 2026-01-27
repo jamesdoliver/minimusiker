@@ -72,6 +72,7 @@ export interface EngineerEventDetail {
   eventType: string;
   classes: EngineerClassView[];
   mixingStatus: EngineerMixingStatus;
+  isSchulsong?: boolean;
 }
 
 // =============================================================================
@@ -114,6 +115,7 @@ export interface ConfirmMixedUploadRequest {
   type: 'preview' | 'final';
   fileSizeBytes?: number;
   durationSeconds?: number;
+  isSchulsong?: boolean;
 }
 
 /**

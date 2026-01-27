@@ -11,6 +11,7 @@ import PreviewPlayer from '@/components/landing/PreviewPlayer';
 import ProductSelector from '@/components/parent-portal/ProductSelector';
 import HeroIntroSection from '@/components/parent-portal/HeroIntroSection';
 import PreparationSection from '@/components/parent-portal/PreparationSection';
+import SchulsongSection from '@/components/parent-portal/SchulsongSection';
 // Note: VideoCard removed - video is now handled in HeroIntroSection
 import { CartProvider } from '@/lib/contexts/CartContext';
 import { CartDrawer } from '@/components/shop';
@@ -451,6 +452,9 @@ function ParentPortalContent() {
 
       {/* Preparation Section - Yellow PDF Download */}
       <PreparationSection />
+
+      {/* Schulsong Section - Free school song with waveform player */}
+      {eventId && <SchulsongSection eventId={eventId} />}
 
       {/* Audio Preview Section - Full width, only show when audio is available */}
       {!isLoadingAudio && audioStatus?.hasAudio && audioStatus.audioUrl && (

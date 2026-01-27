@@ -242,5 +242,12 @@
       "viewAll": "Alle anzeigen",
       "viewOptions": "Optionen anzeigen"
     }
+  },
+  "schulsong": {
+    "comingSoon": "Wir arbeiten an eurem Schulsong! Er wird bald fertig sein!",
+    "download": "Schulsong herunterladen",
+    "play": "Abspielen",
+    "pause": "Pause",
+    "loading": "Wird geladen..."
   }
 }

@@ -43,6 +43,36 @@ export default function EngineerEventDetailPage() {
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const [isTogglingPublish, setIsTogglingPublish] = useState(false);
+  const [togglingSchulsong, setTogglingSchulsong] = useState<string | null>(null);
+
+  const handleToggleSchulsong = async (audioFileId: string, currentValue: boolean) => {
+    setTogglingSchulsong(audioFileId);
+    try {
+      const response = await fetch(
+        `/api/engineer/events/${encodeURIComponent(eventId)}/toggle-schulsong`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioFileRecordId: audioFileId,
+            isSchulsong: !currentValue,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        await fetchEventDetail();
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Failed to toggle schulsong');
+      }
+    } catch (err) {
+      console.error('Error toggling schulsong:', err);
+      alert('Failed to toggle schulsong');
+    } finally {
+      setTogglingSchulsong(null);
+    }
+  };
 
   useEffect(() => {
     fetchEventDetail();
@@ -423,6 +453,9 @@ export default function EngineerEventDetailPage() {
               onDownloadZip={() => handleDownloadAllZip(classView.classId)}
               onFileSelect={(type, e) => handleFileSelect(classView.classId, type, e)}
               isDownloadingZip={isDownloadingZip}
+              eventIsSchulsong={event.isSchulsong}
+              onToggleSchulsong={handleToggleSchulsong}
+              togglingSchulsongId={togglingSchulsong}
             />
           ))}
         </div>
@@ -438,6 +471,9 @@ interface ClassCardProps {
   onDownloadZip: () => void;
   onFileSelect: (type: 'preview' | 'final', e: React.ChangeEvent<HTMLInputElement>) => void;
   isDownloadingZip: boolean;
+  eventIsSchulsong?: boolean;
+  onToggleSchulsong: (audioFileId: string, currentValue: boolean) => void;
+  togglingSchulsongId: string | null;
 }
 
 function ClassCard({
@@ -447,6 +483,9 @@ function ClassCard({
   onDownloadZip,
   onFileSelect,
   isDownloadingZip,
+  eventIsSchulsong,
+  onToggleSchulsong,
+  togglingSchulsongId,
 }: ClassCardProps) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -472,6 +511,11 @@ function ClassCard({
           >
             Final {classView.finalFile ? '✓' : ''}
           </span>
+          {classView.finalFile?.isSchulsong && (
+            <span className="px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-700 font-bold">
+              S
+            </span>
+          )}
         </div>
       </div>
 
@@ -651,6 +695,38 @@ function ClassCard({
             </label>
           </div>
         </div>
+
+        {/* Schulsong toggle - only shown when event has schulsong enabled and final file exists */}
+        {eventIsSchulsong && classView.finalFile && (
+          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+                S
+              </span>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Mark as Schulsong</p>
+                <p className="text-xs text-gray-500">
+                  {classView.finalFile.isSchulsong
+                    ? 'This audio is the school song'
+                    : 'Tag this final audio as the school song'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => onToggleSchulsong(classView.finalFile!.id, !!classView.finalFile!.isSchulsong)}
+              disabled={togglingSchulsongId === classView.finalFile.id}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                classView.finalFile.isSchulsong ? 'bg-amber-500' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  classView.finalFile.isSchulsong ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -53,6 +53,7 @@ export const AUDIO_FILES_FIELD_IDS = {
   duration_seconds: 'fldNzuiQghH3FhmdU', // Audio duration
   file_size_bytes: 'fldGo0LsZEcy9X9jx', // File size
   status: 'fldCAcEMu0IF1bWgz', // pending | processing | ready | error
+  is_schulsong: 'fldaPVT59Gdf8hqPL', // Checkbox - marks audio file as the schulsong
 } as const;
 
 // =============================================================================
@@ -124,6 +125,7 @@ export interface AudioFile {
   durationSeconds?: number; // Audio duration
   fileSizeBytes?: number; // File size
   status: AudioFileStatus; // pending | processing | ready | error
+  isSchulsong?: boolean; // Whether this audio file is the schulsong for the event
 }
 
 /**

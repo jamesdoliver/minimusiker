@@ -242,5 +242,12 @@
       "viewAll": "View All",
       "viewOptions": "View Options"
     }
+  },
+  "schulsong": {
+    "comingSoon": "We're working on your school song! It will be ready soon!",
+    "download": "Download School Song",
+    "play": "Play",
+    "pause": "Pause",
+    "loading": "Loading..."
   }
 }

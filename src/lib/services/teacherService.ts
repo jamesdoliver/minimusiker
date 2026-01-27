@@ -776,6 +776,7 @@ class TeacherService {
       durationSeconds: record.fields.duration_seconds || record.fields[AUDIO_FILES_FIELD_IDS.duration_seconds],
       fileSizeBytes: record.fields.file_size_bytes || record.fields[AUDIO_FILES_FIELD_IDS.file_size_bytes],
       status: (record.fields.status || record.fields[AUDIO_FILES_FIELD_IDS.status] || 'pending') as AudioFileStatus,
+      isSchulsong: record.fields.is_schulsong ?? record.fields[AUDIO_FILES_FIELD_IDS.is_schulsong] ?? false,
     };
   }
 
@@ -937,6 +938,7 @@ class TeacherService {
     durationSeconds?: number;
     fileSizeBytes?: number;
     status?: AudioFileStatus;
+    isSchulsong?: boolean;
   }): Promise<AudioFile> {
     try {
       const fields: any = {
@@ -951,6 +953,7 @@ class TeacherService {
         duration_seconds: data.durationSeconds,
         file_size_bytes: data.fileSizeBytes,
         status: data.status || 'pending',
+        is_schulsong: data.isSchulsong || false,
       };
 
       // If using normalized tables, also populate linked record fields
@@ -1018,6 +1021,7 @@ class TeacherService {
       durationSeconds?: number;
       fileSizeBytes?: number;
       status?: AudioFileStatus;
+      isSchulsong?: boolean;
     }
   ): Promise<AudioFile> {
     try {
@@ -1028,6 +1032,7 @@ class TeacherService {
       if (data.durationSeconds !== undefined) updateData.duration_seconds = data.durationSeconds;
       if (data.fileSizeBytes !== undefined) updateData.file_size_bytes = data.fileSizeBytes;
       if (data.status !== undefined) updateData.status = data.status;
+      if (data.isSchulsong !== undefined) updateData.is_schulsong = data.isSchulsong;
       // Update uploaded_at timestamp
       updateData.uploaded_at = new Date().toISOString();
 
@@ -1048,6 +1053,23 @@ class TeacherService {
     } catch (error) {
       console.error('Error deleting audio file:', error);
       throw new Error(`Failed to delete audio file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get the schulsong audio file for an event
+   * Returns the first audio file with is_schulsong=true, type=final, status=ready
+   */
+  async getSchulsongAudioFile(eventId: string): Promise<AudioFile | null> {
+    try {
+      const allFiles = await this.getAudioFilesByEventId(eventId);
+      const schulsongFile = allFiles.find(
+        (f) => f.isSchulsong && f.type === 'final' && f.status === 'ready'
+      );
+      return schulsongFile || null;
+    } catch (error) {
+      console.error('Error getting schulsong audio file:', error);
+      return null;
     }
   }
 

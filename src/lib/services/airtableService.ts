@@ -4421,6 +4421,21 @@ class AirtableService {
   }
 
   /**
+   * Check if an event has the schulsong feature enabled
+   * @param eventId - The event_id (not Airtable record ID)
+   * @returns true if the event's is_schulsong field is true
+   */
+  async getEventIsSchulsong(eventId: string): Promise<boolean> {
+    try {
+      const event = await this.getEventByEventId(eventId);
+      return event?.is_schulsong === true;
+    } catch (error) {
+      console.error('Error checking is_schulsong for event:', error);
+      return false;
+    }
+  }
+
+  /**
    * Get an Event by its access_code (short URL code)
    * Used for short URL routing: minimusiker.app/1562 → Event
    */

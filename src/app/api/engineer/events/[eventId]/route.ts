@@ -102,6 +102,9 @@ export async function GET(
       mixingStatus = 'in-progress';
     }
 
+    // Check if event has schulsong feature enabled
+    const isSchulsong = await getAirtableService().getEventIsSchulsong(eventId);
+
     const response: EngineerEventDetail = {
       eventId: eventDetail.eventId,
       schoolName: eventDetail.schoolName,
@@ -109,6 +112,7 @@ export async function GET(
       eventType: eventDetail.eventType,
       classes: classesWithAudio,
       mixingStatus,
+      isSchulsong,
     };
 
     return NextResponse.json({

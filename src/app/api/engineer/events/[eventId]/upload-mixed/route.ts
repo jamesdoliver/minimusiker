@@ -113,7 +113,7 @@ export async function PUT(
     }
 
     const eventId = decodeURIComponent(params.eventId);
-    const { classId, r2Key, filename, type, fileSizeBytes, durationSeconds } =
+    const { classId, r2Key, filename, type, fileSizeBytes, durationSeconds, isSchulsong } =
       await request.json();
 
     // Validate required fields
@@ -169,6 +169,7 @@ export async function PUT(
         fileSizeBytes,
         durationSeconds,
         status: 'ready',
+        isSchulsong: isSchulsong ?? undefined,
       });
     } else {
       // Create new audio file record
@@ -182,6 +183,7 @@ export async function PUT(
         fileSizeBytes,
         durationSeconds,
         status: 'ready',
+        isSchulsong: isSchulsong ?? undefined,
       });
     }
 
