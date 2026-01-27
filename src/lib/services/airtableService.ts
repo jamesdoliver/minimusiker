@@ -5166,6 +5166,7 @@ class AirtableService {
       name: (record.get(EMAIL_TEMPLATES_FIELD_IDS.name) as string) || '',
       audience: (record.get(EMAIL_TEMPLATES_FIELD_IDS.audience) as 'teacher' | 'parent' | 'both') || 'both',
       triggerDays: (record.get(EMAIL_TEMPLATES_FIELD_IDS.trigger_days) as number) || 0,
+      triggerHour: (record.get(EMAIL_TEMPLATES_FIELD_IDS.trigger_hour) as number) ?? 7,
       subject: (record.get(EMAIL_TEMPLATES_FIELD_IDS.email_subject) as string) || '',
       bodyHtml: (record.get(EMAIL_TEMPLATES_FIELD_IDS.email_body_html) as string) || '',
       active: (record.get(EMAIL_TEMPLATES_FIELD_IDS.active) as boolean) || false,
@@ -5261,6 +5262,7 @@ class AirtableService {
         [EMAIL_TEMPLATES_FIELD_IDS.name]: data.name,
         [EMAIL_TEMPLATES_FIELD_IDS.audience]: data.audience,
         [EMAIL_TEMPLATES_FIELD_IDS.trigger_days]: data.triggerDays,
+        [EMAIL_TEMPLATES_FIELD_IDS.trigger_hour]: data.triggerHour ?? 7,
         [EMAIL_TEMPLATES_FIELD_IDS.email_subject]: data.subject,
         [EMAIL_TEMPLATES_FIELD_IDS.email_body_html]: data.bodyHtml,
         [EMAIL_TEMPLATES_FIELD_IDS.active]: data.active ?? true,
@@ -5286,6 +5288,7 @@ class AirtableService {
       if (data.name !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.name] = data.name;
       if (data.audience !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.audience] = data.audience;
       if (data.triggerDays !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.trigger_days] = data.triggerDays;
+      if (data.triggerHour !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.trigger_hour] = data.triggerHour;
       if (data.subject !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.email_subject] = data.subject;
       if (data.bodyHtml !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.email_body_html] = data.bodyHtml;
       if (data.active !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.active] = data.active;

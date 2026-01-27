@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
       name: body.name,
       audience: body.audience,
       triggerDays: body.triggerDays,
+      triggerHour: body.triggerHour,
       subject: body.subject,
       bodyHtml: body.bodyHtml,
       active: body.active ?? true,

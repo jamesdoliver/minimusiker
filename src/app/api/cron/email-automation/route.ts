@@ -2,8 +2,8 @@
  * Email Automation Cron Endpoint
  *
  * This endpoint is called by Vercel Cron to process automated email sending.
- * It runs daily at 7:00 AM and sends emails based on active templates and
- * event date thresholds.
+ * It runs every hour and only processes templates whose triggerHour matches
+ * the current Europe/Berlin hour.
  *
  * @route POST /api/cron/email-automation
  * @security Protected by CRON_SECRET environment variable
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     endpoint: '/api/cron/email-automation',
     method: 'POST',
     description: 'Process automated email sending based on active templates',
-    schedule: '0 7 * * * (daily at 7:00 AM)',
+    schedule: '0 * * * * (every hour)',
     queryParams: {
       dryRun: 'Set to "true" to preview what would be sent without actually sending',
     },

@@ -20,6 +20,7 @@ export const EMAIL_TEMPLATES_FIELD_IDS = {
   name: 'fldJnr0LjUf1fG3aK',                     // Single line text
   audience: 'fldnmFNebIrstXsWT',                 // Single select: teacher, parent, both
   trigger_days: 'fldqvR1BPJg3oSEFN',             // Number (negative = before, positive = after)
+  trigger_hour: 'fldZdp0R50gmHwLl2',             // Number (0-23, German time hour)
   email_subject: 'fldmkqyWITt9y8462',            // Single line text with {{variables}}
   email_body_html: 'fldhg7doIpDXwxcoO',          // Long text (HTML)
   active: 'fldBcHlpMUQCCN8iZ',                   // Checkbox
@@ -52,6 +53,7 @@ export interface EmailTemplate {
   name: string;                                  // Human-readable name
   audience: 'teacher' | 'parent' | 'both';       // Who receives this email
   triggerDays: number;                           // Days relative to event (negative = before)
+  triggerHour: number;                           // Hour of day to send (0-23 in Europe/Berlin time)
   subject: string;                               // Email subject with {{variables}}
   bodyHtml: string;                              // HTML body with {{variables}}
   active: boolean;                               // Whether template is active
@@ -83,6 +85,7 @@ export interface CreateEmailTemplateInput {
   name: string;
   audience: 'teacher' | 'parent' | 'both';
   triggerDays: number;
+  triggerHour?: number;                          // defaults to 7
   subject: string;
   bodyHtml: string;
   active?: boolean;
@@ -95,6 +98,7 @@ export interface UpdateEmailTemplateInput {
   name?: string;
   audience?: 'teacher' | 'parent' | 'both';
   triggerDays?: number;
+  triggerHour?: number;
   subject?: string;
   bodyHtml?: string;
   active?: boolean;
@@ -146,6 +150,9 @@ export interface TemplateData {
 
   // Order/purchase information
   order_link?: string;
+
+  // Internal: ISO date string for date math (not directly substitutable)
+  _event_date_iso?: string;
 
   // Dynamic: any additional variables
   [key: string]: string | undefined;
