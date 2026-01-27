@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { EmailTemplate, EmailLog } from '@/lib/types/email-automation';
@@ -45,6 +45,19 @@ interface DryRunParentRecipient {
   childName: string | undefined;
 }
 
+interface SendNowEvent {
+  eventId: string;
+  eventRecordId: string;
+  schoolName: string;
+  eventDate: string;
+  eventType: string;
+}
+
+interface SendNowResult {
+  summary: { sent: number; failed: number; skipped: number };
+  details: Array<{ eventId: string; email: string; status: string; error?: string }>;
+}
+
 interface DryRunData {
   template: {
     id: string;
@@ -71,12 +84,21 @@ export default function AdminEmails() {
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'teacher' | 'parent' | 'all'>('all');
   const [dryRunData, setDryRunData] = useState<DryRunData | null>(null);
   const [isDryRunLoading, setIsDryRunLoading] = useState(false);
   const [isDryRunModalOpen, setIsDryRunModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [sendNowTemplateId, setSendNowTemplateId] = useState<string | null>(null);
+  const [sendNowEvents, setSendNowEvents] = useState<SendNowEvent[]>([]);
+  const [sendNowSelectedEventIds, setSendNowSelectedEventIds] = useState<Set<string>>(new Set());
+  const [isSendNowModalOpen, setIsSendNowModalOpen] = useState(false);
+  const [isSendNowLoading, setIsSendNowLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sendNowResult, setSendNowResult] = useState<SendNowResult | null>(null);
+  const [newLogIds, setNewLogIds] = useState<Set<string>>(new Set());
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previousLogIdsRef = useRef<Set<string>>(new Set());
 
   const fetchTemplates = useCallback(async () => {
     try {
@@ -104,9 +126,9 @@ export default function AdminEmails() {
     }
   }, []);
 
-  const fetchLogs = useCallback(async () => {
+  const fetchLogs = useCallback(async (silent?: boolean) => {
     try {
-      setIsLoadingLogs(true);
+      if (!silent) setIsLoadingLogs(true);
       const response = await fetch('/api/admin/email-logs?limit=50', {
         credentials: 'include',
       });
@@ -118,6 +140,25 @@ export default function AdminEmails() {
 
       const data = await response.json();
       if (data.success) {
+        const newLogs: EmailLog[] = data.data.logs;
+        // Detect new log entries on silent refresh
+        if (silent && newLogs.length > 0) {
+          const currentIds = new Set(newLogs.map((l: EmailLog) => l.id));
+          const freshIds = new Set<string>();
+          for (const id of currentIds) {
+            if (!previousLogIdsRef.current.has(id)) {
+              freshIds.add(id);
+            }
+          }
+          if (freshIds.size > 0) {
+            setNewLogIds(freshIds);
+            // Clear highlight after 3 seconds
+            setTimeout(() => setNewLogIds(new Set()), 3000);
+          }
+          previousLogIdsRef.current = currentIds;
+        } else if (!silent && newLogs.length > 0) {
+          previousLogIdsRef.current = new Set(newLogs.map((l: EmailLog) => l.id));
+        }
         setLogsData(data.data);
       } else {
         throw new Error(data.error || 'Failed to load logs');
@@ -126,7 +167,7 @@ export default function AdminEmails() {
       console.error('Error fetching logs:', err);
       // Don't set error for logs - templates are primary
     } finally {
-      setIsLoadingLogs(false);
+      if (!silent) setIsLoadingLogs(false);
     }
   }, []);
 
@@ -186,18 +227,88 @@ export default function AdminEmails() {
     }
   };
 
+  const openSendNowModal = useCallback(async (templateId: string) => {
+    setSendNowTemplateId(templateId);
+    setIsSendNowModalOpen(true);
+    setIsSendNowLoading(true);
+    setSendNowResult(null);
+    setSendNowSelectedEventIds(new Set());
+    try {
+      const response = await fetch('/api/admin/events/list', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch events');
+      const data = await response.json();
+      if (data.success) {
+        setSendNowEvents(data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching events:', err);
+      setSendNowEvents([]);
+    } finally {
+      setIsSendNowLoading(false);
+    }
+  }, []);
+
+  const closeSendNowModal = useCallback(() => {
+    setIsSendNowModalOpen(false);
+    setSendNowTemplateId(null);
+    setSendNowEvents([]);
+    setSendNowSelectedEventIds(new Set());
+    setSendNowResult(null);
+  }, []);
+
+  const toggleSendNowEvent = useCallback((eventId: string) => {
+    setSendNowSelectedEventIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(eventId)) {
+        next.delete(eventId);
+      } else {
+        next.add(eventId);
+      }
+      return next;
+    });
+  }, []);
+
+  const executeSendNow = useCallback(async () => {
+    if (!sendNowTemplateId || sendNowSelectedEventIds.size === 0) return;
+    setIsSending(true);
+    try {
+      const response = await fetch(`/api/admin/email-templates/${sendNowTemplateId}/send-now`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventIds: Array.from(sendNowSelectedEventIds) }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setSendNowResult(data.data);
+        fetchLogs();
+      } else {
+        alert(data.error || 'Fehler beim Senden');
+      }
+    } catch (err) {
+      console.error('Error sending:', err);
+      alert('Fehler beim Senden');
+    } finally {
+      setIsSending(false);
+    }
+  }, [sendNowTemplateId, sendNowSelectedEventIds, fetchLogs]);
+
   useEffect(() => {
     fetchTemplates();
     fetchLogs();
   }, [fetchTemplates, fetchLogs]);
 
-  const getFilteredTemplates = () => {
-    if (!templatesData) return [];
-    if (activeTab === 'all') return templatesData.templates;
-    return templatesData.templates.filter(
-      (t) => t.audience === activeTab || t.audience === 'both'
-    );
-  };
+  // Auto-poll logs every 15 seconds
+  useEffect(() => {
+    pollingIntervalRef.current = setInterval(() => {
+      fetchLogs(true);
+    }, 15000);
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [fetchLogs]);
 
   const formatTriggerDays = (days: number): string => {
     if (days === 0) return 'Am Veranstaltungstag';
@@ -262,117 +373,139 @@ export default function AdminEmails() {
         </Link>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {[
-            { key: 'all', label: 'Alle Vorlagen' },
-            { key: 'teacher', label: 'Lehrer' },
-            { key: 'parent', label: 'Eltern' },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as 'all' | 'teacher' | 'parent')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                activeTab === tab.key
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.label}
-              {templatesData && (
-                <span className="ml-2 py-0.5 px-2 rounded-full text-xs bg-gray-100">
-                  {tab.key === 'all'
-                    ? templatesData.total
-                    : tab.key === 'teacher'
-                    ? templatesData.grouped.teacher.length
-                    : templatesData.grouped.parent.length}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-      </div>
+      {/* Templates Timeline */}
+      {isLoadingTemplates ? (
+        <div className="flex justify-center py-8">
+          <LoadingSpinner />
+        </div>
+      ) : !templatesData || templatesData.templates.length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          Keine Vorlagen gefunden
+        </div>
+      ) : (
+        <div className="relative">
+          {/* Vertical timeline line */}
+          <div className="absolute left-[7.5rem] top-0 bottom-0 w-0.5 bg-gray-200" />
 
-      {/* Templates Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {isLoadingTemplates ? (
-          <div className="col-span-full flex justify-center py-8">
-            <LoadingSpinner />
-          </div>
-        ) : getFilteredTemplates().length === 0 ? (
-          <div className="col-span-full text-center py-8 text-gray-500">
-            Keine Vorlagen gefunden
-          </div>
-        ) : (
-          getFilteredTemplates().map((template) => (
-            <div
-              key={template.id}
-              className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
-            >
-              <Link
-                href={`/admin/emails/${template.id}`}
-                className="block"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-900 truncate">
-                      {template.name}
-                    </h3>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {template.audience === 'teacher' && 'Lehrer'}
-                      {template.audience === 'parent' && 'Eltern'}
-                      {template.audience === 'both' && 'Lehrer & Eltern'}
-                      {' | '}
-                      {formatTriggerDays(template.triggerDays)}
-                    </p>
+          <div className="space-y-0">
+            {(() => {
+              const sorted = [...templatesData.templates].sort((a, b) => a.triggerDays - b.triggerDays);
+              const firstNonNegativeIdx = sorted.findIndex(t => t.triggerDays >= 0);
+              const items: React.ReactNode[] = [];
+
+              sorted.forEach((template, idx) => {
+                // Insert "Veranstaltungstag" divider before first template with triggerDays >= 0
+                if (idx === firstNonNegativeIdx) {
+                  items.push(
+                    <div key="divider" className="relative flex items-center py-3">
+                      <div className="w-[7.5rem] flex-shrink-0" />
+                      <div className="relative z-10 flex items-center justify-center w-5 h-5 bg-primary rounded-full ring-4 ring-primary/20" />
+                      <div className="ml-4 flex-1 border-t-2 border-dashed border-primary/40 relative">
+                        <span className="absolute -top-3 left-2 bg-white px-2 text-xs font-semibold text-primary">
+                          Veranstaltungstag
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const dotColor = template.triggerDays < 0
+                  ? 'bg-blue-500'
+                  : template.triggerDays === 0
+                  ? 'bg-primary'
+                  : 'bg-amber-500';
+
+                const audienceBadge = template.audience === 'teacher'
+                  ? { label: 'Lehrer', cls: 'bg-purple-100 text-purple-700' }
+                  : template.audience === 'parent'
+                  ? { label: 'Eltern', cls: 'bg-orange-100 text-orange-700' }
+                  : { label: 'Beide', cls: 'bg-blue-100 text-blue-700' };
+
+                items.push(
+                  <div key={template.id} className="relative flex items-start py-2 group">
+                    {/* Trigger day label */}
+                    <div className="w-[7.5rem] flex-shrink-0 text-right pr-4 pt-3">
+                      <span className="text-xs font-medium text-gray-500">
+                        {formatTriggerDays(template.triggerDays)} · {template.triggerHour}:00 Uhr
+                      </span>
+                    </div>
+
+                    {/* Dot */}
+                    <div className={`relative z-10 mt-3.5 w-3 h-3 rounded-full ${dotColor} ring-2 ring-white flex-shrink-0`} />
+
+                    {/* Card */}
+                    <div className="ml-4 flex-1 bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+                      <Link href={`/admin/emails/${template.id}`} className="block">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="text-sm font-medium text-gray-900">
+                                {template.name}
+                              </h3>
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${audienceBadge.cls}`}>
+                                {audienceBadge.label}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-gray-600 truncate">
+                              Betreff: {template.subject}
+                            </p>
+                          </div>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${
+                              template.active
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {template.active ? 'Aktiv' : 'Inaktiv'}
+                          </span>
+                        </div>
+                      </Link>
+                      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-3">
+                        <button
+                          onClick={() => fetchDryRun(template.id)}
+                          className="text-xs text-primary hover:text-primary/80 font-medium"
+                        >
+                          Dry Run
+                        </button>
+                        <button
+                          onClick={() => openSendNowModal(template.id)}
+                          className="text-xs text-green-600 hover:text-green-800 font-medium"
+                        >
+                          Jetzt senden
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(template.id)}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium"
+                        >
+                          Löschen
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <span
-                    className={`ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      template.active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
-                  >
-                    {template.active ? 'Aktiv' : 'Inaktiv'}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-gray-600 truncate">
-                  Betreff: {template.subject}
-                </p>
-              </Link>
-              <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    fetchDryRun(template.id);
-                  }}
-                  className="text-xs text-primary hover:text-primary/80 font-medium"
-                >
-                  Dry Run
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDeleteConfirmId(template.id);
-                  }}
-                  className="text-xs text-red-600 hover:text-red-800 font-medium"
-                >
-                  Löschen
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+                );
+              });
+
+              return items;
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Recent Logs Section */}
       <div className="mt-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Letzte Aktivitäten
-        </h2>
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Letzte Aktivitäten
+          </h2>
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-400">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+            </span>
+            Automatische Aktualisierung
+          </span>
+        </div>
 
         {logsData && logsData.stats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
@@ -413,9 +546,9 @@ export default function AdminEmails() {
               Noch keine E-Mails gesendet
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="max-h-96 overflow-y-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 sticky top-0">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Zeitpunkt
@@ -432,8 +565,13 @@ export default function AdminEmails() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {logsData?.logs.slice(0, 10).map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50">
+                  {logsData?.logs.map((log) => (
+                    <tr
+                      key={log.id}
+                      className={`transition-colors duration-500 ${
+                        newLogIds.has(log.id) ? 'bg-green-50' : 'hover:bg-gray-50'
+                      }`}
+                    >
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(log.sentAt)}
                       </td>
@@ -508,6 +646,117 @@ export default function AdminEmails() {
                     {isDeleting ? 'Löscht...' : 'Löschen'}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Now Modal */}
+      {isSendNowModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4 text-center">
+            <div
+              className="fixed inset-0 bg-black/30"
+              onClick={closeSendNowModal}
+            />
+            <div className="relative w-full max-w-lg transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all">
+              {/* Modal Header */}
+              <div className="border-b border-gray-200 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Jetzt senden: {templatesData?.templates.find(t => t.id === sendNowTemplateId)?.name}
+                  </h3>
+                  <button
+                    onClick={closeSendNowModal}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <span className="text-2xl">&times;</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+                {isSendNowLoading ? (
+                  <div className="flex justify-center py-8">
+                    <LoadingSpinner />
+                  </div>
+                ) : sendNowResult ? (
+                  <div className="space-y-4">
+                    <h4 className="font-medium text-gray-900">Ergebnis</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-green-50 rounded-lg p-3 text-center">
+                        <p className="text-xl font-bold text-green-700">{sendNowResult.summary.sent}</p>
+                        <p className="text-xs text-green-600">Gesendet</p>
+                      </div>
+                      <div className="bg-red-50 rounded-lg p-3 text-center">
+                        <p className="text-xl font-bold text-red-700">{sendNowResult.summary.failed}</p>
+                        <p className="text-xs text-red-600">Fehlgeschlagen</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3 text-center">
+                        <p className="text-xl font-bold text-gray-600">{sendNowResult.summary.skipped}</p>
+                        <p className="text-xs text-gray-500">Übersprungen</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : sendNowEvents.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Keine Veranstaltungen im Zeitfenster gefunden
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-500 mb-3">
+                      Wähle die Veranstaltungen aus, an deren Empfänger die E-Mail gesendet werden soll:
+                    </p>
+                    {sendNowEvents.map((event) => (
+                      <label
+                        key={event.eventId}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={sendNowSelectedEventIds.has(event.eventId)}
+                          onChange={() => toggleSendNowEvent(event.eventId)}
+                          className="rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {event.schoolName}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(event.eventDate).toLocaleDateString('de-DE', {
+                              day: '2-digit',
+                              month: 'long',
+                              year: 'numeric',
+                            })}
+                            {' | '}
+                            {event.eventType}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="border-t border-gray-200 px-6 py-4 flex gap-3">
+                <button
+                  onClick={closeSendNowModal}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  {sendNowResult ? 'Schließen' : 'Abbrechen'}
+                </button>
+                {!sendNowResult && (
+                  <button
+                    onClick={executeSendNow}
+                    disabled={sendNowSelectedEventIds.size === 0 || isSending}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {isSending ? 'Sendet...' : `Senden (${sendNowSelectedEventIds.size} Events)`}
+                  </button>
+                )}
               </div>
             </div>
           </div>

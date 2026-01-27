@@ -89,9 +89,20 @@ export function substituteTemplateVariables(
 ): string {
   let result = template;
 
-  // Replace all {{variable}} patterns
+  // Pre-process date math: {{event_date+N}} or {{event_date-N}}
+  if (data._event_date_iso) {
+    const baseDate = new Date(data._event_date_iso);
+    result = result.replace(/\{\{event_date([+-]\d+)\}\}/g, (_match, offsetStr: string) => {
+      const offset = parseInt(offsetStr, 10);
+      const computed = new Date(baseDate);
+      computed.setDate(computed.getDate() + offset);
+      return formatDateGerman(computed.toISOString());
+    });
+  }
+
+  // Replace all {{variable}} patterns, skipping _-prefixed internal keys
   for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined) {
+    if (value !== undefined && !key.startsWith('_')) {
       const pattern = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
       result = result.replace(pattern, value);
     }
@@ -212,6 +223,7 @@ async function getTeacherRecipientsForEvent(
               class_name: cls.class_name,
               teacher_name: cls.main_teacher,
               teacher_first_name: cls.main_teacher.split(' ')[0],
+              _event_date_iso: eventData.eventDate,
             },
           });
         }
@@ -239,6 +251,7 @@ async function getTeacherRecipientsForEvent(
                 event_type: eventData.eventType,
                 teacher_name: staff.staff_name,
                 teacher_first_name: staff.staff_name?.split(' ')[0] || '',
+                _event_date_iso: eventData.eventDate,
               },
             });
           }
@@ -301,6 +314,7 @@ async function getParentRecipientsForEvent(
               child_name: registration.registered_child,
               class_name: className,
               parent_portal_link: `${process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app'}/parent`,
+              _event_date_iso: eventData.eventDate,
             },
           });
         }
@@ -344,7 +358,7 @@ export async function getRecipientsForEvent(
 /**
  * Send a single automated email
  */
-async function sendAutomatedEmail(
+export async function sendAutomatedEmail(
   template: EmailTemplate,
   recipient: EmailRecipient
 ): Promise<EmailSendResult> {
@@ -425,13 +439,31 @@ async function sendAutomatedEmail(
 // =============================================================================
 
 /**
- * Process all email automation for today
- * This is the main entry point called by the cron job
+ * Get the current hour in Europe/Berlin timezone
+ */
+function getCurrentBerlinHour(): number {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Berlin',
+    hour: 'numeric',
+    hourCycle: 'h23',
+  });
+  return parseInt(formatter.format(new Date()), 10);
+}
+
+/**
+ * Process all email automation for the current hour
+ * This is the main entry point called by the cron job (runs hourly).
+ * Only processes templates whose triggerHour matches the current Berlin time hour.
+ *
+ * @param dryRun - If true, logs what would be sent without actually sending
+ * @param currentHour - Override the current hour (for testing). If not provided, uses Europe/Berlin time.
  */
 export async function processEmailAutomation(
-  dryRun: boolean = false
+  dryRun: boolean = false,
+  currentHour?: number
 ): Promise<AutomationResult> {
   const airtable = getAirtableService();
+  const hour = currentHour ?? getCurrentBerlinHour();
   const result: AutomationResult = {
     processedAt: new Date().toISOString(),
     templatesProcessed: 0,
@@ -444,14 +476,21 @@ export async function processEmailAutomation(
 
   try {
     // Get all active templates
-    const templates = await airtable.getActiveEmailTemplates();
+    const allTemplates = await airtable.getActiveEmailTemplates();
 
-    if (templates.length === 0) {
+    if (allTemplates.length === 0) {
       result.errors.push('No active email templates found');
       return result;
     }
 
-    console.log(`[Email Automation] Processing ${templates.length} active templates`);
+    // Filter to only templates matching the current hour
+    const templates = allTemplates.filter(t => t.triggerHour === hour);
+
+    console.log(`[Email Automation] Hour ${hour} (Berlin) — ${templates.length}/${allTemplates.length} active templates match`);
+
+    if (templates.length === 0) {
+      return result;
+    }
 
     for (const template of templates) {
       try {
@@ -572,6 +611,7 @@ export function getPreviewTemplateData(): TemplateData {
     class_name: 'Klasse 3a',
     class_time: '10:00 Uhr',
     order_link: 'https://minimusiker.app/shop',
+    _event_date_iso: eventDate.toISOString(),
   };
 }
 
@@ -612,6 +652,7 @@ export async function sendTestEmail(
         teacher_portal_link: `${baseUrl}/teacher`,
         parent_portal_link: `${baseUrl}/parent`,
         event_link: `${baseUrl}/parent`,
+        _event_date_iso: event.event_date,
       };
     } else {
       // Use default preview data

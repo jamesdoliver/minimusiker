@@ -85,6 +85,7 @@ export async function PUT(
     if (body.name !== undefined) updateInput.name = body.name;
     if (body.audience !== undefined) updateInput.audience = body.audience;
     if (body.triggerDays !== undefined) updateInput.triggerDays = body.triggerDays;
+    if (body.triggerHour !== undefined) updateInput.triggerHour = body.triggerHour;
     if (body.subject !== undefined) updateInput.subject = body.subject;
     if (body.bodyHtml !== undefined) updateInput.bodyHtml = body.bodyHtml;
     if (body.active !== undefined) updateInput.active = body.active;
