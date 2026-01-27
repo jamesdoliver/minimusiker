@@ -155,6 +155,8 @@ class ActivityService {
         return `Generated ${details.taskCount} tasks for event`;
       case 'booking_status_changed':
         return `Booking status changed to "${details.newStatus}"`;
+      case 'event_deleted':
+        return `Event "${details.schoolName}" deleted by admin`;
       default:
         return 'Activity logged';
     }

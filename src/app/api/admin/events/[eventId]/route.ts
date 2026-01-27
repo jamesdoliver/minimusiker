@@ -98,7 +98,7 @@ export async function GET(
     // Fetch Event record to get status and type fields
     const airtableService = getAirtableService();
     let eventStatusAndType: {
-      eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled';
+      eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted';
       isPlus?: boolean;
       isKita?: boolean;
       isSchulsong?: boolean;
@@ -323,6 +323,87 @@ export async function PATCH(
       {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update event',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/admin/events/[eventId]
+ * Soft-delete an event by marking Event and SchoolBooking as deleted
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { eventId: string } }
+) {
+  try {
+    // Verify admin authentication
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const eventId = decodeURIComponent(params.eventId);
+    const airtableService = getAirtableService();
+
+    // Resolve eventRecordId (same lookup logic as PATCH)
+    let eventRecordId: string | null = null;
+
+    const eventsByEventId = await airtableService.getEventsRecordIdByBookingId(eventId);
+    if (eventsByEventId) {
+      eventRecordId = eventsByEventId;
+    }
+
+    if (!eventRecordId && /^\d+$/.test(eventId)) {
+      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      if (booking) {
+        const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (eventRecord) {
+          eventRecordId = eventRecord.id;
+        }
+      }
+    }
+
+    if (!eventRecordId) {
+      return NextResponse.json(
+        { success: false, error: 'Event not found' },
+        { status: 404 }
+      );
+    }
+
+    // Soft-delete the event
+    const result = await airtableService.softDeleteEvent(eventRecordId);
+
+    // Log activity (fire-and-forget)
+    getActivityService().logActivity({
+      eventRecordId,
+      activityType: 'event_deleted',
+      description: ActivityService.generateDescription('event_deleted', {
+        schoolName: result.schoolName,
+      }),
+      actorEmail: admin.email,
+      actorType: 'admin',
+      metadata: {
+        eventId: result.eventId,
+        schoolName: result.schoolName,
+        bookingRecordId: result.bookingRecordId,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Event "${result.schoolName}" has been deleted`,
+    });
+  } catch (error) {
+    console.error('Error deleting event:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete event',
       },
       { status: 500 }
     );

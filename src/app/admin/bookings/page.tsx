@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import BookingsTable from '@/components/admin/bookings/BookingsTable';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
@@ -58,6 +58,11 @@ export default function AdminBookings() {
       setIsLoading(false);
     }
   };
+
+  const handleEventDeleted = useCallback((bookingId: string) => {
+    setBookings(prev => prev.filter(b => b.id !== bookingId));
+    setStats(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+  }, []);
 
   // Filter bookings based on status and search
   const filteredBookings = useMemo(() => {
@@ -215,7 +220,7 @@ export default function AdminBookings() {
       )}
 
       {/* Bookings Table */}
-      <BookingsTable bookings={filteredBookings} />
+      <BookingsTable bookings={filteredBookings} onEventDeleted={handleEventDeleted} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import EventTypeCircles from './EventTypeCircles';
 
 interface BookingsTableProps {
   bookings: BookingWithDetails[];
+  onEventDeleted?: (bookingId: string) => void;
 }
 
 function ChevronIcon({ isOpen }: { isOpen: boolean }) {
@@ -55,7 +56,7 @@ function formatDate(dateString: string): string {
   }
 }
 
-export default function BookingsTable({ bookings }: BookingsTableProps) {
+export default function BookingsTable({ bookings, onEventDeleted }: BookingsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const toggleRow = (bookingId: string) => {
@@ -159,7 +160,7 @@ export default function BookingsTable({ bookings }: BookingsTableProps) {
                           className="overflow-hidden transition-all duration-300 ease-in-out"
                           style={{ maxHeight: isExpanded ? '1000px' : '0' }}
                         >
-                          <BookingDetailsBreakdown booking={booking} />
+                          <BookingDetailsBreakdown booking={booking} onEventDeleted={onEventDeleted} />
                         </div>
                       </td>
                     </tr>

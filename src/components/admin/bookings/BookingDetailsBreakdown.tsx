@@ -7,12 +7,15 @@ import { BookingWithDetails } from '@/app/api/admin/bookings/route';
 import ConfirmPrintablesModal from './ConfirmPrintablesModal';
 import RefreshBookingModal from './RefreshBookingModal';
 import OrderOverviewModal from './OrderOverviewModal';
+import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfirmModal';
+import { toast } from 'sonner';
 
 interface BookingDetailsBreakdownProps {
   booking: BookingWithDetails;
+  onEventDeleted?: (bookingId: string) => void;
 }
 
-export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreakdownProps) {
+export default function BookingDetailsBreakdown({ booking, onEventDeleted }: BookingDetailsBreakdownProps) {
   const [showPrintablesModal, setShowPrintablesModal] = useState(false);
   const [showOrdersModal, setShowOrdersModal] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -26,6 +29,8 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
   } | null>(null);
   const [isApplyingRefresh, setIsApplyingRefresh] = useState(false);
   const [forceRefresh, setForceRefresh] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Generate QR code on mount
   useEffect(() => {
@@ -118,6 +123,32 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
       console.error('Apply refresh error:', error);
     } finally {
       setIsApplyingRefresh(false);
+    }
+  };
+
+  // Delete event handler
+  const handleDeleteEvent = async () => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/admin/events/${booking.code}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success(data.message || 'Event deleted successfully');
+        setIsDeleteModalOpen(false);
+        onEventDeleted?.(booking.id);
+      } else {
+        toast.error(data.error || 'Failed to delete event');
+      }
+    } catch (error) {
+      console.error('Delete event error:', error);
+      toast.error('Failed to delete event');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -298,7 +329,22 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
       </div>
 
       {/* Actions Row */}
-      <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end gap-3">
+      <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between">
+        {/* Left side - Delete button */}
+        <div>
+          <button
+            onClick={() => setIsDeleteModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete Event
+          </button>
+        </div>
+
+        {/* Right side - existing action buttons */}
+        <div className="flex gap-3">
         <button
           onClick={() => handleRefresh()}
           disabled={isRefreshing}
@@ -349,7 +395,19 @@ export default function BookingDetailsBreakdown({ booking }: BookingDetailsBreak
           </svg>
           View Event Details
         </Link>
+        </div>
       </div>
+
+      {/* Delete Event Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <DeleteConfirmModal
+          title="Delete Event"
+          message={`Are you sure you want to delete the event for "${booking.schoolName}" on ${booking.bookingDate}? (Access code: ${booking.code}) This will mark the event and booking as deleted.`}
+          onConfirm={handleDeleteEvent}
+          onCancel={() => setIsDeleteModalOpen(false)}
+          isDeleting={isDeleting}
+        />
+      )}
 
       {/* Confirm Printables Modal */}
       <ConfirmPrintablesModal
