@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import Image from 'next/image';
 import dynamic from 'next/dynamic';
 
 const SchulsongWaveformPlayer = dynamic(
@@ -62,28 +61,13 @@ export default function SchulsongSection({ eventId }: SchulsongSectionProps) {
 
   return (
     <section
-      className="relative py-12 md:py-16 bg-cover bg-center"
+      className="relative pt-64 md:pt-80 pb-12 md:pb-16 bg-cover bg-center"
       style={{
         backgroundImage: `url('/images/schulesong/Wallpaper UnserSchulsong.png')`,
       }}
     >
-      {/* Semi-transparent overlay for readability */}
-      <div className="absolute inset-0 bg-black/10" />
-
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center">
-          {/* Logo */}
-          <div className="mb-8">
-            <Image
-              src="/images/schulesong/Logo UnserSchulsong.png"
-              alt="Unser Schulsong"
-              width={280}
-              height={100}
-              className="drop-shadow-lg"
-              priority={false}
-            />
-          </div>
-
           {/* Content area */}
           <div className="w-full max-w-2xl">
             {status.hasAudio && status.audioUrl ? (
