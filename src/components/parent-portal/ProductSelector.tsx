@@ -178,41 +178,39 @@ const STANDARD_CLOTHING_PRODUCTS: ClothingProduct[] = [
 ];
 
 // Personalized clothing products (shown when >19 days before event)
-function getPersonalizedClothingProducts(schoolName: string): ClothingProduct[] {
-  return [
-    {
-      id: 'tshirt',
-      name: 'T-Shirt Personalisiert',
-      description: `Minimusiker T-Shirt personalisiert für ${schoolName}`,
-      price: 25.00,
-      imageSrc: '/images/familie_portal/T-Shirt Fallback Picture.png',
-      showTshirtSize: true,
-      showHoodieSize: false,
-      isPersonalized: true,
-    },
-    {
-      id: 'hoodie',
-      name: 'Hoodie Personalisiert',
-      description: `Kuscheliger Hoodie personalisiert für ${schoolName}`,
-      price: 49.00,
-      imageSrc: '/images/familie_portal/Hoodie Fallback Picture.png',
-      showTshirtSize: false,
-      showHoodieSize: true,
-      isPersonalized: true,
-    },
-    {
-      id: 'tshirt-hoodie',
-      name: 'T-Shirt & Hoodie Personalisiert',
-      description: `Das komplette Minimusiker Set personalisiert für ${schoolName}`,
-      price: 59.00,
-      imageSrc: '/images/familie_portal/Hoodie and T-Shirt Picture.jpeg',
-      showTshirtSize: true,
-      showHoodieSize: true,
-      savings: 15,
-      isPersonalized: true,
-    },
-  ];
-}
+const PERSONALIZED_CLOTHING_PRODUCTS: ClothingProduct[] = [
+  {
+    id: 'tshirt',
+    name: 'Minimusiker Schul-T-Shirt',
+    description: 'Der gemütliche Minimusiker Schul-T-Shirt – extra für eure Schule gemacht',
+    price: 25.00,
+    imageSrc: '/images/familie_portal/T-Shirt Fallback Picture.png',
+    showTshirtSize: true,
+    showHoodieSize: false,
+    isPersonalized: true,
+  },
+  {
+    id: 'hoodie',
+    name: 'Minimusiker Schul-Hoodie',
+    description: 'Der gemütliche Minimusiker Schul-Hoodie – extra für eure Schule gemacht',
+    price: 49.00,
+    imageSrc: '/images/familie_portal/Hoodie Fallback Picture.png',
+    showTshirtSize: false,
+    showHoodieSize: true,
+    isPersonalized: true,
+  },
+  {
+    id: 'tshirt-hoodie',
+    name: 'Minimusiker Schul-T-Shirt & Schul-Hoodie Bundle',
+    description: 'Das komplette Minimusiker Schul-Set – extra für eure Schule gemacht',
+    price: 59.00,
+    imageSrc: '/images/familie_portal/Hoodie and T-Shirt Picture.jpeg',
+    showTshirtSize: true,
+    showHoodieSize: true,
+    savings: 15,
+    isPersonalized: true,
+  },
+];
 
 // Backwards compatibility - default to standard
 const CLOTHING_PRODUCTS = STANDARD_CLOTHING_PRODUCTS;
@@ -460,9 +458,9 @@ export default function ProductSelector({
   // Select the appropriate clothing products based on time until event
   const activeClothingProducts = useMemo(
     () => showPersonalized
-      ? getPersonalizedClothingProducts(schoolName)
+      ? PERSONALIZED_CLOTHING_PRODUCTS
       : STANDARD_CLOTHING_PRODUCTS,
-    [showPersonalized, schoolName]
+    [showPersonalized]
   );
 
   // Fetch products from Shopify for images (use 'all' to get all products)
