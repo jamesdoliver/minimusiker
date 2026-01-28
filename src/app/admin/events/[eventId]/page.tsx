@@ -232,8 +232,8 @@ export default function EventDetailPage() {
 
       const data = await response.json();
 
-      // Update local state with new date
-      setEvent(prev => prev ? { ...prev, eventDate: editedDate } : null);
+      // Re-fetch to ensure display matches Airtable
+      await fetchEventDetail();
       setIsEditingDate(false);
       setEditedDate('');
 

@@ -4534,8 +4534,17 @@ class AirtableService {
       }
 
       // First, get the current event to find linked SchoolBooking
-      const eventRecord = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
-      const linkedBookingIds = eventRecord.get(EVENTS_FIELD_IDS.simplybook_booking) as string[] | undefined;
+      const eventRecords = await this.base(EVENTS_TABLE_ID).select({
+        filterByFormula: `RECORD_ID() = '${eventRecordId}'`,
+        maxRecords: 1,
+        returnFieldsByFieldId: true,
+      }).firstPage();
+
+      if (eventRecords.length === 0) {
+        throw new Error('Event not found');
+      }
+
+      const linkedBookingIds = eventRecords[0].fields[EVENTS_FIELD_IDS.simplybook_booking] as string[] | undefined;
 
       // Update the Events table
       await this.base(EVENTS_TABLE_ID).update(eventRecordId, {
