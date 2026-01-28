@@ -176,7 +176,8 @@ function ParentPortalContent() {
         if (response.ok) {
           const data = await response.json();
           // Schulsong-only = has schulsong but is NOT a minimusikertag
-          setIsSchulsongOnly(data.isSchulsong === true && !data.isMinimusikertag);
+          const schulsongOnly = data.isSchulsong === true && !data.isMinimusikertag;
+          setIsSchulsongOnly(schulsongOnly);
         }
       } catch (err) {
         console.error('Error fetching schulsong status:', err);
