@@ -23,6 +23,10 @@ export default function EmailTemplateEdit({ params }: PageProps) {
     subject: '',
     bodyHtml: '',
     active: true,
+    is_minimusikertag: true,
+    is_kita: false,
+    is_plus: false,
+    is_schulsong: false,
   });
   const [isLoading, setIsLoading] = useState(!isNewTemplate);
   const [isSaving, setIsSaving] = useState(false);
@@ -280,6 +284,123 @@ export default function EmailTemplateEdit({ params }: PageProps) {
 
       {/* Form */}
       <div className="space-y-6 bg-white rounded-lg border border-gray-200 p-6">
+        {/* Event Types */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Event-Typen
+          </label>
+          <div className="space-y-3">
+            {/* Minimusikertag Toggle */}
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={template.is_minimusikertag ?? true}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    if (!next && !template.is_kita && !template.is_plus && !template.is_schulsong) return;
+                    setTemplate({ ...template, is_minimusikertag: next });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-green-500 transition-colors" />
+                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform flex items-center justify-center">
+                  <span className="text-[8px] font-bold" style={{ color: '#166534' }}>M</span>
+                </div>
+              </div>
+              <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                Minimusikertag
+              </span>
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                style={{ backgroundColor: '#86efac', color: '#166534' }}
+              >
+                M
+              </div>
+            </label>
+
+            {/* Minimusikertag PLUS Toggle */}
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={template.is_plus ?? false}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    if (!next && !template.is_minimusikertag && !template.is_kita && !template.is_schulsong) return;
+                    setTemplate({ ...template, is_plus: next });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-colors" />
+                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+              </div>
+              <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                Minimusikertag PLUS
+              </span>
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                style={{ backgroundColor: '#93c5fd', color: '#1e40af' }}
+              >
+                +
+              </div>
+            </label>
+
+            {/* KiTa Toggle */}
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={template.is_kita ?? false}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    if (!next && !template.is_minimusikertag && !template.is_plus && !template.is_schulsong) return;
+                    setTemplate({ ...template, is_kita: next });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-violet-500 transition-colors" />
+                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+              </div>
+              <span className="text-sm text-gray-700 group-hover:text-gray-900">KiTa</span>
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                style={{ backgroundColor: '#c4b5fd', color: '#5b21b6' }}
+              >
+                K
+              </div>
+            </label>
+
+            {/* Schulsong Toggle */}
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={template.is_schulsong ?? false}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    if (!next && !template.is_minimusikertag && !template.is_plus && !template.is_kita) return;
+                    setTemplate({ ...template, is_schulsong: next });
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-orange-500 transition-colors" />
+                <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+              </div>
+              <span className="text-sm text-gray-700 group-hover:text-gray-900">Schulsong</span>
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                style={{ backgroundColor: '#fdba74', color: '#9a3412' }}
+              >
+                S
+              </div>
+            </label>
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            Mindestens ein Event-Typ muss ausgewählt sein. Template wird nur an Events gesendet, die alle ausgewählten Typen haben.
+          </p>
+        </div>
+
         {/* Name */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">

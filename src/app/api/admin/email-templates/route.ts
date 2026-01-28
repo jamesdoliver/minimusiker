@@ -121,6 +121,10 @@ export async function POST(request: NextRequest) {
       subject: body.subject,
       bodyHtml: body.bodyHtml,
       active: body.active ?? true,
+      is_minimusikertag: body.is_minimusikertag,
+      is_kita: body.is_kita,
+      is_plus: body.is_plus,
+      is_schulsong: body.is_schulsong,
     };
 
     const airtable = getAirtableService();

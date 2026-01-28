@@ -5253,6 +5253,10 @@ class AirtableService {
       subject: (record.get(EMAIL_TEMPLATES_FIELD_IDS.email_subject) as string) || '',
       bodyHtml: (record.get(EMAIL_TEMPLATES_FIELD_IDS.email_body_html) as string) || '',
       active: (record.get(EMAIL_TEMPLATES_FIELD_IDS.active) as boolean) || false,
+      is_minimusikertag: (record.get(EMAIL_TEMPLATES_FIELD_IDS.is_minimusikertag) as boolean) || false,
+      is_kita: (record.get(EMAIL_TEMPLATES_FIELD_IDS.is_kita) as boolean) || false,
+      is_plus: (record.get(EMAIL_TEMPLATES_FIELD_IDS.is_plus) as boolean) || false,
+      is_schulsong: (record.get(EMAIL_TEMPLATES_FIELD_IDS.is_schulsong) as boolean) || false,
     };
   }
 
@@ -5349,6 +5353,10 @@ class AirtableService {
         [EMAIL_TEMPLATES_FIELD_IDS.email_subject]: data.subject,
         [EMAIL_TEMPLATES_FIELD_IDS.email_body_html]: data.bodyHtml,
         [EMAIL_TEMPLATES_FIELD_IDS.active]: data.active ?? true,
+        [EMAIL_TEMPLATES_FIELD_IDS.is_minimusikertag]: data.is_minimusikertag ?? false,
+        [EMAIL_TEMPLATES_FIELD_IDS.is_kita]: data.is_kita ?? false,
+        [EMAIL_TEMPLATES_FIELD_IDS.is_plus]: data.is_plus ?? false,
+        [EMAIL_TEMPLATES_FIELD_IDS.is_schulsong]: data.is_schulsong ?? false,
       });
 
       return this.transformEmailTemplateRecord(record);
@@ -5375,6 +5383,10 @@ class AirtableService {
       if (data.subject !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.email_subject] = data.subject;
       if (data.bodyHtml !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.email_body_html] = data.bodyHtml;
       if (data.active !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.active] = data.active;
+      if (data.is_minimusikertag !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.is_minimusikertag] = data.is_minimusikertag;
+      if (data.is_kita !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.is_kita] = data.is_kita;
+      if (data.is_plus !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.is_plus] = data.is_plus;
+      if (data.is_schulsong !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.is_schulsong] = data.is_schulsong;
 
       const record = await this.emailTemplatesTable!.update(id, fields);
       return this.transformEmailTemplateRecord(record);

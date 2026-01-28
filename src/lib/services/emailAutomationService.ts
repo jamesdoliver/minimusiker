@@ -27,6 +27,18 @@ const RATE_LIMIT_DELAY_MS = 500; // 500ms delay between emails to respect Resend
 // =============================================================================
 
 /**
+ * Check if an event matches a template's event type filters (AND logic).
+ * Returns false if the template requires an event type the event doesn't have.
+ */
+export function eventMatchesTemplate(event: EventThresholdMatch, template: EmailTemplate): boolean {
+  if (template.is_minimusikertag && !event.isMinimusikertag) return false;
+  if (template.is_kita && !event.isKita) return false;
+  if (template.is_plus && !event.isPlus) return false;
+  if (template.is_schulsong && !event.isSchulsong) return false;
+  return true;
+}
+
+/**
  * Calculate the difference in days between two dates (ignoring time)
  */
 function daysBetween(date1: Date, date2: Date): number {
@@ -166,6 +178,9 @@ export async function getEventsHittingThreshold(
           daysUntilEvent: daysUntil,
           accessCode: event.access_code,
           isKita: event.is_kita,
+          isMinimusikertag: event.is_minimusikertag,
+          isPlus: event.is_plus,
+          isSchulsong: event.is_schulsong,
         });
       }
     }
@@ -571,14 +586,17 @@ export async function processEmailAutomation(
         // Get events matching this template's trigger threshold
         const events = await getEventsHittingThreshold(template.triggerDays);
 
-        if (events.length === 0) {
-          console.log(`[Email Automation] No events match trigger threshold ${template.triggerDays}`);
+        // Filter events by template's event type filters
+        const filteredEvents = events.filter(event => eventMatchesTemplate(event, template));
+
+        if (filteredEvents.length === 0) {
+          console.log(`[Email Automation] No events match trigger threshold ${template.triggerDays} (${events.length} before event type filter)`);
           continue;
         }
 
-        console.log(`[Email Automation] Found ${events.length} events matching threshold`);
+        console.log(`[Email Automation] Found ${filteredEvents.length} events matching threshold (${events.length} before event type filter)`);
 
-        for (const event of events) {
+        for (const event of filteredEvents) {
           // Get recipients for this event
           const recipients = await getRecipientsForEvent(
             event.eventId,

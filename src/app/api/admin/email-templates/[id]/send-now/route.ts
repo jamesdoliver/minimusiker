@@ -11,6 +11,7 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import {
   getRecipientsForEvent,
   sendAutomatedEmail,
+  eventMatchesTemplate,
 } from '@/lib/services/emailAutomationService';
 import { EventThresholdMatch } from '@/lib/types/email-automation';
 
@@ -81,7 +82,16 @@ export async function POST(
         daysUntilEvent: daysBetween(today, eventDate),
         accessCode: event.access_code,
         isKita: event.is_kita,
+        isMinimusikertag: event.is_minimusikertag,
+        isPlus: event.is_plus,
+        isSchulsong: event.is_schulsong,
       };
+
+      // Check if event matches template's event type filters
+      if (!eventMatchesTemplate(thresholdMatch, template)) {
+        skipped++;
+        continue;
+      }
 
       const recipients = await getRecipientsForEvent(
         event.event_id,

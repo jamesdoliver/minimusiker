@@ -24,6 +24,10 @@ export const EMAIL_TEMPLATES_FIELD_IDS = {
   email_subject: 'fldmkqyWITt9y8462',            // Single line text with {{variables}}
   email_body_html: 'fldhg7doIpDXwxcoO',          // Long text (HTML)
   active: 'fldBcHlpMUQCCN8iZ',                   // Checkbox
+  is_minimusikertag: 'fldn63uUb14CkH4l3',       // Checkbox
+  is_kita: 'fldBCfeWCeVNErpQW',                 // Checkbox
+  is_plus: 'fldHIcAFxGOHLMZD9',                 // Checkbox
+  is_schulsong: 'fldbYsFdCwHoTvhmh',            // Checkbox
 } as const;
 
 // =============================================================================
@@ -64,6 +68,10 @@ export interface EmailTemplate {
   subject: string;                               // Email subject with {{variables}}
   bodyHtml: string;                              // HTML body with {{variables}}
   active: boolean;                               // Whether template is active
+  is_minimusikertag: boolean;                    // Event type filter
+  is_kita: boolean;                              // Event type filter
+  is_plus: boolean;                              // Event type filter
+  is_schulsong: boolean;                         // Event type filter
 }
 
 /**
@@ -96,6 +104,10 @@ export interface CreateEmailTemplateInput {
   subject: string;
   bodyHtml: string;
   active?: boolean;
+  is_minimusikertag?: boolean;
+  is_kita?: boolean;
+  is_plus?: boolean;
+  is_schulsong?: boolean;
 }
 
 /**
@@ -109,6 +121,10 @@ export interface UpdateEmailTemplateInput {
   subject?: string;
   bodyHtml?: string;
   active?: boolean;
+  is_minimusikertag?: boolean;
+  is_kita?: boolean;
+  is_plus?: boolean;
+  is_schulsong?: boolean;
 }
 
 /**
@@ -228,6 +244,9 @@ export interface EventThresholdMatch {
   daysUntilEvent: number;                        // Positive = future, negative = past
   accessCode?: number;                           // Event short URL code for {{event_link}}
   isKita?: boolean;                              // true = KiTa event, false/undefined = Schule
+  isMinimusikertag?: boolean;
+  isPlus?: boolean;
+  isSchulsong?: boolean;
 }
 
 // =============================================================================
