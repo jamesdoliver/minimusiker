@@ -34,7 +34,7 @@ export async function GET(): Promise<NextResponse> {
         eventRecordId: event.id,
         schoolName: event.school_name,
         eventDate: event.event_date,
-        eventType: event.event_type || 'Minimusikertag',
+        eventType: event.is_kita ? 'KiTa' : 'Schule',
       }));
 
     return NextResponse.json({ success: true, data: filtered });

@@ -227,6 +227,7 @@ export interface EventThresholdMatch {
   eventType: string;
   daysUntilEvent: number;                        // Positive = future, negative = past
   accessCode?: number;                           // Event short URL code for {{event_link}}
+  isKita?: boolean;                              // true = KiTa event, false/undefined = Schule
 }
 
 // =============================================================================

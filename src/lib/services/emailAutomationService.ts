@@ -162,9 +162,10 @@ export async function getEventsHittingThreshold(
           eventRecordId: event.id,
           schoolName: event.school_name,
           eventDate: event.event_date,
-          eventType: event.event_type || 'Minimusikertag',
+          eventType: event.is_kita ? 'KiTa' : 'Schule',
           daysUntilEvent: daysUntil,
           accessCode: event.access_code,
+          isKita: event.is_kita,
         });
       }
     }
@@ -667,7 +668,7 @@ export function getPreviewTemplateData(): TemplateData {
     school_name: 'Muster-Grundschule',
     event_date: formatDateGerman(eventDate.toISOString()),
     event_link: 'https://minimusiker.app/e/1234',
-    event_type: 'Minimusikertag',
+    event_type: 'Schule',
     teacher_name: 'Frau Schmidt',
     teacher_first_name: 'Maria',
     teacher_portal_link: 'https://minimusiker.app/teacher',
@@ -719,7 +720,7 @@ export async function sendTestEmail(
       templateData = {
         school_name: event.school_name || '',
         event_date: formatDateGerman(event.event_date || ''),
-        event_type: event.event_type || 'Minimusikertag',
+        event_type: event.is_kita ? 'KiTa' : 'Schule',
         teacher_portal_link: `${baseUrl}/teacher`,
         parent_portal_link: `${baseUrl}/parent`,
         event_link: eventLink,

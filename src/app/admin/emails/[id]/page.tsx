@@ -31,6 +31,8 @@ export default function EmailTemplateEdit({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [testEmail, setTestEmail] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState('');
+  const [events, setEvents] = useState<{ eventId: string; schoolName: string; eventDate: string; eventType: string }[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [previewData, setPreviewData] = useState<{
     subject: string;
@@ -71,6 +73,16 @@ export default function EmailTemplateEdit({ params }: PageProps) {
   useEffect(() => {
     fetchTemplate();
   }, [fetchTemplate]);
+
+  useEffect(() => {
+    if (isNewTemplate) return;
+    fetch('/api/admin/events/list', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) setEvents(data.data);
+      })
+      .catch(() => {});
+  }, [isNewTemplate]);
 
   const handleSave = async () => {
     try {
@@ -157,7 +169,7 @@ export default function EmailTemplateEdit({ params }: PageProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: testEmail }),
+        body: JSON.stringify({ email: testEmail, eventId: selectedEventId || undefined }),
       });
 
       const data = await response.json();
@@ -396,7 +408,7 @@ export default function EmailTemplateEdit({ params }: PageProps) {
           />
           <p className="mt-1 text-xs text-gray-500">
             Verfügbare Variablen: {'{{school_name}}'}, {'{{event_date}}'},{' '}
-            {'{{event_link}}'}, {'{{teacher_name}}'}, {'{{parent_name}}'},{' '}
+            {'{{event_type}}'}, {'{{event_link}}'}, {'{{teacher_name}}'}, {'{{parent_name}}'},{' '}
             {'{{child_name}}'}, {'{{event_date+/-X}}'} (z.B. {'{{event_date-7}}'})
           </p>
         </div>
@@ -422,6 +434,7 @@ export default function EmailTemplateEdit({ params }: PageProps) {
               <p><code className="bg-gray-200 px-1 rounded">{'{{school_name}}'}</code> – Name der Schule</p>
               <p><code className="bg-gray-200 px-1 rounded">{'{{event_date}}'}</code> – Datum der Veranstaltung (z.B. 15.03.2026)</p>
               <p><code className="bg-gray-200 px-1 rounded">{'{{event_date+N}}'}</code> / <code className="bg-gray-200 px-1 rounded">{'{{event_date-N}}'}</code> – Datum ± N Tage</p>
+              <p><code className="bg-gray-200 px-1 rounded">{'{{event_type}}'}</code> – {'"'}Schule{'"'} oder {'"'}KiTa{'"'}</p>
               <p><code className="bg-gray-200 px-1 rounded">{'{{event_link}}'}</code> – Kurz-URL zur Registrierung (z.B. minimusiker.app/e/64)</p>
               <p><code className="bg-gray-200 px-1 rounded">{'{{teacher_name}}'}</code> – Name des Lehrers</p>
               <p><code className="bg-gray-200 px-1 rounded">{'{{parent_name}}'}</code> / <code className="bg-gray-200 px-1 rounded">{'{{parent_first_name}}'}</code> – Name des Elternteils</p>
@@ -477,6 +490,23 @@ export default function EmailTemplateEdit({ params }: PageProps) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Test-E-Mail senden
             </label>
+            <div className="mb-2">
+              <select
+                value={selectedEventId}
+                onChange={(e) => setSelectedEventId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+              >
+                <option value="">Vorschau-Daten verwenden (kein Event)</option>
+                {events.map((ev) => (
+                  <option key={ev.eventId} value={ev.eventId}>
+                    {ev.schoolName} — {new Date(ev.eventDate).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Wähle ein Event, um echte Daten für die Variablen zu verwenden.
+              </p>
+            </div>
             <div className="flex gap-2">
               <input
                 type="email"

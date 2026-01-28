@@ -77,8 +77,10 @@ export async function POST(
         eventRecordId: event.id,
         schoolName: event.school_name,
         eventDate: event.event_date,
-        eventType: event.event_type || 'Minimusikertag',
+        eventType: event.is_kita ? 'KiTa' : 'Schule',
         daysUntilEvent: daysBetween(today, eventDate),
+        accessCode: event.access_code,
+        isKita: event.is_kita,
       };
 
       const recipients = await getRecipientsForEvent(

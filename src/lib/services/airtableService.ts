@@ -5048,6 +5048,11 @@ class AirtableService {
         created_at: (record.fields[EVENTS_FIELD_IDS.created_at] as string) || '',
         legacy_booking_id: record.fields[EVENTS_FIELD_IDS.legacy_booking_id] as string | undefined,
         simplybook_booking: record.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[] | undefined,
+        access_code: record.fields[EVENTS_FIELD_IDS.access_code] as number | undefined,
+        is_kita: record.fields[EVENTS_FIELD_IDS.is_kita] as boolean | undefined,
+        is_plus: record.fields[EVENTS_FIELD_IDS.is_plus] as boolean | undefined,
+        is_schulsong: record.fields[EVENTS_FIELD_IDS.is_schulsong] as boolean | undefined,
+        is_minimusikertag: record.fields[EVENTS_FIELD_IDS.is_minimusikertag] as boolean | undefined,
       }));
     } catch (error) {
       console.error('Error fetching all events:', error);
