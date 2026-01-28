@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const grouped = {
       teacher: templates.filter((t) => t.audience.includes('teacher')),
       parent: templates.filter((t) => t.audience.includes('parent')),
-      'non-buyer': templates.filter((t) => t.audience.includes('non-buyer')),
+      'non-buyers': templates.filter((t) => t.audience.includes('non-buyers')),
     };
 
     return NextResponse.json({
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate audience
-    const validAudiences = ['teacher', 'parent', 'non-buyer'];
+    const validAudiences = ['teacher', 'parent', 'non-buyers'];
     if (!Array.isArray(body.audience) || body.audience.length === 0) {
       return NextResponse.json(
         { success: false, error: 'audience must be a non-empty array' },
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
     if (!body.audience.every((a: string) => validAudiences.includes(a))) {
       return NextResponse.json(
-        { success: false, error: 'audience values must be "teacher", "parent", and/or "non-buyer"' },
+        { success: false, error: 'audience values must be "teacher", "parent", and/or "non-buyers"' },
         { status: 400 }
       );
     }

@@ -5207,7 +5207,7 @@ class AirtableService {
     const rawAudience = record.get(EMAIL_TEMPLATES_FIELD_IDS.audience);
     let audience: Audience;
     if (Array.isArray(rawAudience)) {
-      audience = rawAudience.filter(v => ['teacher', 'parent', 'non-buyer'].includes(v)) as Audience;
+      audience = rawAudience.filter(v => ['teacher', 'parent', 'non-buyers'].includes(v)) as Audience;
       if (audience.length === 0) audience = ['teacher', 'parent'];
     } else if (rawAudience === 'both') {
       audience = ['teacher', 'parent'];

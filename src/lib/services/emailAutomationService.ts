@@ -388,7 +388,7 @@ export async function getRecipientsForEvent(
     recipients.push(...await getParentRecipientsForEvent(eventId, eventRecordId, eventData));
   }
 
-  if (audience.includes('non-buyer')) {
+  if (audience.includes('non-buyers')) {
     recipients.push(...await getNonBuyerRecipientsForEvent(eventId, eventRecordId, eventData));
   }
 

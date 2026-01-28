@@ -291,7 +291,7 @@ export default function EmailTemplateEdit({ params }: PageProps) {
             {([
               { value: 'teacher' as AudienceValue, label: 'Lehrer' },
               { value: 'parent' as AudienceValue, label: 'Eltern' },
-              { value: 'non-buyer' as AudienceValue, label: 'Non-Buyers' },
+              { value: 'non-buyers' as AudienceValue, label: 'Non-Buyers' },
             ]).map(({ value, label }) => {
               const currentAudience = template.audience || ['parent'];
               const isChecked = currentAudience.includes(value);
@@ -314,7 +314,7 @@ export default function EmailTemplateEdit({ params }: PageProps) {
                     className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                   />
                   <span className="ml-2 text-sm text-gray-700">{label}</span>
-                  {value === 'non-buyer' && (
+                  {value === 'non-buyers' && (
                     <span className="ml-2 text-xs text-gray-400">
                       Eltern, die registriert aber noch nicht bestellt haben.
                     </span>

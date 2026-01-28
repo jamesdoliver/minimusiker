@@ -18,7 +18,7 @@ export const EMAIL_LOGS_TABLE_ID = 'tblxLemlKY8p8cIwS';
 
 export const EMAIL_TEMPLATES_FIELD_IDS = {
   name: 'fldJnr0LjUf1fG3aK',                     // Single line text
-  audience: 'fldnmFNebIrstXsWT',                 // Multi select: teacher, parent, non-buyer
+  audience: 'fldnmFNebIrstXsWT',                 // Multi select: teacher, parent, non-buyers
   trigger_days: 'fldqvR1BPJg3oSEFN',             // Number (negative = before, positive = after)
   trigger_hour: 'fldZdp0R50gmHwLl2',             // Number (0-23, German time hour)
   email_subject: 'fldmkqyWITt9y8462',            // Single line text with {{variables}}
@@ -45,7 +45,7 @@ export const EMAIL_LOGS_FIELD_IDS = {
 // Audience Types
 // =============================================================================
 
-export type AudienceValue = 'teacher' | 'parent' | 'non-buyer';
+export type AudienceValue = 'teacher' | 'parent' | 'non-buyers';
 export type Audience = AudienceValue[];
 
 // =============================================================================

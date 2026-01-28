@@ -10,7 +10,7 @@ interface TemplatesData {
   grouped: {
     teacher: EmailTemplate[];
     parent: EmailTemplate[];
-    'non-buyer': EmailTemplate[];
+    'non-buyers': EmailTemplate[];
   };
   total: number;
 }
@@ -422,7 +422,7 @@ export default function AdminEmails() {
                 const aud = template.audience;
                 const hasTeacher = aud.includes('teacher');
                 const hasParent = aud.includes('parent');
-                const hasNonBuyer = aud.includes('non-buyer');
+                const hasNonBuyer = aud.includes('non-buyers');
 
                 if (hasTeacher && hasParent && !hasNonBuyer) {
                   audienceBadges.push({ label: 'Beide', cls: 'bg-blue-100 text-blue-700' });
@@ -818,7 +818,7 @@ export default function AdminEmails() {
                         {' | '}
                         Zielgruppe:{' '}
                         {dryRunData.template.audience.map(a =>
-                          a === 'teacher' ? 'Lehrer' : a === 'parent' ? 'Eltern' : 'Non-Buyers'
+                          a === 'teacher' ? 'Lehrer' : a === 'parent' ? 'Eltern' : a === 'non-buyers' ? 'Non-Buyers' : a
                         ).join(', ')}
                       </p>
                     </div>

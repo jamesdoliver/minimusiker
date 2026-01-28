@@ -67,7 +67,7 @@ export async function PUT(
 
     // Validate audience if provided
     if (body.audience !== undefined) {
-      const validAudiences = ['teacher', 'parent', 'non-buyer'];
+      const validAudiences = ['teacher', 'parent', 'non-buyers'];
       if (!Array.isArray(body.audience) || body.audience.length === 0) {
         return NextResponse.json(
           { success: false, error: 'audience must be a non-empty array' },
@@ -76,7 +76,7 @@ export async function PUT(
       }
       if (!body.audience.every((a: string) => validAudiences.includes(a))) {
         return NextResponse.json(
-          { success: false, error: 'audience values must be "teacher", "parent", and/or "non-buyer"' },
+          { success: false, error: 'audience values must be "teacher", "parent", and/or "non-buyers"' },
           { status: 400 }
         );
       }
