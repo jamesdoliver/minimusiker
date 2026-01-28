@@ -178,39 +178,41 @@ const STANDARD_CLOTHING_PRODUCTS: ClothingProduct[] = [
 ];
 
 // Personalized clothing products (shown when >19 days before event)
-const PERSONALIZED_CLOTHING_PRODUCTS: ClothingProduct[] = [
-  {
-    id: 'tshirt',
-    name: 'T-Shirt Personalisiert',
-    description: 'Minimusiker T-Shirt mit Namen deines Kindes',
-    price: 25.00,
-    imageSrc: '/images/familie_portal/T-Shirt Fallback Picture.png',
-    showTshirtSize: true,
-    showHoodieSize: false,
-    isPersonalized: true,
-  },
-  {
-    id: 'hoodie',
-    name: 'Hoodie Personalisiert',
-    description: 'Kuscheliger Hoodie mit Namen deines Kindes',
-    price: 49.00,
-    imageSrc: '/images/familie_portal/Hoodie Fallback Picture.png',
-    showTshirtSize: false,
-    showHoodieSize: true,
-    isPersonalized: true,
-  },
-  {
-    id: 'tshirt-hoodie',
-    name: 'T-Shirt & Hoodie Personalisiert',
-    description: 'Das komplette Minimusiker Set mit Namen',
-    price: 59.00,
-    imageSrc: '/images/familie_portal/Hoodie and T-Shirt Picture.jpeg',
-    showTshirtSize: true,
-    showHoodieSize: true,
-    savings: 15,
-    isPersonalized: true,
-  },
-];
+function getPersonalizedClothingProducts(schoolName: string): ClothingProduct[] {
+  return [
+    {
+      id: 'tshirt',
+      name: 'T-Shirt Personalisiert',
+      description: `Minimusiker T-Shirt personalisiert für ${schoolName}`,
+      price: 25.00,
+      imageSrc: '/images/familie_portal/T-Shirt Fallback Picture.png',
+      showTshirtSize: true,
+      showHoodieSize: false,
+      isPersonalized: true,
+    },
+    {
+      id: 'hoodie',
+      name: 'Hoodie Personalisiert',
+      description: `Kuscheliger Hoodie personalisiert für ${schoolName}`,
+      price: 49.00,
+      imageSrc: '/images/familie_portal/Hoodie Fallback Picture.png',
+      showTshirtSize: false,
+      showHoodieSize: true,
+      isPersonalized: true,
+    },
+    {
+      id: 'tshirt-hoodie',
+      name: 'T-Shirt & Hoodie Personalisiert',
+      description: `Das komplette Minimusiker Set personalisiert für ${schoolName}`,
+      price: 59.00,
+      imageSrc: '/images/familie_portal/Hoodie and T-Shirt Picture.jpeg',
+      showTshirtSize: true,
+      showHoodieSize: true,
+      savings: 15,
+      isPersonalized: true,
+    },
+  ];
+}
 
 // Backwards compatibility - default to standard
 const CLOTHING_PRODUCTS = STANDARD_CLOTHING_PRODUCTS;
@@ -456,9 +458,12 @@ export default function ProductSelector({
   );
 
   // Select the appropriate clothing products based on time until event
-  const activeClothingProducts = showPersonalized
-    ? PERSONALIZED_CLOTHING_PRODUCTS
-    : STANDARD_CLOTHING_PRODUCTS;
+  const activeClothingProducts = useMemo(
+    () => showPersonalized
+      ? getPersonalizedClothingProducts(schoolName)
+      : STANDARD_CLOTHING_PRODUCTS,
+    [showPersonalized, schoolName]
+  );
 
   // Fetch products from Shopify for images (use 'all' to get all products)
   const { products: shopifyProducts } = useProducts({ tagFilter: 'all' });
