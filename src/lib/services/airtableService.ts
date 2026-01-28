@@ -2720,13 +2720,15 @@ class AirtableService {
     if (this.useNormalizedTables()) {
       // NEW: Query Events table directly
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - 3);
+        const cutoff = cutoffDate.toISOString().split('T')[0];
 
-        // Get all events with future dates and matching school name
+        // Get all events with recent/future dates and matching school name
         // Use returnFieldsByFieldId: true so we can read results using field IDs
         const events = await this.eventsTable!.select({
           filterByFormula: `AND(
-            IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${today}'),
+            IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${cutoff}'),
             SEARCH(LOWER('${searchQuery.toLowerCase()}'), LOWER({${EVENTS_FIELD_IDS.school_name}}))
           )`,
           returnFieldsByFieldId: true,
@@ -2757,11 +2759,13 @@ class AirtableService {
     } else {
       // LEGACY: Query parent_journey_table
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - 3);
+        const cutoff = cutoffDate.toISOString().split('T')[0];
 
-        // Get all records with future booking dates
+        // Get all records with recent/future booking dates
         const allRecords = await this.query({
-          filterByFormula: `IS_AFTER({booking_date}, '${today}')`,
+          filterByFormula: `IS_AFTER({booking_date}, '${cutoff}')`,
         });
 
         // Filter by search query (case-insensitive)
@@ -2805,13 +2809,15 @@ class AirtableService {
     if (this.useNormalizedTables()) {
       // NEW: Query Events table and count classes
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - 3);
+        const cutoff = cutoffDate.toISOString().split('T')[0];
 
-        // Get all events for this school with future dates
+        // Get all events for this school with recent/future dates
         const events = await this.eventsTable!.select({
           filterByFormula: `AND(
             {${EVENTS_FIELD_IDS.school_name}} = '${schoolName.replace(/'/g, "\\'")}',
-            IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${today}')
+            IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${cutoff}')
           )`,
         }).all();
 
@@ -2843,13 +2849,15 @@ class AirtableService {
     } else {
       // LEGACY: Query parent_journey_table
       try {
-        const today = new Date().toISOString().split('T')[0];
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - 3);
+        const cutoff = cutoffDate.toISOString().split('T')[0];
 
-        // Get all records for this school with future dates
+        // Get all records for this school with recent/future dates
         const records = await this.query({
           filterByFormula: `AND(
             {school_name} = '${schoolName.replace(/'/g, "\\'")}',
-            IS_AFTER({booking_date}, '${today}')
+            IS_AFTER({booking_date}, '${cutoff}')
           )`,
         });
 
