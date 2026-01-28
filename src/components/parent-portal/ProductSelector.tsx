@@ -707,7 +707,7 @@ export default function ProductSelector({
           {t('title')}
         </h2>
         <p className="text-gray-600 mt-1">
-          {t('subtitle', { schoolName })}
+          {isSchulsongOnly ? t('subtitleSchulsongOnly') : t('subtitle', { schoolName })}
         </p>
       </div>
 
