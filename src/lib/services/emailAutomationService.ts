@@ -164,6 +164,7 @@ export async function getEventsHittingThreshold(
           eventDate: event.event_date,
           eventType: event.event_type || 'Minimusikertag',
           daysUntilEvent: daysUntil,
+          accessCode: event.access_code,
         });
       }
     }
@@ -211,6 +212,10 @@ async function getTeacherRecipientsForEvent(
         // For now, skip if it's not an email format
         if (cls.main_teacher.includes('@')) {
           seenEmails.add(cls.main_teacher.toLowerCase());
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
+          const eventLink = eventData.accessCode
+            ? `${baseUrl}/e/${eventData.accessCode}`
+            : `${baseUrl}/parent`;
           recipients.push({
             email: cls.main_teacher,
             name: cls.main_teacher.split('@')[0],
@@ -221,6 +226,7 @@ async function getTeacherRecipientsForEvent(
               school_name: eventData.schoolName,
               event_date: formatDateGerman(eventData.eventDate),
               event_type: eventData.eventType,
+              event_link: eventLink,
               class_name: cls.class_name,
               teacher_name: cls.main_teacher,
               teacher_first_name: cls.main_teacher.split(' ')[0],
@@ -237,6 +243,10 @@ async function getTeacherRecipientsForEvent(
       const event = await airtable.getEventByRecordId(eventRecordId);
       if (event?.assigned_staff && event.assigned_staff.length > 0) {
         // Look up staff emails from Personen table
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
+        const eventLink = eventData.accessCode
+          ? `${baseUrl}/e/${eventData.accessCode}`
+          : `${baseUrl}/parent`;
         for (const staffId of event.assigned_staff) {
           const staff = await airtable.getPersonById(staffId);
           if (staff?.email && !seenEmails.has(staff.email.toLowerCase())) {
@@ -250,6 +260,7 @@ async function getTeacherRecipientsForEvent(
                 school_name: eventData.schoolName,
                 event_date: formatDateGerman(eventData.eventDate),
                 event_type: eventData.eventType,
+                event_link: eventLink,
                 teacher_name: staff.staff_name,
                 teacher_first_name: staff.staff_name?.split(' ')[0] || '',
                 _event_date_iso: eventData.eventDate,
@@ -300,6 +311,10 @@ async function getParentRecipientsForEvent(
             className = classRecord?.class_name || '';
           }
 
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
+          const eventLink = eventData.accessCode
+            ? `${baseUrl}/e/${eventData.accessCode}`
+            : `${baseUrl}/parent`;
           recipients.push({
             email: parent.parent_email,
             name: parent.parent_first_name,
@@ -310,11 +325,12 @@ async function getParentRecipientsForEvent(
               school_name: eventData.schoolName,
               event_date: formatDateGerman(eventData.eventDate),
               event_type: eventData.eventType,
+              event_link: eventLink,
               parent_name: parent.parent_first_name,
               parent_first_name: parent.parent_first_name,
               child_name: registration.registered_child,
               class_name: className,
-              parent_portal_link: `${process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app'}/parent`,
+              parent_portal_link: `${baseUrl}/parent`,
               _event_date_iso: eventData.eventDate,
             },
           });
@@ -650,7 +666,7 @@ export function getPreviewTemplateData(): TemplateData {
   return {
     school_name: 'Muster-Grundschule',
     event_date: formatDateGerman(eventDate.toISOString()),
-    event_link: 'https://minimusiker.app/parent',
+    event_link: 'https://minimusiker.app/e/1234',
     event_type: 'Minimusikertag',
     teacher_name: 'Frau Schmidt',
     teacher_first_name: 'Maria',
@@ -697,13 +713,16 @@ export async function sendTestEmail(
       }
 
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
+      const eventLink = event.access_code
+        ? `${baseUrl}/e/${event.access_code}`
+        : `${baseUrl}/parent`;
       templateData = {
         school_name: event.school_name || '',
         event_date: formatDateGerman(event.event_date || ''),
         event_type: event.event_type || 'Minimusikertag',
         teacher_portal_link: `${baseUrl}/teacher`,
         parent_portal_link: `${baseUrl}/parent`,
-        event_link: `${baseUrl}/parent`,
+        event_link: eventLink,
         _event_date_iso: event.event_date,
       };
     } else {

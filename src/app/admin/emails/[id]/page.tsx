@@ -396,7 +396,8 @@ export default function EmailTemplateEdit({ params }: PageProps) {
           />
           <p className="mt-1 text-xs text-gray-500">
             Verfügbare Variablen: {'{{school_name}}'}, {'{{event_date}}'},{' '}
-            {'{{teacher_name}}'}, {'{{parent_name}}'}, {'{{child_name}}'}
+            {'{{event_link}}'}, {'{{teacher_name}}'}, {'{{parent_name}}'},{' '}
+            {'{{child_name}}'}, {'{{event_date+/-X}}'} (z.B. {'{{event_date-7}}'})
           </p>
         </div>
 
@@ -414,6 +415,22 @@ export default function EmailTemplateEdit({ params }: PageProps) {
             placeholder="HTML-Inhalt der E-Mail..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
           />
+          {/* Variable Reference */}
+          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+            <p className="text-sm font-medium text-gray-700 mb-2">Variablen-Referenz</p>
+            <div className="text-xs text-gray-600 space-y-1">
+              <p><code className="bg-gray-200 px-1 rounded">{'{{school_name}}'}</code> – Name der Schule</p>
+              <p><code className="bg-gray-200 px-1 rounded">{'{{event_date}}'}</code> – Datum der Veranstaltung (z.B. 15.03.2026)</p>
+              <p><code className="bg-gray-200 px-1 rounded">{'{{event_date+N}}'}</code> / <code className="bg-gray-200 px-1 rounded">{'{{event_date-N}}'}</code> – Datum ± N Tage</p>
+              <p><code className="bg-gray-200 px-1 rounded">{'{{event_link}}'}</code> – Kurz-URL zur Registrierung (z.B. minimusiker.app/e/64)</p>
+              <p><code className="bg-gray-200 px-1 rounded">{'{{teacher_name}}'}</code> – Name des Lehrers</p>
+              <p><code className="bg-gray-200 px-1 rounded">{'{{parent_name}}'}</code> / <code className="bg-gray-200 px-1 rounded">{'{{parent_first_name}}'}</code> – Name des Elternteils</p>
+              <p><code className="bg-gray-200 px-1 rounded">{'{{child_name}}'}</code> – Name des Kindes</p>
+              <p><code className="bg-gray-200 px-1 rounded">{'{{class_name}}'}</code> – Name der Klasse</p>
+              <p><code className="bg-gray-200 px-1 rounded">{'{{parent_portal_link}}'}</code> – Link zum Elternportal</p>
+              <p><code className="bg-gray-200 px-1 rounded">{'{{teacher_portal_link}}'}</code> – Link zum Lehrerportal</p>
+            </div>
+          </div>
         </div>
 
         {/* Active Toggle */}

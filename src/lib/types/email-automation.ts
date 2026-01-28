@@ -226,6 +226,7 @@ export interface EventThresholdMatch {
   eventDate: string;
   eventType: string;
   daysUntilEvent: number;                        // Positive = future, negative = past
+  accessCode?: number;                           // Event short URL code for {{event_link}}
 }
 
 // =============================================================================
