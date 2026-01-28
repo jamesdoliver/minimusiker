@@ -5,6 +5,7 @@ import { getActivityService, ActivityService } from '@/lib/services/activityServ
 import { SchoolEventDetail } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { simplybookService } from '@/lib/services/simplybookService';
 
 export async function GET(
   request: NextRequest,
@@ -250,13 +251,26 @@ export async function PATCH(
     // Get existing event for activity logging
     const existingEvent = await airtableService.getEventById(eventRecordId);
 
-    let dateResult: { message: string; bookingUpdated: boolean } | null = null;
+    let dateResult: { message: string; bookingUpdated: boolean; simplybookId?: string } | null = null;
     let tasksRecalculated = 0;
+    let simplybookSynced = false;
 
     // Handle date update
     if (hasDateUpdate) {
       const oldDate = existingEvent?.event_date || 'Unknown';
       dateResult = await airtableService.updateEventDate(eventRecordId, body.event_date);
+
+      // Sync date change back to SimplyBook (best-effort)
+      if (dateResult.simplybookId) {
+        const sbResult = await simplybookService.editBookingDate(
+          dateResult.simplybookId,
+          body.event_date
+        );
+        simplybookSynced = sbResult.success;
+        if (!sbResult.success) {
+          console.warn(`SimplyBook sync failed for booking ${dateResult.simplybookId}: ${sbResult.error}`);
+        }
+      }
 
       // Log activity for date change
       getActivityService().logActivity({
@@ -268,7 +282,7 @@ export async function PATCH(
         }),
         actorEmail: admin.email,
         actorType: 'admin',
-        metadata: { oldDate, newDate: body.event_date },
+        metadata: { oldDate, newDate: body.event_date, simplybookSynced },
       });
 
       // Recalculate task deadlines for pending tasks
@@ -321,6 +335,7 @@ export async function PATCH(
       success: true,
       message: dateResult?.message || 'Event updated successfully',
       bookingUpdated: dateResult?.bookingUpdated || false,
+      simplybookSynced,
       tasksRecalculated,
       data: updatedEvent,
     });

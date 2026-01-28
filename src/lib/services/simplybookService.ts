@@ -405,6 +405,50 @@ class SimplybookService {
   }
 
   /**
+   * Edit a booking's date in SimplyBook.
+   * Uses the editBook JSON-RPC method with admin authentication.
+   * @param simplybookId - The SimplyBook booking ID (stored as simplybook_id in SchoolBookings)
+   * @param newDate - New date in YYYY-MM-DD format
+   * @returns Object with success status and any error message
+   */
+  async editBookingDate(
+    simplybookId: string,
+    newDate: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const booking = await this.getBookingDetails(simplybookId);
+
+      if (!booking) {
+        return { success: false, error: 'Booking not found in SimplyBook' };
+      }
+
+      await this.jsonRpcCall<Record<string, unknown>>(
+        'editBook',
+        [
+          parseInt(simplybookId, 10),
+          parseInt(booking.event_id, 10),
+          parseInt(booking.unit_id || '0', 10),
+          parseInt(booking.client_id, 10),
+          newDate,
+          '08:00:00',
+          newDate,
+          '14:00:00',
+          0,
+          {},
+        ],
+        true
+      );
+
+      console.log(`SimplyBook: Updated booking ${simplybookId} date to ${newDate}`);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`SimplyBook: Failed to update booking ${simplybookId} date:`, message);
+      return { success: false, error: message };
+    }
+  }
+
+  /**
    * Find existing Einrichtung (school) by name and optionally postal code
    */
   async findEinrichtungByName(schoolName: string, postalCode?: string): Promise<string | null> {

@@ -242,6 +242,11 @@ export default function EventDetailPage() {
       if (data.bookingUpdated) {
         message += ' and synced to booking';
       }
+      if (data.simplybookSynced) {
+        message += ' and SimplyBook';
+      } else if (data.bookingUpdated && !data.simplybookSynced) {
+        message += ' (SimplyBook not synced)';
+      }
       if (data.tasksRecalculated > 0) {
         message += ` (${data.tasksRecalculated} task deadline${data.tasksRecalculated === 1 ? '' : 's'} recalculated)`;
       }

@@ -4519,7 +4519,7 @@ class AirtableService {
   async updateEventDate(
     eventRecordId: string,
     newDate: string
-  ): Promise<{ success: boolean; bookingUpdated: boolean; message: string }> {
+  ): Promise<{ success: boolean; bookingUpdated: boolean; simplybookId?: string; message: string }> {
     try {
       // Validate date format
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -4554,9 +4554,21 @@ class AirtableService {
 
       // If there's a linked SchoolBooking, update it too
       let bookingUpdated = false;
+      let simplybookId: string | undefined;
       if (linkedBookingIds && linkedBookingIds.length > 0) {
         const bookingRecordId = linkedBookingIds[0];
         try {
+          // Fetch the SchoolBooking to get simplybook_id before updating
+          const bookingRecords = await this.base(SCHOOL_BOOKINGS_TABLE_ID).select({
+            filterByFormula: `RECORD_ID() = '${bookingRecordId}'`,
+            maxRecords: 1,
+            returnFieldsByFieldId: true,
+          }).firstPage();
+
+          if (bookingRecords.length > 0) {
+            simplybookId = bookingRecords[0].fields[SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id] as string | undefined;
+          }
+
           await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecordId, {
             [SCHOOL_BOOKINGS_FIELD_IDS.start_date]: newDate,
           });
@@ -4571,6 +4583,7 @@ class AirtableService {
       return {
         success: true,
         bookingUpdated,
+        simplybookId,
         message: bookingUpdated
           ? 'Event date updated and synced to booking'
           : 'Event date updated (no linked booking to sync)',
