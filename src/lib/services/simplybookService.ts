@@ -422,7 +422,21 @@ class SimplybookService {
         return { success: false, error: 'Booking not found in SimplyBook' };
       }
 
-      await this.jsonRpcCall<Record<string, unknown>>(
+      // Use the booking's actual times (only change the date)
+      const startTime = booking.start_time || '08:00:00';
+      const endTime = booking.end_time || '14:00:00';
+
+      console.log(`SimplyBook: Attempting to update booking ${simplybookId}:`, {
+        event_id: booking.event_id,
+        unit_id: booking.unit_id,
+        client_id: booking.client_id,
+        oldDate: booking.start_date,
+        newDate,
+        startTime,
+        endTime,
+      });
+
+      const result = await this.jsonRpcCall<Record<string, unknown> | null>(
         'editBook',
         [
           parseInt(simplybookId, 10),
@@ -430,16 +444,22 @@ class SimplybookService {
           parseInt(booking.unit_id || '0', 10),
           parseInt(booking.client_id, 10),
           newDate,
-          '08:00:00',
+          startTime,
           newDate,
-          '14:00:00',
+          endTime,
           0,
           {},
         ],
         true
       );
 
-      console.log(`SimplyBook: Updated booking ${simplybookId} date to ${newDate}`);
+      // editBook returns null if parameters are not valid
+      if (result === null) {
+        console.error(`SimplyBook: editBook returned null for booking ${simplybookId} - parameters not valid`);
+        return { success: false, error: 'SimplyBook rejected the update (invalid parameters)' };
+      }
+
+      console.log(`SimplyBook: Updated booking ${simplybookId} date to ${newDate}`, result);
       return { success: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
