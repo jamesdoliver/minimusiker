@@ -427,36 +427,30 @@ class SimplybookService {
         return { success: false, error: 'Booking not found in SimplyBook' };
       }
 
-      // Log full booking for debugging
-      console.log(`SimplyBook: Full booking details for ${simplybookId}:`, JSON.stringify(booking, null, 2));
+      // Extract times from start_date_time and end_date_time (format: "YYYY-MM-DD HH:MM:SS")
+      const startTime = booking.start_date_time?.split(' ')[1] || '08:00:00';
+      const endTime = booking.end_date_time?.split(' ')[1] || '14:00:00';
 
-      // Check if booking is in a state that allows editing
-      if (booking.status === 'cancelled') {
-        return { success: false, error: 'Cannot edit a cancelled booking' };
-      }
-
-      // Use the booking's actual times (only change the date)
-      // Ensure times are in H:i:s format (add seconds if missing)
-      let startTime = booking.start_time || '08:00:00';
-      let endTime = booking.end_time || '14:00:00';
-
-      // Add seconds if time is in H:i format
-      if (startTime.match(/^\d{2}:\d{2}$/)) {
-        startTime = `${startTime}:00`;
-      }
-      if (endTime.match(/^\d{2}:\d{2}$/)) {
-        endTime = `${endTime}:00`;
+      // Convert additional_fields array to object format for editBook API
+      // The API requires these fields to be passed back or it will fail validation
+      const additionalFields: Record<string, string> = {};
+      const rawFields = booking.additional_fields || [];
+      const fieldsArray = Array.isArray(rawFields) ? rawFields : Object.values(rawFields);
+      for (const field of fieldsArray) {
+        if (field?.field_name && field.value !== null && field.value !== undefined) {
+          additionalFields[field.field_name] = field.value;
+        }
       }
 
       console.log(`SimplyBook: Attempting to update booking ${simplybookId}:`, {
         event_id: booking.event_id,
         unit_id: booking.unit_id,
         client_id: booking.client_id,
-        status: booking.status,
-        oldDate: booking.start_date,
+        oldDate: booking.start_date_time?.split(' ')[0],
         newDate,
         startTime,
         endTime,
+        additionalFieldsCount: Object.keys(additionalFields).length,
       });
 
       const result = await this.jsonRpcCall<Record<string, unknown> | null>(
@@ -471,7 +465,7 @@ class SimplybookService {
           newDate,
           endTime,
           0,
-          {},
+          additionalFields,
         ],
         true
       );
