@@ -2083,6 +2083,20 @@ class AirtableService {
           const eventType = eventRecord.fields[EVENTS_FIELD_IDS.event_type] as string;
           const assignedStaffIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_staff] as string[];
           const assignedEngineerIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[];
+          const simplybookBookingIds = eventRecord.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[];
+
+          // Get contact person from linked SchoolBooking as fallback
+          let contactPerson: string | undefined;
+          if (simplybookBookingIds?.[0]) {
+            try {
+              const booking = await this.getSchoolBookingById(simplybookBookingIds[0]);
+              if (booking?.schoolContactName) {
+                contactPerson = booking.schoolContactName;
+              }
+            } catch (error) {
+              console.error('Error fetching booking contact:', error);
+            }
+          }
 
           // Get classes for this event
           const classRecords = await this.base(CLASSES_TABLE_ID)
@@ -2132,6 +2146,7 @@ class AirtableService {
             eventDate,
             eventType,
             mainTeacher,
+            contactPerson,
             classCount: classRecords.length,
             totalChildren,
             totalParents: registrations.length,
@@ -2321,6 +2336,20 @@ class AirtableService {
         const eventType = eventRecord.fields[EVENTS_FIELD_IDS.event_type] as string;
         const assignedStaffIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_staff] as string[];
         const assignedStaffId = assignedStaffIds?.[0];
+        const simplybookBookingIds = eventRecord.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[];
+
+        // Get contact person from linked SchoolBooking as fallback
+        let contactPerson: string | undefined;
+        if (simplybookBookingIds?.[0]) {
+          try {
+            const booking = await this.getSchoolBookingById(simplybookBookingIds[0]);
+            if (booking?.schoolContactName) {
+              contactPerson = booking.schoolContactName;
+            }
+          } catch (error) {
+            console.error('Error fetching booking contact for detail:', error);
+          }
+        }
 
         // Get linked class IDs from the event record
         const linkedClassIds = eventRecord.fields[EVENTS_FIELD_IDS.classes] as string[] || [];
@@ -2402,6 +2431,7 @@ class AirtableService {
           eventDate,
           eventType,
           mainTeacher,
+          contactPerson,
           classCount: classes.length,
           totalChildren,
           totalParents,
@@ -5121,6 +5151,21 @@ class AirtableService {
    */
   async getClassByRecordId(recordId: string): Promise<Class | null> {
     return this.queryClassById(recordId);
+  }
+
+  /**
+   * Update a class's main_teacher field
+   * Used when syncing teacher data from booking contact person
+   */
+  async updateClassTeacher(classRecordId: string, teacherName: string): Promise<void> {
+    try {
+      await this.base(CLASSES_TABLE_ID).update(classRecordId, {
+        [CLASSES_FIELD_IDS.main_teacher]: teacherName,
+      });
+    } catch (error) {
+      console.error('Error updating class teacher:', error);
+      throw new Error(`Failed to update class teacher: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**

@@ -383,6 +383,7 @@ export interface SchoolEventSummary {
   eventDate: string;
   eventType: string;
   mainTeacher: string;
+  contactPerson?: string;    // Fallback from booking.schoolContactName when mainTeacher is empty
   classCount: number;
   totalChildren: number;
   totalParents: number;

@@ -49,7 +49,11 @@ export default function SchoolEventCard({ event, basePath = '/admin/events' }: S
 
       {/* Teacher */}
       <p className="text-sm text-gray-600 mb-1">
-        {event.mainTeacher ? `Teacher: ${event.mainTeacher}` : 'No teacher assigned'}
+        {event.mainTeacher
+          ? `Teacher: ${event.mainTeacher}`
+          : event.contactPerson
+            ? `Contact: ${event.contactPerson}`
+            : 'No teacher assigned'}
       </p>
 
       {/* Assigned Staff */}

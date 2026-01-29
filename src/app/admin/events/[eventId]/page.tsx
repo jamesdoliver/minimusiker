@@ -131,6 +131,9 @@ export default function EventDetailPage() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdatingToggles, setIsUpdatingToggles] = useState<string | null>(null); // Track which toggle is updating
 
+  // Refresh teacher state
+  const [isRefreshingTeacher, setIsRefreshingTeacher] = useState(false);
+
   const eventId = params.eventId as string;
 
   useEffect(() => {
@@ -256,6 +259,32 @@ export default function EventDetailPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to update date');
     } finally {
       setIsUpdatingDate(false);
+    }
+  };
+
+  // Refresh teacher handler - syncs contact person to class main_teacher
+  const handleRefreshTeacher = async () => {
+    setIsRefreshingTeacher(true);
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/refresh-teacher`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to refresh teacher');
+      }
+
+      const data = await response.json();
+      toast.success(data.message || 'Teacher information refreshed');
+      // Re-fetch event detail to show updated teacher
+      await fetchEventDetail();
+    } catch (err) {
+      console.error('Error refreshing teacher:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to refresh teacher');
+    } finally {
+      setIsRefreshingTeacher(false);
     }
   };
 
@@ -611,9 +640,35 @@ export default function EventDetailPage() {
               )}
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">{event.schoolName}</h1>
-            <p className="text-gray-600">
-              {event.mainTeacher ? `Teacher: ${event.mainTeacher}` : 'No teacher assigned'}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-gray-600">
+                {event.mainTeacher
+                  ? `Teacher: ${event.mainTeacher}`
+                  : event.contactPerson
+                    ? `Contact: ${event.contactPerson}`
+                    : 'No teacher assigned'}
+              </p>
+              {/* Show refresh button when mainTeacher is empty but contactPerson exists */}
+              {!event.mainTeacher && event.contactPerson && (
+                <button
+                  onClick={handleRefreshTeacher}
+                  disabled={isRefreshingTeacher}
+                  className="p-1 text-gray-400 hover:text-[#5a8a82] transition-colors disabled:opacity-50"
+                  title="Sync contact as teacher"
+                >
+                  {isRefreshingTeacher ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Right: Stats */}
