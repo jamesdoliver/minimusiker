@@ -88,6 +88,13 @@ export interface PrintableTextConfig {
     width: number;
     height: number;
   };
+  /** Preview image path for the editor (PNG at 2x resolution) */
+  previewImage: string;
+  /** Preview image dimensions (2x PDF dimensions for retina) */
+  previewDimensions: {
+    width: number;
+    height: number;
+  };
   /** R2 template filename (without path) */
   templateFilename: string;
   /** Default text block position/size - null for back items that have no text */
@@ -255,6 +262,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: 'A3 print (297×420mm) - text above logo',
     templateFilename: 'tshirt-print-template.pdf',
     pdfDimensions: { width: 842, height: 1191 },
+    previewImage: '/images/printable_blank_logo/printable_logo_blank.png',
+    previewDimensions: { width: 1414, height: 2000 }, // Matches LOGO_CANVAS_DIMENSIONS
     textDefaults: {
       x: 221,        // Centered (421 - 200/2)
       y: 850,        // Upper third of page
@@ -272,6 +281,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: 'A3 print (297×420mm) - text above logo',
     templateFilename: 'hoodie-print-template.pdf',
     pdfDimensions: { width: 842, height: 1191 },
+    previewImage: '/images/printable_blank_logo/printable_logo_blank.png',
+    previewDimensions: { width: 1414, height: 2000 }, // Matches LOGO_CANVAS_DIMENSIONS
     textDefaults: {
       x: 221,
       y: 850,
@@ -289,6 +300,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: 'DIN Long landscape (210×105mm)',
     templateFilename: 'flyer1-template.pdf',
     pdfDimensions: { width: 595, height: 298 },
+    previewImage: '/images/printable_previews/flyer1-preview.png',
+    previewDimensions: { width: 1190, height: 596 }, // 2x PDF dims
     textDefaults: {
       x: 148,        // Centered (298 - 300/2)
       y: 200,        // Upper area
@@ -306,6 +319,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: 'DIN Long landscape - QR code side',
     templateFilename: 'flyer1-back-template.pdf',
     pdfDimensions: { width: 595, height: 298 },
+    previewImage: '/images/printable_previews/flyer1-back-preview.png',
+    previewDimensions: { width: 1190, height: 596 }, // 2x PDF dims
     isBack: true,
     textDefaults: null, // Backs don't have text
     qrDefaults: {
@@ -320,6 +335,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: 'DIN Long landscape (210×105mm)',
     templateFilename: 'flyer2-template.pdf',
     pdfDimensions: { width: 595, height: 298 },
+    previewImage: '/images/printable_previews/flyer2-preview.png',
+    previewDimensions: { width: 1190, height: 596 }, // 2x PDF dims
     textDefaults: {
       x: 148,
       y: 200,
@@ -337,6 +354,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: 'DIN Long landscape - QR code side',
     templateFilename: 'flyer2-back-template.pdf',
     pdfDimensions: { width: 595, height: 298 },
+    previewImage: '/images/printable_previews/flyer2-back-preview.png',
+    previewDimensions: { width: 1190, height: 596 }, // 2x PDF dims
     isBack: true,
     textDefaults: null,
     qrDefaults: {
@@ -351,6 +370,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: 'A5 portrait (148×210mm)',
     templateFilename: 'flyer3-template.pdf',
     pdfDimensions: { width: 420, height: 595 },
+    previewImage: '/images/printable_previews/flyer3-preview.png',
+    previewDimensions: { width: 840, height: 1190 }, // 2x PDF dims
     textDefaults: {
       x: 60,         // Centered (210 - 300/2)
       y: 480,        // Upper area
@@ -368,6 +389,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: 'A5 portrait - QR code side',
     templateFilename: 'flyer3-back-template.pdf',
     pdfDimensions: { width: 420, height: 595 },
+    previewImage: '/images/printable_previews/flyer3-back-preview.png',
+    previewDimensions: { width: 840, height: 1190 }, // 2x PDF dims
     isBack: true,
     textDefaults: null,
     qrDefaults: {
@@ -382,6 +405,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: '38mm circular button (50×50mm with bleed)',
     templateFilename: 'button-template.pdf',
     pdfDimensions: { width: 142, height: 142 },
+    previewImage: '/images/printable_previews/button-preview.png',
+    previewDimensions: { width: 284, height: 284 }, // 2x PDF dims
     textDefaults: {
       x: 21,         // Safe zone centered
       y: 55,
@@ -399,6 +424,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: 'DIN Long landscape (210×105mm)',
     templateFilename: 'minicard-template.pdf',
     pdfDimensions: { width: 595, height: 298 },
+    previewImage: '/images/printable_previews/minicard-preview.png',
+    previewDimensions: { width: 1190, height: 596 }, // 2x PDF dims
     textDefaults: {
       x: 148,
       y: 140,
@@ -416,6 +443,8 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     description: 'Standard CD jacket (120×120mm)',
     templateFilename: 'cd-jacket-template.pdf',
     pdfDimensions: { width: 340, height: 340 },
+    previewImage: '/images/printable_previews/cd-jacket-preview.png',
+    previewDimensions: { width: 680, height: 680 }, // 2x PDF dims
     textDefaults: {
       x: 70,
       y: 230,

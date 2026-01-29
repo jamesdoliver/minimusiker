@@ -121,7 +121,7 @@ export default function DraggableQrCode({
         <div className="relative w-full h-full p-2">
           <QrPlaceholder />
           {qrUrl && (
-            <div className="absolute -bottom-4 left-0 right-0 text-center bg-white/90 py-0.5 text-[8px] text-gray-500 truncate px-1">
+            <div className="absolute -bottom-6 left-0 right-0 text-center bg-white/90 py-0.5 text-[8px] text-gray-500 truncate px-1">
               {qrUrl}
             </div>
           )}

@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import PdfCanvas from './PdfCanvas';
-import LogoCanvas from './LogoCanvas';
+import ImageCanvas from './LogoCanvas';
 import DraggableText from './DraggableText';
 import DraggableQrCode from './DraggableQrCode';
 import DesignControls from './DesignControls';
@@ -61,7 +60,7 @@ export default function PrintableEditor({
   const [templateExists, setTemplateExists] = useState(true);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
-  // Handle PDF canvas load - store scale factor for later PDF conversion
+  // Handle image canvas load - store scale factor for later PDF conversion
   const handleCanvasLoad = useCallback(
     (dims: { width: number; height: number; scale: number }) => {
       setCanvasDimensions(dims);
@@ -77,7 +76,7 @@ export default function PrintableEditor({
     [editorState, onEditorStateChange]
   );
 
-  // Handle PDF canvas error (template doesn't exist)
+  // Handle image canvas error (preview image doesn't exist)
   const handleCanvasError = useCallback(() => {
     setTemplateExists(false);
   }, []);
@@ -313,20 +312,12 @@ export default function PrintableEditor({
       {/* Right panel - Canvas with overlays */}
       <div className="flex-1 overflow-y-auto p-4 bg-gray-50 flex items-start justify-center">
         <div className="relative w-full max-w-2xl">
-          {/* Canvas background - Logo or PDF */}
-          {isLogoType ? (
-            <LogoCanvas
-              onLoad={handleCanvasLoad}
-              onError={handleCanvasError}
-            />
-          ) : (
-            <PdfCanvas
-              templateType={itemConfig.type}
-              pdfDimensions={itemConfig.pdfDimensions}
-              onLoad={handleCanvasLoad}
-              onError={handleCanvasError}
-            />
-          )}
+          {/* Canvas background - Image preview for all types */}
+          <ImageCanvas
+            templateType={itemConfig.type}
+            onLoad={handleCanvasLoad}
+            onError={handleCanvasError}
+          />
 
           {/* Overlay container - positioned over the canvas */}
           {canvasDimensions && templateExists && (

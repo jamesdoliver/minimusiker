@@ -259,15 +259,22 @@ class R2Service {
     }
 
     // Check all templates
-    const allTemplateTypes: TemplateType[] = [
+    // Note: Clothing templates (tshirt-print, hoodie-print) are optional - we can generate blank PDFs
+    const requiredTemplateTypes: TemplateType[] = [
       'flyer1', 'flyer1-back',
       'flyer2', 'flyer2-back',
       'flyer3', 'flyer3-back',
       'button',
-      'tshirt-print', 'hoodie-print',
       'minicard', 'cd-jacket',
       'mock-tshirt', 'mock-hoodie',
     ];
+
+    const optionalTemplateTypes: TemplateType[] = [
+      'tshirt-print', 'hoodie-print',
+    ];
+
+    const allTemplateTypes: TemplateType[] = [...requiredTemplateTypes, ...optionalTemplateTypes];
+    const requiredMissing: string[] = [];
 
     for (const templateType of allTemplateTypes) {
       const filename = TEMPLATE_FILENAMES[templateType];
@@ -277,11 +284,15 @@ class R2Service {
         templatesFound.push(templateType);
       } else {
         templatesMissing.push(templateType);
+        // Only add to requiredMissing if it's a required template
+        if (requiredTemplateTypes.includes(templateType)) {
+          requiredMissing.push(templateType);
+        }
       }
     }
 
-    if (templatesMissing.length > 0) {
-      errors.push(`Missing templates: ${templatesMissing.join(', ')}`);
+    if (requiredMissing.length > 0) {
+      errors.push(`Missing required templates: ${requiredMissing.join(', ')}`);
     }
 
     // Check all fonts
@@ -302,7 +313,8 @@ class R2Service {
       errors.push(`Missing fonts: ${fontsMissing.join(', ')}`);
     }
 
-    const healthy = bucketAccessible && templatesMissing.length === 0 && fontsMissing.length === 0;
+    // Health is based on required templates (clothing templates are optional)
+    const healthy = bucketAccessible && requiredMissing.length === 0 && fontsMissing.length === 0;
 
     return {
       healthy,

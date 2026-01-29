@@ -250,19 +250,28 @@ class PrintableService {
           continue;
         }
 
-        // Fetch the template
-        const templateBuffer = await this.r2Service.getTemplate(type);
-        if (!templateBuffer) {
-          results.push({
-            success: false,
-            type,
-            error: `Template not found: ${type}. Please upload template to R2.`,
-          });
-          continue;
-        }
+        // Fetch the template or generate blank for clothing
+        let templateBuffer = await this.r2Service.getTemplate(type);
+        let pdfDoc: PDFDocument;
 
-        // Load the PDF
-        const pdfDoc = await PDFDocument.load(templateBuffer);
+        if (!templateBuffer) {
+          // For clothing items (tshirt/hoodie), generate a blank PDF
+          if (this.isClothingType(type)) {
+            console.log(`[PrintableService] No template for ${type}, generating blank A3 PDF`);
+            const blankPdfBuffer = await this.generateBlankPdf(842, 1191); // A3 dimensions
+            pdfDoc = await PDFDocument.load(blankPdfBuffer);
+          } else {
+            results.push({
+              success: false,
+              type,
+              error: `Template not found: ${type}. Please upload template to R2.`,
+            });
+            continue;
+          }
+        } else {
+          // Load the PDF from template
+          pdfDoc = await PDFDocument.load(templateBuffer);
+        }
 
         // For back items - only add QR code at custom position
         if (printableIsBack(type)) {
@@ -396,17 +405,26 @@ class PrintableService {
         };
       }
 
-      // Fetch the template
-      const templateBuffer = await this.r2Service.getTemplate(type);
-      if (!templateBuffer) {
-        return {
-          success: false,
-          error: `Template not found: ${type}. Please upload template to R2.`,
-        };
-      }
+      // Fetch the template or generate blank for clothing
+      let templateBuffer = await this.r2Service.getTemplate(type);
+      let pdfDoc: PDFDocument;
 
-      // Load the PDF
-      const pdfDoc = await PDFDocument.load(templateBuffer);
+      if (!templateBuffer) {
+        // For clothing items (tshirt/hoodie), generate a blank PDF
+        if (this.isClothingType(type)) {
+          console.log(`[PrintableService] No template for ${type}, generating blank A3 PDF for preview`);
+          const blankPdfBuffer = await this.generateBlankPdf(842, 1191); // A3 dimensions
+          pdfDoc = await PDFDocument.load(blankPdfBuffer);
+        } else {
+          return {
+            success: false,
+            error: `Template not found: ${type}. Please upload template to R2.`,
+          };
+        }
+      } else {
+        // Load the PDF from template
+        pdfDoc = await PDFDocument.load(templateBuffer);
+      }
 
       // For back items - only add QR code at custom position
       if (printableIsBack(type)) {
@@ -1131,6 +1149,28 @@ class PrintableService {
   // ========================================
   // PDF Manipulation Helpers
   // ========================================
+
+  /**
+   * Generate a blank PDF with the specified dimensions
+   * Used for clothing items (tshirt/hoodie) when no R2 template exists
+   *
+   * @param width - PDF width in points
+   * @param height - PDF height in points
+   * @returns Buffer containing the blank PDF
+   */
+  private async generateBlankPdf(width: number, height: number): Promise<Buffer> {
+    const pdfDoc = await PDFDocument.create();
+    pdfDoc.addPage([width, height]);
+    const pdfBytes = await pdfDoc.save();
+    return Buffer.from(pdfBytes);
+  }
+
+  /**
+   * Check if a printable type is a clothing item (tshirt or hoodie)
+   */
+  private isClothingType(type: PrintableType): boolean {
+    return type === 'tshirt-print' || type === 'hoodie-print';
+  }
 
   /**
    * Add text to a PDF at the specified position
