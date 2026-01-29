@@ -6,6 +6,7 @@ import {
   TextElementType,
   PrintableItemType,
   TEXT_ELEMENT_STYLES,
+  FontFamily,
 } from '@/lib/config/printableTextConfig';
 
 interface DesignControlsProps {
@@ -348,6 +349,27 @@ export default function DesignControls({
                     placeholder="#000000"
                   />
                 </div>
+              </div>
+
+              {/* Font Family */}
+              <div>
+                <label
+                  htmlFor="element-font-family"
+                  className="block text-xs font-medium text-gray-600 mb-1"
+                >
+                  Font Family
+                </label>
+                <select
+                  id="element-font-family"
+                  value={selectedElement.fontFamily || 'springwood-display'}
+                  onChange={(e) => onUpdateTextElement(selectedElementId!, {
+                    fontFamily: e.target.value as FontFamily
+                  })}
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#F4A261] focus:border-transparent"
+                >
+                  <option value="springwood-display">Springwood Display</option>
+                  <option value="fredoka">Fredoka</option>
+                </select>
               </div>
 
               {/* Position Info */}

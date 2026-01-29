@@ -61,6 +61,7 @@ export interface TextElementConfig {
   height: number;   // PDF points
   fontSize: number; // PDF points
   color: { r: number; g: number; b: number }; // RGB 0-1
+  fontFamily?: 'fredoka' | 'springwood-display';  // Optional font override
 }
 
 // Config for each printable item from the editor (Phase 4)
@@ -487,18 +488,22 @@ class PrintableService {
 
     const firstPage = pages[0];
 
-    // Get the appropriate font based on printable type
+    // Get the appropriate font - prefer element's choice, fall back to template default
     let useFont;
-    if (PRINTABLE_FONTS[printableType]) {
-      try {
-        const fontName = PRINTABLE_FONTS[printableType];
-        const fontData = await this.getCustomFont(fontName);
-        useFont = await pdfDoc.embedFont(fontData);
-      } catch (error) {
-        console.warn(`Failed to load custom font for ${printableType}, using Helvetica:`, error);
-        useFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    try {
+      // Determine which font to use
+      let fontName: FontName;
+      if (element.fontFamily) {
+        // Use element's specific font choice
+        fontName = element.fontFamily === 'springwood-display' ? 'springwood-display' : 'fredoka';
+      } else {
+        // Fall back to template default (now always springwood-display)
+        fontName = PRINTABLE_FONTS[printableType] || 'springwood-display';
       }
-    } else {
+      const fontData = await this.getCustomFont(fontName);
+      useFont = await pdfDoc.embedFont(fontData);
+    } catch (error) {
+      console.warn(`Failed to load custom font for element, using Helvetica:`, error);
       useFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     }
 

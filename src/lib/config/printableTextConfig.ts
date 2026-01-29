@@ -25,6 +25,11 @@ export type PrintableItemType =
 export type TextElementType = 'headline' | 'subline' | 'calendar' | 'custom';
 
 /**
+ * Font family options for text elements
+ */
+export type FontFamily = 'fredoka' | 'springwood-display';
+
+/**
  * A single text element in the editor
  * All position/size values are in CSS pixels during editing
  */
@@ -36,6 +41,7 @@ export interface TextElement {
   size: { width: number; height: number }; // CSS pixels
   fontSize: number;     // CSS pixels
   color: string;        // Hex color e.g. "#f7f6f6"
+  fontFamily?: FontFamily;  // Optional - defaults to 'springwood-display'
 }
 
 /**
@@ -138,9 +144,10 @@ const TEAL_TEXT_COLOR = { r: 0.24, g: 0.48, b: 0.48 }; // #3D7A7A
 /**
  * Text element style presets per template type
  * When admin adds a new text element, these defaults are applied
+ * Note: All types now default to Springwood Display font (can be changed per-element)
  */
 export const TEXT_ELEMENT_STYLES: Record<PrintableItemType, Record<TextElementType, TextElementStyle>> = {
-  // Flyers use Fredoka font
+  // Flyers default to Springwood Display (can be changed per-element)
   flyer1: {
     headline: { fontSize: 35, color: '#f7f6f6' },
     subline: { fontSize: 18, color: '#b93656' },
@@ -212,13 +219,22 @@ export const TEXT_ELEMENT_STYLES: Record<PrintableItemType, Record<TextElementTy
 };
 
 /**
- * Get the font family for a template type
+ * Get the default font family for a template type
+ * All types now default to Springwood Display
  */
 export function getFontFamilyForType(type: PrintableItemType): string {
-  if (type === 'tshirt' || type === 'hoodie') {
-    return 'Springwood Display, cursive';
+  // All types now default to Springwood Display
+  return 'Springwood Display, cursive';
+}
+
+/**
+ * Convert a FontFamily value to its CSS font-family string
+ */
+export function fontFamilyToCss(fontFamily?: FontFamily): string {
+  if (fontFamily === 'fredoka') {
+    return 'Fredoka, sans-serif';
   }
-  return 'Fredoka, sans-serif';
+  return 'Springwood Display, cursive';
 }
 
 /**

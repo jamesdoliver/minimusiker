@@ -114,20 +114,20 @@ export const PRODUCT_DIMENSIONS = {
 } as const;
 
 /**
- * Font mapping per printable type
- * - Fredoka: Flyers, Button, Minicard, CD Jacket
- * - Springwood Display: T-Shirt & Hoodie
+ * Font mapping per printable type (default fonts)
+ * All types now default to Springwood Display
+ * Note: Per-element font selection is available in the editor for flyers
  */
 export const PRINTABLE_FONTS: Record<PrintableType, FontName> = {
-  'flyer1': 'fredoka',
-  'flyer1-back': 'fredoka',
-  'flyer2': 'fredoka',
-  'flyer2-back': 'fredoka',
-  'flyer3': 'fredoka',
-  'flyer3-back': 'fredoka',
-  'button': 'fredoka',
-  'minicard': 'fredoka',
-  'cd-jacket': 'fredoka',
+  'flyer1': 'springwood-display',
+  'flyer1-back': 'springwood-display',
+  'flyer2': 'springwood-display',
+  'flyer2-back': 'springwood-display',
+  'flyer3': 'springwood-display',
+  'flyer3-back': 'springwood-display',
+  'button': 'springwood-display',
+  'minicard': 'springwood-display',
+  'cd-jacket': 'springwood-display',
   'tshirt-print': 'springwood-display',
   'hoodie-print': 'springwood-display',
 };

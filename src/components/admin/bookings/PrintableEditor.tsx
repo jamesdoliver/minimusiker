@@ -14,6 +14,7 @@ import {
   TextElementType,
   createTextElement,
   getFontFamilyForType,
+  fontFamilyToCss,
   TSHIRT_HOODIE_TEXT_DEFAULTS,
   FLYER_TEXT_DEFAULTS,
   TEXT_ELEMENT_STYLES,
@@ -345,7 +346,7 @@ export default function PrintableEditor({
                   position={element.position}
                   size={element.size}
                   color={element.color}
-                  fontFamily={fontFamily}
+                  fontFamily={isLogoType ? fontFamily : fontFamilyToCss(element.fontFamily)}
                   isSelected={isLogoType || element.id === selectedElementId}
                   elementType={isLogoType ? undefined : element.type}
                   onPositionChange={(pos) => handleTextPositionChange(element.id, pos)}

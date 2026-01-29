@@ -23,7 +23,7 @@ import {
   cssToPdfPosition,
   cssToPdfSize,
   hexToRgb,
-  getFontFamilyForType,
+  FontFamily,
 } from '@/lib/config/printableTextConfig';
 
 // Item status type
@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
           height: pdfSize.height,
           fontSize: element.fontSize / scale, // Convert CSS px to PDF points
           color,
+          fontFamily: element.fontFamily,  // Pass through element's font choice
         };
       });
 
