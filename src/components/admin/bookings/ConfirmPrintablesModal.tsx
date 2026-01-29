@@ -11,6 +11,9 @@ import {
 } from '@/lib/config/printableTextConfig';
 import PrintableEditor from './PrintableEditor';
 
+// Item status type for the confirmation workflow
+type ItemStatus = 'pending' | 'confirmed' | 'skipped';
+
 interface ConfirmPrintablesModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -70,8 +73,17 @@ export default function ConfirmPrintablesModal({
     initializeAllItemsEditorState(booking.schoolName, booking.bookingDate)
   );
 
-  // Track which items have been confirmed
-  const [confirmedItems, setConfirmedItems] = useState<Set<PrintableItemType>>(new Set());
+  // Track status of each item: pending, confirmed, or skipped
+  const [itemsStatus, setItemsStatus] = useState<Record<PrintableItemType, ItemStatus>>(() => {
+    const status: Record<PrintableItemType, ItemStatus> = {} as Record<PrintableItemType, ItemStatus>;
+    PRINTABLE_ITEMS.forEach((item) => {
+      status[item.type] = 'pending';
+    });
+    return status;
+  });
+
+  // Loading state for fetching existing status
+  const [isLoadingStatus, setIsLoadingStatus] = useState(false);
 
   // Health check state
   const [healthCheck, setHealthCheck] = useState<HealthCheckResult | null>(null);
@@ -90,12 +102,17 @@ export default function ConfirmPrintablesModal({
   const currentItem = PRINTABLE_ITEMS[currentStep];
   const currentEditorState = itemEditorStates[currentItem.type];
 
-  // Run health check when modal opens
+  // Run health check and load status when modal opens
   useEffect(() => {
     if (isOpen) {
       setCurrentStep(0);
       setItemEditorStates(initializeAllItemsEditorState(booking.schoolName, booking.bookingDate));
-      setConfirmedItems(new Set());
+      // Reset all items to pending
+      const initialStatus: Record<PrintableItemType, ItemStatus> = {} as Record<PrintableItemType, ItemStatus>;
+      PRINTABLE_ITEMS.forEach((item) => {
+        initialStatus[item.type] = 'pending';
+      });
+      setItemsStatus(initialStatus);
       setIsGenerating(false);
       setGenerationError(null);
       setGenerationResult(null);
@@ -104,8 +121,44 @@ export default function ConfirmPrintablesModal({
 
       // Run health check
       checkHealth();
+
+      // Load existing printable status from R2
+      loadPrintablesStatus();
     }
   }, [isOpen, booking.schoolName]);
+
+  // Load existing printables status from R2
+  const loadPrintablesStatus = async () => {
+    setIsLoadingStatus(true);
+    try {
+      const params = new URLSearchParams({
+        eventId: booking.code,
+        schoolName: booking.schoolName,
+        eventDate: booking.bookingDate,
+      });
+      const response = await fetch(`/api/admin/printables/status?${params.toString()}`);
+      if (!response.ok) {
+        console.warn('Could not load printables status');
+        return;
+      }
+      const data = await response.json();
+      if (data.status) {
+        setItemsStatus(data.status);
+
+        // Find the first pending or skipped item to jump to
+        const firstPendingOrSkippedIndex = PRINTABLE_ITEMS.findIndex(
+          (item) => data.status[item.type] === 'pending' || data.status[item.type] === 'skipped'
+        );
+        if (firstPendingOrSkippedIndex >= 0) {
+          setCurrentStep(firstPendingOrSkippedIndex);
+        }
+      }
+    } catch (error) {
+      console.warn('Error loading printables status:', error);
+    } finally {
+      setIsLoadingStatus(false);
+    }
+  };
 
   // Health check function
   const checkHealth = async () => {
@@ -143,7 +196,22 @@ export default function ConfirmPrintablesModal({
 
   // Handle confirm current item and go to next
   const handleConfirmAndNext = () => {
-    setConfirmedItems((prev) => new Set(prev).add(currentItem.type));
+    setItemsStatus((prev) => ({
+      ...prev,
+      [currentItem.type]: 'confirmed',
+    }));
+
+    if (currentStep < TOTAL_PRINTABLE_ITEMS - 1) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  // Handle skip current item and go to next
+  const handleSkip = () => {
+    setItemsStatus((prev) => ({
+      ...prev,
+      [currentItem.type]: 'skipped',
+    }));
 
     if (currentStep < TOTAL_PRINTABLE_ITEMS - 1) {
       setCurrentStep(currentStep + 1);
@@ -175,6 +243,7 @@ export default function ConfirmPrintablesModal({
             const state = itemEditorStates[item.type];
             return {
               type: item.type,
+              status: itemsStatus[item.type], // Include status for each item
               textElements: state.textElements,
               qrPosition: state.qrPosition,
               canvasScale: state.canvasScale,
@@ -229,6 +298,7 @@ export default function ConfirmPrintablesModal({
               const state = itemEditorStates[item.type];
               return {
                 type: item.type,
+                status: itemsStatus[item.type],
                 textElements: state.textElements,
                 qrPosition: state.qrPosition,
                 canvasScale: state.canvasScale,
@@ -317,14 +387,22 @@ export default function ConfirmPrintablesModal({
     }
   };
 
-  // Check if all items are confirmed
-  const allItemsConfirmed = confirmedItems.size === TOTAL_PRINTABLE_ITEMS;
+  // Count items by status
+  const confirmedCount = Object.values(itemsStatus).filter(s => s === 'confirmed').length;
+  const skippedCount = Object.values(itemsStatus).filter(s => s === 'skipped').length;
+  const pendingCount = Object.values(itemsStatus).filter(s => s === 'pending').length;
+
+  // All items are ready when none are pending (all confirmed or skipped)
+  const allItemsReady = pendingCount === 0;
 
   // Check if on last step
   const isLastStep = currentStep === TOTAL_PRINTABLE_ITEMS - 1;
 
   // Check if health check passed
   const healthOk = healthCheck?.healthy ?? false;
+
+  // Current item status
+  const currentItemStatus = itemsStatus[currentItem.type];
 
   if (!isOpen) return null;
 
@@ -385,20 +463,29 @@ export default function ConfirmPrintablesModal({
               Step {currentStep + 1} of {TOTAL_PRINTABLE_ITEMS}: {currentItem.name}
             </span>
             <div className="flex items-center gap-1.5">
-              {PRINTABLE_ITEMS.map((item, index) => (
-                <button
-                  key={item.type}
-                  onClick={() => setCurrentStep(index)}
-                  className={`w-3 h-3 rounded-full transition-all ${
-                    index === currentStep
-                      ? 'bg-[#F4A261] scale-125'
-                      : confirmedItems.has(item.type)
-                        ? 'bg-green-500'
-                        : 'bg-gray-300'
-                  }`}
-                  title={item.name}
-                />
-              ))}
+              {PRINTABLE_ITEMS.map((item, index) => {
+                const status = itemsStatus[item.type];
+                const isCurrent = index === currentStep;
+
+                // Determine dot style based on status
+                let dotClass = 'bg-gray-300'; // pending
+                if (status === 'confirmed') {
+                  dotClass = 'bg-green-500';
+                } else if (status === 'skipped') {
+                  dotClass = 'bg-amber-400';
+                }
+
+                return (
+                  <button
+                    key={item.type}
+                    onClick={() => setCurrentStep(index)}
+                    className={`w-3 h-3 rounded-full transition-all ${dotClass} ${
+                      isCurrent ? 'ring-2 ring-[#F4A261] ring-offset-1 scale-125' : ''
+                    }`}
+                    title={`${item.name} (${status})`}
+                  />
+                );
+              })}
             </div>
           </div>
         </div>
@@ -512,11 +599,68 @@ export default function ConfirmPrintablesModal({
           />
         </div>
 
+        {/* Summary display when all items are ready */}
+        {allItemsReady && !generationResult && (
+          <div className="px-6 py-4 border-t border-gray-100 bg-gray-50">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-700">Ready to Generate</h3>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                  {confirmedCount} confirmed
+                </span>
+                {skippedCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                    {skippedCount} skipped
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {PRINTABLE_ITEMS.map((item) => {
+                const status = itemsStatus[item.type];
+                return (
+                  <span
+                    key={item.type}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${
+                      status === 'confirmed'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {status === 'confirmed' ? (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                      </svg>
+                    )}
+                    {item.name}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Footer with actions */}
         <div className="px-6 py-4 border-t border-gray-200 bg-white">
           {generationError && (
             <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {generationError}
+            </div>
+          )}
+
+          {/* Already generated indicator for confirmed items */}
+          {currentItemStatus === 'confirmed' && (
+            <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              This item has already been generated. You can update and regenerate if needed.
             </div>
           )}
 
@@ -567,13 +711,24 @@ export default function ConfirmPrintablesModal({
 
             {/* Right side buttons */}
             <div className="flex items-center gap-3">
+              {/* Skip button */}
+              <button
+                onClick={handleSkip}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Skip
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              </button>
+
               {/* Confirm & Next / Confirm button */}
               {!isLastStep ? (
                 <button
                   onClick={handleConfirmAndNext}
                   className="inline-flex items-center gap-2 px-5 py-2 bg-[#F4A261] text-white rounded-lg hover:bg-[#E07B3A] transition-colors font-medium"
                 >
-                  {confirmedItems.has(currentItem.type) ? 'Update & Next' : 'Confirm & Next'}
+                  {currentItemStatus === 'confirmed' ? 'Update & Next' : 'Confirm & Next'}
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
@@ -581,28 +736,18 @@ export default function ConfirmPrintablesModal({
               ) : (
                 <button
                   onClick={handleConfirmAndNext}
-                  disabled={confirmedItems.has(currentItem.type)}
                   className={`inline-flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-colors ${
-                    confirmedItems.has(currentItem.type)
-                      ? 'bg-green-100 text-green-700 cursor-default'
+                    currentItemStatus === 'confirmed'
+                      ? 'bg-[#F4A261] text-white hover:bg-[#E07B3A]'
                       : 'bg-[#F4A261] text-white hover:bg-[#E07B3A]'
                   }`}
                 >
-                  {confirmedItems.has(currentItem.type) ? (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Confirmed
-                    </>
-                  ) : (
-                    'Confirm Last Item'
-                  )}
+                  {currentItemStatus === 'confirmed' ? 'Update' : 'Confirm'}
                 </button>
               )}
 
-              {/* Generate All button - only show when all confirmed */}
-              {allItemsConfirmed && (
+              {/* Generate All button - show when all items are ready (no pending) */}
+              {allItemsReady && (
                 <button
                   onClick={handleGenerateAll}
                   disabled={isGenerating || !healthOk}
@@ -622,7 +767,7 @@ export default function ConfirmPrintablesModal({
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Generate All PDFs
+                      Generate {confirmedCount} PDFs
                     </>
                   )}
                 </button>

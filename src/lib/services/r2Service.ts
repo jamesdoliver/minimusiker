@@ -1573,6 +1573,140 @@ class R2Service {
     return urls as Record<PrintableType, string | null>;
   }
 
+  /**
+   * Get the path for a printable item
+   * Used to determine where PDFs and skip placeholders are stored
+   */
+  private getPrintablePath(eventId: string, printableType: PrintableType): string {
+    if (printableType.startsWith('flyer')) {
+      return `${R2_PATHS.EVENT_PRINTABLES_FLYERS(eventId)}/`;
+    } else if (printableType === 'minicard') {
+      return `${R2_PATHS.EVENT_PRINTABLES_MINICARDS(eventId)}/`;
+    } else if (printableType === 'cd-jacket') {
+      return `${R2_PATHS.EVENT_PRINTABLES_CD_JACKET(eventId)}/`;
+    }
+    // button, tshirt-print, hoodie-print go directly in printables
+    return `${R2_PATHS.EVENT_PRINTABLES(eventId)}/`;
+  }
+
+  /**
+   * Get the full key for a printable PDF
+   */
+  private getPrintableKey(eventId: string, printableType: PrintableType): string {
+    return `${this.getPrintablePath(eventId, printableType)}${PRINTABLE_FILENAMES[printableType]}`;
+  }
+
+  /**
+   * Upload a placeholder JSON file for a skipped printable item
+   * Used when admin skips an item during confirmation
+   *
+   * @param eventId - The event ID
+   * @param printableType - The type of printable that was skipped
+   */
+  async uploadSkippedPlaceholder(
+    eventId: string,
+    printableType: PrintableType
+  ): Promise<{ success: boolean; key: string; error?: string }> {
+    // Get base filename without extension and add -skipped.json
+    const baseFilename = PRINTABLE_FILENAMES[printableType].replace('.pdf', '');
+    const key = `${this.getPrintablePath(eventId, printableType)}${baseFilename}-skipped.json`;
+
+    const placeholder = {
+      status: 'skipped',
+      skippedAt: new Date().toISOString(),
+      type: printableType,
+    };
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+        Body: JSON.stringify(placeholder, null, 2),
+        ContentType: 'application/json',
+        Metadata: {
+          eventId,
+          printableType,
+          status: 'skipped',
+        },
+      });
+
+      await this.client.send(command);
+
+      console.log(`[R2Service] Uploaded skipped placeholder for ${printableType} (event: ${eventId})`);
+
+      return { success: true, key };
+    } catch (error) {
+      console.error(`[R2Service] Error uploading skipped placeholder for ${printableType}:`, error);
+      return {
+        success: false,
+        key,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Get the status of all printables for an event
+   * Checks for existing PDFs and skipped placeholders
+   *
+   * @param eventId - The event ID
+   * @returns Record mapping each printable type to its status
+   */
+  async getPrintablesStatus(
+    eventId: string
+  ): Promise<Record<PrintableType, 'confirmed' | 'skipped' | 'pending'>> {
+    const allTypes: PrintableType[] = [
+      'flyer1', 'flyer1-back',
+      'flyer2', 'flyer2-back',
+      'flyer3', 'flyer3-back',
+      'button',
+      'tshirt-print', 'hoodie-print',
+      'minicard', 'cd-jacket',
+    ];
+
+    const status: Record<string, 'confirmed' | 'skipped' | 'pending'> = {};
+
+    for (const printableType of allTypes) {
+      // Check if PDF exists (confirmed)
+      const pdfKey = this.getPrintableKey(eventId, printableType);
+      const pdfExists = await this.fileExistsInAssetsBucket(pdfKey);
+
+      if (pdfExists) {
+        status[printableType] = 'confirmed';
+        continue;
+      }
+
+      // Check if skipped placeholder exists
+      const baseFilename = PRINTABLE_FILENAMES[printableType].replace('.pdf', '');
+      const skippedKey = `${this.getPrintablePath(eventId, printableType)}${baseFilename}-skipped.json`;
+      const skippedExists = await this.fileExistsInAssetsBucket(skippedKey);
+
+      if (skippedExists) {
+        status[printableType] = 'skipped';
+        continue;
+      }
+
+      // Neither exists - pending
+      status[printableType] = 'pending';
+    }
+
+    return status as Record<PrintableType, 'confirmed' | 'skipped' | 'pending'>;
+  }
+
+  /**
+   * Delete a skipped placeholder file
+   * Used when a previously-skipped item is confirmed
+   */
+  async deleteSkippedPlaceholder(
+    eventId: string,
+    printableType: PrintableType
+  ): Promise<boolean> {
+    const baseFilename = PRINTABLE_FILENAMES[printableType].replace('.pdf', '');
+    const key = `${this.getPrintablePath(eventId, printableType)}${baseFilename}-skipped.json`;
+
+    return this.deleteFileFromAssetsBucket(key);
+  }
+
   // ========================================
   // Mockup Methods
   // ========================================

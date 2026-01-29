@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getPrintableService, PrintableItemConfig, TextElementConfig } from '@/lib/services/printableService';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { getR2Service } from '@/lib/services/r2Service';
+import { getR2Service, PrintableType } from '@/lib/services/r2Service';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import {
   PrintableItemType,
@@ -26,6 +26,19 @@ import {
   getFontFamilyForType,
 } from '@/lib/config/printableTextConfig';
 
+// Item status type
+type ItemStatus = 'pending' | 'confirmed' | 'skipped';
+
+// Map UI PrintableItemType to R2 PrintableType
+// Most types are the same, but tshirt/hoodie differ
+function itemTypeToR2Type(itemType: PrintableItemType): PrintableType {
+  const mapping: Partial<Record<PrintableItemType, PrintableType>> = {
+    'tshirt': 'tshirt-print',
+    'hoodie': 'hoodie-print',
+  };
+  return (mapping[itemType] || itemType) as PrintableType;
+}
+
 // Request body type - Phase 4 with multiple text elements
 interface GeneratePrintablesRequest {
   eventId: string;        // Could be SimplyBook ID or actual event_id
@@ -34,6 +47,7 @@ interface GeneratePrintablesRequest {
   accessCode?: number;    // Optional - auto-fetched if not provided
   items: {
     type: PrintableItemType;
+    status?: ItemStatus;  // Item status - 'skipped' items get placeholder instead of PDF
     textElements: TextElement[];  // Array of text elements
     qrPosition?: {
       x: number;     // CSS pixels
@@ -142,9 +156,13 @@ export async function POST(request: NextRequest) {
       console.warn('[printables/generate] No access_code available - printables will be generated WITHOUT QR codes');
     }
 
-    // Convert items to PrintableItemConfig format for the service
+    // Separate items into confirmed (to generate) and skipped (to create placeholder)
+    const confirmedItems = items.filter(item => item.status !== 'skipped');
+    const skippedItems = items.filter(item => item.status === 'skipped');
+
+    // Convert confirmed items to PrintableItemConfig format for the service
     // Transform CSS coordinates to PDF coordinates
-    const itemConfigs: PrintableItemConfig[] = items.map(item => {
+    const itemConfigs: PrintableItemConfig[] = confirmedItems.map(item => {
       const printableConfig = getPrintableConfig(item.type);
       const pdfHeight = printableConfig?.pdfDimensions.height || 1000;
       const scale = item.canvasScale || 1;
@@ -201,47 +219,66 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Generate all printables with custom positions
-    const result = await printableService.generateAllPrintablesWithConfigs(
-      eventId,
-      schoolName,
-      eventDate,
-      itemConfigs,
-      logoBuffer,
-      qrCodeUrl
-    );
-
-    // Categorize results
-    const succeeded = result.results.filter(r => r.success);
-    const failed = result.results.filter(r => !r.success);
+    // Results tracking
+    const succeeded: { type: string; key?: string }[] = [];
+    const failed: { type: string; error?: string }[] = [];
     const skipped: { type: string; reason: string }[] = [];
 
-    // Check for skipped back items (no QR code)
-    if (!qrCodeUrl) {
-      const backTypes = ['flyer1-back', 'flyer2-back', 'flyer3-back'];
-      for (const failedItem of failed) {
-        if (backTypes.includes(failedItem.type) && failedItem.error?.includes('No QR code')) {
-          skipped.push({ type: failedItem.type, reason: 'No QR code available' });
+    // Handle skipped items - upload placeholder files
+    for (const item of skippedItems) {
+      const r2Type = itemTypeToR2Type(item.type);
+      const result = await r2Service.uploadSkippedPlaceholder(eventId, r2Type);
+      if (result.success) {
+        skipped.push({ type: item.type, reason: 'User skipped' });
+      } else {
+        // If we can't upload the placeholder, treat it as a failure
+        failed.push({ type: item.type, error: result.error || 'Failed to create skip placeholder' });
+      }
+    }
+
+    // Generate confirmed items
+    if (itemConfigs.length > 0) {
+      const result = await printableService.generateAllPrintablesWithConfigs(
+        eventId,
+        schoolName,
+        eventDate,
+        itemConfigs,
+        logoBuffer,
+        qrCodeUrl
+      );
+
+      // Process generation results
+      for (const r of result.results) {
+        if (r.success) {
+          succeeded.push({ type: r.type, key: r.key });
+          // If this item was previously skipped, delete the placeholder
+          await r2Service.deleteSkippedPlaceholder(eventId, r.type as PrintableType);
+        } else {
+          // Check if this is a back item that failed due to no QR code
+          const backTypes = ['flyer1-back', 'flyer2-back', 'flyer3-back'];
+          if (!qrCodeUrl && backTypes.includes(r.type) && r.error?.includes('No QR code')) {
+            skipped.push({ type: r.type, reason: 'No QR code available' });
+          } else {
+            failed.push({ type: r.type, error: r.error || 'Unknown error' });
+          }
         }
       }
     }
 
     // Determine success status
-    const anySucceeded = succeeded.length > 0;
+    const anySucceeded = succeeded.length > 0 || skipped.length > 0;
     const allSucceeded = failed.length === 0;
     const partialSuccess = anySucceeded && !allSucceeded;
 
     // Log generation status
-    console.log(`[printables/generate] Generated ${succeeded.length}/${result.results.length} printables for event ${eventId}`);
+    console.log(`[printables/generate] Generated ${succeeded.length} PDFs, skipped ${skipped.length}, failed ${failed.length} for event ${eventId}`);
 
-    // Create audio folder structure after successful printable uploads
+    // Always create audio folder structure when generation runs
     let audioFolderCreated = false;
-    if (anySucceeded) {
-      const folderResult = await r2Service.createAudioFolderStructure(eventId);
-      audioFolderCreated = folderResult.success;
-      if (!folderResult.success) {
-        console.warn(`[printables/generate] Failed to create audio folder: ${folderResult.error}`);
-      }
+    const folderResult = await r2Service.createAudioFolderStructure(eventId);
+    audioFolderCreated = folderResult.success;
+    if (!folderResult.success) {
+      console.warn(`[printables/generate] Failed to create audio folder: ${folderResult.error}`);
     }
 
     // Return improved response structure
@@ -257,13 +294,13 @@ export async function POST(request: NextRequest) {
           type: r.type,
           key: r.key,
         })),
-        failed: failed.filter(f => !skipped.some(s => s.type === f.type)).map(r => ({
+        failed: failed.map(r => ({
           type: r.type,
           error: r.error || 'Unknown error',
         })),
         skipped,
       },
-      errors: result.errors,
+      errors: [],
     });
 
   } catch (error) {
