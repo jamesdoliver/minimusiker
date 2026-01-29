@@ -191,6 +191,11 @@ class SimplybookService {
 
     const data: SimplybookJsonRpcResponse<T> = await response.json();
 
+    // Log full response for debugging editBook issues
+    if (method === 'editBook') {
+      console.log(`SimplyBook ${method} raw response:`, JSON.stringify(data));
+    }
+
     if (data.error) {
       throw new Error(`SimplyBook API error: ${data.error.message}`);
     }
@@ -422,14 +427,32 @@ class SimplybookService {
         return { success: false, error: 'Booking not found in SimplyBook' };
       }
 
+      // Log full booking for debugging
+      console.log(`SimplyBook: Full booking details for ${simplybookId}:`, JSON.stringify(booking, null, 2));
+
+      // Check if booking is in a state that allows editing
+      if (booking.status === 'cancelled') {
+        return { success: false, error: 'Cannot edit a cancelled booking' };
+      }
+
       // Use the booking's actual times (only change the date)
-      const startTime = booking.start_time || '08:00:00';
-      const endTime = booking.end_time || '14:00:00';
+      // Ensure times are in H:i:s format (add seconds if missing)
+      let startTime = booking.start_time || '08:00:00';
+      let endTime = booking.end_time || '14:00:00';
+
+      // Add seconds if time is in H:i format
+      if (startTime.match(/^\d{2}:\d{2}$/)) {
+        startTime = `${startTime}:00`;
+      }
+      if (endTime.match(/^\d{2}:\d{2}$/)) {
+        endTime = `${endTime}:00`;
+      }
 
       console.log(`SimplyBook: Attempting to update booking ${simplybookId}:`, {
         event_id: booking.event_id,
         unit_id: booking.unit_id,
         client_id: booking.client_id,
+        status: booking.status,
         oldDate: booking.start_date,
         newDate,
         startTime,
