@@ -49,3 +49,15 @@ export interface ParentWelcomeParams {
   childName: string;
   schoolName: string;
 }
+
+export interface StaffReassignmentParams {
+  staffName: string;
+  schoolName: string;
+  eventDate: string;
+  eventTime?: string;
+  schoolAddress?: string;
+  contactPerson?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  staffPortalUrl: string;
+}

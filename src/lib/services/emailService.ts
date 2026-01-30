@@ -12,6 +12,7 @@ import {
   RecordingReadyParams,
   NewBookingAlertParams,
   ParentWelcomeParams,
+  StaffReassignmentParams,
 } from '@/lib/types/email';
 
 class EmailService {
@@ -150,6 +151,25 @@ class EmailService {
       templateId,
       params,
       tags: ['parent-notification', 'welcome'],
+    });
+  }
+
+  /**
+   * Send staff reassignment notification
+   * Sent when an event is reassigned to a different staff member
+   */
+  async sendStaffReassignment(
+    staffEmail: string,
+    staffName: string,
+    params: StaffReassignmentParams
+  ): Promise<SendEmailResult> {
+    const templateId = this.getTemplateId('BREVO_TEMPLATE_STAFF_REASSIGNMENT');
+
+    return this.sendEmail({
+      to: { email: staffEmail, name: staffName },
+      templateId,
+      params,
+      tags: ['staff-notification', 'reassignment'],
     });
   }
 

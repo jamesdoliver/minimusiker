@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTaskService } from '@/lib/services/taskService';
 import { getActivityService, ActivityService } from '@/lib/services/activityService';
-import { SchoolEventDetail } from '@/lib/types/airtable';
+import { getEmailService } from '@/lib/services/emailService';
+import { SchoolEventDetail, EVENTS_TABLE_ID, EVENTS_FIELD_IDS, PERSONEN_TABLE_ID, PERSONEN_FIELD_IDS } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { simplybookService } from '@/lib/services/simplybookService';
@@ -183,15 +184,16 @@ export async function PATCH(
     // Check if any valid field is provided
     const hasDateUpdate = body.event_date !== undefined;
     const hasStatusUpdate = body.status !== undefined;
+    const hasStaffUpdate = body.assigned_staff !== undefined;
     const hasEventTypeUpdates =
       body.is_plus !== undefined ||
       body.is_kita !== undefined ||
       body.is_schulsong !== undefined ||
       body.is_minimusikertag !== undefined;
 
-    if (!hasDateUpdate && !hasStatusUpdate && !hasEventTypeUpdates) {
+    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates) {
       return NextResponse.json(
-        { success: false, error: 'No valid fields to update. Supported: event_date, status, is_plus, is_kita, is_schulsong, is_minimusikertag' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag' },
         { status: 400 }
       );
     }
@@ -254,6 +256,8 @@ export async function PATCH(
     let dateResult: { message: string; bookingUpdated: boolean; simplybookId?: string } | null = null;
     let tasksRecalculated = 0;
     let simplybookSynced = false;
+    let staffReassigned = false;
+    let emailSentToNewStaff = false;
 
     // Handle date update
     if (hasDateUpdate) {
@@ -300,6 +304,112 @@ export async function PATCH(
       }
     }
 
+    // Handle staff reassignment
+    if (hasStaffUpdate) {
+      const newStaffId = body.assigned_staff;
+      const oldStaffId = existingEvent?.assigned_staff?.[0] || null;
+
+      // Only process if staff is actually changing
+      if (newStaffId !== oldStaffId) {
+        const base = airtableService['base'];
+
+        // Update the Event record's assigned_staff field
+        await base(EVENTS_TABLE_ID).update(eventRecordId, {
+          [EVENTS_FIELD_IDS.assigned_staff]: newStaffId ? [newStaffId] : [],
+        });
+
+        staffReassigned = true;
+
+        // Get new staff details for email
+        if (newStaffId) {
+          try {
+            const staffRecords = await base(PERSONEN_TABLE_ID)
+              .select({
+                filterByFormula: `RECORD_ID() = '${newStaffId}'`,
+                maxRecords: 1,
+                fields: [PERSONEN_FIELD_IDS.staff_name, PERSONEN_FIELD_IDS.email],
+                returnFieldsByFieldId: true,
+              })
+              .firstPage();
+
+            if (staffRecords.length > 0) {
+              const staffRecord = staffRecords[0];
+              const staffName = staffRecord.fields[PERSONEN_FIELD_IDS.staff_name] as string || '';
+              const staffEmail = staffRecord.fields[PERSONEN_FIELD_IDS.email] as string || '';
+
+              if (staffEmail) {
+                // Get booking info for the event to include in email
+                let schoolAddress = existingEvent?.school_address || '';
+                let schoolPhone = existingEvent?.school_phone || '';
+                let contactPerson = '';
+                let contactEmail = '';
+
+                // Try to get additional info from SchoolBookings if available
+                if (existingEvent?.simplybook_booking?.[0]) {
+                  try {
+                    const booking = await airtableService.getSchoolBookingById(existingEvent.simplybook_booking[0]);
+                    if (booking) {
+                      schoolAddress = schoolAddress || booking.schoolAddress || '';
+                      schoolPhone = schoolPhone || booking.schoolPhone || '';
+                      contactPerson = booking.schoolContactName || '';
+                      contactEmail = booking.schoolContactEmail || '';
+                    }
+                  } catch (e) {
+                    console.warn('Could not fetch booking details for email:', e);
+                  }
+                }
+
+                // Format event date for display
+                const eventDate = body.event_date || existingEvent?.event_date || '';
+                const formattedDate = eventDate ? new Date(eventDate).toLocaleDateString('de-DE', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                }) : '';
+
+                // Send email notification
+                try {
+                  const emailResult = await getEmailService().sendStaffReassignment(
+                    staffEmail,
+                    staffName,
+                    {
+                      staffName,
+                      schoolName: existingEvent?.school_name || '',
+                      eventDate: formattedDate,
+                      schoolAddress,
+                      contactPerson,
+                      contactEmail,
+                      contactPhone: schoolPhone,
+                      staffPortalUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://minimusiker.app'}/staff`,
+                    }
+                  );
+                  emailSentToNewStaff = emailResult.success;
+                } catch (emailError) {
+                  console.warn('Could not send staff reassignment email:', emailError);
+                }
+              }
+            }
+          } catch (staffError) {
+            console.warn('Could not fetch new staff details:', staffError);
+          }
+        }
+
+        // Log activity for staff reassignment
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: newStaffId ? 'staff_assigned' : 'staff_unassigned',
+          description: ActivityService.generateDescription(
+            newStaffId ? 'staff_assigned' : 'staff_unassigned',
+            { staffId: newStaffId || oldStaffId }
+          ),
+          actorEmail: admin.email,
+          actorType: 'admin',
+          metadata: { oldStaffId, newStaffId, emailSent: emailSentToNewStaff },
+        });
+      }
+    }
+
     // Handle status and event type toggle updates
     let updatedEvent = existingEvent;
     if (hasStatusUpdate || hasEventTypeUpdates) {
@@ -337,6 +447,8 @@ export async function PATCH(
       bookingUpdated: dateResult?.bookingUpdated || false,
       simplybookSynced,
       tasksRecalculated,
+      staffReassigned,
+      emailSentToNewStaff,
       data: updatedEvent,
     });
   } catch (error) {
