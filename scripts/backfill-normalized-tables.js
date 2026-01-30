@@ -89,9 +89,34 @@ const DRY_RUN = process.argv.includes('--dry-run');
 // =============================================================================
 
 /**
+ * Normalize event type for consistent event ID generation.
+ * All MiniMusiker variations map to canonical "minimusiker".
+ */
+function normalizeEventTypeForId(eventType) {
+  if (!eventType) return 'minimusiker';
+
+  const normalized = eventType.toLowerCase().trim();
+
+  // All MiniMusiker variants normalize to same canonical value
+  if (
+    normalized.includes('minimusik') ||
+    normalized.includes('mini musik') ||
+    normalized === 'concert'
+  ) {
+    return 'minimusiker';
+  }
+
+  // Default for safety - all current events are MiniMusiker variants
+  return 'minimusiker';
+}
+
+/**
  * Generate a unique event ID from school name, event type, and booking date
  */
 function generateEventId(schoolName, eventType, bookingDate) {
+  // CRITICAL: Normalize event type for consistent ID generation
+  const normalizedEventType = normalizeEventTypeForId(eventType);
+
   const schoolSlug = schoolName
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '_')
@@ -99,7 +124,7 @@ function generateEventId(schoolName, eventType, bookingDate) {
     .replace(/^_|_$/g, '')
     .substring(0, 30);
 
-  const eventSlug = eventType
+  const eventSlug = normalizedEventType
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '_')
     .replace(/_+/g, '_')
@@ -112,7 +137,8 @@ function generateEventId(schoolName, eventType, bookingDate) {
     dateStr = dateOnly.replace(/-/g, '');
   }
 
-  const hashInput = `${schoolName}|${eventType}|${bookingDate || ''}`;
+  // Hash must use normalized event type for consistency
+  const hashInput = `${schoolName}|${normalizedEventType}|${bookingDate || ''}`;
   const hash = crypto.createHash('md5').update(hashInput).digest('hex').substring(0, 6);
 
   if (dateStr) {

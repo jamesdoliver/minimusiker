@@ -1,8 +1,39 @@
 import crypto from 'crypto';
 
 /**
+ * Normalize event type for consistent event ID generation.
+ * All MiniMusiker variations map to canonical "minimusiker".
+ *
+ * This prevents duplicate events when different code paths pass different
+ * event type variations (e.g., "MiniMusiker" vs "Minimusikertag" vs "Minimusikertag PLUS").
+ *
+ * @param eventType - The event type string to normalize
+ * @returns Normalized event type (always "minimusiker" for MiniMusiker variations)
+ */
+export function normalizeEventTypeForId(eventType: string | undefined | null): string {
+  if (!eventType) return 'minimusiker';
+
+  const normalized = eventType.toLowerCase().trim();
+
+  // All MiniMusiker variants normalize to same canonical value
+  if (
+    normalized.includes('minimusik') ||
+    normalized.includes('mini musik') ||
+    normalized === 'concert'
+  ) {
+    return 'minimusiker';
+  }
+
+  // Default for safety - all current events are MiniMusiker variants
+  return 'minimusiker';
+}
+
+/**
  * Generate a unique event ID from school name, event type, and booking date
  * This creates a deterministic ID that's the same for the same input values
+ *
+ * IMPORTANT: Event type is normalized internally to prevent duplicates from
+ * different event type variations (e.g., "MiniMusiker" vs "Minimusikertag").
  *
  * @param schoolName - Name of the school (e.g., "Calder High School")
  * @param eventType - Type of event (e.g., "minimusiker", "spring concert")
@@ -14,6 +45,9 @@ export function generateEventId(
   eventType: string,
   bookingDate?: string
 ): string {
+  // CRITICAL: Normalize event type for consistent ID generation
+  const normalizedEventType = normalizeEventTypeForId(eventType);
+
   // Create slugs from school and event type
   const schoolSlug = schoolName
     .toLowerCase()
@@ -22,7 +56,7 @@ export function generateEventId(
     .replace(/^_|_$/g, '')
     .substring(0, 30); // Limit length for readability
 
-  const eventSlug = eventType
+  const eventSlug = normalizedEventType
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '_')
     .replace(/_+/g, '_')
@@ -38,7 +72,8 @@ export function generateEventId(
   }
 
   // Generate a short hash for uniqueness (in case of similar names)
-  const hashInput = `${schoolName}|${eventType}|${bookingDate || ''}`;
+  // Hash must use normalized event type for consistency
+  const hashInput = `${schoolName}|${normalizedEventType}|${bookingDate || ''}`;
   const hash = crypto.createHash('md5').update(hashInput).digest('hex').substring(0, 6);
 
   // Combine parts to create event ID
