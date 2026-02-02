@@ -13,7 +13,7 @@ import {
   validateRegistrationData,
   sanitizeRegistrationData,
 } from '@/lib/validators/registrationValidators';
-import { generateEventId, generateSchoolId } from '@/lib/utils/eventIdentifiers';
+import { generateSchoolId } from '@/lib/utils/eventIdentifiers';
 
 const PARENT_JWT_SECRET =
   process.env.PARENT_JWT_SECRET || process.env.JWT_SECRET || 'parent-secret-key';
@@ -88,12 +88,9 @@ export async function POST(request: NextRequest) {
 
       const mostRecentRecord = existingRecords[0];
 
-      // Generate event ID for session
-      const eventId = generateEventId(
-        mostRecentRecord.school_name,
-        mostRecentRecord.event_type,
-        mostRecentRecord.booking_date
-      );
+      // Use the actual booking_id from the database as the event identifier
+      // Do NOT regenerate - hash variations cause event_id linking failures
+      const eventId = mostRecentRecord.booking_id;
       const schoolId = generateSchoolId(mostRecentRecord.school_name);
 
       // Create children array from existing records
@@ -102,11 +99,7 @@ export async function POST(request: NextRequest) {
         bookingId: record.booking_id,
         classId: record.class_id,
         class: record.class,
-        eventId: generateEventId(
-          record.school_name,
-          record.event_type,
-          record.booking_date
-        ),
+        eventId: record.booking_id, // Use actual booking_id, not generated ID
         schoolName: record.school_name,
         eventType: record.event_type,
         bookingDate: record.booking_date,
@@ -184,14 +177,9 @@ export async function POST(request: NextRequest) {
     );
 
     // Step 5: Generate session data
-    // Use fallback for eventType to prevent double-underscore event IDs when Events table has empty event_type
-    // Must match the casing used in SimplyBook webhook ('MiniMusiker') to ensure consistent hash
-    const eventType = eventDetails.eventType || 'MiniMusiker';
-    const eventId = generateEventId(
-      eventDetails.schoolName,
-      eventType,
-      eventDetails.bookingDate
-    );
+    // Use the canonical booking_id from the validated event
+    // Do NOT regenerate - hash variations cause event_id linking failures
+    const eventId = sanitizedData.eventId;
     const schoolId = generateSchoolId(eventDetails.schoolName);
 
     // Create children array for session
@@ -200,9 +188,9 @@ export async function POST(request: NextRequest) {
       bookingId: sanitizedData.eventId,
       classId: sanitizedData.classId,
       class: eventDetails.className,
-      eventId,
+      eventId: sanitizedData.eventId, // Use canonical booking_id
       schoolName: eventDetails.schoolName,
-      eventType,
+      eventType: eventDetails.eventType,
       bookingDate: eventDetails.bookingDate,
     }));
 
