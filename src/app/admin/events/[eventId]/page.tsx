@@ -40,6 +40,7 @@ import AddGroupModal from '@/components/shared/class-management/AddGroupModal';
 import EditGroupModal from '@/components/shared/class-management/EditGroupModal';
 import EventActivityTimeline from '@/components/admin/EventActivityTimeline';
 import DateChangeModal from '@/components/admin/events/DateChangeModal';
+import AddTeacherModal from '@/components/admin/AddTeacherModal';
 
 // Group type for admin view
 interface ClassGroup {
@@ -132,6 +133,9 @@ export default function EventDetailPage() {
 
   // Refresh teacher state
   const [isRefreshingTeacher, setIsRefreshingTeacher] = useState(false);
+
+  // Add teacher modal state
+  const [showAddTeacherModal, setShowAddTeacherModal] = useState(false);
 
   const eventId = params.eventId as string;
 
@@ -578,6 +582,14 @@ export default function EventDetailPage() {
                   )}
                 </button>
               )}
+              {/* Add Teacher Button */}
+              <button
+                onClick={() => setShowAddTeacherModal(true)}
+                className="ml-2 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                title="Add another teacher to this event"
+              >
+                + Add Teacher
+              </button>
             </div>
           </div>
 
@@ -1457,6 +1469,19 @@ export default function EventDetailPage() {
           fetchEventDetail();
         }}
       />
+
+      {/* Add Teacher Modal */}
+      {showAddTeacherModal && (
+        <AddTeacherModal
+          eventId={eventId}
+          onClose={() => setShowAddTeacherModal(false)}
+          onTeacherAdded={() => {
+            setShowAddTeacherModal(false);
+            toast.success('Teacher added successfully');
+            fetchEventDetail();
+          }}
+        />
+      )}
     </div>
   );
 }

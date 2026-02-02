@@ -15,13 +15,17 @@ import {
   UpsertClassRequest,
   AudioFileType,
   AudioFileStatus,
+  TeacherInvite,
   TEACHERS_TABLE_ID,
   SONGS_TABLE_ID,
   AUDIO_FILES_TABLE_ID,
+  TEACHER_INVITES_TABLE_ID,
   TEACHERS_FIELD_IDS,
   SONGS_FIELD_IDS,
   AUDIO_FILES_FIELD_IDS,
+  TEACHER_INVITES_FIELD_IDS,
   MAGIC_LINK_EXPIRY_MS,
+  INVITE_EXPIRY_MS,
 } from '@/lib/types/teacher';
 import {
   AIRTABLE_FIELD_IDS,
@@ -2461,6 +2465,270 @@ class TeacherService {
   async getTeacherEventDetail(eventId: string, teacherEmail: string): Promise<TeacherEventView | null> {
     const events = await this.getTeacherEvents(teacherEmail);
     return events.find((e) => e.eventId === eventId) || null;
+  }
+
+  // =============================================================================
+  // TEACHER INVITE OPERATIONS
+  // =============================================================================
+
+  /**
+   * Transform Airtable record to TeacherInvite interface
+   */
+  private transformInviteRecord(record: any): TeacherInvite {
+    const fields = record.fields;
+    return {
+      id: record.id,
+      inviteToken: fields[TEACHER_INVITES_FIELD_IDS.invite_token] || fields.invite_token || '',
+      eventId: '', // Populated from linked event
+      eventRecordId: Array.isArray(fields[TEACHER_INVITES_FIELD_IDS.event_id])
+        ? fields[TEACHER_INVITES_FIELD_IDS.event_id][0]
+        : fields[TEACHER_INVITES_FIELD_IDS.event_id],
+      invitedBy: Array.isArray(fields[TEACHER_INVITES_FIELD_IDS.invited_by])
+        ? fields[TEACHER_INVITES_FIELD_IDS.invited_by][0]
+        : fields[TEACHER_INVITES_FIELD_IDS.invited_by] || '',
+      expiresAt: fields[TEACHER_INVITES_FIELD_IDS.expires_at] || fields.expires_at || '',
+      usedAt: fields[TEACHER_INVITES_FIELD_IDS.used_at] || fields.used_at,
+      usedBy: Array.isArray(fields[TEACHER_INVITES_FIELD_IDS.used_by])
+        ? fields[TEACHER_INVITES_FIELD_IDS.used_by][0]
+        : fields[TEACHER_INVITES_FIELD_IDS.used_by],
+      status: fields[TEACHER_INVITES_FIELD_IDS.status] || fields.status || 'pending',
+    };
+  }
+
+  /**
+   * Create an invite for a teacher to access a specific event
+   * @param eventRecordId - The Airtable record ID of the event
+   * @param invitedByTeacherId - The teacher record ID who is creating the invite
+   * @returns Token, expiry date, and full invite URL
+   */
+  async createEventInvite(
+    eventRecordId: string,
+    invitedByTeacherId: string
+  ): Promise<{
+    token: string;
+    expiresAt: string;
+    inviteUrl: string;
+  }> {
+    try {
+      // Generate 64-char hex token
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + INVITE_EXPIRY_MS).toISOString();
+
+      // Create the invite record
+      await this.base(TEACHER_INVITES_TABLE_ID).create({
+        [TEACHER_INVITES_FIELD_IDS.invite_token]: token,
+        [TEACHER_INVITES_FIELD_IDS.event_id]: [eventRecordId],
+        [TEACHER_INVITES_FIELD_IDS.invited_by]: [invitedByTeacherId],
+        [TEACHER_INVITES_FIELD_IDS.expires_at]: expiresAt,
+        [TEACHER_INVITES_FIELD_IDS.status]: 'pending',
+      });
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://portal.minimusiker.de';
+      const inviteUrl = `${appUrl}/paedagogen-einladung/${token}`;
+
+      return {
+        token,
+        expiresAt,
+        inviteUrl,
+      };
+    } catch (error) {
+      console.error('Error creating event invite:', error);
+      throw new Error(`Failed to create invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get invite by token
+   * Returns null if not found, expired, or already used
+   */
+  async getInviteByToken(token: string): Promise<TeacherInvite | null> {
+    try {
+      const records = await this.base(TEACHER_INVITES_TABLE_ID)
+        .select({
+          filterByFormula: `{${TEACHER_INVITES_FIELD_IDS.invite_token}} = '${token.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+        })
+        .all();
+
+      if (records.length === 0) {
+        return null;
+      }
+
+      const invite = this.transformInviteRecord(records[0]);
+
+      // Check if already used
+      if (invite.status === 'accepted' || invite.usedAt) {
+        return null;
+      }
+
+      // Check expiration
+      if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+        // Mark as expired
+        await this.base(TEACHER_INVITES_TABLE_ID).update(records[0].id, {
+          [TEACHER_INVITES_FIELD_IDS.status]: 'expired',
+        });
+        return null;
+      }
+
+      // Populate invitedByName
+      if (invite.invitedBy) {
+        const invitingTeacher = await this.getTeacherById(invite.invitedBy);
+        if (invitingTeacher) {
+          invite.invitedByName = invitingTeacher.name;
+        }
+      }
+
+      return invite;
+    } catch (error) {
+      console.error('Error getting invite by token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Accept an invite - creates/links teacher and grants event access
+   * @param token - The invite token
+   * @param email - Email of the accepting teacher
+   * @param name - Optional name for new teachers
+   * @returns The teacher and eventId for session/redirect
+   */
+  async acceptInvite(
+    token: string,
+    email: string,
+    name?: string
+  ): Promise<{
+    teacher: Teacher;
+    eventId: string;
+    eventRecordId: string;
+  }> {
+    try {
+      // Validate the invite
+      const records = await this.base(TEACHER_INVITES_TABLE_ID)
+        .select({
+          filterByFormula: `{${TEACHER_INVITES_FIELD_IDS.invite_token}} = '${token.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+        })
+        .all();
+
+      if (records.length === 0) {
+        throw new Error('Invite not found');
+      }
+
+      const inviteRecord = records[0];
+      const invite = this.transformInviteRecord(inviteRecord);
+
+      // Check if already used
+      if (invite.status === 'accepted' || invite.usedAt) {
+        throw new Error('This invite has already been used');
+      }
+
+      // Check expiration
+      if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+        await this.base(TEACHER_INVITES_TABLE_ID).update(inviteRecord.id, {
+          [TEACHER_INVITES_FIELD_IDS.status]: 'expired',
+        });
+        throw new Error('This invite has expired');
+      }
+
+      // Get event record ID from invite
+      const eventRecordId = invite.eventRecordId;
+      if (!eventRecordId) {
+        throw new Error('Invalid invite: no event linked');
+      }
+
+      // Get the event to find the event_id (booking_id)
+      const eventRecord = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
+      const eventId =
+        (eventRecord.fields[EVENTS_FIELD_IDS.event_id] as string) ||
+        (eventRecord.fields[EVENTS_FIELD_IDS.legacy_booking_id] as string);
+
+      if (!eventId) {
+        throw new Error('Invalid event: no event ID found');
+      }
+
+      // Get the school name from the event
+      const schoolName = (eventRecord.fields[EVENTS_FIELD_IDS.school_name] as string) || 'Unknown School';
+
+      // Find or create the teacher
+      let teacher = await this.getTeacherByEmail(email);
+      if (!teacher) {
+        teacher = await this.createTeacher({
+          email,
+          name: name || email.split('@')[0],
+          schoolName,
+          linkedEventId: eventRecordId,
+        });
+      } else {
+        // Link the event to the existing teacher
+        await this.linkEventToTeacher(teacher.id, eventRecordId);
+      }
+
+      // Mark invite as accepted
+      await this.base(TEACHER_INVITES_TABLE_ID).update(inviteRecord.id, {
+        [TEACHER_INVITES_FIELD_IDS.status]: 'accepted',
+        [TEACHER_INVITES_FIELD_IDS.used_at]: new Date().toISOString(),
+        [TEACHER_INVITES_FIELD_IDS.used_by]: [teacher.id],
+      });
+
+      return {
+        teacher,
+        eventId,
+        eventRecordId,
+      };
+    } catch (error) {
+      console.error('Error accepting invite:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all teachers who have access to an event
+   * @param eventRecordId - The Airtable record ID of the event
+   * @returns Array of teachers with access
+   */
+  async getEventTeachers(eventRecordId: string): Promise<Teacher[]> {
+    try {
+      // Query teachers who have this event in their linked_events
+      const records = await this.base(TEACHERS_TABLE)
+        .select({
+          filterByFormula: `FIND('${eventRecordId}', ARRAYJOIN({${TEACHERS_FIELD_IDS.linked_events}}, ',')) > 0`,
+        })
+        .all();
+
+      return records.map((record) => this.transformTeacherRecord(record));
+    } catch (error) {
+      console.error('Error getting event teachers:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if a teacher has access to an event
+   */
+  async teacherHasEventAccess(teacherEmail: string, eventId: string): Promise<boolean> {
+    const event = await this.getTeacherEventDetail(eventId, teacherEmail);
+    return event !== null;
+  }
+
+  /**
+   * Get event info for an invite (for display on acceptance page)
+   */
+  async getEventInfoForInvite(eventRecordId: string): Promise<{
+    schoolName: string;
+    eventDate: string;
+    eventType: string;
+  } | null> {
+    try {
+      const eventRecord = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
+      return {
+        schoolName: (eventRecord.fields[EVENTS_FIELD_IDS.school_name] as string) || 'Unknown School',
+        eventDate: (eventRecord.fields[EVENTS_FIELD_IDS.event_date] as string) || '',
+        eventType: (eventRecord.fields[EVENTS_FIELD_IDS.event_type] as string) || 'Minimusikertag',
+      };
+    } catch (error) {
+      console.error('Error getting event info for invite:', error);
+      return null;
+    }
   }
 }
 

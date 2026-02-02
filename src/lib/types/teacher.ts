@@ -8,6 +8,7 @@
 export const TEACHERS_TABLE_ID = 'tblLO2vXcgvNjrJ0T';
 export const SONGS_TABLE_ID = 'tblPjGWQlHuG8jp5X';
 export const AUDIO_FILES_TABLE_ID = 'tbloCM4tmH7mYoyXR';
+export const TEACHER_INVITES_TABLE_ID = 'tblQsDeJo4tg0GvI5';
 
 // =============================================================================
 // AIRTABLE FIELD IDs
@@ -55,6 +56,21 @@ export const AUDIO_FILES_FIELD_IDS = {
   status: 'fldCAcEMu0IF1bWgz', // pending | processing | ready | error
   is_schulsong: 'fldaPVT59Gdf8hqPL', // Checkbox - marks audio file as the schulsong
 } as const;
+
+export const TEACHER_INVITES_FIELD_IDS = {
+  invite_token: 'fldbP4n0Irz6wSYjM', // 64-char hex token
+  event_id: 'flddABYvRLkdngd44', // Link to Events table
+  invited_by: 'fld9mgK81sr1PVy4t', // Link to Teachers table
+  expires_at: 'fldIm5VZQVBjRlxLW', // Date & time - 7 days from creation
+  used_at: 'fldLmgBP82bJmXcks', // Date & time - when accepted (null if pending)
+  used_by: 'fldsO6OhoFxbyzRVi', // Link to Teachers table - who accepted
+  status: 'fldMWHaQSW7HRcCZc', // Single select: pending | accepted | expired
+} as const;
+
+/**
+ * Teacher invite expiration time (7 days in milliseconds)
+ */
+export const INVITE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
 // =============================================================================
 // INTERFACES
@@ -265,6 +281,23 @@ export interface CreateClassGroupInput {
 export interface UpdateClassGroupInput {
   groupName?: string;
   memberClassIds?: string[];      // Can update which classes are in the group
+}
+
+/**
+ * TeacherInvite - Invitation for a teacher to access a specific event
+ * Used for teacher-to-teacher sharing via invite links
+ */
+export interface TeacherInvite {
+  id: string; // Airtable record ID
+  inviteToken: string; // 64-char hex token
+  eventId: string; // booking_id (event identifier)
+  eventRecordId?: string; // Airtable record ID of the event
+  invitedBy: string; // Teacher record ID who created invite
+  invitedByName?: string; // Display name of inviting teacher
+  expiresAt: string; // ISO datetime when invite expires
+  usedAt?: string; // ISO datetime when accepted (null if pending)
+  usedBy?: string; // Teacher record ID who accepted
+  status: 'pending' | 'accepted' | 'expired';
 }
 
 // =============================================================================
