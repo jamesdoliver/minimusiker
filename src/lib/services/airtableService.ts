@@ -234,6 +234,7 @@ class AirtableService {
         created_at: record.fields[EVENTS_FIELD_IDS.created_at] as string,
         legacy_booking_id: record.fields[EVENTS_FIELD_IDS.legacy_booking_id] as string,
         simplybook_booking: record.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[],
+        teachers: record.fields[EVENTS_FIELD_IDS.teachers] as string[],
       };
     } catch (error) {
       console.error('Error querying event by ID:', error);

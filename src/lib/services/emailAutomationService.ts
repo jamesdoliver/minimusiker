@@ -7,6 +7,7 @@
 
 import { getAirtableService } from './airtableService';
 import { sendCampaignEmail } from './resendService';
+import { getTeacherService } from './teacherService';
 import {
   EmailTemplate,
   EmailRecipient,
@@ -197,7 +198,10 @@ export async function getEventsHittingThreshold(
 // =============================================================================
 
 /**
- * Get teacher recipients for an event
+ * Get teacher recipients for an event using a failsafe chain:
+ * Priority 1: Events.teachers linked records → Teachers table (proper teacher names)
+ * Priority 2: Events.simplybook_booking → SchoolBookings.school_contact_name (booking contact)
+ * Priority 3: Events.assigned_staff → Personen (staff names as last resort)
  */
 async function getTeacherRecipientsForEvent(
   eventId: string,
@@ -206,46 +210,35 @@ async function getTeacherRecipientsForEvent(
 ): Promise<EmailRecipient[]> {
   const airtable = getAirtableService();
   const recipients: EmailRecipient[] = [];
+  const seenEmails = new Set<string>();
 
   try {
-    // Get classes for this event
-    const classes = await airtable.getClassesByEventId(eventRecordId);
+    // Get event with teachers and simplybook_booking linked records
+    const event = await airtable.getEventByRecordId(eventRecordId);
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
+    const eventLink = eventData.accessCode
+      ? `${baseUrl}/e/${eventData.accessCode}`
+      : `${baseUrl}/parent`;
 
-    // Track unique teacher emails to avoid duplicates
-    const seenEmails = new Set<string>();
-
-    for (const cls of classes) {
-      // For now, we don't have direct teacher email in classes
-      // Teachers are typically linked through the main_teacher field
-      // This would need to be enhanced to look up teacher emails from Personen table
-
-      // For the MVP, we can use the school booking contact as a fallback
-      // or implement teacher email lookup later
-
-      if (cls.main_teacher && !seenEmails.has(cls.main_teacher.toLowerCase())) {
-        // main_teacher might be a name, not an email
-        // We'd need to look this up in the Personen table
-        // For now, skip if it's not an email format
-        if (cls.main_teacher.includes('@')) {
-          seenEmails.add(cls.main_teacher.toLowerCase());
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
-          const eventLink = eventData.accessCode
-            ? `${baseUrl}/e/${eventData.accessCode}`
-            : `${baseUrl}/parent`;
+    // PRIORITY 1: Use linked teachers from Events.teachers
+    if (event?.teachers && event.teachers.length > 0) {
+      const teacherService = getTeacherService();
+      for (const teacherId of event.teachers) {
+        const teacher = await teacherService.getTeacherById(teacherId);
+        if (teacher?.email && !seenEmails.has(teacher.email.toLowerCase())) {
+          seenEmails.add(teacher.email.toLowerCase());
           recipients.push({
-            email: cls.main_teacher,
-            name: cls.main_teacher.split('@')[0],
+            email: teacher.email,
+            name: teacher.name,
             type: 'teacher',
             eventId: eventId,
-            classId: cls.class_id,
             templateData: {
               school_name: eventData.schoolName,
               event_date: formatDateGerman(eventData.eventDate),
               event_type: eventData.eventType,
               event_link: eventLink,
-              class_name: cls.class_name,
-              teacher_name: cls.main_teacher,
-              teacher_first_name: cls.main_teacher.split(' ')[0],
+              teacher_name: teacher.name,
+              teacher_first_name: teacher.name?.split(' ')[0] || '',
               _event_date_iso: eventData.eventDate,
             },
           });
@@ -253,36 +246,51 @@ async function getTeacherRecipientsForEvent(
       }
     }
 
-    // If no teacher emails found in classes, try to get from assigned staff
-    if (recipients.length === 0) {
-      // Try to get staff assigned to the event
-      const event = await airtable.getEventByRecordId(eventRecordId);
-      if (event?.assigned_staff && event.assigned_staff.length > 0) {
-        // Look up staff emails from Personen table
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
-        const eventLink = eventData.accessCode
-          ? `${baseUrl}/e/${eventData.accessCode}`
-          : `${baseUrl}/parent`;
-        for (const staffId of event.assigned_staff) {
-          const staff = await airtable.getPersonById(staffId);
-          if (staff?.email && !seenEmails.has(staff.email.toLowerCase())) {
-            seenEmails.add(staff.email.toLowerCase());
-            recipients.push({
-              email: staff.email,
-              name: staff.staff_name,
-              type: 'teacher',
-              eventId: eventId,
-              templateData: {
-                school_name: eventData.schoolName,
-                event_date: formatDateGerman(eventData.eventDate),
-                event_type: eventData.eventType,
-                event_link: eventLink,
-                teacher_name: staff.staff_name,
-                teacher_first_name: staff.staff_name?.split(' ')[0] || '',
-                _event_date_iso: eventData.eventDate,
-              },
-            });
-          }
+    // PRIORITY 2: Fallback to SchoolBookings.school_contact_name
+    if (recipients.length === 0 && event?.simplybook_booking?.[0]) {
+      const booking = await airtable.getSchoolBookingById(event.simplybook_booking[0]);
+      if (booking?.schoolContactEmail && !seenEmails.has(booking.schoolContactEmail.toLowerCase())) {
+        seenEmails.add(booking.schoolContactEmail.toLowerCase());
+        const contactName = booking.schoolContactName || 'Kontaktperson';
+        recipients.push({
+          email: booking.schoolContactEmail,
+          name: contactName,
+          type: 'teacher',
+          eventId: eventId,
+          templateData: {
+            school_name: eventData.schoolName,
+            event_date: formatDateGerman(eventData.eventDate),
+            event_type: eventData.eventType,
+            event_link: eventLink,
+            teacher_name: contactName,
+            teacher_first_name: contactName.split(' ')[0] || '',
+            _event_date_iso: eventData.eventDate,
+          },
+        });
+      }
+    }
+
+    // PRIORITY 3: Fallback to assigned_staff (existing logic)
+    if (recipients.length === 0 && event?.assigned_staff && event.assigned_staff.length > 0) {
+      for (const staffId of event.assigned_staff) {
+        const staff = await airtable.getPersonById(staffId);
+        if (staff?.email && !seenEmails.has(staff.email.toLowerCase())) {
+          seenEmails.add(staff.email.toLowerCase());
+          recipients.push({
+            email: staff.email,
+            name: staff.staff_name,
+            type: 'teacher',
+            eventId: eventId,
+            templateData: {
+              school_name: eventData.schoolName,
+              event_date: formatDateGerman(eventData.eventDate),
+              event_type: eventData.eventType,
+              event_link: eventLink,
+              teacher_name: staff.staff_name,
+              teacher_first_name: staff.staff_name?.split(' ')[0] || '',
+              _event_date_iso: eventData.eventDate,
+            },
+          });
         }
       }
     }
