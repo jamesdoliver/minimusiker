@@ -232,6 +232,11 @@ export interface TeacherEventView {
 }
 
 /**
+ * Class type for collection categorization
+ */
+export type ClassType = 'regular' | 'choir' | 'teacher_song';
+
+/**
  * Teacher's view of a class within their event
  */
 export interface TeacherClassView {
@@ -245,6 +250,7 @@ export interface TeacherClassView {
     hasFinal: boolean;
   };
   isDefault?: boolean;  // Auto-created "Alle Kinder" catch-all class
+  classType?: ClassType;  // regular | choir | teacher_song
 }
 
 /**

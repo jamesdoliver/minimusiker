@@ -51,6 +51,19 @@ interface ClassGroup {
   songCount: number;
 }
 
+// Collection type for admin view (Choir and Teacher Song)
+interface Collection {
+  classId: string;
+  className: string;
+  classType: 'choir' | 'teacher_song';
+  songs: Array<{ id: string; title: string; artist?: string; notes?: string }>;
+  audioStatus: {
+    hasRawAudio: boolean;
+    hasPreview: boolean;
+    hasFinal: boolean;
+  };
+}
+
 function formatDate(dateString: string): string {
   if (!dateString) return 'No date';
   try {
@@ -66,9 +79,176 @@ function formatDate(dateString: string): string {
   }
 }
 
+// Add Collection Modal Component (for Choir and Teacher Song)
+interface AddCollectionModalProps {
+  eventId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function AddCollectionModal({ eventId, onClose, onSuccess }: AddCollectionModalProps) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState<'choir' | 'teacher_song'>('choir');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError('Please enter a collection name');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/collections`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          type,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to create collection');
+      }
+
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create collection');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Create Collection</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-blue-800">What is a collection?</p>
+              <p className="text-sm text-blue-700 mt-1">
+                Collections contain songs visible to all parents - regardless of their child&apos;s class.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Type <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-3">
+              <label
+                className={`flex-1 flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  type === 'choir'
+                    ? 'border-teal-500 bg-teal-50'
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="type"
+                  value="choir"
+                  checked={type === 'choir'}
+                  onChange={() => setType('choir')}
+                  className="w-4 h-4 text-teal-600 border-gray-300 focus:ring-teal-500"
+                />
+                <div>
+                  <p className="font-medium text-gray-900">Choir</p>
+                  <p className="text-xs text-gray-500">Group choir songs</p>
+                </div>
+              </label>
+              <label
+                className={`flex-1 flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  type === 'teacher_song'
+                    ? 'border-amber-500 bg-amber-50'
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="type"
+                  value="teacher_song"
+                  checked={type === 'teacher_song'}
+                  onChange={() => setType('teacher_song')}
+                  className="w-4 h-4 text-amber-600 border-gray-300 focus:ring-amber-500"
+                />
+                <div>
+                  <p className="font-medium text-gray-900">Teacher Song</p>
+                  <p className="text-xs text-gray-500">Teacher performances</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+              placeholder={type === 'choir' ? 'e.g. School Choir, Grade 3+4 Choir' : 'e.g. Teacher Band, Farewell Song'}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 ${
+                type === 'choir'
+                  ? 'bg-teal-600 hover:bg-teal-700'
+                  : 'bg-amber-600 hover:bg-amber-700'
+              }`}
+            >
+              {isSubmitting ? 'Creating...' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function EventDetailPage() {
   const params = useParams();
-  const router = useRouter();
+  const _router = useRouter();
   const [event, setEvent] = useState<EventDetailWithBooking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +290,11 @@ export default function EventDetailPage() {
   const [showEditGroup, setShowEditGroup] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<ClassGroup | null>(null);
 
+  // Collection management state (Choir and Teacher Song)
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
+  const [showAddCollection, setShowAddCollection] = useState(false);
+
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{
     type: 'class' | 'song' | 'group';
@@ -144,6 +329,7 @@ export default function EventDetailPage() {
       fetchEventDetail();
       fetchTeamStaff();
       fetchGroups();
+      fetchCollections();
     }
   }, [eventId]);
 
@@ -200,6 +386,40 @@ export default function EventDetailPage() {
     } catch (err) {
       console.error('Error fetching groups:', err);
     }
+  };
+
+  const fetchCollections = async () => {
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/collections`);
+      if (response.ok) {
+        const data = await response.json();
+        setCollections(data.collections || []);
+      }
+    } catch (err) {
+      console.error('Error fetching collections:', err);
+    }
+  };
+
+  // Collection management handlers
+  const handleAddCollection = () => {
+    setShowAddCollection(true);
+  };
+
+  const toggleCollectionExpanded = (classId: string) => {
+    setExpandedCollections((prev) => {
+      const next = new Set(prev);
+      if (next.has(classId)) {
+        next.delete(classId);
+      } else {
+        next.add(classId);
+      }
+      return next;
+    });
+  };
+
+  const handleAddSongToCollection = (classId: string) => {
+    setSelectedClass({ id: classId, name: '', numChildren: 0 });
+    setShowAddSong(true);
   };
 
   // Refresh teacher handler - syncs contact person to class main_teacher
@@ -1322,6 +1542,234 @@ export default function EventDetailPage() {
         )}
       </div>
 
+      {/* Collections Section (Choir and Teacher Song) */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Sammlungen
+            {collections.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                ({collections.length} {collections.length === 1 ? 'Sammlung' : 'Sammlungen'})
+              </span>
+            )}
+          </h2>
+          <button
+            onClick={handleAddCollection}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Sammlung erstellen
+          </button>
+        </div>
+
+        {collections.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-emerald-100 p-8 text-center">
+            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Keine Sammlungen</h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Erstellen Sie Chor- oder Lehrerlied-Sammlungen, die alle Eltern sehen können.
+            </p>
+            <button
+              onClick={handleAddCollection}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Erste Sammlung erstellen
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {collections.map((collection) => {
+              const isExpanded = expandedCollections.has(collection.classId);
+              const songs = collection.songs || [];
+              const isChoir = collection.classType === 'choir';
+
+              return (
+                <div
+                  key={collection.classId}
+                  className={`bg-white rounded-xl shadow-sm border ${
+                    isChoir ? 'border-teal-200' : 'border-amber-200'
+                  } overflow-hidden group`}
+                >
+                  {/* Collection Header - Clickable to expand */}
+                  <button
+                    onClick={() => toggleCollectionExpanded(collection.classId)}
+                    className={`w-full px-5 py-4 flex items-center justify-between ${
+                      isChoir ? 'hover:bg-teal-50/50' : 'hover:bg-amber-50/50'
+                    } transition-colors`}
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      {/* Collection Icon */}
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          isChoir ? 'bg-teal-100' : 'bg-amber-100'
+                        }`}
+                      >
+                        <svg
+                          className={`w-4 h-4 ${isChoir ? 'text-teal-600' : 'text-amber-600'}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                          />
+                        </svg>
+                      </div>
+
+                      {/* Collection Info */}
+                      <div className="text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{collection.className}</span>
+                          <span
+                            className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                              isChoir
+                                ? 'bg-teal-100 text-teal-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {isChoir ? 'Chor' : 'Lehrerlied'}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {songs.length} {songs.length === 1 ? 'Lied' : 'Lieder'}
+                          {collection.audioStatus?.hasPreview && (
+                            <span className="ml-2 text-green-600">Audio bereit</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expand/Collapse Icon */}
+                    <svg
+                      className={`w-5 h-5 text-gray-400 transition-transform ${
+                        isExpanded ? 'rotate-180' : ''
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Expanded Content - Songs List */}
+                  {isExpanded && (
+                    <div
+                      className={`border-t px-5 py-4 ${
+                        isChoir ? 'border-teal-100 bg-teal-50/30' : 'border-amber-100 bg-amber-50/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-medium text-gray-700">Lieder</h4>
+                        <button
+                          onClick={() => handleAddSongToCollection(collection.classId)}
+                          className={`text-sm font-medium flex items-center gap-1 ${
+                            isChoir
+                              ? 'text-teal-600 hover:text-teal-700'
+                              : 'text-amber-600 hover:text-amber-700'
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Lied hinzufügen
+                        </button>
+                      </div>
+
+                      {songs.length === 0 ? (
+                        <div className="text-center py-6 text-gray-500">
+                          <svg
+                            className="w-8 h-8 mx-auto mb-2 text-gray-300"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                            />
+                          </svg>
+                          <p className="text-sm">Noch keine Lieder</p>
+                          <button
+                            onClick={() => handleAddSongToCollection(collection.classId)}
+                            className={`mt-2 text-sm ${
+                              isChoir
+                                ? 'text-teal-600 hover:text-teal-700'
+                                : 'text-amber-600 hover:text-amber-700'
+                            }`}
+                          >
+                            Erstes Lied hinzufügen
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {songs.map((song) => (
+                            <div
+                              key={song.id}
+                              className="flex items-center justify-between p-3 bg-white rounded-lg group hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-gray-900 truncate">{song.title}</div>
+                                {song.artist && (
+                                  <div className="text-sm text-gray-500 truncate">{song.artist}</div>
+                                )}
+                                {song.notes && (
+                                  <div className="text-xs text-gray-400 mt-1 truncate">{song.notes}</div>
+                                )}
+                              </div>
+
+                              {/* Song actions */}
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleEditSong(song)}
+                                  className={`p-1.5 text-gray-400 rounded transition-colors ${
+                                    isChoir
+                                      ? 'hover:text-teal-600 hover:bg-teal-50'
+                                      : 'hover:text-amber-600 hover:bg-amber-50'
+                                  }`}
+                                  title="Lied bearbeiten"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSong(song)}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Lied löschen"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Activity Timeline */}
       <div className="mt-8">
         <EventActivityTimeline eventId={eventId} />
@@ -1371,6 +1819,7 @@ export default function EventDetailPage() {
             setSelectedClass(null);
             fetchEventDetail();
             fetchGroups(); // Also refetch groups for group songs
+            fetchCollections(); // Also refetch collections for collection songs
           }}
           apiBasePath="/api/admin"
         />
@@ -1479,6 +1928,19 @@ export default function EventDetailPage() {
             setShowAddTeacherModal(false);
             toast.success('Teacher added successfully');
             fetchEventDetail();
+          }}
+        />
+      )}
+
+      {/* Add Collection Modal */}
+      {showAddCollection && (
+        <AddCollectionModal
+          eventId={eventId}
+          onClose={() => setShowAddCollection(false)}
+          onSuccess={() => {
+            setShowAddCollection(false);
+            fetchCollections();
+            toast.success('Collection created successfully');
           }}
         />
       )}

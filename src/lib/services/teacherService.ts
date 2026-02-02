@@ -39,6 +39,7 @@ import {
   CLASSES_TABLE_ID,
   GROUPS_TABLE_ID,
   GROUPS_FIELD_IDS,
+  ClassType,
 } from '@/lib/types/airtable';
 import { getAirtableService } from './airtableService';
 
@@ -1278,6 +1279,7 @@ class TeacherService {
     teacherEmail: string;
     teacherName?: string;
     numChildren?: number;
+    classType?: ClassType;
   }): Promise<TeacherClassView> {
     try {
       // First, look up the Event record - it's the source of truth for event info
@@ -1333,6 +1335,11 @@ class TeacherService {
         classFields[CLASSES_FIELD_IDS.total_children] = data.numChildren;
       }
 
+      // Set class_type (defaults to 'regular' if not specified)
+      if (data.classType) {
+        classFields[CLASSES_FIELD_IDS.class_type] = data.classType;
+      }
+
       // Link to Event if found
       if (eventRecordId) {
         classFields[CLASSES_FIELD_IDS.event_id] = [eventRecordId];
@@ -1352,11 +1359,31 @@ class TeacherService {
           hasPreview: false,
           hasFinal: false,
         },
+        classType: data.classType,
       };
     } catch (error) {
       console.error('Error creating class:', error);
       throw new Error(`Failed to create class: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Create a collection (Choir or Teacher Song) for an event
+   * Collections are special class types that hold songs visible to all parents
+   */
+  async createCollection(data: {
+    eventId: string;
+    name: string;
+    type: 'choir' | 'teacher_song';
+    teacherEmail: string;
+  }): Promise<TeacherClassView> {
+    return this.createClass({
+      eventId: data.eventId,
+      className: data.name,
+      teacherEmail: data.teacherEmail,
+      classType: data.type,
+      numChildren: 0, // Collections don't have children
+    });
   }
 
   /**
@@ -1546,6 +1573,65 @@ class TeacherService {
     } catch (error) {
       console.error('Error deleting class:', error);
       throw new Error(`Failed to delete class: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get all collections (Choir and Teacher Song) for an event
+   * Used by parent portal to display shared song collections
+   */
+  async getCollectionsForEvent(
+    eventId: string,
+    type?: 'choir' | 'teacher_song'
+  ): Promise<TeacherClassView[]> {
+    try {
+      // Build filter formula - get collections by class_type
+      let filterFormula: string;
+      if (type) {
+        filterFormula = `AND({${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${CLASSES_FIELD_IDS.class_type}} = '${type}')`;
+      } else {
+        filterFormula = `AND({${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}', OR({${CLASSES_FIELD_IDS.class_type}} = 'choir', {${CLASSES_FIELD_IDS.class_type}} = 'teacher_song'))`;
+      }
+
+      const classRecords = await this.base(CLASSES_TABLE_ID)
+        .select({
+          filterByFormula: filterFormula,
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      // Get songs and audio files for this event
+      const songs = await this.getSongsByEventId(eventId);
+      const audioFiles = await this.getAudioFilesByEventId(eventId);
+
+      // Build class views
+      const collections: TeacherClassView[] = [];
+      for (const classRecord of classRecords) {
+        const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
+        const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
+        const classType = (classRecord.fields[CLASSES_FIELD_IDS.class_type] as ClassType | undefined) || 'regular';
+
+        const classSongs = songs.filter((s) => s.classId === classId);
+        const classAudioFiles = audioFiles.filter((a) => a.classId === classId);
+
+        collections.push({
+          classId,
+          className,
+          numChildren: 0,
+          songs: classSongs,
+          audioStatus: {
+            hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
+            hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
+            hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+          },
+          classType,
+        });
+      }
+
+      return collections;
+    } catch (error) {
+      console.error('Error getting collections for event:', error);
+      return [];
     }
   }
 
@@ -2110,6 +2196,7 @@ class TeacherService {
           const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
           const numChildren = classRecord.fields[CLASSES_FIELD_IDS.total_children] as number | undefined;
           const isDefault = Boolean(classRecord.fields[CLASSES_FIELD_IDS.is_default]);
+          const classType = (classRecord.fields[CLASSES_FIELD_IDS.class_type] as ClassType | undefined) || 'regular';
 
           const classSongs = songs.filter((s) => s.classId === classId);
           const classAudioFiles = audioFiles.filter((a) => a.classId === classId);
@@ -2125,6 +2212,7 @@ class TeacherService {
               hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
             },
             isDefault,
+            classType,
           });
         }
 
@@ -2245,6 +2333,7 @@ class TeacherService {
           const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
           const numChildren = classRecord.fields[CLASSES_FIELD_IDS.total_children] as number | undefined;
           const isDefault = Boolean(classRecord.fields[CLASSES_FIELD_IDS.is_default]);
+          const classType = (classRecord.fields[CLASSES_FIELD_IDS.class_type] as ClassType | undefined) || 'regular';
 
           const classSongs = songs.filter((s) => s.classId === classId);
           const classAudioFiles = audioFiles.filter((a) => a.classId === classId);
@@ -2260,6 +2349,7 @@ class TeacherService {
               hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
             },
             isDefault,
+            classType,
           });
         }
 
@@ -2366,6 +2456,7 @@ class TeacherService {
           const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
           const numChildren = classRecord.fields[CLASSES_FIELD_IDS.total_children] as number | undefined;
           const isDefault = Boolean(classRecord.fields[CLASSES_FIELD_IDS.is_default]);
+          const classType = (classRecord.fields[CLASSES_FIELD_IDS.class_type] as ClassType | undefined) || 'regular';
 
           const classSongs = songs.filter((s) => s.classId === classId);
           const classAudioFiles = audioFiles.filter((a) => a.classId === classId);
@@ -2381,6 +2472,7 @@ class TeacherService {
               hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
             },
             isDefault,
+            classType,
           });
         }
 

@@ -561,6 +561,7 @@ export const CLASSES_FIELD_IDS = {
   legacy_booking_id: 'fldXGF3yXrHeI4vWn',  // Original booking_id from parent_journey_table
   is_default: 'fldJouWNH4fudWQl0',      // Auto-created "Alle Kinder" catch-all class
   registrations: 'fld9hLZ4aNOw4v75X',   // Linked record → Registrations (reverse lookup)
+  class_type: 'fldTODO_CLASS_TYPE',     // Single select: regular | choir | teacher_song
 } as const;
 
 // Groups Table - "Classes Singing Together" - groups of classes that perform together
@@ -679,6 +680,14 @@ export interface Event {
 }
 
 /**
+ * Class type for collection categorization
+ * - regular: Standard class with children and songs
+ * - choir: Choir collection visible to all parents (no children, songs only)
+ * - teacher_song: Teacher song collection visible to all parents (no children, songs only)
+ */
+export type ClassType = 'regular' | 'choir' | 'teacher_song';
+
+/**
  * Class record - One row per class within an event
  */
 export interface Class {
@@ -691,6 +700,7 @@ export interface Class {
   total_children: number;
   created_at: string;
   legacy_booking_id?: string;           // Original booking_id from parent_journey_table
+  class_type?: ClassType;               // regular | choir | teacher_song (defaults to regular)
 }
 
 /**

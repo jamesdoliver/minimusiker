@@ -802,6 +802,352 @@ function DeleteGroupModal({ groupId, groupName, onClose, onGroupDeleted }: Delet
   );
 }
 
+interface AddCollectionModalProps {
+  eventId: string;
+  onClose: () => void;
+  onCollectionAdded: () => void;
+}
+
+function AddCollectionModal({ eventId, onClose, onCollectionAdded }: AddCollectionModalProps) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState<'choir' | 'teacher_song'>('choir');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError('Bitte geben Sie einen Namen ein');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/collections`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          type,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Fehler beim Erstellen');
+      }
+
+      onCollectionAdded();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Fehler beim Erstellen');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl max-w-md w-full p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Sammlung hinzufügen</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-blue-800">Was ist eine Sammlung?</p>
+              <p className="text-sm text-blue-700 mt-1">
+                Sammlungen enthalten Lieder, die für alle Eltern sichtbar sind - unabhängig von der Klasse ihres Kindes.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Typ <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-3">
+              <label
+                className={`flex-1 flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  type === 'choir'
+                    ? 'border-teal-500 bg-teal-50'
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="type"
+                  value="choir"
+                  checked={type === 'choir'}
+                  onChange={() => setType('choir')}
+                  className="w-4 h-4 text-teal-600 border-gray-300 focus:ring-teal-500"
+                />
+                <div>
+                  <p className="font-medium text-gray-900">Chor</p>
+                  <p className="text-xs text-gray-500">Gemeinsame Chorlieder</p>
+                </div>
+              </label>
+              <label
+                className={`flex-1 flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  type === 'teacher_song'
+                    ? 'border-orange-500 bg-orange-50'
+                    : 'border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="type"
+                  value="teacher_song"
+                  checked={type === 'teacher_song'}
+                  onChange={() => setType('teacher_song')}
+                  className="w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500"
+                />
+                <div>
+                  <p className="font-medium text-gray-900">Lehrerlied</p>
+                  <p className="text-xs text-gray-500">Lieder der Lehrkräfte</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500"
+              placeholder={type === 'choir' ? 'z.B. Schulchor, Klasse 3+4 Chor' : 'z.B. Lehrerband, Abschiedslied'}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Abbrechen
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 ${
+                type === 'choir'
+                  ? 'bg-teal-600 hover:bg-teal-700'
+                  : 'bg-orange-600 hover:bg-orange-700'
+              }`}
+            >
+              {isSubmitting ? 'Wird erstellt...' : 'Erstellen'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function CollectionCard({
+  collection,
+  eventId,
+  isEditable,
+  onCollectionUpdated,
+}: {
+  collection: TeacherClassView;
+  eventId: string;
+  isEditable: boolean;
+  onCollectionUpdated: () => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showAddSong, setShowAddSong] = useState(false);
+  const [showDeleteClass, setShowDeleteClass] = useState(false);
+
+  const isChoir = collection.classType === 'choir';
+
+  const handleDeleteSong = async (songId: string) => {
+    try {
+      const response = await fetch(`/api/teacher/songs/${songId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete song');
+      }
+
+      onCollectionUpdated();
+    } catch (err) {
+      console.error('Error deleting song:', err);
+      alert('Fehler beim Löschen des Liedes');
+    }
+  };
+
+  return (
+    <div className={`bg-white rounded-xl border-2 ${isChoir ? 'border-teal-200' : 'border-orange-200'} shadow-sm overflow-hidden`}>
+      {/* Collection Header */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`w-full px-5 py-4 flex items-center justify-between ${isChoir ? 'hover:bg-teal-50/50' : 'hover:bg-orange-50/50'} transition-colors`}
+      >
+        <div className="flex items-center gap-4">
+          <div className={`w-10 h-10 rounded-full ${isChoir ? 'bg-teal-100' : 'bg-orange-100'} flex items-center justify-center`}>
+            {isChoir ? (
+              <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+            )}
+          </div>
+          <div className="text-left">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900">{collection.className}</h3>
+              <span className={`px-2 py-0.5 text-xs ${isChoir ? 'bg-teal-100 text-teal-700' : 'bg-orange-100 text-orange-700'} rounded-full font-medium`}>
+                {isChoir ? 'Chor' : 'Lehrerlied'}
+              </span>
+            </div>
+            <p className="text-sm text-gray-500">
+              {collection.songs.length} {collection.songs.length === 1 ? 'Lied' : 'Lieder'} · Sichtbar für alle Eltern
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Audio Status Badges */}
+          <div className="flex gap-1">
+            {collection.audioStatus.hasRawAudio && (
+              <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">Raw</span>
+            )}
+            {collection.audioStatus.hasPreview && (
+              <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded">Vorschau</span>
+            )}
+            {collection.audioStatus.hasFinal && (
+              <span className="px-2 py-0.5 text-xs bg-green-100 text-green-600 rounded">Final</span>
+            )}
+          </div>
+          {/* Delete button */}
+          {isEditable && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowDeleteClass(true);
+              }}
+              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+              title="Sammlung löschen"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
+          <svg
+            className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className={`border-t ${isChoir ? 'border-teal-100' : 'border-orange-100'} px-5 py-4`}>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-medium text-gray-700">Lieder in dieser Sammlung</h4>
+            {isEditable && (
+              <button
+                onClick={() => setShowAddSong(true)}
+                className={`text-sm ${isChoir ? 'text-teal-600 hover:text-teal-700' : 'text-orange-600 hover:text-orange-700'} font-medium flex items-center gap-1`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Lied hinzufügen
+              </button>
+            )}
+          </div>
+
+          {collection.songs.length === 0 ? (
+            <div className="text-center py-6 text-gray-500">
+              <svg
+                className="w-8 h-8 mx-auto mb-2 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                />
+              </svg>
+              <p className="text-sm">Noch keine Lieder in dieser Sammlung</p>
+              {isEditable && (
+                <button
+                  onClick={() => setShowAddSong(true)}
+                  className={`mt-2 text-sm ${isChoir ? 'text-teal-600 hover:text-teal-700' : 'text-orange-600 hover:text-orange-700'}`}
+                >
+                  Erstes Lied hinzufügen
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {collection.songs.map((song) => (
+                <SongCard key={song.id} song={song} onDelete={isEditable ? handleDeleteSong : () => {}} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Song Modal */}
+      {showAddSong && (
+        <AddSongModal
+          classId={collection.classId}
+          eventId={eventId}
+          onClose={() => setShowAddSong(false)}
+          onSongAdded={onCollectionUpdated}
+        />
+      )}
+
+      {/* Delete Collection Modal */}
+      {showDeleteClass && (
+        <DeleteClassModal
+          classId={collection.classId}
+          className={collection.className}
+          onClose={() => setShowDeleteClass(false)}
+          onClassDeleted={onCollectionUpdated}
+        />
+      )}
+    </div>
+  );
+}
+
 function GroupCard({
   group,
   eventId,
@@ -1193,9 +1539,11 @@ export default function TeacherEventDetailPage() {
   const router = useRouter();
   const [event, setEvent] = useState<TeacherEventView | null>(null);
   const [groups, setGroups] = useState<ClassGroup[]>([]);
+  const [collections, setCollections] = useState<TeacherClassView[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddClass, setShowAddClass] = useState(false);
+  const [showAddCollection, setShowAddCollection] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
 
@@ -1205,6 +1553,7 @@ export default function TeacherEventDetailPage() {
     if (eventId) {
       fetchEventDetail();
       fetchGroups();
+      fetchCollections();
     }
   }, [eventId]);
 
@@ -1247,9 +1596,22 @@ export default function TeacherEventDetailPage() {
     }
   };
 
+  const fetchCollections = async () => {
+    try {
+      const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/collections`);
+      if (response.ok) {
+        const data = await response.json();
+        setCollections(data.collections || []);
+      }
+    } catch (err) {
+      console.error('Error fetching collections:', err);
+    }
+  };
+
   const handleRefresh = () => {
     fetchEventDetail();
     fetchGroups();
+    fetchCollections();
   };
 
   const isEditable = event?.status !== 'completed';
@@ -1376,7 +1738,17 @@ export default function TeacherEventDetailPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900">Klassen & Lieder</h2>
             {isEditable && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap justify-end">
+                <button
+                  onClick={() => setShowAddCollection(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+                  title="Chor oder Lehrerlied hinzufügen (sichtbar für alle Eltern)"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  Sammlung
+                </button>
                 <button
                   onClick={() => setShowCreateGroup(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
@@ -1385,7 +1757,7 @@ export default function TeacherEventDetailPage() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  Gruppe erstellen
+                  Gruppe
                 </button>
                 <button
                   onClick={() => setShowAddClass(true)}
@@ -1394,7 +1766,7 @@ export default function TeacherEventDetailPage() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Klasse hinzufügen
+                  Klasse
                 </button>
               </div>
             )}
@@ -1457,12 +1829,44 @@ export default function TeacherEventDetailPage() {
           </div>
         )}
 
+        {/* Collections Section (Choir + Teacher Songs) */}
+        {collections.length > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center gap-3 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Sammlungen</h2>
+              <span className="px-2 py-0.5 text-xs bg-teal-100 text-teal-700 rounded-full font-medium">
+                Sichtbar für alle Eltern
+              </span>
+            </div>
+            <div className="space-y-4">
+              {collections.map((collection) => (
+                <CollectionCard
+                  key={collection.classId}
+                  collection={collection}
+                  eventId={event.eventId}
+                  isEditable={isEditable}
+                  onCollectionUpdated={handleRefresh}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Add Class Modal */}
         {showAddClass && (
           <AddClassModal
             eventId={event.eventId}
             onClose={() => setShowAddClass(false)}
             onClassAdded={handleRefresh}
+          />
+        )}
+
+        {/* Add Collection Modal */}
+        {showAddCollection && (
+          <AddCollectionModal
+            eventId={event.eventId}
+            onClose={() => setShowAddCollection(false)}
+            onCollectionAdded={handleRefresh}
           />
         )}
 
