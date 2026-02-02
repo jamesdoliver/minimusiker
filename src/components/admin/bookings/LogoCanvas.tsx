@@ -50,6 +50,20 @@ export default function ImageCanvas({
     setHasError(false);
   }, [templateType]);
 
+  // Timeout fallback - if image doesn't load within 5 seconds, show error
+  useEffect(() => {
+    if (imageLoaded || hasError) return;
+
+    const timeoutId = setTimeout(() => {
+      if (!imageLoaded && !hasError) {
+        setHasError(true);
+        onError?.(`Preview image timed out for ${config?.name ?? templateType}`);
+      }
+    }, 5000);
+
+    return () => clearTimeout(timeoutId);
+  }, [templateType, imageLoaded, hasError, onError, config?.name]);
+
   // Measure container width
   useEffect(() => {
     const updateWidth = () => {

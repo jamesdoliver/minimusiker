@@ -588,7 +588,7 @@ export default function ConfirmPrintablesModal({
         )}
 
         {/* Main content - PrintableEditor */}
-        <div className="flex-1 overflow-hidden min-h-0">
+        <div className="flex-1 min-h-0">
           <PrintableEditor
             itemConfig={currentItem}
             schoolName={booking.schoolName}

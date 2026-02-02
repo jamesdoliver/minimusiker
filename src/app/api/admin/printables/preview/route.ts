@@ -172,15 +172,44 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now();
     const previewKey = `previews/${eventId}/${item.type}_${timestamp}.pdf`;
 
-    const uploadResult = await r2Service.uploadToAssetsBucket(
-      previewKey,
-      result.pdfBuffer,
-      'application/pdf'
-    );
+    // Retry upload with exponential backoff (3 attempts)
+    const maxAttempts = 3;
+    let uploadSuccess = false;
+    let lastError: string | undefined;
 
-    if (!uploadResult.success) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const uploadResult = await r2Service.uploadToAssetsBucket(
+        previewKey,
+        result.pdfBuffer,
+        'application/pdf'
+      );
+
+      if (uploadResult.success) {
+        uploadSuccess = true;
+        break;
+      }
+
+      lastError = uploadResult.error;
+      console.warn(`[printables/preview] Upload attempt ${attempt}/${maxAttempts} failed:`, lastError);
+
+      if (attempt < maxAttempts) {
+        // Exponential backoff: 500ms, 1000ms
+        await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+      }
+    }
+
+    if (!uploadSuccess) {
       return NextResponse.json(
-        { error: 'Failed to upload preview' },
+        { error: 'Failed to upload preview after multiple attempts', details: lastError },
+        { status: 500 }
+      );
+    }
+
+    // Verify file exists in R2 before generating signed URL
+    const fileExists = await r2Service.fileExistsInAssetsBucket(previewKey);
+    if (!fileExists) {
+      return NextResponse.json(
+        { error: 'Preview file missing from R2 after upload' },
         { status: 500 }
       );
     }
