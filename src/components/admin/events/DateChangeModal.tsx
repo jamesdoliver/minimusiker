@@ -189,11 +189,21 @@ export default function DateChangeModal({
         message = `Event moved to ${formatDisplayDate(selectedDate)}`;
       }
 
+      // Show SimplyBook sync status
       if (data.simplybookSynced) {
-        message += ' (synced to SimplyBook)';
+        toast.success(message, {
+          description: '✓ SimplyBook calendar updated',
+        });
+      } else if (data.simplybookSynced === false) {
+        // Airtable updated but SimplyBook sync failed
+        toast.warning(message, {
+          description: '⚠ SimplyBook was not updated - please update manually',
+          duration: 6000,
+        });
+      } else {
+        // No SimplyBook ID linked (older booking or no sync configured)
+        toast.success(message);
       }
-
-      toast.success(message);
       setShowConfirmDialog(false);
       onSuccess();
       onClose();
