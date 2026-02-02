@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Airtable from 'airtable';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { SchoolBooking, TEAMS_REGIONEN_TABLE_ID } from '@/lib/types/airtable';
+import { SchoolBooking, SecondaryContact, TEAMS_REGIONEN_TABLE_ID } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 
@@ -17,7 +17,9 @@ export interface BookingWithDetails {
   phone?: string;
   address?: string;
   postalCode?: string;
-  region?: string;
+  region?: string;               // Region name for display
+  regionId?: string;             // Region record ID for dropdown selection
+  city?: string;                 // City field
   numberOfChildren: number;
   costCategory: '>150 children' | '<150 children';
   bookingDate: string;
@@ -25,15 +27,18 @@ export interface BookingWithDetails {
   startTime?: string;
   endTime?: string;
   eventName?: string;
-  accessCode?: number;         // From linked Event
-  shortUrl?: string;           // Computed: "minimusiker.app/e/{accessCode}"
+  accessCode?: number;           // From linked Event
+  shortUrl?: string;             // Computed: "minimusiker.app/e/{accessCode}"
   // Event status and type fields for admin booking view
   eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted';  // Status traffic light
-  isPlus?: boolean;               // Shows '+' instead of 'M'
-  isKita?: boolean;               // Shows 'K' circle (or derived from event_type)
-  isSchulsong?: boolean;          // Shows 'S' circle
-  isMinimusikertag?: boolean;     // true = full event, false = schulsong-only
-  eventType?: string;             // Original event_type for backwards compatibility
+  isPlus?: boolean;              // Shows '+' instead of 'M'
+  isKita?: boolean;              // Shows 'K' circle (or derived from event_type)
+  isSchulsong?: boolean;         // Shows 'S' circle
+  isMinimusikertag?: boolean;    // true = full event, false = schulsong-only
+  eventType?: string;            // Original event_type for backwards compatibility
+  // Edit booking modal fields
+  secondaryContacts?: SecondaryContact[];  // Additional contacts stored as JSON
+  simplybookClientId?: string;   // SimplyBook client ID for editClient sync
 }
 
 /**
@@ -54,6 +59,8 @@ function transformToBookingWithDetails(
     address: booking.schoolAddress,
     postalCode: booking.schoolPostalCode,
     region: regionId ? (regionMap.get(regionId) || regionId) : undefined,
+    regionId: regionId || undefined,  // Raw record ID for edit modal dropdown
+    city: booking.city,
     numberOfChildren: booking.estimatedChildren || 0,
     costCategory: booking.schoolSizeCategory || '<150 children',
     bookingDate: booking.startDate || '',
@@ -61,7 +68,25 @@ function transformToBookingWithDetails(
     startTime: booking.startTime,
     endTime: booking.endTime,
     eventName: 'MiniMusiker Day',
+    // Parse secondaryContacts from JSON field
+    secondaryContacts: booking.secondaryContacts ? parseSecondaryContacts(booking.secondaryContacts) : undefined,
   };
+}
+
+/**
+ * Safely parse secondary contacts JSON
+ */
+function parseSecondaryContacts(json: string): SecondaryContact[] | undefined {
+  try {
+    const parsed = JSON.parse(json);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+    return undefined;
+  } catch {
+    console.warn('Failed to parse secondary contacts JSON:', json);
+    return undefined;
+  }
 }
 
 /**

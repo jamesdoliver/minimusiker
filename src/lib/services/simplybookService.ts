@@ -416,6 +416,48 @@ class SimplybookService {
    * @param newDate - New date in YYYY-MM-DD format
    * @returns Object with success status and any error message
    */
+  /**
+   * Edit a client's information in SimplyBook.
+   * Uses the editClient JSON-RPC method with admin authentication.
+   * @param clientId - The SimplyBook client ID
+   * @param data - Client data to update (name, email, phone, address1, city, zip)
+   * @returns Object with success status and any error message
+   */
+  async editClient(
+    clientId: string,
+    data: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      address1?: string;
+      city?: string;
+      zip?: string;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      console.log(`SimplyBook: Attempting to update client ${clientId}:`, data);
+
+      const result = await this.jsonRpcCall<Record<string, unknown> | null>(
+        'editClient',
+        [parseInt(clientId, 10), data],
+        true
+      );
+
+      // editClient returns null if parameters are not valid
+      if (result === null) {
+        console.error(`SimplyBook: editClient returned null for client ${clientId} - parameters not valid`);
+        return { success: false, error: 'SimplyBook rejected the update (invalid parameters)' };
+      }
+
+      console.log(`SimplyBook: Updated client ${clientId}`, result);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`SimplyBook: Failed to update client ${clientId}:`, message);
+      return { success: false, error: message };
+    }
+  }
+
   async editBookingDate(
     simplybookId: string,
     newDate: string

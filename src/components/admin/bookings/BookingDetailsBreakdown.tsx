@@ -7,6 +7,7 @@ import { BookingWithDetails } from '@/app/api/admin/bookings/route';
 import ConfirmPrintablesModal from './ConfirmPrintablesModal';
 import RefreshBookingModal from './RefreshBookingModal';
 import OrderOverviewModal from './OrderOverviewModal';
+import EditBookingModal from './EditBookingModal';
 import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfirmModal';
 import { toast } from 'sonner';
 
@@ -31,6 +32,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
   const [forceRefresh, setForceRefresh] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // Generate QR code on mount
   useEffect(() => {
@@ -346,6 +348,15 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         {/* Right side - existing action buttons */}
         <div className="flex gap-3">
         <button
+          onClick={() => setShowEditModal(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Edit Booking
+        </button>
+        <button
           onClick={() => handleRefresh()}
           disabled={isRefreshing}
           className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
@@ -446,6 +457,17 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         eventId={booking.code}
         schoolName={booking.schoolName}
         eventDate={booking.bookingDate}
+      />
+
+      {/* Edit Booking Modal */}
+      <EditBookingModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        booking={booking}
+        onSuccess={() => {
+          // Reload page to show updated data
+          window.location.reload();
+        }}
       />
     </div>
   );

@@ -71,7 +71,17 @@ export const SCHOOL_BOOKINGS_FIELD_IDS = {
   city: 'fldiVb8duhKGIzDkD',
   // School name field (actual institution name, not contact person)
   school_name: 'fldVgEyfHufAuNovP',
+  // Secondary contacts field (JSON stored in long text)
+  secondary_contacts: 'fldwmGkwY7W7DzngT',
 } as const;
+
+// Secondary contact for school bookings
+export interface SecondaryContact {
+  name: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+}
 
 // Einrichtungen (Schools) table
 export const EINRICHTUNGEN_TABLE_ID = 'tblLPUjLnHZ0Y4mdB';
@@ -475,6 +485,8 @@ export interface SchoolBooking {
   portalStatus?: 'pending_setup' | 'classes_added' | 'ready';
   // Assigned staff for events without class data
   assignedStaff?: string[];           // Linked record IDs (Personen/Staff)
+  // Secondary contacts (stored as JSON string)
+  secondaryContacts?: string;
 }
 
 // Type for portal status values

@@ -3953,6 +3953,7 @@ class AirtableService {
       endTime: record.fields[SCHOOL_BOOKINGS_FIELD_IDS.end_time],
       portalStatus: record.fields[SCHOOL_BOOKINGS_FIELD_IDS.portal_status],
       assignedStaff: record.fields[SCHOOL_BOOKINGS_FIELD_IDS.assigned_staff],
+      secondaryContacts: record.fields[SCHOOL_BOOKINGS_FIELD_IDS.secondary_contacts],
     };
   }
 
