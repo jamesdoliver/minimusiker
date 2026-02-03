@@ -155,7 +155,16 @@ export async function PUT(
 /**
  * DELETE /api/admin/groups/[groupId]
  * Delete a group (admin access)
- * Will fail if group has songs assigned
+ *
+ * Query params:
+ * - confirmMove=true: Move songs to "Alle Kinder" before deleting
+ *
+ * Response codes:
+ * - 200: Group deleted successfully
+ * - 400: DATA_ATTACHED - Group has data attached (returns songCount and audioFileCount)
+ * - 401: Unauthorized
+ * - 404: Group not found
+ * - 500: Server error
  */
 export async function DELETE(
   request: NextRequest,
@@ -168,6 +177,9 @@ export async function DELETE(
     }
 
     const groupId = decodeURIComponent(params.groupId);
+    const { searchParams } = new URL(request.url);
+    const confirmMove = searchParams.get('confirmMove') === 'true';
+
     const teacherService = getTeacherService();
 
     // Verify group exists
@@ -179,16 +191,8 @@ export async function DELETE(
       );
     }
 
-    // Check if group has songs
-    const songs = await teacherService.getSongsByClassId(existingGroup.groupId);
-    if (songs.length > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete group with songs. Please remove all songs first.' },
-        { status: 400 }
-      );
-    }
-
-    await teacherService.deleteGroup(groupId);
+    // If confirmMove=false and group has data, this will throw DATA_ATTACHED error
+    await teacherService.deleteGroup(groupId, { confirmMove });
 
     // Log activity (fire-and-forget) - resolve eventRecordId from eventId
     if (existingGroup.eventId) {
@@ -202,17 +206,33 @@ export async function DELETE(
           }),
           actorEmail: admin.email,
           actorType: 'admin',
-          metadata: { groupId, groupName: existingGroup.groupName },
+          metadata: { groupId, groupName: existingGroup.groupName, dataMoved: confirmMove },
         });
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Group deleted successfully',
+      message: confirmMove ? 'Songs moved to Alle Kinder and group deleted' : 'Group deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting group:', error);
+
+    // Handle DATA_ATTACHED error specially - return counts for frontend dialog
+    if (error instanceof Error && error.message === 'DATA_ATTACHED') {
+      const typedError = error as Error & { songCount?: number; audioFileCount?: number };
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Group has data attached',
+          code: 'DATA_ATTACHED',
+          songCount: typedError.songCount || 0,
+          audioFileCount: typedError.audioFileCount || 0,
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

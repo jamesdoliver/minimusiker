@@ -101,6 +101,15 @@ export async function PUT(
 /**
  * DELETE /api/admin/classes/[classId]
  * Delete a class (admin only)
+ *
+ * Query params:
+ * - confirmMove=true: Move songs and registrations to "Alle Kinder" before deleting
+ *
+ * Response codes:
+ * - 200: Class deleted successfully
+ * - 400: DATA_ATTACHED - Class has data attached (returns songCount and registrationCount)
+ * - 401: Unauthorized
+ * - 500: Server error
  */
 export async function DELETE(
   request: NextRequest,
@@ -114,14 +123,17 @@ export async function DELETE(
     }
 
     const classId = decodeURIComponent(params.classId);
+    const { searchParams } = new URL(request.url);
+    const confirmMove = searchParams.get('confirmMove') === 'true';
+
     const teacherService = getTeacherService();
 
     // Get class info for activity logging before deletion
     const classInfo = await getClassInfo(classId);
 
     // Admins can delete any class - no ownership check
-    // Business rules (cannot delete if has children/songs) enforced in service layer
-    await teacherService.deleteClass(classId);
+    // If class has data and confirmMove=false, will throw DATA_ATTACHED error
+    await teacherService.deleteClass(classId, { confirmMove });
 
     // Log activity (fire-and-forget)
     if (classInfo?.eventRecordId) {
@@ -133,16 +145,32 @@ export async function DELETE(
         }),
         actorEmail: session.email,
         actorType: 'admin',
-        metadata: { classId, className: classInfo.className },
+        metadata: { classId, className: classInfo.className, dataMoved: confirmMove },
       });
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Class deleted successfully',
+      message: confirmMove ? 'Data moved to Alle Kinder and class deleted' : 'Class deleted successfully',
     });
   } catch (error) {
     console.error('Error deleting class (admin):', error);
+
+    // Handle DATA_ATTACHED error specially - return counts for frontend dialog
+    if (error instanceof Error && error.message === 'DATA_ATTACHED') {
+      const typedError = error as Error & { songCount?: number; registrationCount?: number };
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Class has data attached',
+          code: 'DATA_ATTACHED',
+          songCount: typedError.songCount || 0,
+          registrationCount: typedError.registrationCount || 0,
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       {
         success: false,

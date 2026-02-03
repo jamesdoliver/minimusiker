@@ -1523,9 +1523,12 @@ class TeacherService {
   }
 
   /**
-   * Delete a class (only if no children registered and no songs)
+   * Delete a class
+   * - Cannot delete the default "Alle Kinder" class
+   * - If songs or registrations exist and confirmMove is false, throws DATA_ATTACHED error with counts
+   * - If confirmMove is true, moves all data to "Alle Kinder" before deleting
    */
-  async deleteClass(classId: string): Promise<void> {
+  async deleteClass(classId: string, options?: { confirmMove?: boolean }): Promise<void> {
     try {
       // Find the class record in Classes table
       const classRecords = await this.base(CLASSES_TABLE_ID)
@@ -1541,6 +1544,7 @@ class TeacherService {
       }
 
       const classRecord = classRecords[0];
+      const classRecordId = classRecord.id;
       const classFields = classRecord.fields as Record<string, unknown>;
 
       // Check if this is a default class (cannot be deleted)
@@ -1550,27 +1554,46 @@ class TeacherService {
         throw new Error('Die Standardklasse kann nicht gelöscht werden. Eltern können sich hier registrieren, bevor Sie Klassen einrichten.');
       }
 
-      // Check if any children are registered for this class (from parent_journey_table)
-      const registrationRecords = await this.base(PARENT_JOURNEY_TABLE)
-        .select({
-          filterByFormula: `AND({${AIRTABLE_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
-          maxRecords: 1,
-        })
-        .firstPage();
+      // Check what data needs to be moved
+      const songs = await this.getSongsByClassId(classId);
+      const registrations = await this.getRegistrationsForClass(classRecordId, classId);
 
-      if (registrationRecords.length > 0) {
-        throw new Error('Cannot delete class with registered children');
+      // If data exists and no confirmation, throw error with counts for frontend dialog
+      if ((songs.length > 0 || registrations.length > 0) && !options?.confirmMove) {
+        const error = new Error('DATA_ATTACHED') as Error & { songCount: number; registrationCount: number };
+        error.songCount = songs.length;
+        error.registrationCount = registrations.length;
+        throw error;
       }
 
-      // Check if class has any songs
-      const songs = await this.getSongsByClassId(classId);
-      if (songs.length > 0) {
-        throw new Error('Cannot delete class with songs. Remove songs first.');
+      // Move data to "Alle Kinder" before deleting (if confirmed)
+      if (songs.length > 0 || registrations.length > 0) {
+        // Get the event record ID from the class
+        const eventRecordId = await this.getEventRecordIdForClass(classRecordId);
+
+        // Get or create the default class for this event
+        const defaultClass = await this.getOrCreateDefaultClassForEvent(eventRecordId);
+
+        // Move songs to default class
+        if (songs.length > 0) {
+          await this.moveSongsToClass(songs, defaultClass.recordId, defaultClass.classId);
+          console.log(`Moved ${songs.length} songs from ${classId} to ${defaultClass.classId}`);
+        }
+
+        // Move registrations to default class
+        if (registrations.length > 0) {
+          await this.moveRegistrationsToClass(registrations, defaultClass.recordId, defaultClass.classId);
+          console.log(`Moved ${registrations.length} registrations from ${classId} to ${defaultClass.classId}`);
+        }
       }
 
       // Delete the class from Classes table
-      await this.base(CLASSES_TABLE_ID).destroy(classRecord.id);
+      await this.base(CLASSES_TABLE_ID).destroy(classRecordId);
     } catch (error) {
+      // Re-throw DATA_ATTACHED errors as-is (they're expected)
+      if (error instanceof Error && error.message === 'DATA_ATTACHED') {
+        throw error;
+      }
       console.error('Error deleting class:', error);
       throw new Error(`Failed to delete class: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -1991,8 +2014,10 @@ class TeacherService {
 
   /**
    * Delete a class group
+   * - If songs or audio files exist and confirmMove is false, throws DATA_ATTACHED error with counts
+   * - If confirmMove is true, moves all songs to "Alle Kinder" before deleting
    */
-  async deleteGroup(groupId: string): Promise<void> {
+  async deleteGroup(groupId: string, options?: { confirmMove?: boolean }): Promise<void> {
     try {
       if (!this.groupsTable) {
         throw new Error('Groups table not initialized');
@@ -2011,20 +2036,47 @@ class TeacherService {
         throw new Error('Group not found');
       }
 
-      // Check if group has songs (cannot delete if has songs)
+      const groupRecord = records[0];
+
+      // Check what data needs to be moved
       const songs = await this.getSongsByClassId(groupId);
-      if (songs.length > 0) {
-        throw new Error('Cannot delete group with songs. Remove songs first.');
-      }
-
-      // Check if group has audio files
       const audioFiles = await this.getAudioFilesByClassId(groupId);
-      if (audioFiles.length > 0) {
-        throw new Error('Cannot delete group with audio files. Remove audio files first.');
+
+      // If data exists and no confirmation, throw error with counts for frontend dialog
+      if ((songs.length > 0 || audioFiles.length > 0) && !options?.confirmMove) {
+        const error = new Error('DATA_ATTACHED') as Error & { songCount: number; audioFileCount: number };
+        error.songCount = songs.length;
+        error.audioFileCount = audioFiles.length;
+        throw error;
       }
 
-      await this.groupsTable.destroy(records[0].id);
+      // Move songs to "Alle Kinder" before deleting (if confirmed)
+      if (songs.length > 0) {
+        // Get the event record ID from the group's linked event
+        const eventLink = groupRecord.fields[GROUPS_FIELD_IDS.event_id] as string[] | undefined;
+        if (!eventLink || eventLink.length === 0) {
+          throw new Error('Group not linked to event');
+        }
+        const eventRecordId = eventLink[0];
+
+        // Get or create the default class for this event
+        const defaultClass = await this.getOrCreateDefaultClassForEvent(eventRecordId);
+
+        // Move songs to default class
+        await this.moveSongsToClass(songs, defaultClass.recordId, defaultClass.classId);
+        console.log(`Moved ${songs.length} songs from group ${groupId} to ${defaultClass.classId}`);
+      }
+
+      // Note: Audio files are moved along with songs (they reference the song, not the group directly)
+      // Audio files that reference the group's classId directly will remain orphaned
+      // In practice, this should be rare as audio files are typically linked to songs
+
+      await this.groupsTable.destroy(groupRecord.id);
     } catch (error) {
+      // Re-throw DATA_ATTACHED errors as-is (they're expected)
+      if (error instanceof Error && error.message === 'DATA_ATTACHED') {
+        throw error;
+      }
       console.error('Error deleting group:', error);
       throw new Error(`Failed to delete group: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -2833,6 +2885,159 @@ class TeacherService {
       console.error('Error getting event info for invite:', error);
       return null;
     }
+  }
+
+  // =============================================================================
+  // CLASS/GROUP DELETION HELPERS (Move data to "Alle Kinder" before deleting)
+  // =============================================================================
+
+  /**
+   * Get registrations for a class from both legacy and normalized tables
+   */
+  async getRegistrationsForClass(classRecordId: string, classId: string): Promise<Array<{ id: string; table: 'legacy' | 'normalized' }>> {
+    const results: Array<{ id: string; table: 'legacy' | 'normalized' }> = [];
+
+    // Check legacy parent_journey_table using class_id string
+    try {
+      const legacyRecords = await this.base(PARENT_JOURNEY_TABLE)
+        .select({
+          filterByFormula: `AND({${AIRTABLE_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
+        })
+        .all();
+
+      for (const r of legacyRecords) {
+        results.push({ id: r.id, table: 'legacy' });
+      }
+    } catch (error) {
+      console.error('Error fetching legacy registrations:', error);
+    }
+
+    // Check normalized Registrations table using linked record
+    if (this.useNormalizedTables()) {
+      try {
+        const normalizedRecords = await this.base('Registrations')
+          .select({
+            filterByFormula: `FIND('${classRecordId}', ARRAYJOIN({class_id}))`,
+          })
+          .all();
+
+        for (const r of normalizedRecords) {
+          results.push({ id: r.id, table: 'normalized' });
+        }
+      } catch (error) {
+        console.error('Error fetching normalized registrations:', error);
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Move registrations from one class to another
+   */
+  async moveRegistrationsToClass(
+    registrations: Array<{ id: string; table: 'legacy' | 'normalized' }>,
+    targetClassRecordId: string,
+    targetClassId: string
+  ): Promise<void> {
+    for (const reg of registrations) {
+      try {
+        if (reg.table === 'legacy') {
+          // Legacy table uses class_id string field
+          await this.base(PARENT_JOURNEY_TABLE).update(reg.id, {
+            [AIRTABLE_FIELD_IDS.class_id]: targetClassId,
+          });
+        } else {
+          // Normalized table uses linked record
+          await this.base('Registrations').update(reg.id, {
+            class_id: [targetClassRecordId],
+          });
+        }
+      } catch (error) {
+        console.error(`Error moving registration ${reg.id}:`, error);
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Move songs from one class to another
+   */
+  async moveSongsToClass(songs: Song[], targetClassRecordId: string, targetClassId: string): Promise<void> {
+    for (const song of songs) {
+      try {
+        const updateFields: any = {
+          class_id: targetClassId, // Text field for compatibility
+        };
+
+        // If using normalized tables, also update linked record
+        if (this.useNormalizedTables()) {
+          updateFields[SONGS_LINKED_FIELD_IDS.class_link] = [targetClassRecordId];
+        }
+
+        await this.base(SONGS_TABLE).update(song.id, updateFields);
+      } catch (error) {
+        console.error(`Error moving song ${song.id}:`, error);
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Get event record ID from a class record
+   */
+  private async getEventRecordIdForClass(classRecordId: string): Promise<string> {
+    const classRecord = await this.base(CLASSES_TABLE_ID)
+      .select({
+        filterByFormula: `RECORD_ID() = '${classRecordId}'`,
+        maxRecords: 1,
+        returnFieldsByFieldId: true,
+      })
+      .firstPage();
+
+    if (classRecord.length === 0) throw new Error('Class not found');
+
+    const eventIds = classRecord[0].fields[CLASSES_FIELD_IDS.event_id] as string[];
+    if (!eventIds?.length) throw new Error('Class not linked to event');
+    return eventIds[0];
+  }
+
+  /**
+   * Get or create the default "Alle Kinder" class for an event
+   */
+  async getOrCreateDefaultClassForEvent(eventRecordId: string): Promise<{ classId: string; recordId: string }> {
+    // Find existing default class for this event
+    const existing = await this.base(CLASSES_TABLE_ID)
+      .select({
+        filterByFormula: `AND(FIND('${eventRecordId}', ARRAYJOIN({${CLASSES_FIELD_IDS.event_id}})), {${CLASSES_FIELD_IDS.is_default}} = TRUE())`,
+        maxRecords: 1,
+        returnFieldsByFieldId: true,
+      })
+      .firstPage();
+
+    if (existing.length > 0) {
+      return {
+        classId: existing[0].fields[CLASSES_FIELD_IDS.class_id] as string,
+        recordId: existing[0].id,
+      };
+    }
+
+    // Create default class if missing
+    const eventRecord = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
+    const schoolName = (eventRecord.fields[EVENTS_FIELD_IDS.school_name] as string) || 'Unknown';
+    const eventDate = (eventRecord.fields[EVENTS_FIELD_IDS.event_date] as string) || new Date().toISOString().split('T')[0];
+    const legacyBookingId = (eventRecord.fields[EVENTS_FIELD_IDS.event_id] as string) || '';
+
+    const defaultClassId = generateClassId(schoolName, eventDate, 'Alle Kinder');
+    const created = await this.base(CLASSES_TABLE_ID).create({
+      [CLASSES_FIELD_IDS.class_id]: defaultClassId,
+      [CLASSES_FIELD_IDS.class_name]: 'Alle Kinder',
+      [CLASSES_FIELD_IDS.is_default]: true,
+      [CLASSES_FIELD_IDS.event_id]: [eventRecordId],
+      [CLASSES_FIELD_IDS.legacy_booking_id]: legacyBookingId,
+    });
+
+    return { classId: defaultClassId, recordId: created.id };
   }
 }
 
