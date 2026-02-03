@@ -7,6 +7,10 @@ import { SchoolEventDetail, EVENTS_TABLE_ID, EVENTS_FIELD_IDS, PERSONEN_TABLE_ID
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { simplybookService } from '@/lib/services/simplybookService';
+import {
+  triggerDateChangeNotification,
+  triggerCancellationNotification,
+} from '@/lib/services/notificationService';
 
 export async function GET(
   request: NextRequest,
@@ -289,6 +293,42 @@ export async function PATCH(
         metadata: { oldDate, newDate: body.event_date, simplybookSynced },
       });
 
+      // Send admin notification for date change
+      try {
+        // Get booking details for notification
+        let contactName = '';
+        let contactEmail = '';
+        let contactPhone = '';
+        let schoolAddress = existingEvent?.school_address || '';
+        let city = '';
+
+        if (existingEvent?.simplybook_booking?.[0]) {
+          const booking = await airtableService.getSchoolBookingById(existingEvent.simplybook_booking[0]);
+          if (booking) {
+            contactName = booking.schoolContactName || '';
+            contactEmail = booking.schoolContactEmail || '';
+            contactPhone = booking.schoolPhone || '';
+            schoolAddress = schoolAddress || booking.schoolAddress || '';
+            city = booking.city || '';
+          }
+        }
+
+        await triggerDateChangeNotification({
+          bookingId: eventId,
+          schoolName: existingEvent?.school_name || '',
+          contactName,
+          contactEmail,
+          contactPhone,
+          eventDate: body.event_date,
+          address: schoolAddress,
+          city,
+          oldDate,
+          newDate: body.event_date,
+        });
+      } catch (notificationError) {
+        console.warn('Could not send date change notification:', notificationError);
+      }
+
       // Recalculate task deadlines for pending tasks
       if (body.recalculate_tasks !== false) {
         try {
@@ -439,6 +479,43 @@ export async function PATCH(
       }
 
       updatedEvent = await airtableService.updateEventFields(eventRecordId, fieldUpdates);
+
+      // Send cancellation notification if status changed to Cancelled
+      if (hasStatusUpdate && body.status === 'Cancelled' && existingEvent?.status !== 'Cancelled') {
+        try {
+          // Get booking details for notification
+          let contactName = '';
+          let contactEmail = '';
+          let contactPhone = '';
+          let schoolAddress = existingEvent?.school_address || '';
+          let city = '';
+
+          if (existingEvent?.simplybook_booking?.[0]) {
+            const booking = await airtableService.getSchoolBookingById(existingEvent.simplybook_booking[0]);
+            if (booking) {
+              contactName = booking.schoolContactName || '';
+              contactEmail = booking.schoolContactEmail || '';
+              contactPhone = booking.schoolPhone || '';
+              schoolAddress = schoolAddress || booking.schoolAddress || '';
+              city = booking.city || '';
+            }
+          }
+
+          await triggerCancellationNotification({
+            bookingId: eventId,
+            schoolName: existingEvent?.school_name || '',
+            contactName,
+            contactEmail,
+            contactPhone,
+            eventDate: existingEvent?.event_date || '',
+            address: schoolAddress,
+            city,
+            reason: 'cancelled',
+          });
+        } catch (notificationError) {
+          console.warn('Could not send cancellation notification:', notificationError);
+        }
+      }
     }
 
     return NextResponse.json({
@@ -509,6 +586,29 @@ export async function DELETE(
       );
     }
 
+    // Get event details before deletion for notification
+    const existingEvent = await airtableService.getEventById(eventRecordId);
+    let contactName = '';
+    let contactEmail = '';
+    let contactPhone = '';
+    let schoolAddress = existingEvent?.school_address || '';
+    let city = '';
+
+    if (existingEvent?.simplybook_booking?.[0]) {
+      try {
+        const booking = await airtableService.getSchoolBookingById(existingEvent.simplybook_booking[0]);
+        if (booking) {
+          contactName = booking.schoolContactName || '';
+          contactEmail = booking.schoolContactEmail || '';
+          contactPhone = booking.schoolPhone || '';
+          schoolAddress = schoolAddress || booking.schoolAddress || '';
+          city = booking.city || '';
+        }
+      } catch (e) {
+        console.warn('Could not fetch booking details for deletion notification:', e);
+      }
+    }
+
     // Soft-delete the event
     const result = await airtableService.softDeleteEvent(eventRecordId);
 
@@ -527,6 +627,23 @@ export async function DELETE(
         bookingRecordId: result.bookingRecordId,
       },
     });
+
+    // Send deletion notification
+    try {
+      await triggerCancellationNotification({
+        bookingId: eventId,
+        schoolName: result.schoolName || '',
+        contactName,
+        contactEmail,
+        contactPhone,
+        eventDate: existingEvent?.event_date || '',
+        address: schoolAddress,
+        city,
+        reason: 'deleted',
+      });
+    } catch (notificationError) {
+      console.warn('Could not send deletion notification:', notificationError);
+    }
 
     return NextResponse.json({
       success: true,

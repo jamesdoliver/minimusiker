@@ -10,6 +10,7 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
+import { triggerNewBookingNotification } from '@/lib/services/notificationService';
 import Airtable from 'airtable';
 
 // Initialize Airtable
@@ -268,6 +269,27 @@ export async function POST(request: Request) {
         // Log but don't fail the webhook
         console.error('Error sending booking alert:', emailError);
       }
+    }
+
+    // ========================================
+    // Send admin notification for new booking
+    // ========================================
+    try {
+      await triggerNewBookingNotification({
+        bookingId: payload.booking_id,
+        schoolName: mappedData.schoolName,
+        contactName: mappedData.contactPerson,
+        contactEmail: mappedData.contactEmail,
+        contactPhone: mappedData.phone,
+        eventDate: mappedData.bookingDate,
+        estimatedChildren: mappedData.numberOfChildren,
+        region: mappedData.region,
+        address: mappedData.address,
+        city: mappedData.city,
+      });
+    } catch (notificationError) {
+      // Log but don't fail the webhook
+      console.error('Error sending admin notification:', notificationError);
     }
 
     return NextResponse.json({

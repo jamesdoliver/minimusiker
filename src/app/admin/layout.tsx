@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import SettingsModal from '@/components/admin/settings/SettingsModal';
 
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: '📊' },
@@ -26,6 +27,7 @@ export default function AdminLayout({
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -131,7 +133,17 @@ export default function AdminLayout({
               </Link>
             ))}
           </nav>
-          <div className="flex-shrink-0 border-t border-gray-200 p-4">
+          <div className="flex-shrink-0 border-t border-gray-200 p-4 space-y-1">
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setIsSettingsOpen(true);
+              }}
+              className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md"
+            >
+              <span className="mr-3">⚙️</span>
+              Settings
+            </button>
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
@@ -173,21 +185,23 @@ export default function AdminLayout({
                   ))}
                 </nav>
               </div>
-              <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
+              <div className="flex-shrink-0 border-t border-gray-200 p-4 space-y-2">
+                {/* Settings button */}
+                <button
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="w-full flex items-center px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-md transition-colors"
+                >
+                  <span className="mr-3 text-lg">⚙️</span>
+                  Settings
+                </button>
+
+                {/* Logout button */}
                 <button
                   onClick={handleLogout}
-                  className="flex-shrink-0 w-full group block"
+                  className="w-full flex items-center px-2 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-md transition-colors"
                 >
-                  <div className="flex items-center">
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
-                        Admin User
-                      </p>
-                      <p className="text-xs font-medium text-gray-500 group-hover:text-gray-700">
-                        Sign out
-                      </p>
-                    </div>
-                  </div>
+                  <span className="mr-3 text-lg">🚪</span>
+                  Sign out
                 </button>
               </div>
             </div>
@@ -205,6 +219,9 @@ export default function AdminLayout({
           </main>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 }
