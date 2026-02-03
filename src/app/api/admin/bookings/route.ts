@@ -214,18 +214,23 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Calculate stats from all bookings
+    // Filter out deleted events (soft-deleted via Event status)
+    const visibleBookings = bookingsWithAccessCodes.filter(
+      (booking) => booking.eventStatus !== 'Deleted'
+    );
+
+    // Calculate stats from visible bookings only
     const stats = {
-      total: bookingsWithAccessCodes.length,
-      confirmed: bookingsWithAccessCodes.filter((b) => b.status === 'confirmed').length,
-      pending: bookingsWithAccessCodes.filter((b) => b.status === 'pending').length,
-      cancelled: bookingsWithAccessCodes.filter((b) => b.status === 'cancelled').length,
+      total: visibleBookings.length,
+      confirmed: visibleBookings.filter((b) => b.status === 'confirmed').length,
+      pending: visibleBookings.filter((b) => b.status === 'pending').length,
+      cancelled: visibleBookings.filter((b) => b.status === 'cancelled').length,
     };
 
     return NextResponse.json({
       success: true,
       data: {
-        bookings: bookingsWithAccessCodes,
+        bookings: visibleBookings,
         stats,
         staffList,
         regionList,
