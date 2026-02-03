@@ -2944,10 +2944,25 @@ class AirtableService {
 
       // NEW: Query Classes table and Registrations
       try {
-        // Get all classes for this event using legacy_booking_id (stores string event_id)
-        // Note: event_id is a linked record field, so we can't compare it directly
+        // Get all classes for this event using legacy_booking_id
+        // Classes may have been created with either event_id (e.g., "gs-frankenberg-2025-03-15")
+        // or simplybookId (e.g., "8594251"), so we need to search for both
+        let filterFormula = `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${bookingId.replace(/'/g, "\\'")}'`;
+
+        // Try to get the Event record to find alternative identifiers
+        const event = await this.getEventByEventId(bookingId);
+        if (event?.simplybook_booking?.[0]) {
+          const schoolBooking = await this.getSchoolBookingById(event.simplybook_booking[0]);
+          if (schoolBooking?.simplybookId && schoolBooking.simplybookId !== bookingId) {
+            filterFormula = `OR(
+              {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${bookingId.replace(/'/g, "\\'")}',
+              {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${schoolBooking.simplybookId.replace(/'/g, "\\'")}'
+            )`;
+          }
+        }
+
         const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${bookingId}'`,
+          filterByFormula: filterFormula,
         }).all();
 
         // For each class, count registered children
