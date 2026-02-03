@@ -188,6 +188,13 @@ export default function AdminBookings() {
       );
     }
 
+    // Sort confirmed bookings by date ascending (oldest/closest to completion first)
+    if (statusFilter === 'confirmed') {
+      filtered = [...filtered].sort((a, b) =>
+        new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime()
+      );
+    }
+
     return filtered;
   }, [bookings, statusFilter, activeTypes, staffFilter, regionFilter, monthFilter, childrenFilter, searchQuery]);
 
