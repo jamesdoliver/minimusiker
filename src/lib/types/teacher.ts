@@ -208,7 +208,8 @@ export interface UpsertClassRequest {
  * Teacher's view of their event
  */
 export interface TeacherEventView {
-  eventId: string; // booking_id
+  eventId: string; // canonical event_id from Events table (e.g., evt_kindergarten_st_bruno_...)
+  simplybookId?: string; // SimplyBook booking ID for fallback lookup (e.g., "1727")
   schoolName: string;
   eventDate: string;
   eventType: string;

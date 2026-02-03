@@ -2281,6 +2281,7 @@ class TeacherService {
 
         events.push({
           eventId,
+          simplybookId: booking.simplybookId, // Store simplybookId for fallback lookup
           schoolName: actualSchoolName,
           eventDate: actualEventDate,
           eventType: 'MiniMusiker Day',
@@ -2304,6 +2305,10 @@ class TeacherService {
 
         // Track this event to avoid duplicates from linked_events
         processedEventIds.add(eventId);
+        // Also track simplybookId to detect duplicates
+        if (booking.simplybookId) {
+          processedEventIds.add(booking.simplybookId);
+        }
       }
 
       // Process legacy events not in SchoolBookings
@@ -2553,10 +2558,17 @@ class TeacherService {
 
   /**
    * Get a single event detail for teacher
+   * Supports lookup by canonical eventId or simplybookId for backward compatibility
    */
   async getTeacherEventDetail(eventId: string, teacherEmail: string): Promise<TeacherEventView | null> {
     const events = await this.getTeacherEvents(teacherEmail);
-    return events.find((e) => e.eventId === eventId) || null;
+    // First try exact match on eventId
+    let event = events.find((e) => e.eventId === eventId);
+    // If not found, try matching by simplybookId (for setup-booking page compatibility)
+    if (!event) {
+      event = events.find((e) => e.simplybookId === eventId);
+    }
+    return event || null;
   }
 
   // =============================================================================
