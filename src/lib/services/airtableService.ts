@@ -2836,37 +2836,85 @@ class AirtableService {
     eventType: string;
     eventDate: string;
     classCount: number;
+    classes: Array<{
+      classId: string;
+      className: string;
+      teacherName: string;
+      registeredCount: number;
+      isDefault: boolean;
+    }>;
   }>> {
+    this.ensureNormalizedTablesInitialized();
+
     if (this.useNormalizedTables()) {
-      // NEW: Query Events table and count classes
+      // NEW: Query Events table and fetch class details
       try {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - 3);
         const cutoff = cutoffDate.toISOString().split('T')[0];
 
         // Get all events for this school with recent/future dates
+        // Use returnFieldsByFieldId: true so we can read results using field IDs
         const events = await this.eventsTable!.select({
           filterByFormula: `AND(
             {${EVENTS_FIELD_IDS.school_name}} = '${schoolName.replace(/'/g, "\\'")}',
             IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${cutoff}')
           )`,
+          returnFieldsByFieldId: true,
         }).all();
 
-        // For each event, count the number of classes
+        // For each event, fetch class details with registration counts
         const eventDetails = await Promise.all(
           events.map(async (event) => {
             const eventFields = event.fields as Record<string, any>;
 
-            // Count classes for this event
-            const classes = await this.classesTable!.select({
-              filterByFormula: `{${CLASSES_FIELD_IDS.event_id}} = '${event.id}'`,
+            // Fetch classes for this event using legacy_booking_id
+            const eventBookingId = eventFields[EVENTS_FIELD_IDS.event_id] || '';
+            const classRecords = await this.classesTable!.select({
+              filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventBookingId.replace(/'/g, "\\'")}'`,
             }).all();
 
+            // For each class, count registered children
+            const classesWithCounts = await Promise.all(
+              classRecords.map(async (classRecord) => {
+                const classFields = classRecord.fields as Record<string, any>;
+                const classId = classFields['class_id'] || classFields[CLASSES_FIELD_IDS.class_id];
+
+                // Count registrations for this class (excluding placeholders)
+                const registrations = await this.registrationsTable!.select({
+                  filterByFormula: `{${REGISTRATIONS_FIELD_IDS.class_id}} = '${classRecord.id}'`,
+                }).all();
+
+                // Filter out placeholder records (no parent_id link)
+                const realRegistrations = registrations.filter(reg => {
+                  const regFields = reg.fields as Record<string, any>;
+                  return regFields[REGISTRATIONS_FIELD_IDS.parent_id] &&
+                         regFields[REGISTRATIONS_FIELD_IDS.parent_id].length > 0;
+                });
+
+                return {
+                  classId: classId || '',
+                  className: classFields['class_name'] || classFields[CLASSES_FIELD_IDS.class_name] || 'Unknown Class',
+                  teacherName: classFields['main_teacher'] || classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+                  registeredCount: realRegistrations.length,
+                  isDefault: Boolean(classFields['is_default'] || classFields[CLASSES_FIELD_IDS.is_default]),
+                };
+              })
+            );
+
+            // Sort classes: alphabetically, but default classes at the end
+            const sortedClasses = classesWithCounts.sort((a, b) => {
+              if (a.isDefault && !b.isDefault) return 1;
+              if (!a.isDefault && b.isDefault) return -1;
+              return a.className.localeCompare(b.className);
+            });
+
             return {
-              bookingId: eventFields[EVENTS_FIELD_IDS.event_id] || '',
+              bookingId: eventBookingId,
               eventType: eventFields[EVENTS_FIELD_IDS.event_type] || 'Event',
               eventDate: eventFields[EVENTS_FIELD_IDS.event_date] || '',
-              classCount: classes.length,
+              classCount: classRecords.length,
+              classes: sortedClasses,
             };
           })
         );
@@ -2892,11 +2940,16 @@ class AirtableService {
           )`,
         });
 
-        // Group by booking_id to get unique events
+        // Group by booking_id and class_id to build events with class details
         const eventMap = new Map<string, {
           eventType: string;
           eventDate: string;
-          classes: Set<string>;
+          classMap: Map<string, {
+            className: string;
+            teacherName: string;
+            registeredCount: number;
+            isDefault: boolean;
+          }>;
         }>();
 
         records.forEach(r => {
@@ -2905,23 +2958,53 @@ class AirtableService {
               eventMap.set(r.booking_id, {
                 eventType: r.event_type || 'Event',
                 eventDate: r.booking_date || '',
-                classes: new Set(),
+                classMap: new Map(),
               });
             }
             if (r.class_id) {
-              eventMap.get(r.booking_id)!.classes.add(r.class_id);
+              const event = eventMap.get(r.booking_id)!;
+              if (!event.classMap.has(r.class_id)) {
+                const isDefaultClass = r.class === 'Alle Kinder';
+                event.classMap.set(r.class_id, {
+                  className: r.class || 'Unknown Class',
+                  teacherName: r.main_teacher || '',
+                  registeredCount: 0,
+                  isDefault: isDefaultClass,
+                });
+              }
+              // Count non-placeholder registrations
+              if (r.parent_id && r.parent_id !== 'PLACEHOLDER') {
+                event.classMap.get(r.class_id)!.registeredCount++;
+              }
             }
           }
         });
 
-        // Convert to array and sort by date
+        // Convert to array with classes sorted (alphabetically, default at end)
         return Array.from(eventMap.entries())
-          .map(([bookingId, data]) => ({
-            bookingId,
-            eventType: data.eventType,
-            eventDate: data.eventDate,
-            classCount: data.classes.size,
-          }))
+          .map(([bookingId, data]) => {
+            const classes = Array.from(data.classMap.entries())
+              .map(([classId, classData]) => ({
+                classId,
+                className: classData.className,
+                teacherName: classData.teacherName,
+                registeredCount: classData.registeredCount,
+                isDefault: classData.isDefault,
+              }))
+              .sort((a, b) => {
+                if (a.isDefault && !b.isDefault) return 1;
+                if (!a.isDefault && b.isDefault) return -1;
+                return a.className.localeCompare(b.className);
+              });
+
+            return {
+              bookingId,
+              eventType: data.eventType,
+              eventDate: data.eventDate,
+              classCount: data.classMap.size,
+              classes,
+            };
+          })
           .sort((a, b) => new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime());
       } catch (error) {
         console.error('Error getting school events:', error);

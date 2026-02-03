@@ -195,23 +195,41 @@ function RegistrationPageContent() {
     setCurrentStep('event');
   };
 
-  const handleEventSelect = (eventId: string, eventDate: string, eventType: string) => {
+  const handleEventSelect = (
+    eventId: string,
+    eventDate: string,
+    eventType: string,
+    classId?: string,
+    className?: string
+  ) => {
     setDiscoveryState((prev) => ({
       ...prev,
       eventId,
       eventDate,
       eventType,
     }));
-    setCurrentStep('class');
+
+    if (classId && className) {
+      // Class selected from accordion - skip ClassSelectionStep
+      // Pass eventId directly since state update is async
+      setDiscoveryState((prev) => ({ ...prev, classId, className }));
+      handleClassSelect(classId, className, eventId);
+    } else {
+      // No class selected - go to ClassSelectionStep (fallback)
+      setCurrentStep('class');
+    }
   };
 
-  const handleClassSelect = async (classId: string, className: string) => {
+  const handleClassSelect = async (classId: string, className: string, eventIdOverride?: string) => {
     setDiscoveryState((prev) => ({ ...prev, classId, className }));
+
+    // Use override if provided (for accordion flow where state hasn't updated yet)
+    const effectiveEventId = eventIdOverride || discoveryState.eventId;
 
     // Fetch full event details for the form
     try {
       const response = await fetch(
-        `/api/airtable/event-details?eventId=${encodeURIComponent(discoveryState.eventId)}&classId=${encodeURIComponent(classId)}`
+        `/api/airtable/event-details?eventId=${encodeURIComponent(effectiveEventId)}&classId=${encodeURIComponent(classId)}`
       );
       const data = await response.json();
 
