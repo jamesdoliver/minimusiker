@@ -35,17 +35,27 @@ export default function EventTypeCircles({
   // Build array of circles to display
   const circles: CircleConfig[] = [];
 
-  // Circle 1: Only show M/+ circle when isMinimusikertag is true
+  // Circle 1: Show M when isMinimusikertag is true
   if (isMinimusikertag) {
     circles.push({
-      letter: isPlus ? '+' : 'M',
+      letter: 'M',
       bgColor: '#93c5fd', // blue-300
       textColor: '#1e40af', // blue-800
-      label: isPlus ? 'Minimusikertag PLUS' : 'Minimusikertag',
+      label: 'Minimusikertag',
     });
   }
 
-  // Circle 2: Shows 'K' if is_kita=true
+  // Circle 2: Show + when isPlus is true (independent)
+  if (isPlus) {
+    circles.push({
+      letter: '+',
+      bgColor: '#93c5fd', // blue-300
+      textColor: '#1e40af', // blue-800
+      label: 'Plus',
+    });
+  }
+
+  // Circle 3: Shows 'K' if is_kita=true
   if (isKita) {
     circles.push({
       letter: 'K',
@@ -55,7 +65,7 @@ export default function EventTypeCircles({
     });
   }
 
-  // Circle 3: Shows 'S' if is_schulsong=true
+  // Circle 4: Shows 'S' if is_schulsong=true
   if (isSchulsong) {
     circles.push({
       letter: 'S',
