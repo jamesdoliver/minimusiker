@@ -45,8 +45,8 @@ export default function AdminBookings() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Tier 1: Status tab (mutually exclusive)
-  const [statusFilter, setStatusFilter] = useState<ComputedStatus>('confirmed');
+  // Tier 1: Status toggles (multi-select, OR logic)
+  const [activeStatuses, setActiveStatuses] = useState<Set<ComputedStatus>>(new Set<ComputedStatus>(['confirmed']));
 
   // Tier 2: Event type toggles (multi-select, OR logic)
   const [activeTypes, setActiveTypes] = useState<Set<EventType>>(new Set());
@@ -97,6 +97,23 @@ export default function AdminBookings() {
     setBookings(prev => prev.filter(b => b.id !== bookingId));
   }, []);
 
+  // Toggle a status filter
+  const toggleStatus = (status: ComputedStatus) => {
+    setActiveStatuses(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(status)) {
+        newSet.delete(status);
+        // Default to confirmed if all are deselected
+        if (newSet.size === 0) {
+          newSet.add('confirmed');
+        }
+      } else {
+        newSet.add(status);
+      }
+      return newSet;
+    });
+  };
+
   // Toggle an event type filter
   const toggleEventType = (type: EventType) => {
     setActiveTypes(prev => {
@@ -134,8 +151,8 @@ export default function AdminBookings() {
   const filteredBookings = useMemo(() => {
     let filtered = bookings;
 
-    // TIER 1: Filter by computed status
-    filtered = filtered.filter(b => getComputedStatus(b) === statusFilter);
+    // TIER 1: Filter by computed status (OR logic - show if matches ANY selected status)
+    filtered = filtered.filter(b => activeStatuses.has(getComputedStatus(b)));
 
     // TIER 2: Filter by event type (OR logic - show if matches ANY selected type)
     if (activeTypes.size > 0) {
@@ -189,14 +206,15 @@ export default function AdminBookings() {
     }
 
     // Sort confirmed bookings by date ascending (oldest/closest to completion first)
-    if (statusFilter === 'confirmed') {
+    // Only apply this sort when confirmed is the only active status
+    if (activeStatuses.size === 1 && activeStatuses.has('confirmed')) {
       filtered = [...filtered].sort((a, b) =>
         new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime()
       );
     }
 
     return filtered;
-  }, [bookings, statusFilter, activeTypes, staffFilter, regionFilter, monthFilter, childrenFilter, searchQuery]);
+  }, [bookings, activeStatuses, activeTypes, staffFilter, regionFilter, monthFilter, childrenFilter, searchQuery]);
 
   // Check if any filters are active (beyond status tab)
   const hasActiveFilters = activeTypes.size > 0 || staffFilter || regionFilter || monthFilter || childrenFilter || searchQuery;
@@ -252,7 +270,7 @@ export default function AdminBookings() {
       {/* Filter Panel */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 space-y-4">
 
-        {/* TIER 1: Status Tabs */}
+        {/* TIER 1: Status Toggles (multi-select) */}
         <div className="flex flex-wrap gap-2">
           {(['confirmed', 'completed', 'onHold'] as ComputedStatus[]).map((status) => {
             const labels: Record<ComputedStatus, string> = {
@@ -265,21 +283,19 @@ export default function AdminBookings() {
               completed: stats.completed,
               onHold: stats.onHold,
             };
+            const isActive = activeStatuses.has(status);
 
             return (
               <button
                 key={status}
-                onClick={() => setStatusFilter(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  statusFilter === status
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                onClick={() => toggleStatus(status)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-gray-700 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                {labels[status]}
-                <span className="ml-1 text-xs opacity-75">
-                  ({counts[status]})
-                </span>
+                {labels[status]} ({counts[status]})
               </button>
             );
           })}
@@ -421,7 +437,7 @@ export default function AdminBookings() {
       {/* Results Count */}
       {hasActiveFilters && (
         <p className="text-sm text-gray-600 mb-4">
-          Showing {filteredBookings.length} of {stats[statusFilter]} {statusFilter} bookings
+          Showing {filteredBookings.length} bookings
         </p>
       )}
 
