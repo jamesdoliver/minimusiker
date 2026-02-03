@@ -220,10 +220,7 @@ export default function AdminBookings() {
     <div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
-          <p className="text-gray-600 mt-1">{stats.total} total bookings</p>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-900">Bookings Overview</h1>
         <button
           onClick={fetchBookings}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -243,26 +240,6 @@ export default function AdminBookings() {
           </svg>
           Refresh
         </button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-500">Total</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-500">Confirmed</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">{stats.confirmed}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-500">Completed</p>
-          <p className="text-2xl font-bold text-gray-500 mt-1">{stats.completed}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-500">On Hold</p>
-          <p className="text-2xl font-bold text-orange-600 mt-1">{stats.onHold}</p>
-        </div>
       </div>
 
       {/* Filter Panel */}
