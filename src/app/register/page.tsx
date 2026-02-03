@@ -8,6 +8,7 @@ import RegistrationForm from '@/components/registration/RegistrationForm';
 import SchoolSearchStep from '@/components/registration/SchoolSearchStep';
 import EventSelectionStep from '@/components/registration/EventSelectionStep';
 import ClassSelectionStep from '@/components/registration/ClassSelectionStep';
+import EmailCheckStep from '@/components/registration/EmailCheckStep';
 import RegistrationStepper from '@/components/registration/RegistrationStepper';
 import VideoPlayer from '@/components/registration/VideoPlayer';
 import RegisterCTACard from '@/components/registration/RegisterCTACard';
@@ -16,7 +17,13 @@ import LanguageSelector from '@/components/shared/LanguageSelector';
 import { EventClassDetails } from '@/lib/types/airtable';
 import { isValidEventId, isValidClassId } from '@/lib/utils/validators';
 
-type RegistrationStep = 'school' | 'event' | 'class' | 'form';
+type RegistrationStep = 'school' | 'event' | 'class' | 'email' | 'form';
+
+interface ExistingChild {
+  name: string;
+  eventName?: string;
+  className?: string;
+}
 
 interface DiscoveryState {
   schoolName: string;
@@ -56,9 +63,15 @@ function RegistrationPageContent() {
     className: '',
   });
 
+  // Email check state for known parents
+  const [verifiedEmail, setVerifiedEmail] = useState<string>('');
+  const [parentData, setParentData] = useState<{ firstName: string; phone: string } | null>(null);
+  const [existingChildren, setExistingChildren] = useState<ExistingChild[]>([]);
+  const [showEmailStep, setShowEmailStep] = useState(false);
+
   useEffect(() => {
     const validateAndFetchEvent = async () => {
-      // Case 1: Both event and class provided → direct to form
+      // Case 1: Both event and class provided → show email check step first
       if (urlEventId && urlClassId) {
         // Validate URL parameters
         if (!isValidEventId(urlEventId) || !isValidClassId(urlClassId)) {
@@ -86,6 +99,12 @@ function RegistrationPageContent() {
           const data = await response.json();
           if (data.success && data.data) {
             setEventDetails(data.data);
+            // Show email step first (unless email already provided in URL)
+            if (!initialEmail) {
+              setShowEmailStep(true);
+            } else {
+              setVerifiedEmail(initialEmail);
+            }
           } else {
             setError('event_not_found');
           }
@@ -241,6 +260,34 @@ function RegistrationPageContent() {
       classId: '',
       className: '',
     });
+    // Reset email check state
+    setShowEmailStep(false);
+    setVerifiedEmail('');
+    setParentData(null);
+    setExistingChildren([]);
+  };
+
+  // Email verification handler
+  const handleEmailVerified = (
+    email: string,
+    parentInfo?: { firstName: string; phone: string },
+    children?: ExistingChild[]
+  ) => {
+    setVerifiedEmail(email);
+    setShowEmailStep(false);
+    if (parentInfo) {
+      setParentData(parentInfo);
+    }
+    if (children) {
+      setExistingChildren(children);
+    }
+  };
+
+  const handleEmailBack = () => {
+    setShowEmailStep(true);
+    setVerifiedEmail('');
+    setParentData(null);
+    setExistingChildren([]);
   };
 
   const getStepNumber = (): number => {
@@ -511,18 +558,48 @@ function RegistrationPageContent() {
             )}
           </div>
 
-          {/* Registration Form */}
-          <RegistrationForm
-            eventId={effectiveEventId}
-            classId={effectiveClassId}
-            schoolName={eventDetails.schoolName}
-            className={eventDetails.className}
-            eventType={eventDetails.eventType}
-            initialEmail={initialEmail}
-          />
+          {/* Email Check Step - Show first for direct link flow */}
+          {showEmailStep && (
+            <div className="bg-white shadow-lg rounded-lg p-8">
+              <EmailCheckStep
+                eventId={effectiveEventId}
+                onEmailVerified={handleEmailVerified}
+              />
+            </div>
+          )}
+
+          {/* Registration Form - Show after email is verified */}
+          {!showEmailStep && (
+            <>
+              <RegistrationForm
+                eventId={effectiveEventId}
+                classId={effectiveClassId}
+                schoolName={eventDetails.schoolName}
+                className={eventDetails.className}
+                eventType={eventDetails.eventType}
+                initialEmail={verifiedEmail || initialEmail}
+                initialFirstName={parentData?.firstName}
+                initialPhone={parentData?.phone}
+                existingChildren={existingChildren}
+                isKnownParent={!!parentData}
+              />
+
+              {/* Back to email step - only show for direct link flow if user has verified */}
+              {!isDiscoveryMode && verifiedEmail && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={handleEmailBack}
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    ← Use a different email
+                  </button>
+                </div>
+              )}
+            </>
+          )}
 
           {/* Back button for discovery mode */}
-          {isDiscoveryMode && (
+          {isDiscoveryMode && !showEmailStep && (
             <div className="mt-4 text-center">
               <button
                 onClick={handleBack}

@@ -15,6 +15,7 @@ import SchulsongSection from '@/components/parent-portal/SchulsongSection';
 // Note: VideoCard removed - video is now handled in HeroIntroSection
 import { CartProvider } from '@/lib/contexts/CartContext';
 import { CartDrawer } from '@/components/shop';
+import { ManageChildren } from '@/components/parent';
 import { ParentSession, ParentPortalData } from '@/lib/types';
 
 // Audio status response type
@@ -908,6 +909,18 @@ function ParentPortalContent() {
             schoolName={schoolName}
             children={children}
             isSchulsongOnly={isSchulsongOnly}
+          />
+        </section>
+
+        {/* Manage Registration Section */}
+        <section className="mb-12">
+          <ManageChildren
+            eventId={eventId}
+            classId={classId}
+            parentEmail={session.email}
+            parentFirstName={session.firstName}
+            parentPhone={portalData?.parentJourney?.parent_telephone || ''}
+            onDataChange={verifySessionAndLoadData}
           />
         </section>
 

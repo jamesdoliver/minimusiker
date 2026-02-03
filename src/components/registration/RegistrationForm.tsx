@@ -14,6 +14,12 @@ import {
 } from '@/lib/validators/registrationValidators';
 import { validateEmail } from '@/lib/utils/validators';
 
+interface ExistingChild {
+  name: string;
+  eventName?: string;
+  className?: string;
+}
+
 interface RegistrationFormProps {
   eventId: string;
   classId: string;
@@ -21,6 +27,10 @@ interface RegistrationFormProps {
   className: string;
   eventType: string;
   initialEmail?: string;
+  initialFirstName?: string;
+  initialPhone?: string;
+  existingChildren?: ExistingChild[];
+  isKnownParent?: boolean;
 }
 
 export default function RegistrationForm({
@@ -30,9 +40,14 @@ export default function RegistrationForm({
   className,
   eventType,
   initialEmail = '',
+  initialFirstName = '',
+  initialPhone = '',
+  existingChildren = [],
+  isKnownParent = false,
 }: RegistrationFormProps) {
   const router = useRouter();
   const t = useTranslations('registration.form');
+  const tEmailCheck = useTranslations('parentPortal.emailCheck');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -41,8 +56,8 @@ export default function RegistrationForm({
 
   const [formData, setFormData] = useState<Omit<RegistrationData, 'eventId' | 'classId'>>({
     parentEmail: initialEmail,
-    parentFirstName: '',
-    parentPhone: '',
+    parentFirstName: initialFirstName,
+    parentPhone: initialPhone,
     children: [{ childName: '', gradeLevel: '' }],
   });
 
@@ -202,6 +217,27 @@ export default function RegistrationForm({
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Welcome Back Banner for known parents */}
+      {isKnownParent && initialFirstName && (
+        <div className="bg-sage-50 border border-sage-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-sage-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg className="w-4 h-4 text-sage-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-sage-800">
+                {tEmailCheck('knownParent', { name: initialFirstName })}
+              </p>
+              <p className="text-sm text-sage-700 mt-1">
+                {tEmailCheck('prefillMessage')}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

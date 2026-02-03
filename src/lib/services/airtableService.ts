@@ -5565,6 +5565,500 @@ class AirtableService {
       return [];
     }
   }
+
+  // ==================== Parent Registration Management ====================
+
+  /**
+   * Get parent with all their children across all events
+   * Returns parent data and existing children for pre-filling registration forms
+   */
+  async getParentWithChildren(email: string): Promise<{
+    parent: Parent | null;
+    children: Array<{
+      registrationId: string;
+      childName: string;
+      eventId: string;
+      eventName?: string;
+      classId: string;
+      className?: string;
+      eventDate?: string;
+    }>;
+  }> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.useNormalizedTables()) {
+      // LEGACY: Query parent_journey_table
+      const records = await this.getParentRecordsByEmail(email);
+      if (!records || records.length === 0) {
+        return { parent: null, children: [] };
+      }
+
+      const firstRecord = records[0];
+      return {
+        parent: {
+          id: firstRecord.id,
+          parents_id: '',
+          parent_id: firstRecord.parent_id,
+          parent_email: firstRecord.parent_email,
+          parent_first_name: firstRecord.parent_first_name,
+          parent_telephone: firstRecord.parent_telephone || '',
+          email_campaigns: firstRecord.email_campaigns as 'yes' | 'no',
+          created_at: '',
+        },
+        children: records.map(r => ({
+          registrationId: r.id,
+          childName: r.registered_child,
+          eventId: r.booking_id,
+          eventName: r.school_name,
+          classId: r.class_id || '',
+          className: r.class,
+          eventDate: r.booking_date,
+        })),
+      };
+    }
+
+    // NEW: Query normalized tables
+    const parent = await this.queryParentByEmail(email);
+    if (!parent) {
+      return { parent: null, children: [] };
+    }
+
+    const registrations = await this.queryRegistrationsByParent(parent.id);
+
+    // Fetch event and class details for each registration
+    const childrenWithDetails = await Promise.all(
+      registrations.map(async (reg) => {
+        let eventName: string | undefined;
+        let className: string | undefined;
+        let eventDate: string | undefined;
+
+        // Fetch event details
+        if (reg.event_id?.[0]) {
+          const event = await this.queryEventById(reg.event_id[0]);
+          if (event) {
+            eventName = event.school_name;
+            eventDate = event.event_date;
+          }
+        }
+
+        // Fetch class details
+        if (reg.class_id?.[0]) {
+          const classRecord = await this.queryClassById(reg.class_id[0]);
+          if (classRecord) {
+            className = classRecord.class_name;
+          }
+        }
+
+        return {
+          registrationId: reg.id,
+          childName: reg.registered_child,
+          eventId: reg.event_id?.[0] || '',
+          eventName,
+          classId: reg.class_id?.[0] || '',
+          className,
+          eventDate,
+        };
+      })
+    );
+
+    return { parent, children: childrenWithDetails };
+  }
+
+  /**
+   * Get children registered for a specific event by parent email
+   */
+  async getChildrenByParentEmailForEvent(
+    email: string,
+    eventId: string
+  ): Promise<Array<{
+    registrationId: string;
+    childName: string;
+    classId: string;
+    className?: string;
+  }>> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.useNormalizedTables()) {
+      // LEGACY: Query parent_journey_table
+      const records = await this.query({
+        filterByFormula: `AND(
+          LOWER({${AIRTABLE_FIELD_IDS.parent_email}}) = LOWER('${email.replace(/'/g, "\\'")}'),
+          {${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId}'
+        )`,
+      });
+
+      return records.map(r => ({
+        registrationId: r.id,
+        childName: r.registered_child,
+        classId: r.class_id || '',
+        className: r.class,
+      }));
+    }
+
+    // NEW: Query normalized tables
+    const parent = await this.queryParentByEmail(email);
+    if (!parent) return [];
+
+    // Find event record ID
+    const eventRecords = await this.eventsTable!.select({
+      filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId}'`,
+      maxRecords: 1,
+      returnFieldsByFieldId: true,
+    }).firstPage();
+
+    if (eventRecords.length === 0) return [];
+    const eventRecordId = eventRecords[0].id;
+
+    // Get all registrations for this parent
+    const allRegistrations = await this.queryRegistrationsByParent(parent.id);
+
+    // Filter by event
+    const eventRegistrations = allRegistrations.filter(
+      reg => reg.event_id?.includes(eventRecordId)
+    );
+
+    // Fetch class details
+    return Promise.all(
+      eventRegistrations.map(async (reg) => {
+        let className: string | undefined;
+        if (reg.class_id?.[0]) {
+          const classRecord = await this.queryClassById(reg.class_id[0]);
+          className = classRecord?.class_name;
+        }
+
+        return {
+          registrationId: reg.id,
+          childName: reg.registered_child,
+          classId: reg.class_id?.[0] || '',
+          className,
+        };
+      })
+    );
+  }
+
+  /**
+   * Add a new child registration for an existing parent
+   */
+  async addChildRegistration(
+    parentEmail: string,
+    eventId: string,
+    classId: string,
+    childName: string
+  ): Promise<{ success: boolean; registrationId?: string; error?: string }> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.useNormalizedTables()) {
+      // LEGACY: Create row in parent_journey_table
+      try {
+        // Get parent data from existing record
+        const existingRecords = await this.getParentRecordsByEmail(parentEmail);
+        if (!existingRecords || existingRecords.length === 0) {
+          return { success: false, error: 'Parent not found' };
+        }
+
+        const parentData = existingRecords[0];
+
+        // Get event/class details
+        const eventDetails = await this.getEventAndClassDetails(eventId, classId);
+        if (!eventDetails) {
+          return { success: false, error: 'Event or class not found' };
+        }
+
+        // Generate child ID
+        const crypto = await import('crypto');
+        const childId = `CHD-${crypto.createHash('md5').update(`${parentEmail}-${childName}-${Date.now()}`).digest('hex').substring(0, 8)}`;
+
+        // Create new record
+        const newRecord = await this.create({
+          booking_id: eventId,
+          class_id: classId,
+          parent_email: parentEmail,
+          parent_first_name: parentData.parent_first_name,
+          parent_telephone: parentData.parent_telephone,
+          parent_id: parentData.parent_id,
+          registered_child: childName,
+          child_id: childId,
+          school_name: eventDetails.schoolName,
+          class: eventDetails.className,
+          main_teacher: eventDetails.teacherName,
+          event_type: eventDetails.eventType,
+          booking_date: eventDetails.bookingDate,
+          registered_complete: true,
+          email_campaigns: parentData.email_campaigns,
+        });
+
+        return { success: true, registrationId: newRecord.id };
+      } catch (error) {
+        console.error('Error adding child registration:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    }
+
+    // NEW: Create in normalized tables
+    try {
+      // Find parent
+      const parent = await this.queryParentByEmail(parentEmail);
+      if (!parent) {
+        return { success: false, error: 'Parent not found' };
+      }
+
+      // Find event record
+      const eventRecords = await this.eventsTable!.select({
+        filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId}'`,
+        maxRecords: 1,
+        returnFieldsByFieldId: true,
+      }).firstPage();
+
+      if (eventRecords.length === 0) {
+        return { success: false, error: 'Event not found' };
+      }
+      const eventRecordId = eventRecords[0].id;
+
+      // Find class record
+      const classRecords = await this.classesTable!.select({
+        filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId}'`,
+        maxRecords: 1,
+        returnFieldsByFieldId: true,
+      }).firstPage();
+
+      if (classRecords.length === 0) {
+        return { success: false, error: 'Class not found' };
+      }
+      const classRecordId = classRecords[0].id;
+
+      // Generate child ID
+      const crypto = await import('crypto');
+      const childId = `CHD-${crypto.createHash('md5').update(`${parentEmail}-${childName}-${Date.now()}`).digest('hex').substring(0, 8)}`;
+
+      // Create registration
+      const registrationFields: any = {
+        [REGISTRATIONS_FIELD_IDS.parent_id]: [parent.id],
+        [REGISTRATIONS_FIELD_IDS.event_id]: [eventRecordId],
+        [REGISTRATIONS_FIELD_IDS.class_id]: [classRecordId],
+        [REGISTRATIONS_FIELD_IDS.registered_child]: childName,
+        [REGISTRATIONS_FIELD_IDS.child_id]: childId,
+        [REGISTRATIONS_FIELD_IDS.registered_complete]: true,
+        [REGISTRATIONS_FIELD_IDS.registration_date]: new Date().toISOString(),
+      };
+
+      const newRecords = await this.registrationsTable!.create([{ fields: registrationFields }]);
+      return { success: true, registrationId: newRecords[0].id };
+    } catch (error) {
+      console.error('Error adding child registration:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Update an existing child registration
+   */
+  async updateChildRegistration(
+    registrationId: string,
+    updates: { childName?: string; classId?: string }
+  ): Promise<{ success: boolean; error?: string }> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.useNormalizedTables()) {
+      // LEGACY: Update parent_journey_table
+      try {
+        const updateFields: any = {};
+        if (updates.childName) updateFields.registered_child = updates.childName;
+        if (updates.classId) updateFields.class_id = updates.classId;
+
+        await this.base(TABLE_NAME).update(registrationId, updateFields);
+        return { success: true };
+      } catch (error) {
+        console.error('Error updating child registration:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    }
+
+    // NEW: Update registrations table
+    try {
+      const updateFields: any = {};
+
+      if (updates.childName) {
+        updateFields[REGISTRATIONS_FIELD_IDS.registered_child] = updates.childName;
+      }
+
+      if (updates.classId) {
+        // Find class record ID
+        const classRecords = await this.classesTable!.select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${updates.classId}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        }).firstPage();
+
+        if (classRecords.length === 0) {
+          return { success: false, error: 'Class not found' };
+        }
+        updateFields[REGISTRATIONS_FIELD_IDS.class_id] = [classRecords[0].id];
+      }
+
+      await this.registrationsTable!.update(registrationId, updateFields);
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating child registration:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Delete a child registration
+   */
+  async deleteChildRegistration(
+    registrationId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.useNormalizedTables()) {
+      // LEGACY: Delete from parent_journey_table
+      try {
+        await this.base(TABLE_NAME).destroy(registrationId);
+        return { success: true };
+      } catch (error) {
+        console.error('Error deleting child registration:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    }
+
+    // NEW: Delete from registrations table
+    try {
+      await this.registrationsTable!.destroy(registrationId);
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting child registration:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Update parent profile (name, phone)
+   */
+  async updateParentProfile(
+    email: string,
+    updates: { firstName?: string; phone?: string }
+  ): Promise<{ success: boolean; error?: string }> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.useNormalizedTables()) {
+      // LEGACY: Update all records in parent_journey_table for this parent
+      try {
+        const records = await this.getParentRecordsByEmail(email);
+        if (!records || records.length === 0) {
+          return { success: false, error: 'Parent not found' };
+        }
+
+        const updateFields: any = {};
+        if (updates.firstName) updateFields.parent_first_name = updates.firstName;
+        if (updates.phone) updateFields.parent_telephone = updates.phone;
+
+        // Update all records for this parent
+        const updatePromises = records.map(r =>
+          this.base(TABLE_NAME).update(r.id, updateFields)
+        );
+        await Promise.all(updatePromises);
+
+        return { success: true };
+      } catch (error) {
+        console.error('Error updating parent profile:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    }
+
+    // NEW: Update parents table
+    try {
+      const parent = await this.queryParentByEmail(email);
+      if (!parent) {
+        return { success: false, error: 'Parent not found' };
+      }
+
+      const updateFields: any = {};
+      if (updates.firstName) {
+        updateFields[PARENTS_FIELD_IDS.parent_first_name] = updates.firstName;
+      }
+      if (updates.phone) {
+        updateFields[PARENTS_FIELD_IDS.parent_telephone] = updates.phone;
+      }
+
+      await this.parentsTable!.update(parent.id, updateFields);
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating parent profile:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Get a single registration by ID with details
+   */
+  async getRegistrationById(registrationId: string): Promise<{
+    id: string;
+    childName: string;
+    parentEmail: string;
+    eventId: string;
+    classId: string;
+  } | null> {
+    this.ensureNormalizedTablesInitialized();
+
+    if (!this.useNormalizedTables()) {
+      // LEGACY: Query parent_journey_table
+      try {
+        const record = await this.base(TABLE_NAME).find(registrationId);
+        return {
+          id: record.id,
+          childName: record.fields.registered_child as string,
+          parentEmail: record.fields.parent_email as string,
+          eventId: record.fields.booking_id as string,
+          classId: record.fields.class_id as string,
+        };
+      } catch (error) {
+        console.error('Error fetching registration:', error);
+        return null;
+      }
+    }
+
+    // NEW: Query registrations table
+    try {
+      const record = await this.registrationsTable!.find(registrationId);
+      const fields = record.fields as Record<string, any>;
+
+      // Get parent email
+      let parentEmail = '';
+      const parentIds = fields[REGISTRATIONS_FIELD_IDS.parent_id] as string[] | undefined;
+      if (parentIds?.[0]) {
+        const parentRecord = await this.parentsTable!.find(parentIds[0]);
+        parentEmail = parentRecord.fields[PARENTS_FIELD_IDS.parent_email] as string;
+      }
+
+      // Get event ID
+      let eventId = '';
+      const eventIds = fields[REGISTRATIONS_FIELD_IDS.event_id] as string[] | undefined;
+      if (eventIds?.[0]) {
+        const eventRecord = await this.eventsTable!.find(eventIds[0]);
+        eventId = eventRecord.fields[EVENTS_FIELD_IDS.event_id] as string;
+      }
+
+      // Get class ID
+      let classId = '';
+      const classIds = fields[REGISTRATIONS_FIELD_IDS.class_id] as string[] | undefined;
+      if (classIds?.[0]) {
+        const classRecord = await this.classesTable!.find(classIds[0]);
+        classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
+      }
+
+      return {
+        id: record.id,
+        childName: fields[REGISTRATIONS_FIELD_IDS.registered_child] as string,
+        parentEmail,
+        eventId,
+        classId,
+      };
+    } catch (error) {
+      console.error('Error fetching registration:', error);
+      return null;
+    }
+  }
 }
 
 // Lazy getter to prevent build-time instantiation
