@@ -3,28 +3,61 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import BookingsTable from '@/components/admin/bookings/BookingsTable';
-import { BookingWithDetails } from '@/app/api/admin/bookings/route';
+import { BookingWithDetails, StaffOption, RegionOption } from '@/app/api/admin/bookings/route';
 
-type StatusFilter = 'all' | 'confirmed' | 'pending' | 'cancelled';
+// Tier 1: Computed status (mutually exclusive)
+type ComputedStatus = 'confirmed' | 'completed' | 'onHold';
+
+// Tier 2: Event types for toggle buttons
+type EventType = 'minimusikertag' | 'plus' | 'schulsong' | 'kita';
 
 interface BookingsStats {
   total: number;
   confirmed: number;
-  pending: number;
-  cancelled: number;
+  completed: number;
+  onHold: number;
+}
+
+/**
+ * Compute the display status of a booking based on event date and eventStatus
+ * - On Hold: eventStatus === 'On Hold' (overrides date logic)
+ * - Confirmed: event_date is future OR ≤15 days past
+ * - Completed: event_date is >15 days past
+ */
+function getComputedStatus(booking: BookingWithDetails): ComputedStatus {
+  // On Hold status overrides date-based logic
+  if (booking.eventStatus === 'On Hold') {
+    return 'onHold';
+  }
+
+  const eventDate = new Date(booking.bookingDate);
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 15);
+
+  return eventDate >= cutoff ? 'confirmed' : 'completed';
 }
 
 export default function AdminBookings() {
+  // Data state
   const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
-  const [stats, setStats] = useState<BookingsStats>({
-    total: 0,
-    confirmed: 0,
-    pending: 0,
-    cancelled: 0,
-  });
+  const [staffList, setStaffList] = useState<StaffOption[]>([]);
+  const [regionList, setRegionList] = useState<RegionOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  // Tier 1: Status tab (mutually exclusive)
+  const [statusFilter, setStatusFilter] = useState<ComputedStatus>('confirmed');
+
+  // Tier 2: Event type toggles (multi-select, OR logic)
+  const [activeTypes, setActiveTypes] = useState<Set<EventType>>(new Set());
+
+  // Tier 3: Search filters
+  const [staffFilter, setStaffFilter] = useState<string>('');
+  const [regionFilter, setRegionFilter] = useState<string>('');
+  const [monthFilter, setMonthFilter] = useState<string>(''); // 'YYYY-MM'
+  const [childrenFilter, setChildrenFilter] = useState<string>('');
+
+  // Text search (existing functionality)
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -47,7 +80,8 @@ export default function AdminBookings() {
 
       if (data.success) {
         setBookings(data.data.bookings || []);
-        setStats(data.data.stats || { total: 0, confirmed: 0, pending: 0, cancelled: 0 });
+        setStaffList(data.data.staffList || []);
+        setRegionList(data.data.regionList || []);
       } else {
         throw new Error(data.error || 'Failed to load bookings');
       }
@@ -61,19 +95,88 @@ export default function AdminBookings() {
 
   const handleEventDeleted = useCallback((bookingId: string) => {
     setBookings(prev => prev.filter(b => b.id !== bookingId));
-    setStats(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
   }, []);
 
-  // Filter bookings based on status and search
+  // Toggle an event type filter
+  const toggleEventType = (type: EventType) => {
+    setActiveTypes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(type)) {
+        newSet.delete(type);
+      } else {
+        newSet.add(type);
+      }
+      return newSet;
+    });
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setActiveTypes(new Set());
+    setStaffFilter('');
+    setRegionFilter('');
+    setMonthFilter('');
+    setChildrenFilter('');
+    setSearchQuery('');
+  };
+
+  // Calculate stats based on computed status
+  const stats = useMemo((): BookingsStats => {
+    return {
+      total: bookings.length,
+      confirmed: bookings.filter(b => getComputedStatus(b) === 'confirmed').length,
+      completed: bookings.filter(b => getComputedStatus(b) === 'completed').length,
+      onHold: bookings.filter(b => getComputedStatus(b) === 'onHold').length,
+    };
+  }, [bookings]);
+
+  // Apply all filter tiers
   const filteredBookings = useMemo(() => {
     let filtered = bookings;
 
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((b) => b.status === statusFilter);
+    // TIER 1: Filter by computed status
+    filtered = filtered.filter(b => getComputedStatus(b) === statusFilter);
+
+    // TIER 2: Filter by event type (OR logic - show if matches ANY selected type)
+    if (activeTypes.size > 0) {
+      filtered = filtered.filter(b =>
+        (activeTypes.has('minimusikertag') && b.isMinimusikertag) ||
+        (activeTypes.has('plus') && b.isPlus) ||
+        (activeTypes.has('schulsong') && b.isSchulsong) ||
+        (activeTypes.has('kita') && b.isKita)
+      );
     }
 
-    // Filter by search query
+    // TIER 3: Search filters (AND logic between each filter)
+
+    // Staff filter
+    if (staffFilter) {
+      filtered = filtered.filter(b =>
+        b.assignedStaff?.includes(staffFilter)
+      );
+    }
+
+    // Region filter
+    if (regionFilter) {
+      filtered = filtered.filter(b => b.regionId === regionFilter);
+    }
+
+    // Month filter
+    if (monthFilter) {
+      filtered = filtered.filter(b =>
+        b.bookingDate.startsWith(monthFilter)
+      );
+    }
+
+    // Children count filter (±50)
+    const childrenCount = parseInt(childrenFilter, 10);
+    if (!isNaN(childrenCount)) {
+      filtered = filtered.filter(b =>
+        Math.abs((b.numberOfChildren || 0) - childrenCount) <= 50
+      );
+    }
+
+    // Text search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -86,7 +189,10 @@ export default function AdminBookings() {
     }
 
     return filtered;
-  }, [bookings, statusFilter, searchQuery]);
+  }, [bookings, statusFilter, activeTypes, staffFilter, regionFilter, monthFilter, childrenFilter, searchQuery]);
+
+  // Check if any filters are active (beyond status tab)
+  const hasActiveFilters = activeTypes.size > 0 || staffFilter || regionFilter || monthFilter || childrenFilter || searchQuery;
 
   if (isLoading) {
     return (
@@ -115,7 +221,7 @@ export default function AdminBookings() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">SimplyBook Bookings</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Bookings</h1>
           <p className="text-gray-600 mt-1">{stats.total} total bookings</p>
         </div>
         <button
@@ -142,7 +248,7 @@ export default function AdminBookings() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-500">Total Bookings</p>
+          <p className="text-sm font-medium text-gray-500">Total</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
@@ -150,21 +256,33 @@ export default function AdminBookings() {
           <p className="text-2xl font-bold text-green-600 mt-1">{stats.confirmed}</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-500">Pending</p>
-          <p className="text-2xl font-bold text-orange-600 mt-1">{stats.pending}</p>
+          <p className="text-sm font-medium text-gray-500">Completed</p>
+          <p className="text-2xl font-bold text-gray-500 mt-1">{stats.completed}</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <p className="text-sm font-medium text-gray-500">Cancelled</p>
-          <p className="text-2xl font-bold text-red-600 mt-1">{stats.cancelled}</p>
+          <p className="text-sm font-medium text-gray-500">On Hold</p>
+          <p className="text-2xl font-bold text-orange-600 mt-1">{stats.onHold}</p>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Status Tabs */}
-          <div className="flex gap-2">
-            {(['all', 'confirmed', 'pending', 'cancelled'] as StatusFilter[]).map((status) => (
+      {/* Filter Panel */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 space-y-4">
+
+        {/* TIER 1: Status Tabs */}
+        <div className="flex flex-wrap gap-2">
+          {(['confirmed', 'completed', 'onHold'] as ComputedStatus[]).map((status) => {
+            const labels: Record<ComputedStatus, string> = {
+              confirmed: 'Confirmed',
+              completed: 'Completed',
+              onHold: 'On Hold',
+            };
+            const counts: Record<ComputedStatus, number> = {
+              confirmed: stats.confirmed,
+              completed: stats.completed,
+              onHold: stats.onHold,
+            };
+
+            return (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -174,25 +292,119 @@ export default function AdminBookings() {
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                {status.charAt(0).toUpperCase() + status.slice(1)}
-                {status !== 'all' && (
-                  <span className="ml-1 text-xs opacity-75">
-                    ({stats[status as keyof Omit<BookingsStats, 'total'>]})
-                  </span>
-                )}
+                {labels[status]}
+                <span className="ml-1 text-xs opacity-75">
+                  ({counts[status]})
+                </span>
               </button>
+            );
+          })}
+        </div>
+
+        {/* TIER 2: Event Type Toggles */}
+        <div className="flex flex-wrap gap-2">
+          <span className="text-sm text-gray-500 py-2 pr-2">Event Type:</span>
+          <button
+            onClick={() => toggleEventType('minimusikertag')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+              activeTypes.has('minimusikertag')
+                ? 'bg-blue-500 text-white border-blue-500'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            Minimusikertag
+          </button>
+          <button
+            onClick={() => toggleEventType('plus')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+              activeTypes.has('plus')
+                ? 'bg-violet-500 text-white border-violet-500'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            Plus
+          </button>
+          <button
+            onClick={() => toggleEventType('schulsong')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+              activeTypes.has('schulsong')
+                ? 'bg-orange-500 text-white border-orange-500'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            Schulsong
+          </button>
+          <button
+            onClick={() => toggleEventType('kita')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+              activeTypes.has('kita')
+                ? 'bg-violet-500 text-white border-violet-500'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            KiTa
+          </button>
+        </div>
+
+        {/* TIER 3: Search Dropdowns */}
+        <div className="flex flex-wrap gap-3">
+          {/* Staff dropdown */}
+          <select
+            value={staffFilter}
+            onChange={(e) => setStaffFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">All Staff</option>
+            {staffList.map((staff) => (
+              <option key={staff.id} value={staff.id}>
+                {staff.name}
+              </option>
             ))}
+          </select>
+
+          {/* Region dropdown */}
+          <select
+            value={regionFilter}
+            onChange={(e) => setRegionFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">All Regions</option>
+            {regionList.map((region) => (
+              <option key={region.id} value={region.id}>
+                {region.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Month picker */}
+          <input
+            type="month"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Month"
+          />
+
+          {/* Children count */}
+          <div className="relative">
+            <input
+              type="number"
+              value={childrenFilter}
+              onChange={(e) => setChildrenFilter(e.target.value)}
+              placeholder="Children (±50)"
+              className="w-36 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
           </div>
 
-          {/* Search */}
-          <div className="flex-1">
+          {/* Text search */}
+          <div className="flex-1 min-w-[200px]">
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search by school, contact, or booking code..."
+                placeholder="Search school, contact, code..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <svg
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -209,18 +421,32 @@ export default function AdminBookings() {
               </svg>
             </div>
           </div>
+
+          {/* Clear filters button */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       </div>
 
       {/* Results Count */}
-      {(statusFilter !== 'all' || searchQuery) && (
+      {hasActiveFilters && (
         <p className="text-sm text-gray-600 mb-4">
-          Showing {filteredBookings.length} of {stats.total} bookings
+          Showing {filteredBookings.length} of {stats[statusFilter]} {statusFilter} bookings
         </p>
       )}
 
       {/* Bookings Table */}
-      <BookingsTable bookings={filteredBookings} onEventDeleted={handleEventDeleted} />
+      <BookingsTable
+        bookings={filteredBookings}
+        onEventDeleted={handleEventDeleted}
+        getComputedStatus={getComputedStatus}
+      />
     </div>
   );
 }

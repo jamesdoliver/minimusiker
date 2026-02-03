@@ -20,6 +20,9 @@ import {
   EINRICHTUNGEN_TABLE_ID,
   EINRICHTUNGEN_FIELD_IDS,
   Einrichtung,
+  // Teams/Regionen table
+  TEAMS_REGIONEN_TABLE_ID,
+  TEAMS_REGIONEN_FIELD_IDS,
   // New normalized table types and IDs
   Event,
   Class,
@@ -4245,6 +4248,44 @@ class AirtableService {
   }
 
   /**
+   * Get all bookings (past and future)
+   * Only filters out deleted records, returns all bookings with valid start_date
+   * Sorted by start_date descending (newest first)
+   */
+  async getAllBookings(): Promise<SchoolBooking[]> {
+    try {
+      // Use returnFieldsByFieldId to get field IDs in response (matching our SCHOOL_BOOKINGS_FIELD_IDS)
+      const allRecords = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
+        .select({
+          pageSize: 100,
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      // Filter out deleted records and records without start_date
+      const validRecords = allRecords.filter(record => {
+        const status = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status] as string | undefined;
+        if (status === 'deleted') return false;
+
+        const startDateStr = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.start_date] as string | undefined;
+        return Boolean(startDateStr);
+      });
+
+      // Sort by start_date descending (newest first)
+      validRecords.sort((a, b) => {
+        const dateA = new Date(a.fields[SCHOOL_BOOKINGS_FIELD_IDS.start_date] as string);
+        const dateB = new Date(b.fields[SCHOOL_BOOKINGS_FIELD_IDS.start_date] as string);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      return validRecords.map((record) => this.transformSchoolBookingRecord(record));
+    } catch (error) {
+      console.error('Error fetching all bookings:', error);
+      throw new Error(`Failed to fetch all bookings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Get a single school booking by SimplyBook ID
    */
   async getSchoolBookingBySimplybookId(simplybookId: string): Promise<SchoolBooking | null> {
@@ -5364,6 +5405,58 @@ class AirtableService {
     } catch (error) {
       console.error('Error fetching person by ID:', error);
       return null;
+    }
+  }
+
+  /**
+   * Get all staff members from Personen table for dropdown lists
+   * Returns id and name for each staff member
+   */
+  async getAllStaffMembers(): Promise<Array<{ id: string; name: string }>> {
+    try {
+      const records = await this.base(PERSONEN_TABLE_ID)
+        .select({
+          fields: [PERSONEN_FIELD_IDS.staff_name],
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      return records
+        .map(record => ({
+          id: record.id,
+          name: (record.fields[PERSONEN_FIELD_IDS.staff_name] as string) || '',
+        }))
+        .filter(staff => staff.name) // Filter out records without names
+        .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
+    } catch (error) {
+      console.error('Error fetching all staff members:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all regions from Teams/Regionen table for dropdown lists
+   * Returns id and name for each region
+   */
+  async getAllRegions(): Promise<Array<{ id: string; name: string }>> {
+    try {
+      const records = await this.base(TEAMS_REGIONEN_TABLE_ID)
+        .select({
+          fields: [TEAMS_REGIONEN_FIELD_IDS.name],
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      return records
+        .map(record => ({
+          id: record.id,
+          name: (record.fields[TEAMS_REGIONEN_FIELD_IDS.name] as string) || '',
+        }))
+        .filter(region => region.name) // Filter out records without names
+        .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
+    } catch (error) {
+      console.error('Error fetching all regions:', error);
+      return [];
     }
   }
 

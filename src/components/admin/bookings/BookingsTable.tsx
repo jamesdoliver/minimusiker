@@ -7,9 +7,13 @@ import BookingDetailsBreakdown from './BookingDetailsBreakdown';
 import StatusCircle from './StatusCircle';
 import EventTypeCircles from './EventTypeCircles';
 
+// Computed status type for styling
+type ComputedStatus = 'confirmed' | 'completed' | 'onHold';
+
 interface BookingsTableProps {
   bookings: BookingWithDetails[];
   onEventDeleted?: (bookingId: string) => void;
+  getComputedStatus?: (booking: BookingWithDetails) => ComputedStatus;
 }
 
 function ChevronIcon({ isOpen }: { isOpen: boolean }) {
@@ -56,7 +60,7 @@ function formatDate(dateString: string): string {
   }
 }
 
-export default function BookingsTable({ bookings, onEventDeleted }: BookingsTableProps) {
+export default function BookingsTable({ bookings, onEventDeleted, getComputedStatus }: BookingsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const toggleRow = (bookingId: string) => {
@@ -112,13 +116,15 @@ export default function BookingsTable({ bookings, onEventDeleted }: BookingsTabl
             {bookings.map((booking, index) => {
               const isExpanded = expandedRows.has(booking.id);
               const isEven = index % 2 === 0;
+              // Apply reduced opacity for completed bookings
+              const isCompleted = getComputedStatus?.(booking) === 'completed';
 
               return (
                 <Fragment key={booking.id}>
                   <tr
                     className={`cursor-pointer hover:bg-gray-100 transition-colors ${
                       isEven ? 'bg-white' : 'bg-gray-50'
-                    } ${isExpanded ? 'bg-blue-50 hover:bg-blue-50' : ''}`}
+                    } ${isExpanded ? 'bg-blue-50 hover:bg-blue-50' : ''} ${isCompleted ? 'opacity-60' : ''}`}
                     onClick={() => toggleRow(booking.id)}
                   >
                     <td className="px-4 py-4">

@@ -36,9 +36,23 @@ export interface BookingWithDetails {
   isSchulsong?: boolean;         // Shows 'S' circle
   isMinimusikertag?: boolean;    // true = full event, false = schulsong-only
   eventType?: string;            // Original event_type for backwards compatibility
+  // Staff assignment from linked Event
+  assignedStaff?: string[];      // Array of Personen record IDs
   // Edit booking modal fields
   secondaryContacts?: SecondaryContact[];  // Additional contacts stored as JSON
   simplybookClientId?: string;   // SimplyBook client ID for editClient sync
+}
+
+// Staff member for dropdown
+export interface StaffOption {
+  id: string;
+  name: string;
+}
+
+// Region for dropdown
+export interface RegionOption {
+  id: string;
+  name: string;
 }
 
 /**
@@ -120,8 +134,8 @@ async function fetchRegionNames(regionIds: string[]): Promise<Map<string, string
 
 /**
  * GET /api/admin/bookings
- * Fetch future bookings from Airtable
- * Query params: status (optional filter)
+ * Fetch all bookings (past and future) from Airtable
+ * Includes staff and region lists for dropdowns
  */
 export async function GET(request: NextRequest) {
   try {
@@ -134,13 +148,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Parse query params
-    const { searchParams } = new URL(request.url);
-    const statusFilter = searchParams.get('status') as 'confirmed' | 'pending' | 'cancelled' | null;
-
-    // Fetch future bookings from Airtable
     const airtableService = getAirtableService();
-    const airtableBookings = await airtableService.getFutureBookings();
+
+    // Fetch all bookings (past and future), staff list, and region list in parallel
+    const [airtableBookings, staffList, regionList] = await Promise.all([
+      airtableService.getAllBookings(),
+      airtableService.getAllStaffMembers(),
+      airtableService.getAllRegions(),
+    ]);
 
     // Extract all region IDs and fetch names
     const allRegionIds = airtableBookings
@@ -187,6 +202,8 @@ export async function GET(request: NextRequest) {
               isSchulsong: event.is_schulsong,
               isMinimusikertag: event.is_minimusikertag === true,
               eventType: event.event_type,
+              // Staff assignment
+              assignedStaff: event.assigned_staff,
             };
           }
         } catch (error) {
@@ -197,13 +214,7 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Apply status filter if provided
-    let bookings = bookingsWithAccessCodes;
-    if (statusFilter) {
-      bookings = bookings.filter((b) => b.status === statusFilter);
-    }
-
-    // Calculate stats from all bookings (before filter)
+    // Calculate stats from all bookings
     const stats = {
       total: bookingsWithAccessCodes.length,
       confirmed: bookingsWithAccessCodes.filter((b) => b.status === 'confirmed').length,
@@ -214,8 +225,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        bookings,
+        bookings: bookingsWithAccessCodes,
         stats,
+        staffList,
+        regionList,
       },
     });
   } catch (error) {
