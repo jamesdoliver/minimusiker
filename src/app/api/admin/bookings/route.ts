@@ -38,6 +38,7 @@ export interface BookingWithDetails {
   eventType?: string;            // Original event_type for backwards compatibility
   // Staff assignment from linked Event
   assignedStaff?: string[];      // Array of Personen record IDs
+  assignedStaffNames?: string[]; // Resolved staff names for display
   // Edit booking modal fields
   secondaryContacts?: SecondaryContact[];  // Additional contacts stored as JSON
   simplybookClientId?: string;   // SimplyBook client ID for editClient sync
@@ -163,6 +164,9 @@ export async function GET(request: NextRequest) {
       .filter((id): id is string => Boolean(id));
     const regionMap = await fetchRegionNames(allRegionIds);
 
+    // Build staff ID to name map for resolving assigned staff names
+    const staffMap = new Map(staffList.map(s => [s.id, s.name]));
+
     // Transform to API format and fetch/create Events with access codes and status fields
     const bookingsWithAccessCodes: BookingWithDetails[] = await Promise.all(
       airtableBookings.map(async (booking) => {
@@ -204,6 +208,7 @@ export async function GET(request: NextRequest) {
               eventType: event.event_type,
               // Staff assignment
               assignedStaff: event.assigned_staff,
+              assignedStaffNames: event.assigned_staff?.map(id => staffMap.get(id)).filter(Boolean) as string[],
             };
           }
         } catch (error) {

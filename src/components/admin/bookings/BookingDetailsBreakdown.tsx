@@ -266,14 +266,20 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
             <div>
               <label className="text-xs text-gray-500 uppercase tracking-wide">Address</label>
               <p className="text-sm text-gray-900">{booking.address || '-'}</p>
+              {(booking.postalCode || booking.city) && (
+                <p className="text-sm text-gray-900">
+                  {[booking.postalCode, booking.city].filter(Boolean).join(' ')}
+                </p>
+              )}
             </div>
             <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wide">Postal Code</label>
-              <p className="text-sm text-gray-900">{booking.postalCode || '-'}</p>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wide">Region</label>
-              <p className="text-sm text-gray-900">{booking.region || '-'}</p>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Region & Team</label>
+              <p className="text-sm text-gray-900">
+                {[
+                  booking.region,
+                  booking.assignedStaffNames?.join(', ')
+                ].filter(Boolean).join(' - ') || '-'}
+              </p>
             </div>
           </div>
         </div>
