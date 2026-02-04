@@ -370,20 +370,29 @@ async function getParentRecipientsForEvent(
 
 /**
  * Get emails of parents who have at least one paid order for an event
+ * @param eventRecordId - The Airtable record ID of the Event
  */
-async function getPaidParentEmailsForEvent(eventId: string): Promise<Set<string>> {
+async function getPaidParentEmailsForEvent(eventRecordId: string): Promise<Set<string>> {
   const Airtable = (await import('airtable')).default;
   const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
     .base(process.env.AIRTABLE_BASE_ID!);
 
   const paidEmails = new Set<string>();
-  const orders = await base(ORDERS_TABLE_ID)
+
+  // Fetch all paid orders and filter by event_id linked record
+  const allPaidOrders = await base(ORDERS_TABLE_ID)
     .select({
-      filterByFormula: `AND({${ORDERS_FIELD_IDS.booking_id}} = "${eventId}", {${ORDERS_FIELD_IDS.payment_status}} = "paid")`,
-      fields: [ORDERS_FIELD_IDS.parent_id],
+      filterByFormula: `{${ORDERS_FIELD_IDS.payment_status}} = "paid"`,
+      fields: [ORDERS_FIELD_IDS.parent_id, ORDERS_FIELD_IDS.event_id],
       returnFieldsByFieldId: true,
     })
     .all();
+
+  // Filter orders by event_id linked record
+  const orders = allPaidOrders.filter((order) => {
+    const eventIds = order.get(ORDERS_FIELD_IDS.event_id) as string[] | undefined;
+    return eventIds && eventIds.includes(eventRecordId);
+  });
 
   const airtable = getAirtableService();
   for (const order of orders) {
@@ -405,7 +414,8 @@ async function getNonBuyerRecipientsForEvent(
   eventData: EventThresholdMatch
 ): Promise<EmailRecipient[]> {
   const allParents = await getParentRecipientsForEvent(eventId, eventRecordId, eventData);
-  const paidEmails = await getPaidParentEmailsForEvent(eventId);
+  // Use eventRecordId for order lookup via linked record field
+  const paidEmails = await getPaidParentEmailsForEvent(eventRecordId);
   return allParents.filter(p => !paidEmails.has(p.email.toLowerCase()));
 }
 

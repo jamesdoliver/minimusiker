@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
+import Airtable from 'airtable';
 import { getR2Service } from '@/lib/services/r2Service';
 import {
   ORDERS_TABLE_ID,
@@ -17,6 +18,7 @@ import {
   PARENTS_TABLE_ID,
   PARENTS_FIELD_IDS,
 } from '@/lib/types/airtable';
+import { resolveEventRecordId } from '@/lib/services/ordersHelper';
 
 interface DownloadRequest {
   eventId: string;
@@ -57,12 +59,18 @@ async function verifyParentSession(request: NextRequest): Promise<{ parentId: st
  * Check if parent has digital access for the given event
  */
 async function hasDigitalAccess(parentId: string, eventId: string): Promise<boolean> {
-  const Airtable = require('airtable');
   const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
     .base(process.env.AIRTABLE_BASE_ID!);
 
   try {
-    // First, get the parent's Airtable record ID
+    // First, resolve eventId to Airtable record ID
+    const eventRecordId = await resolveEventRecordId(eventId);
+    if (!eventRecordId) {
+      console.warn('[download] Event not found for identifier:', eventId);
+      return false;
+    }
+
+    // Get the parent's Airtable record ID
     const parentRecords = await base(PARENTS_TABLE_ID)
       .select({
         filterByFormula: `{${PARENTS_FIELD_IDS.parent_id}} = "${parentId}"`,
@@ -77,17 +85,19 @@ async function hasDigitalAccess(parentId: string, eventId: string): Promise<bool
 
     const parentRecordId = parentRecords[0].id;
 
-    // Check for orders with digital_delivered = true linked to this parent
-    // Note: We use booking_id field which contains the eventId
-    const orderRecords = await base(ORDERS_TABLE_ID)
+    // Fetch all orders with digital_delivered = true and filter by event_id linked record
+    const allDigitalOrders = await base(ORDERS_TABLE_ID)
       .select({
-        filterByFormula: `AND(
-          {${ORDERS_FIELD_IDS.digital_delivered}} = TRUE(),
-          {${ORDERS_FIELD_IDS.booking_id}} = "${eventId}"
-        )`,
-        maxRecords: 10,
+        filterByFormula: `{${ORDERS_FIELD_IDS.digital_delivered}} = TRUE()`,
+        returnFieldsByFieldId: true,
       })
-      .firstPage();
+      .all();
+
+    // Filter orders by event_id linked record
+    const orderRecords = allDigitalOrders.filter((order: Airtable.Record<Airtable.FieldSet>) => {
+      const eventIds = order.get(ORDERS_FIELD_IDS.event_id) as string[] | undefined;
+      return eventIds && eventIds.includes(eventRecordId);
+    });
 
     // Check if any order is linked to this parent
     for (const order of orderRecords) {

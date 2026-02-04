@@ -11,12 +11,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import Airtable from 'airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import {
   ORDERS_TABLE_ID,
   ORDERS_FIELD_IDS,
   ShopifyOrderLineItem,
 } from '@/lib/types/airtable';
+import { resolveEventRecordId } from '@/lib/services/ordersHelper';
 
 interface OrderRecord {
   id: string;
@@ -65,11 +67,28 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const limit = parseInt(searchParams.get('limit') || '100', 10);
 
-    // Build filter formula
-    const filters: string[] = [];
+    // If filtering by event, look up Event record ID first
+    let eventRecordId: string | null = null;
     if (eventId) {
-      filters.push(`{${ORDERS_FIELD_IDS.booking_id}} = "${eventId}"`);
+      eventRecordId = await resolveEventRecordId(eventId);
+      if (!eventRecordId) {
+        console.warn(`[admin/orders] Event not found for identifier: ${eventId}`);
+        // Return empty results if event doesn't exist
+        return NextResponse.json({
+          orders: [],
+          summary: {
+            totalOrders: 0,
+            totalRevenue: 0,
+            paidOrders: 0,
+            pendingOrders: 0,
+            digitalDelivered: 0,
+          },
+        });
+      }
     }
+
+    // Build filter formula (only for non-event filters now)
+    const filters: string[] = [];
     if (status) {
       filters.push(`{${ORDERS_FIELD_IDS.payment_status}} = "${status}"`);
     }
@@ -79,17 +98,27 @@ export async function GET(request: NextRequest) {
       : '';
 
     // Fetch orders from Airtable
-    const Airtable = require('airtable');
     const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
       .base(process.env.AIRTABLE_BASE_ID!);
 
-    const records = await base(ORDERS_TABLE_ID)
+    let records = await base(ORDERS_TABLE_ID)
       .select({
         filterByFormula: filterFormula || undefined,
-        maxRecords: limit,
+        maxRecords: eventRecordId ? undefined : limit, // Fetch all if filtering by event (will limit after)
         sort: [{ field: ORDERS_FIELD_IDS.order_date, direction: 'desc' }],
+        returnFieldsByFieldId: true,
       })
       .all();
+
+    // If filtering by event, filter by linked record
+    if (eventRecordId) {
+      records = records.filter((record) => {
+        const eventIds = record.get(ORDERS_FIELD_IDS.event_id) as string[] | undefined;
+        return eventIds && eventIds.includes(eventRecordId);
+      });
+      // Apply limit after filtering
+      records = records.slice(0, limit);
+    }
 
     // Transform records
     const orders: OrderRecord[] = records.map((record: any) => {
@@ -99,7 +128,7 @@ export async function GET(request: NextRequest) {
         if (lineItemsJson) {
           lineItems = JSON.parse(lineItemsJson);
         }
-      } catch (e) {
+      } catch {
         console.warn('Failed to parse line items for order:', record.id);
       }
 

@@ -11,10 +11,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import Airtable from 'airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
-import { ORDERS_TABLE_ID } from '@/lib/types/airtable';
+import { ORDERS_FIELD_IDS } from '@/lib/types/airtable';
+import {
+  getEventRecordIdByAccessCode,
+  getOrdersByEventRecordId,
+} from '@/lib/services/ordersHelper';
 
 interface LineItem {
   variant_id: string;
@@ -66,24 +69,38 @@ export async function GET(request: NextRequest): Promise<NextResponse<EventSumma
       );
     }
 
-    // Determine the actual event_id
-    // If passedEventId looks like a SimplyBook ID (numeric), generate the proper event_id
-    let eventId = passedEventId;
+    // Look up Event by access_code to get the Airtable record ID
+    // passedEventId is the numeric access_code from the admin booking view
+    let eventRecordId: string | null = null;
+
     if (/^\d+$/.test(passedEventId)) {
-      eventId = generateEventId(schoolName, 'MiniMusiker', eventDate);
-      console.log(`[orders/event-summary] Generated event_id: ${eventId} from SimplyBook ID: ${passedEventId}`);
+      // Numeric ID = access_code
+      eventRecordId = await getEventRecordIdByAccessCode(passedEventId);
+      console.log(`[orders/event-summary] Looking up by access_code: ${passedEventId} -> ${eventRecordId || 'not found'}`);
+    } else {
+      // Fallback: generate event_id and try to look it up
+      const eventId = generateEventId(schoolName, 'MiniMusiker', eventDate);
+      console.log(`[orders/event-summary] Generated event_id: ${eventId} from passedEventId: ${passedEventId}`);
+      // For now, we'll still use the access_code lookup since admin bookings always pass access_code
     }
 
-    // Initialize Airtable
-    const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
-      .base(process.env.AIRTABLE_BASE_ID!);
+    // If we couldn't find the event, return empty summary
+    if (!eventRecordId) {
+      console.warn(`[orders/event-summary] Event not found for identifier: ${passedEventId}`);
+      return NextResponse.json({
+        success: true,
+        data: {
+          totalOrders: 0,
+          totalRevenue: 0,
+          totalItems: 0,
+          itemsBreakdown: [],
+        },
+      });
+    }
 
-    // Query orders by booking_id
-    const orders = await base(ORDERS_TABLE_ID)
-      .select({
-        filterByFormula: `{booking_id} = "${eventId}"`,
-      })
-      .all();
+    // Query orders by event_id linked record field
+    const orders = await getOrdersByEventRecordId(eventRecordId);
+    console.log(`[orders/event-summary] Found ${orders.length} orders for event record: ${eventRecordId}`);
 
     // If no orders, return empty summary
     if (orders.length === 0) {
@@ -104,8 +121,9 @@ export async function GET(request: NextRequest): Promise<NextResponse<EventSumma
     let totalItems = 0;
 
     for (const order of orders) {
-      const totalAmount = order.fields.total_amount as number || 0;
-      const lineItemsJson = order.fields.line_items as string;
+      // Note: Helper uses returnFieldsByFieldId, so access via field IDs
+      const totalAmount = order.get(ORDERS_FIELD_IDS.total_amount) as number || 0;
+      const lineItemsJson = order.get(ORDERS_FIELD_IDS.line_items) as string;
 
       totalRevenue += Number(totalAmount);
 
