@@ -7,6 +7,7 @@ import { TeacherEventView, TeacherClassView, Song, ClassGroup } from '@/lib/type
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import InviteTeacherModal from '@/components/teacher/InviteTeacherModal';
 import AlbumLayoutModal from '@/components/teacher/AlbumLayoutModal';
+import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModal';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'Datum unbekannt';
@@ -538,183 +539,6 @@ function DeleteClassModal({ classId, className, onClose, onClassDeleted }: Delet
   );
 }
 
-interface CreateGroupModalProps {
-  eventId: string;
-  classes: TeacherClassView[];
-  onClose: () => void;
-  onGroupCreated: () => void;
-}
-
-function CreateGroupModal({ eventId, classes, onClose, onGroupCreated }: CreateGroupModalProps) {
-  const [groupName, setGroupName] = useState('');
-  const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  // Filter out default classes from selection
-  const availableClasses = classes.filter(c => !c.isDefault);
-
-  const toggleClass = (classId: string) => {
-    setSelectedClassIds(prev =>
-      prev.includes(classId)
-        ? prev.filter(id => id !== classId)
-        : [...prev, classId]
-    );
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!groupName.trim()) {
-      setError('Bitte geben Sie einen Gruppennamen ein');
-      return;
-    }
-
-    if (selectedClassIds.length < 2) {
-      setError('Bitte wählen Sie mindestens 2 Klassen aus');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError('');
-
-    try {
-      const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/groups`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          groupName: groupName.trim(),
-          memberClassIds: selectedClassIds,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Fehler beim Erstellen');
-      }
-
-      onGroupCreated();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Erstellen');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Klassen zusammen singen lassen</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <p className="text-sm font-medium text-blue-800">Gruppen-Aufnahme</p>
-              <p className="text-sm text-blue-700 mt-1">
-                Eine Gruppe erhält eine gemeinsame Audio-Aufnahme.
-                Fügen Sie nach der Erstellung Lieder zur Gruppe hinzu.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Gruppenname <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500"
-              placeholder="z.B. Klassen 2a + 2b, Schulchor, etc."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Klassen auswählen <span className="text-red-500">*</span>
-              <span className="font-normal text-gray-500 ml-1">(mindestens 2)</span>
-            </label>
-            {availableClasses.length < 2 ? (
-              <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                <p className="text-sm">Sie benötigen mindestens 2 Klassen, um eine Gruppe zu erstellen.</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {availableClasses.map((cls) => (
-                  <label
-                    key={cls.classId}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedClassIds.includes(cls.classId)
-                        ? 'border-pink-500 bg-pink-50'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedClassIds.includes(cls.classId)}
-                      onChange={() => toggleClass(cls.classId)}
-                      className="w-4 h-4 text-pink-600 border-gray-300 rounded focus:ring-pink-500"
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{cls.className}</p>
-                      <p className="text-sm text-gray-500">
-                        {cls.numChildren ? `${cls.numChildren} Kinder` : 'Keine Kinderanzahl'}
-                      </p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {selectedClassIds.length > 0 && (
-            <div className="text-sm text-gray-600">
-              <span className="font-medium">{selectedClassIds.length}</span> Klasse(n) ausgewählt
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              Abbrechen
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting || availableClasses.length < 2}
-              className="flex-1 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-50"
-            >
-              {isSubmitting ? 'Wird erstellt...' : 'Gruppe erstellen'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 interface DeleteGroupModalProps {
   groupId: string;
   groupName: string;
@@ -798,172 +622,6 @@ function DeleteGroupModal({ groupId, groupName, onClose, onGroupDeleted }: Delet
             {isDeleting ? 'Löschen...' : 'Löschen'}
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-interface AddCollectionModalProps {
-  eventId: string;
-  onClose: () => void;
-  onCollectionAdded: () => void;
-}
-
-function AddCollectionModal({ eventId, onClose, onCollectionAdded }: AddCollectionModalProps) {
-  const [name, setName] = useState('');
-  const [type, setType] = useState<'choir' | 'teacher_song'>('choir');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setError('Bitte geben Sie einen Namen ein');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError('');
-
-    try {
-      const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/collections`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          type,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Fehler beim Erstellen');
-      }
-
-      onCollectionAdded();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Erstellen');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-md w-full p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Sammlung hinzufügen</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <p className="text-sm font-medium text-blue-800">Was ist eine Sammlung?</p>
-              <p className="text-sm text-blue-700 mt-1">
-                Sammlungen enthalten Lieder, die für alle Eltern sichtbar sind - unabhängig von der Klasse ihres Kindes.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Typ <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-3">
-              <label
-                className={`flex-1 flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  type === 'choir'
-                    ? 'border-teal-500 bg-teal-50'
-                    : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="type"
-                  value="choir"
-                  checked={type === 'choir'}
-                  onChange={() => setType('choir')}
-                  className="w-4 h-4 text-teal-600 border-gray-300 focus:ring-teal-500"
-                />
-                <div>
-                  <p className="font-medium text-gray-900">Chor</p>
-                  <p className="text-xs text-gray-500">Gemeinsame Chorlieder</p>
-                </div>
-              </label>
-              <label
-                className={`flex-1 flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  type === 'teacher_song'
-                    ? 'border-orange-500 bg-orange-50'
-                    : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="type"
-                  value="teacher_song"
-                  checked={type === 'teacher_song'}
-                  onChange={() => setType('teacher_song')}
-                  className="w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500"
-                />
-                <div>
-                  <p className="font-medium text-gray-900">Lehrerlied</p>
-                  <p className="text-xs text-gray-500">Lieder der Lehrkräfte</p>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500"
-              placeholder={type === 'choir' ? 'z.B. Schulchor, Klasse 3+4 Chor' : 'z.B. Lehrerband, Abschiedslied'}
-            />
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              Abbrechen
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 ${
-                type === 'choir'
-                  ? 'bg-teal-600 hover:bg-teal-700'
-                  : 'bg-orange-600 hover:bg-orange-700'
-              }`}
-            >
-              {isSubmitting ? 'Wird erstellt...' : 'Erstellen'}
-            </button>
-          </div>
-        </form>
       </div>
     </div>
   );
@@ -1544,7 +1202,6 @@ export default function TeacherEventDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddClass, setShowAddClass] = useState(false);
-  const [showAddCollection, setShowAddCollection] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAlbumLayoutModal, setShowAlbumLayoutModal] = useState(false);
@@ -1754,19 +1411,9 @@ export default function TeacherEventDetailPage() {
             {isEditable && (
               <div className="flex gap-2 flex-wrap justify-end">
                 <button
-                  onClick={() => setShowAddCollection(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
-                  title="Chor oder Lehrerlied hinzufügen (sichtbar für alle Eltern)"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  Sammlung
-                </button>
-                <button
                   onClick={() => setShowCreateGroup(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
-                  title="Mehrere Klassen für eine gemeinsame Aufnahme gruppieren"
+                  title="Gruppe, Chor oder Lehrerlied hinzufügen"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1875,22 +1522,16 @@ export default function TeacherEventDetailPage() {
           />
         )}
 
-        {/* Add Collection Modal */}
-        {showAddCollection && (
-          <AddCollectionModal
-            eventId={event.eventId}
-            onClose={() => setShowAddCollection(false)}
-            onCollectionAdded={handleRefresh}
-          />
-        )}
-
-        {/* Create Group Modal */}
+        {/* Unified Add Modal (Group, Choir, Teacher Song) */}
         {showCreateGroup && (
-          <CreateGroupModal
+          <UnifiedAddModal
             eventId={event.eventId}
-            classes={event.classes}
+            availableClasses={event.classes
+              .filter(c => !c.isDefault)
+              .map(c => ({ classId: c.classId, className: c.className }))}
             onClose={() => setShowCreateGroup(false)}
-            onGroupCreated={handleRefresh}
+            onSuccess={handleRefresh}
+            apiBasePath="/api/teacher"
           />
         )}
 

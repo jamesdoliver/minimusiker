@@ -36,8 +36,8 @@ import AddSongModal from '@/components/shared/class-management/AddSongModal';
 import EditClassModal from '@/components/shared/class-management/EditClassModal';
 import EditSongModal from '@/components/shared/class-management/EditSongModal';
 import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfirmModal';
-import AddGroupModal from '@/components/shared/class-management/AddGroupModal';
 import EditGroupModal from '@/components/shared/class-management/EditGroupModal';
+import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModal';
 import EventActivityTimeline from '@/components/admin/EventActivityTimeline';
 import DateChangeModal from '@/components/admin/events/DateChangeModal';
 import AddTeacherModal from '@/components/admin/AddTeacherModal';
@@ -77,173 +77,6 @@ function formatDate(dateString: string): string {
   } catch {
     return dateString;
   }
-}
-
-// Add Collection Modal Component (for Choir and Teacher Song)
-interface AddCollectionModalProps {
-  eventId: string;
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-function AddCollectionModal({ eventId, onClose, onSuccess }: AddCollectionModalProps) {
-  const [name, setName] = useState('');
-  const [type, setType] = useState<'choir' | 'teacher_song'>('choir');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setError('Please enter a collection name');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError('');
-
-    try {
-      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/collections`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          type,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create collection');
-      }
-
-      onSuccess();
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create collection');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-md w-full p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Create Collection</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <p className="text-sm font-medium text-blue-800">What is a collection?</p>
-              <p className="text-sm text-blue-700 mt-1">
-                Collections contain songs visible to all parents - regardless of their child&apos;s class.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Type <span className="text-red-500">*</span>
-            </label>
-            <div className="flex gap-3">
-              <label
-                className={`flex-1 flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  type === 'choir'
-                    ? 'border-teal-500 bg-teal-50'
-                    : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="type"
-                  value="choir"
-                  checked={type === 'choir'}
-                  onChange={() => setType('choir')}
-                  className="w-4 h-4 text-teal-600 border-gray-300 focus:ring-teal-500"
-                />
-                <div>
-                  <p className="font-medium text-gray-900">Choir</p>
-                  <p className="text-xs text-gray-500">Group choir songs</p>
-                </div>
-              </label>
-              <label
-                className={`flex-1 flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  type === 'teacher_song'
-                    ? 'border-amber-500 bg-amber-50'
-                    : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="type"
-                  value="teacher_song"
-                  checked={type === 'teacher_song'}
-                  onChange={() => setType('teacher_song')}
-                  className="w-4 h-4 text-amber-600 border-gray-300 focus:ring-amber-500"
-                />
-                <div>
-                  <p className="font-medium text-gray-900">Teacher Song</p>
-                  <p className="text-xs text-gray-500">Teacher performances</p>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-              placeholder={type === 'choir' ? 'e.g. School Choir, Grade 3+4 Choir' : 'e.g. Teacher Band, Farewell Song'}
-            />
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`flex-1 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 ${
-                type === 'choir'
-                  ? 'bg-teal-600 hover:bg-teal-700'
-                  : 'bg-amber-600 hover:bg-amber-700'
-              }`}
-            >
-              {isSubmitting ? 'Creating...' : 'Create'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
 }
 
 export default function EventDetailPage() {
@@ -293,7 +126,6 @@ export default function EventDetailPage() {
   // Collection management state (Choir and Teacher Song)
   const [collections, setCollections] = useState<Collection[]>([]);
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
-  const [showAddCollection, setShowAddCollection] = useState(false);
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -408,10 +240,6 @@ export default function EventDetailPage() {
   };
 
   // Collection management handlers
-  const handleAddCollection = () => {
-    setShowAddCollection(true);
-  };
-
   const toggleCollectionExpanded = (classId: string) => {
     setExpandedCollections((prev) => {
       const next = new Set(prev);
@@ -1600,50 +1428,18 @@ export default function EventDetailPage() {
       </div>
 
       {/* Collections Section (Choir and Teacher Song) */}
+      {collections.length > 0 && (
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">
             Sammlungen
-            {collections.length > 0 && (
-              <span className="ml-2 text-sm font-normal text-gray-500">
-                ({collections.length} {collections.length === 1 ? 'Sammlung' : 'Sammlungen'})
-              </span>
-            )}
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              ({collections.length} {collections.length === 1 ? 'Sammlung' : 'Sammlungen'})
+            </span>
           </h2>
-          <button
-            onClick={handleAddCollection}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Sammlung erstellen
-          </button>
         </div>
 
-        {collections.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-emerald-100 p-8 text-center">
-            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Keine Sammlungen</h3>
-            <p className="text-gray-600 text-sm mb-4">
-              Erstellen Sie Chor- oder Lehrerlied-Sammlungen, die alle Eltern sehen können.
-            </p>
-            <button
-              onClick={handleAddCollection}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Erste Sammlung erstellen
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
+        <div className="space-y-4">
             {collections.map((collection) => {
               const isExpanded = expandedCollections.has(collection.classId);
               const songs = collection.songs || [];
@@ -1824,8 +1620,8 @@ export default function EventDetailPage() {
               );
             })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Activity Timeline */}
       <div className="mt-8">
@@ -1901,8 +1697,9 @@ export default function EventDetailPage() {
         />
       )}
 
+      {/* Unified Add Modal (Group, Choir, Teacher Song) */}
       {showAddGroup && event?.classes && (
-        <AddGroupModal
+        <UnifiedAddModal
           eventId={eventId}
           availableClasses={event.classes.map((c: any) => ({
             classId: c.classId,
@@ -1912,6 +1709,7 @@ export default function EventDetailPage() {
           onSuccess={() => {
             setShowAddGroup(false);
             fetchGroups();
+            fetchCollections();
           }}
           apiBasePath="/api/admin"
         />
@@ -2065,18 +1863,6 @@ export default function EventDetailPage() {
         />
       )}
 
-      {/* Add Collection Modal */}
-      {showAddCollection && (
-        <AddCollectionModal
-          eventId={eventId}
-          onClose={() => setShowAddCollection(false)}
-          onSuccess={() => {
-            setShowAddCollection(false);
-            fetchCollections();
-            toast.success('Collection created successfully');
-          }}
-        />
-      )}
     </div>
   );
 }
