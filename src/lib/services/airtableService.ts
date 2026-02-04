@@ -2647,29 +2647,31 @@ class AirtableService {
         const eventRecord = eventRecords[0];
         const eventFields = eventRecord.fields as Record<string, any>;
 
-        // Query class by class_id and verify it belongs to this event
-        // Use legacy_booking_id (text field) instead of event_id (linked record)
+        // Query class by class_id only, then verify it belongs to this event
+        // via the linked record relationship (event_id field contains event record IDs)
         const classRecords = await this.classesTable!.select({
-          filterByFormula: `AND(
-            {class_id} = '${classId.replace(/'/g, "\\'")}',
-            {legacy_booking_id} = '${bookingId.replace(/'/g, "\\'")}'
-          )`,
+          filterByFormula: `{class_id} = '${classId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
         if (classRecords.length === 0) {
-          // Log details for debugging
-          console.warn(`[getEventAndClassDetails] Class not found. bookingId: ${bookingId}, classId: ${classId}`);
-          // Try to find what classes exist for this event for debugging
-          const allClassesForEvent = await this.classesTable!.select({
-            filterByFormula: `{legacy_booking_id} = '${bookingId.replace(/'/g, "\\'")}'`,
-          }).all();
-          console.warn(`[getEventAndClassDetails] Classes for this event: ${allClassesForEvent.map(c => c.fields['class_id']).join(', ')}`);
+          // Class doesn't exist at all
+          console.warn(`[getEventAndClassDetails] Class not found for classId: ${classId}`);
           return null;
         }
 
         const classRecord = classRecords[0];
         const classFields = classRecord.fields as Record<string, any>;
+
+        // Verify the class belongs to this event via linked record relationship
+        // The event_id field is a linked record field containing event record IDs
+        const linkedEventIds = classFields['event_id'] as string[] | undefined;
+        if (!linkedEventIds || !linkedEventIds.includes(eventRecord.id)) {
+          // Class exists but doesn't belong to this event
+          console.warn(`[getEventAndClassDetails] Class ${classId} exists but is not linked to event ${bookingId} (event record: ${eventRecord.id})`);
+          console.warn(`[getEventAndClassDetails] Class linked events: ${JSON.stringify(linkedEventIds)}`);
+          return null;
+        }
 
         // Transform to EventClassDetails format
         // Note: Airtable returns field names, not field IDs
@@ -2883,12 +2885,27 @@ class AirtableService {
         const eventDetails = await Promise.all(
           events.map(async (event) => {
             const eventFields = event.fields as Record<string, any>;
-
-            // Fetch classes for this event using legacy_booking_id
             const eventBookingId = eventFields[EVENTS_FIELD_IDS.event_id] || '';
-            const classRecords = await this.classesTable!.select({
-              filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventBookingId.replace(/'/g, "\\'")}'`,
-            }).all();
+
+            // Get linked class record IDs from the Event's 'classes' field
+            // This is more reliable than querying by legacy_booking_id
+            const linkedClassIds = eventFields[EVENTS_FIELD_IDS.classes] as string[] | undefined;
+
+            // Fetch classes using the linked record IDs
+            let classRecords: Airtable.Record<FieldSet>[] = [];
+            if (linkedClassIds && linkedClassIds.length > 0) {
+              // Fetch each linked class record
+              classRecords = await Promise.all(
+                linkedClassIds.map(async (classRecordId) => {
+                  try {
+                    return await this.classesTable!.find(classRecordId);
+                  } catch (err) {
+                    console.warn(`[getSchoolEvents] Failed to fetch class ${classRecordId}:`, err);
+                    return null;
+                  }
+                })
+              ).then(records => records.filter((r): r is Airtable.Record<FieldSet> => r !== null));
+            }
 
             // For each class, count registered children
             const classesWithCounts = await Promise.all(
