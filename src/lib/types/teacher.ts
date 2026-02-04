@@ -59,6 +59,8 @@ export const AUDIO_FILES_FIELD_IDS = {
   // Admin approval fields
   approval_status: 'fldTODO_APPROVAL_STATUS', // Single Select - pending | approved | rejected
   rejection_comment: 'fldTODO_REJECTION_COMMENT', // Long Text - Admin's rejection reason
+  // Teacher approval for schulsong
+  teacher_approved_at: 'fldSyA8lWMV72xCuq', // Date/time - when teacher approved schulsong
 } as const;
 
 export const TEACHER_INVITES_FIELD_IDS = {
@@ -155,6 +157,8 @@ export interface AudioFile {
   // Admin approval fields
   approvalStatus?: AudioApprovalStatus; // pending | approved | rejected
   rejectionComment?: string; // Admin's rejection reason
+  // Teacher approval for schulsong
+  teacherApprovedAt?: string; // ISO datetime when teacher approved schulsong
 }
 
 /**
@@ -232,6 +236,7 @@ export interface TeacherEventView {
   bookingRecordId?: string; // Airtable record ID for setup navigation
   schoolAddress?: string; // From SchoolBookings - per-booking address
   schoolPhone?: string; // From SchoolBookings - per-booking phone
+  isSchulsong?: boolean; // Whether this event has a schulsong (for teacher approval workflow)
   // Progress tracking fields (for dashboard)
   progress?: {
     classesCount: number; // Number of classes created

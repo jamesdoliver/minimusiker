@@ -44,9 +44,19 @@ export async function GET(request: NextRequest) {
 
     // Fetch the full event to get both is_schulsong and is_minimusikertag
     const airtableService = getAirtableService();
+    const teacherService = getTeacherService();
     const event = await airtableService.getEventByEventId(eventId);
     const isSchulsong = event?.is_schulsong === true;
     const isMinimusikertag = event?.is_minimusikertag === true;
+    const allTracksApproved = event?.all_tracks_approved === true;
+
+    // Check if 7 days have passed since the event date
+    const eventDate = event?.event_date ? new Date(event.event_date) : null;
+    const sevenDaysAfter = eventDate ? new Date(eventDate) : null;
+    if (sevenDaysAfter) {
+      sevenDaysAfter.setDate(sevenDaysAfter.getDate() + 7);
+    }
+    const hasWaitingPeriodPassed = sevenDaysAfter ? new Date() >= sevenDaysAfter : false;
 
     if (!isSchulsong) {
       return NextResponse.json({
@@ -57,8 +67,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Find the schulsong audio file (is_schulsong=true, type=final, status=ready)
-    const teacherService = getTeacherService();
     const schulsongFile = await teacherService.getSchulsongAudioFile(eventId);
+
+    // Check teacher approval status
+    const teacherApproved = !!schulsongFile?.teacherApprovedAt;
+
+    // Audio is visible only when:
+    // 1. Admin approved ALL tracks AND
+    // 2. Teacher approved the schulsong AND
+    // 3. 7 days have passed since event date
+    const isVisible = allTracksApproved && teacherApproved && hasWaitingPeriodPassed;
 
     if (!schulsongFile) {
       return NextResponse.json({
@@ -91,6 +109,18 @@ export async function GET(request: NextRequest) {
         isSchulsong: true,
         isMinimusikertag,
         hasAudio: false,
+      });
+    }
+
+    // If audio exists but visibility conditions not met, indicate not yet visible
+    if (!isVisible) {
+      return NextResponse.json({
+        success: true,
+        isSchulsong: true,
+        isMinimusikertag,
+        hasAudio: false,
+        notYetVisible: true,
+        visibleAfter: sevenDaysAfter?.toISOString(),
       });
     }
 

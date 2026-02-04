@@ -787,6 +787,8 @@ class TeacherService {
       // Admin approval fields
       approvalStatus: (record.fields[AUDIO_FILES_FIELD_IDS.approval_status] || 'pending') as AudioApprovalStatus,
       rejectionComment: record.fields[AUDIO_FILES_FIELD_IDS.rejection_comment],
+      // Teacher approval for schulsong
+      teacherApprovedAt: record.fields.teacher_approved_at || record.fields[AUDIO_FILES_FIELD_IDS.teacher_approved_at],
     };
   }
 
@@ -2375,6 +2377,7 @@ class TeacherService {
           bookingRecordId: booking.id,
           schoolAddress: booking.schoolAddress,
           schoolPhone: booking.schoolPhone,
+          isSchulsong: eventRecord?.is_schulsong === true,
           progress: {
             classesCount,
             expectedClasses: undefined,
@@ -2615,6 +2618,7 @@ class TeacherService {
           status,
           simplybookHash: undefined,  // No booking for directly linked events
           bookingRecordId: undefined, // No booking for directly linked events
+          isSchulsong: linkedEvent.is_schulsong === true,
           progress: {
             classesCount,
             expectedClasses: undefined,
@@ -3263,6 +3267,123 @@ class TeacherService {
     } catch (error) {
       console.error('Error updating album order:', error);
       throw new Error(`Failed to update album order: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // =============================================================================
+  // SCHULSONG TEACHER APPROVAL
+  // =============================================================================
+
+  /**
+   * Get schulsong status for teacher portal
+   * Returns the current state of schulsong approval workflow
+   */
+  async getSchulsongStatusForTeacher(eventId: string): Promise<{
+    hasSchulsong: boolean;
+    status: 'waiting' | 'ready_for_approval' | 'approved';
+    audioUrl?: string;
+    teacherApprovedAt?: string;
+    availableToParentsAt?: string;
+  }> {
+    try {
+      // Get event to check if schulsong feature is enabled
+      const event = await getAirtableService().getEventByEventId(eventId);
+
+      if (!event?.is_schulsong) {
+        return { hasSchulsong: false, status: 'waiting' };
+      }
+
+      // Calculate when audio will be available to parents (event_date + 7 days)
+      let availableToParentsAt: string | undefined;
+      if (event.event_date) {
+        const eventDate = new Date(event.event_date);
+        eventDate.setDate(eventDate.getDate() + 7);
+        availableToParentsAt = eventDate.toISOString();
+      }
+
+      // Get all audio files for the event and find the schulsong file
+      const allFiles = await this.getAudioFilesByEventId(eventId);
+      const schulsongFile = allFiles.find(
+        (f) => f.isSchulsong && f.type === 'final' && f.status === 'ready'
+      );
+
+      // If no schulsong file OR admin hasn't approved it yet -> waiting
+      if (!schulsongFile || schulsongFile.approvalStatus !== 'approved') {
+        return {
+          hasSchulsong: true,
+          status: 'waiting',
+          availableToParentsAt,
+        };
+      }
+
+      // If teacher has approved -> approved
+      if (schulsongFile.teacherApprovedAt) {
+        return {
+          hasSchulsong: true,
+          status: 'approved',
+          audioUrl: schulsongFile.r2Key, // Will be signed by API route
+          teacherApprovedAt: schulsongFile.teacherApprovedAt,
+          availableToParentsAt,
+        };
+      }
+
+      // Admin approved but teacher hasn't -> ready_for_approval
+      return {
+        hasSchulsong: true,
+        status: 'ready_for_approval',
+        audioUrl: schulsongFile.r2Key, // Will be signed by API route
+        availableToParentsAt,
+      };
+    } catch (error) {
+      console.error('Error getting schulsong status for teacher:', error);
+      throw new Error(`Failed to get schulsong status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Teacher approves the schulsong
+   * Sets teacher_approved_at timestamp on the schulsong audio file
+   */
+  async approveSchulsongAsTeacher(eventId: string): Promise<{ approvedAt: string }> {
+    try {
+      // Get event to verify schulsong feature is enabled
+      const event = await getAirtableService().getEventByEventId(eventId);
+
+      if (!event?.is_schulsong) {
+        throw new Error('Event does not have schulsong feature enabled');
+      }
+
+      // Find the schulsong audio file
+      const allFiles = await this.getAudioFilesByEventId(eventId);
+      const schulsongFile = allFiles.find(
+        (f) => f.isSchulsong && f.type === 'final' && f.status === 'ready'
+      );
+
+      if (!schulsongFile) {
+        throw new Error('No schulsong audio file found');
+      }
+
+      // Verify admin has approved
+      if (schulsongFile.approvalStatus !== 'approved') {
+        throw new Error('Schulsong has not been approved by admin yet');
+      }
+
+      // Check if already approved by teacher
+      if (schulsongFile.teacherApprovedAt) {
+        return { approvedAt: schulsongFile.teacherApprovedAt };
+      }
+
+      // Set teacher_approved_at timestamp
+      const approvedAt = new Date().toISOString();
+      await this.base(AUDIO_FILES_TABLE).update(schulsongFile.id, {
+        [AUDIO_FILES_FIELD_IDS.teacher_approved_at]: approvedAt,
+      });
+
+      console.log(`[approveSchulsongAsTeacher] Teacher approved schulsong for event ${eventId}`);
+      return { approvedAt };
+    } catch (error) {
+      console.error('Error approving schulsong as teacher:', error);
+      throw new Error(`Failed to approve schulsong: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }

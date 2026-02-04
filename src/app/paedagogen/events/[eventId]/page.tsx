@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import InviteTeacherModal from '@/components/teacher/InviteTeacherModal';
 import AlbumLayoutModal from '@/components/teacher/AlbumLayoutModal';
 import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModal';
+import SchulsongApprovalSection from '@/components/teacher/SchulsongApprovalSection';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'Datum unbekannt';
@@ -1391,6 +1392,11 @@ export default function TeacherEventDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Schulsong Approval Section - Only shown for events with schulsong feature */}
+        {event.isSchulsong && (
+          <SchulsongApprovalSection eventId={event.eventId} />
+        )}
 
         {/* Classes Section */}
         <div>
