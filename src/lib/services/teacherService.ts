@@ -15,6 +15,7 @@ import {
   UpsertClassRequest,
   AudioFileType,
   AudioFileStatus,
+  AudioApprovalStatus,
   TeacherInvite,
   TEACHERS_TABLE_ID,
   SONGS_TABLE_ID,
@@ -782,6 +783,9 @@ class TeacherService {
       fileSizeBytes: record.fields.file_size_bytes || record.fields[AUDIO_FILES_FIELD_IDS.file_size_bytes],
       status: (record.fields.status || record.fields[AUDIO_FILES_FIELD_IDS.status] || 'pending') as AudioFileStatus,
       isSchulsong: record.fields.is_schulsong ?? record.fields[AUDIO_FILES_FIELD_IDS.is_schulsong] ?? false,
+      // Admin approval fields
+      approvalStatus: (record.fields[AUDIO_FILES_FIELD_IDS.approval_status] || 'pending') as AudioApprovalStatus,
+      rejectionComment: record.fields[AUDIO_FILES_FIELD_IDS.rejection_comment],
     };
   }
 
@@ -1050,6 +1054,31 @@ class TeacherService {
   }
 
   /**
+   * Update audio file approval status
+   * Used by admin to approve or reject final audio tracks
+   */
+  async updateAudioFileApprovalStatus(
+    audioFileId: string,
+    status: 'approved' | 'rejected',
+    comment?: string
+  ): Promise<AudioFile> {
+    try {
+      const updateData: Record<string, string> = {
+        [AUDIO_FILES_FIELD_IDS.approval_status]: status,
+      };
+      if (comment !== undefined) {
+        updateData[AUDIO_FILES_FIELD_IDS.rejection_comment] = comment || '';
+      }
+
+      const record = await this.base(AUDIO_FILES_TABLE).update(audioFileId, updateData);
+      return this.transformAudioFileRecord(record);
+    } catch (error) {
+      console.error('Error updating audio file approval status:', error);
+      throw new Error(`Failed to update approval status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Delete audio file record
    */
   async deleteAudioFile(audioFileId: string): Promise<void> {
@@ -1212,6 +1241,7 @@ class TeacherService {
     durationSeconds?: number;
     fileSizeBytes?: number;
     status?: AudioFileStatus;
+    isSchulsong?: boolean;
   }): Promise<AudioFile> {
     try {
       const fields: any = {
@@ -1226,6 +1256,7 @@ class TeacherService {
         duration_seconds: data.durationSeconds,
         file_size_bytes: data.fileSizeBytes,
         status: data.status || 'ready',
+        [AUDIO_FILES_FIELD_IDS.is_schulsong]: data.isSchulsong || false,
       };
 
       // If using normalized tables, also populate linked record fields

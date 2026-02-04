@@ -55,6 +55,9 @@ export const AUDIO_FILES_FIELD_IDS = {
   file_size_bytes: 'fldGo0LsZEcy9X9jx', // File size
   status: 'fldCAcEMu0IF1bWgz', // pending | processing | ready | error
   is_schulsong: 'fldaPVT59Gdf8hqPL', // Checkbox - marks audio file as the schulsong
+  // Admin approval fields
+  approval_status: 'fldTODO_APPROVAL_STATUS', // Single Select - pending | approved | rejected
+  rejection_comment: 'fldTODO_REJECTION_COMMENT', // Long Text - Admin's rejection reason
 } as const;
 
 export const TEACHER_INVITES_FIELD_IDS = {
@@ -128,6 +131,11 @@ export type AudioFileStatus = 'pending' | 'processing' | 'ready' | 'error';
  * AudioFile - Tracks audio files in R2 storage
  * Links to class and optionally to specific song
  */
+/**
+ * Approval status for audio files
+ */
+export type AudioApprovalStatus = 'pending' | 'approved' | 'rejected';
+
 export interface AudioFile {
   id: string; // Airtable record ID
   classId: string; // Which class this audio is for
@@ -142,6 +150,9 @@ export interface AudioFile {
   fileSizeBytes?: number; // File size
   status: AudioFileStatus; // pending | processing | ready | error
   isSchulsong?: boolean; // Whether this audio file is the schulsong for the event
+  // Admin approval fields
+  approvalStatus?: AudioApprovalStatus; // pending | approved | rejected
+  rejectionComment?: string; // Admin's rejection reason
 }
 
 /**
