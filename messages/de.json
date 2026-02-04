@@ -34,9 +34,9 @@
         "suggestion": "Bitte kontaktieren Sie Ihre Schule für den korrekten Registrierungslink."
       },
       "eventNotFound": {
-        "title": "Veranstaltung nicht gefunden",
-        "message": "Wir konnten diese Veranstaltung nicht in unserem System finden.",
-        "suggestion": "Die Veranstaltung wurde möglicherweise abgesagt. Bitte kontaktieren Sie Ihre Schule."
+        "title": "Ups, da ist etwas schiefgegangen.",
+        "message": "Unser System hat gerade einen kleinen Hänger, bitte probiere es später noch einmal.",
+        "suggestion": ""
       },
       "noClasses": {
         "title": "Registrierung noch nicht möglich",

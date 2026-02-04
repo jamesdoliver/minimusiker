@@ -2633,12 +2633,16 @@ class AirtableService {
       this.ensureNormalizedTablesInitialized();
       try {
         // Query event by event_id (booking_id)
+        // Note: Field IDs work in Airtable formulas but field names are more readable
         const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
+          filterByFormula: `{event_id} = '${bookingId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
 
-        if (eventRecords.length === 0) return null;
+        if (eventRecords.length === 0) {
+          console.warn(`[getEventAndClassDetails] Event not found for bookingId: ${bookingId}`);
+          return null;
+        }
 
         const eventRecord = eventRecords[0];
         const eventFields = eventRecord.fields as Record<string, any>;
@@ -2647,13 +2651,22 @@ class AirtableService {
         // Use legacy_booking_id (text field) instead of event_id (linked record)
         const classRecords = await this.classesTable!.select({
           filterByFormula: `AND(
-            {${CLASSES_FIELD_IDS.class_id}} = '${classId}',
-            {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${bookingId}'
+            {class_id} = '${classId.replace(/'/g, "\\'")}',
+            {legacy_booking_id} = '${bookingId.replace(/'/g, "\\'")}'
           )`,
           maxRecords: 1,
         }).firstPage();
 
-        if (classRecords.length === 0) return null;
+        if (classRecords.length === 0) {
+          // Log details for debugging
+          console.warn(`[getEventAndClassDetails] Class not found. bookingId: ${bookingId}, classId: ${classId}`);
+          // Try to find what classes exist for this event for debugging
+          const allClassesForEvent = await this.classesTable!.select({
+            filterByFormula: `{legacy_booking_id} = '${bookingId.replace(/'/g, "\\'")}'`,
+          }).all();
+          console.warn(`[getEventAndClassDetails] Classes for this event: ${allClassesForEvent.map(c => c.fields['class_id']).join(', ')}`);
+          return null;
+        }
 
         const classRecord = classRecords[0];
         const classFields = classRecord.fields as Record<string, any>;
@@ -2882,6 +2895,11 @@ class AirtableService {
               classRecords.map(async (classRecord) => {
                 const classFields = classRecord.fields as Record<string, any>;
                 const classId = classFields['class_id'] || classFields[CLASSES_FIELD_IDS.class_id];
+
+                // Debug: warn if classId is empty
+                if (!classId) {
+                  console.warn(`[getSchoolEvents] Empty classId for class record ${classRecord.id}. Fields:`, Object.keys(classFields));
+                }
 
                 // Count registrations for this class (excluding placeholders)
                 const registrations = await this.registrationsTable!.select({
