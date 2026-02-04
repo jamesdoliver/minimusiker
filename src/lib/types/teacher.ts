@@ -38,6 +38,7 @@ export const SONGS_FIELD_IDS = {
   artist: 'fld8kOwPLIscK51yH', // Original artist
   notes: 'fldZRLk0JP05VRDm6', // Special notes/arrangement details
   order: 'fld2RSJGY8pAqBaej', // Position in class setlist
+  album_order: 'fldj1xXfAhsaWcEE7', // Global album track order for printed album
   created_by: 'fldva8udIq88Syq0p', // Teacher record ID who added it
   created_at: 'fldw9R07novjsrvE5', // When song was added
 } as const;
@@ -113,6 +114,7 @@ export interface Song {
   artist?: string; // Original artist
   notes?: string; // Special notes/arrangement details
   order: number; // Position in class setlist (1, 2, 3...)
+  albumOrder?: number; // Global album track order for printed album
   createdBy?: string; // Teacher record ID who added it
   createdAt: string; // When song was added
 }

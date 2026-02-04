@@ -536,6 +536,7 @@ class TeacherService {
       artist: record.fields.artist || record.fields[SONGS_FIELD_IDS.artist],
       notes: record.fields.notes || record.fields[SONGS_FIELD_IDS.notes],
       order: record.fields.order || record.fields[SONGS_FIELD_IDS.order] || 1,
+      albumOrder: record.fields.album_order || record.fields[SONGS_FIELD_IDS.album_order],
       createdBy: record.fields.created_by || record.fields[SONGS_FIELD_IDS.created_by],
       createdAt: record.fields.created_at || record.fields[SONGS_FIELD_IDS.created_at] || record.createdTime,
     };
@@ -3070,6 +3071,200 @@ class TeacherService {
 
     return { classId: defaultClassId, recordId: created.id };
   }
+
+  // =============================================================================
+  // ALBUM ORDER METHODS
+  // =============================================================================
+
+  /**
+   * Get all songs for an event formatted for album layout modal
+   * Includes songs from regular classes, groups, and collection types (choir, teacher_song)
+   */
+  async getAlbumTracks(eventId: string, teacherEmail: string): Promise<AlbumTrack[]> {
+    try {
+      // Verify teacher has access to this event
+      const event = await this.getTeacherEventDetail(eventId, teacherEmail);
+      if (!event) {
+        throw new Error('Event not found or access denied');
+      }
+
+      // Get all songs for this event
+      const songs = await this.getSongsByEventId(eventId);
+
+      // Get all classes for this event to map class names
+      const classRecords = await this.base(CLASSES_TABLE_ID)
+        .select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}' `,
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      // Build class lookup map
+      const classMap = new Map<string, { name: string; type: ClassType; displayOrder: number }>();
+      for (const record of classRecords) {
+        const classId = record.fields[CLASSES_FIELD_IDS.class_id] as string;
+        const className = record.fields[CLASSES_FIELD_IDS.class_name] as string;
+        const classType = (record.fields[CLASSES_FIELD_IDS.class_type] as ClassType) || 'regular';
+        const displayOrder = (record.fields[CLASSES_FIELD_IDS.display_order] as number) || 0;
+        classMap.set(classId, { name: className, type: classType, displayOrder });
+      }
+
+      // Get groups for this event
+      const groupRecords = await this.base(GROUPS_TABLE_ID)
+        .select({
+          filterByFormula: `SEARCH('${eventId.replace(/'/g, "\\'")}', ARRAYJOIN({${GROUPS_FIELD_IDS.event_id}}))`,
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      // Add groups to class map
+      for (const record of groupRecords) {
+        const groupId = record.fields[GROUPS_FIELD_IDS.group_id] as string;
+        const groupName = record.fields[GROUPS_FIELD_IDS.group_name] as string;
+        classMap.set(groupId, { name: groupName, type: 'regular', displayOrder: 999 }); // Groups at end by default
+      }
+
+      // Build album tracks array
+      const tracks: AlbumTrack[] = [];
+      let defaultOrder = 1;
+
+      for (const song of songs) {
+        const classInfo = classMap.get(song.classId);
+        const className = classInfo?.name || 'Unknown';
+        const classType = classInfo?.type || 'regular';
+
+        tracks.push({
+          songId: song.id,
+          songTitle: song.title,
+          classId: song.classId,
+          className,
+          classType,
+          albumOrder: song.albumOrder || defaultOrder,
+          originalTitle: song.title,
+          originalClassName: className,
+        });
+
+        defaultOrder++;
+      }
+
+      // Sort by album order
+      tracks.sort((a, b) => a.albumOrder - b.albumOrder);
+
+      // Renumber to ensure sequential ordering
+      tracks.forEach((track, index) => {
+        track.albumOrder = index + 1;
+      });
+
+      return tracks;
+    } catch (error) {
+      console.error('Error getting album tracks:', error);
+      throw new Error(`Failed to get album tracks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Bulk update album order and optionally song titles/class names
+   * Also updates class display_order based on first song position
+   */
+  async updateAlbumOrder(eventId: string, teacherEmail: string, tracks: AlbumTrackUpdate[]): Promise<void> {
+    try {
+      // Verify teacher has access to this event
+      const event = await this.getTeacherEventDetail(eventId, teacherEmail);
+      if (!event) {
+        throw new Error('Event not found or access denied');
+      }
+
+      // Update songs with new album order and optional title changes
+      for (const track of tracks) {
+        const updateData: { [key: string]: string | number } = {
+          [SONGS_FIELD_IDS.album_order]: track.albumOrder,
+        };
+
+        if (track.title !== undefined) {
+          updateData[SONGS_FIELD_IDS.title] = track.title;
+        }
+
+        await this.base(SONGS_TABLE).update(track.songId, updateData as Airtable.FieldSet);
+      }
+
+      // Update class names if changed
+      const classUpdates = new Map<string, string>();
+      for (const track of tracks) {
+        if (track.className !== undefined && !track.classId.startsWith('group_')) {
+          classUpdates.set(track.classId, track.className);
+        }
+      }
+
+      for (const [classId, className] of classUpdates) {
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+            maxRecords: 1,
+          })
+          .firstPage();
+
+        if (classRecords.length > 0) {
+          await this.base(CLASSES_TABLE_ID).update(classRecords[0].id, {
+            [CLASSES_FIELD_IDS.class_name]: className,
+          });
+        }
+      }
+
+      // Update group names if changed
+      for (const track of tracks) {
+        if (track.className !== undefined && track.classId.startsWith('group_')) {
+          const groupRecords = await this.base(GROUPS_TABLE_ID)
+            .select({
+              filterByFormula: `{${GROUPS_FIELD_IDS.group_id}} = '${track.classId.replace(/'/g, "\\'")}'`,
+              maxRecords: 1,
+            })
+            .firstPage();
+
+          if (groupRecords.length > 0) {
+            await this.base(GROUPS_TABLE_ID).update(groupRecords[0].id, {
+              [GROUPS_FIELD_IDS.group_name]: track.className,
+            });
+          }
+        }
+      }
+
+      // Calculate class display order based on first song position
+      const classFirstPosition = new Map<string, number>();
+      for (const track of tracks) {
+        if (!classFirstPosition.has(track.classId)) {
+          classFirstPosition.set(track.classId, track.albumOrder);
+        } else {
+          const current = classFirstPosition.get(track.classId)!;
+          if (track.albumOrder < current) {
+            classFirstPosition.set(track.classId, track.albumOrder);
+          }
+        }
+      }
+
+      // Update class display_order
+      for (const [classId, displayOrder] of classFirstPosition) {
+        if (classId.startsWith('group_')) continue; // Groups don't have display_order
+
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+            maxRecords: 1,
+          })
+          .firstPage();
+
+        if (classRecords.length > 0) {
+          await this.base(CLASSES_TABLE_ID).update(classRecords[0].id, {
+            [CLASSES_FIELD_IDS.display_order]: displayOrder,
+          });
+        }
+      }
+
+      console.log(`[updateAlbumOrder] Updated ${tracks.length} tracks for event ${eventId}`);
+    } catch (error) {
+      console.error('Error updating album order:', error);
+      throw new Error(`Failed to update album order: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 }
 
 // Export singleton instance getter
@@ -3084,6 +3279,35 @@ export async function updateTeacherSchoolInfo(
 ): Promise<void> {
   const service = TeacherService.getInstance();
   return service.updateTeacherSchoolInfo(teacherEmail, data);
+}
+
+// =============================================================================
+// ALBUM ORDER OPERATIONS
+// =============================================================================
+
+/**
+ * Track data for album layout modal
+ */
+export interface AlbumTrack {
+  songId: string;
+  songTitle: string;
+  classId: string;
+  className: string;
+  classType: ClassType;
+  albumOrder: number;
+  originalTitle: string;
+  originalClassName: string;
+}
+
+/**
+ * Track update data from album layout modal
+ */
+export interface AlbumTrackUpdate {
+  songId: string;
+  albumOrder: number;
+  title?: string;
+  classId: string;
+  className?: string;
 }
 
 // Export standalone function for updating school booking info
@@ -3114,5 +3338,8 @@ export function updateSchoolBookingById(
   const service = TeacherService.getInstance();
   return service.updateSchoolBookingById(bookingId, data);
 }
+
+// Re-export ClassType for AlbumTrack interface consumers
+export type { ClassType } from '@/lib/types/airtable';
 
 export default TeacherService;

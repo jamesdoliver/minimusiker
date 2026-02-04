@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { TeacherEventView, TeacherClassView, Song, ClassGroup } from '@/lib/types/teacher';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import InviteTeacherModal from '@/components/teacher/InviteTeacherModal';
+import AlbumLayoutModal from '@/components/teacher/AlbumLayoutModal';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'Datum unbekannt';
@@ -1546,6 +1547,7 @@ export default function TeacherEventDetailPage() {
   const [showAddCollection, setShowAddCollection] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showAlbumLayoutModal, setShowAlbumLayoutModal] = useState(false);
 
   const eventId = params.eventId as string;
 
@@ -1736,7 +1738,19 @@ export default function TeacherEventDetailPage() {
         {/* Classes Section */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Klassen & Lieder</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold text-gray-900">Klassen & Lieder</h2>
+              <button
+                onClick={() => setShowAlbumLayoutModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                title="Album-Reihenfolge für das gedruckte Album festlegen"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+                Album-Reihenfolge
+              </button>
+            </div>
             {isEditable && (
               <div className="flex gap-2 flex-wrap justify-end">
                 <button
@@ -1886,6 +1900,15 @@ export default function TeacherEventDetailPage() {
             eventId={event.eventId}
             schoolName={event.schoolName}
             onClose={() => setShowInviteModal(false)}
+          />
+        )}
+
+        {/* Album Layout Modal */}
+        {showAlbumLayoutModal && (
+          <AlbumLayoutModal
+            eventId={event.eventId}
+            onClose={() => setShowAlbumLayoutModal(false)}
+            onSave={handleRefresh}
           />
         )}
       </div>

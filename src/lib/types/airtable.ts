@@ -568,6 +568,7 @@ export const CLASSES_FIELD_IDS = {
   is_default: 'fldJouWNH4fudWQl0',      // Auto-created "Alle Kinder" catch-all class
   registrations: 'fld9hLZ4aNOw4v75X',   // Linked record → Registrations (reverse lookup)
   class_type: 'fldpYd9tFi09joNPV',       // Single select: regular | choir | teacher_song
+  display_order: 'fldLN2dUuEeaCrQqi',      // Order in which class appears in teacher portal
 } as const;
 
 // Groups Table - "Classes Singing Together" - groups of classes that perform together
@@ -711,6 +712,7 @@ export interface Class {
   created_at: string;
   legacy_booking_id?: string;           // Original booking_id from parent_journey_table
   class_type?: ClassType;               // regular | choir | teacher_song (defaults to regular)
+  display_order?: number;               // Order in which class appears in teacher portal
 }
 
 /**
