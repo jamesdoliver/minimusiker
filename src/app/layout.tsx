@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Grandstander, Rubik, Amaranth, Playfair_Display } from 'next/font/google';
 import { Toaster } from 'sonner';
 import FooterWrapper from '@/components/shared/FooterWrapper';
+import ErrorBoundary from '@/components/shared/ErrorBoundary';
 import './globals.css';
 
 // MiniMusiker Brand Fonts
@@ -72,12 +73,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${rubik.variable} ${grandstander.variable} ${amaranth.variable} ${playfair.variable} ${rubik.className}`}>
-        <div className="min-h-screen bg-background flex flex-col">
-          <main className="flex-1">
-            {children}
-          </main>
-          <FooterWrapper />
-        </div>
+        <ErrorBoundary>
+          <div className="min-h-screen bg-background flex flex-col">
+            <main className="flex-1">
+              {children}
+            </main>
+            <FooterWrapper />
+          </div>
+        </ErrorBoundary>
         <Toaster
           position="bottom-right"
           toastOptions={{

@@ -16,7 +16,7 @@ import SchulsongSection from '@/components/parent-portal/SchulsongSection';
 import { CartProvider } from '@/lib/contexts/CartContext';
 import { CartDrawer } from '@/components/shop';
 import { ManageChildren } from '@/components/parent';
-import { ParentSession, ParentPortalData } from '@/lib/types';
+import { ParentSession } from '@/lib/types';
 
 // Audio status response type
 interface AudioStatus {
@@ -64,7 +64,6 @@ function ParentPortalContent() {
   const tBanner = useTranslations('schoolBanner');
   const tPreview = useTranslations('recordingPreview');
   const [session, setSession] = useState<ParentSession | null>(null);
-  const [portalData, setPortalData] = useState<ParentPortalData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
@@ -115,23 +114,6 @@ function ParentPortalContent() {
         });
         setSession(sessionData.data);
 
-        // Load parent portal data
-        const portalResponse = await fetch(
-          `/api/airtable/get-parent-data?accessToken=session`,
-          {
-            credentials: 'include',
-            headers: {
-              'X-Parent-ID': sessionData.data.parentId,
-            },
-          }
-        );
-
-        if (portalResponse.ok) {
-          const portal = await portalResponse.json();
-          if (portal.success) {
-            setPortalData(portal.data);
-          }
-        }
       }
     } catch (err) {
       console.error('Error loading portal:', err);
@@ -171,7 +153,7 @@ function ParentPortalContent() {
   const children = session?.children || [];
   const selectedChild = children[selectedChildIndex] || null;
   const eventId = selectedChild?.eventId || session?.eventId || '';
-  const classId = selectedChild?.classId || portalData?.parentJourney?.class_id || '';
+  const classId = selectedChild?.classId || '';
 
   // Fetch audio status when class or event changes (MUST be before early returns)
   useEffect(() => {
@@ -405,11 +387,11 @@ function ParentPortalContent() {
 
   // Use data from session and portal data (children, selectedChild, eventId, classId already calculated above)
   const hasMultipleChildren = children.length > 1;
-  const schoolName = selectedChild?.schoolName || session?.schoolName || portalData?.parentJourney?.school_name || 'Springfield Elementary School';
+  const schoolName = selectedChild?.schoolName || session?.schoolName || 'Springfield Elementary School';
   const schoolColor = '#94B8B3'; // Default sage color
-  const eventType = selectedChild?.eventType || session?.eventType || portalData?.parentJourney?.event_type || 'Minimusiker';
-  const eventDate = selectedChild?.bookingDate || session?.bookingDate || portalData?.parentJourney?.booking_date || '2024-12-15';
-  const className = selectedChild?.class || portalData?.parentJourney?.class || '';
+  const eventType = selectedChild?.eventType || session?.eventType || 'Minimusiker';
+  const eventDate = selectedChild?.bookingDate || session?.bookingDate || '2024-12-15';
+  const className = selectedChild?.class || '';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -919,7 +901,7 @@ function ParentPortalContent() {
             classId={classId}
             parentEmail={session.email}
             parentFirstName={session.firstName}
-            parentPhone={portalData?.parentJourney?.parent_telephone || ''}
+            parentPhone=""
             onDataChange={verifySessionAndLoadData}
           />
         </section>
