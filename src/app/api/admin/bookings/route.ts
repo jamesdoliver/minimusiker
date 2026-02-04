@@ -42,6 +42,9 @@ export interface BookingWithDetails {
   // Edit booking modal fields
   secondaryContacts?: SecondaryContact[];  // Additional contacts stored as JSON
   simplybookClientId?: string;   // SimplyBook client ID for editClient sync
+  // Registration tracking
+  registrationCount?: number;    // Count of registrations for linked event
+  eventRecordId?: string;        // Event record ID for registration lookup
 }
 
 // Staff member for dropdown
@@ -209,6 +212,8 @@ export async function GET(request: NextRequest) {
               // Staff assignment
               assignedStaff: event.assigned_staff,
               assignedStaffNames: event.assigned_staff?.map(id => staffMap.get(id)).filter(Boolean) as string[],
+              // Event record ID for registration lookup
+              eventRecordId: event.id,
             };
           }
         } catch (error) {
@@ -219,8 +224,22 @@ export async function GET(request: NextRequest) {
       })
     );
 
+    // Collect event record IDs for registration count lookup
+    const eventRecordIds = bookingsWithAccessCodes
+      .map(b => b.eventRecordId)
+      .filter((id): id is string => !!id);
+
+    // Fetch registration counts in a single batch query
+    const registrationCounts = await airtableService.getRegistrationCountsByEventIds(eventRecordIds);
+
+    // Merge registration counts into bookings
+    const bookingsWithRegistrations = bookingsWithAccessCodes.map(booking => ({
+      ...booking,
+      registrationCount: booking.eventRecordId ? registrationCounts.get(booking.eventRecordId) || 0 : 0,
+    }));
+
     // Filter out deleted events (soft-deleted via Event status)
-    const visibleBookings = bookingsWithAccessCodes.filter(
+    const visibleBookings = bookingsWithRegistrations.filter(
       (booking) => booking.eventStatus !== 'Deleted'
     );
 

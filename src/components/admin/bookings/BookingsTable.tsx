@@ -6,6 +6,7 @@ import BookingStatusBadge from './BookingStatusBadge';
 import BookingDetailsBreakdown from './BookingDetailsBreakdown';
 import StatusCircle from './StatusCircle';
 import EventTypeCircles from './EventTypeCircles';
+import { RegistrationProgress } from './RegistrationProgress';
 
 // Computed status type for styling
 type ComputedStatus = 'confirmed' | 'completed' | 'onHold';
@@ -96,7 +97,7 @@ export default function BookingsTable({ bookings, onEventDeleted, getComputedSta
                 School Name
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Contact
+                Registration
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Children
@@ -137,8 +138,10 @@ export default function BookingsTable({ bookings, onEventDeleted, getComputedSta
                       <div className="text-xs text-gray-500">ID: {booking.code}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">{booking.contactPerson || '-'}</div>
-                      <div className="text-xs text-gray-500">{booking.contactEmail || ''}</div>
+                      <RegistrationProgress
+                        registered={booking.registrationCount || 0}
+                        estimated={booking.numberOfChildren}
+                      />
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className="text-sm font-medium text-gray-900">

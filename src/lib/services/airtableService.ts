@@ -5217,6 +5217,44 @@ class AirtableService {
   }
 
   /**
+   * Get registration counts for multiple events in a single query
+   * @param eventRecordIds Array of Event record IDs (not event_id strings)
+   * @returns Map of event record ID to registration count
+   */
+  async getRegistrationCountsByEventIds(eventRecordIds: string[]): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+
+    if (eventRecordIds.length === 0) return counts;
+
+    // Initialize all event IDs with 0
+    eventRecordIds.forEach(id => counts.set(id, 0));
+
+    try {
+      // Query all registrations and filter in JS (Airtable formula limitations with linked records)
+      const records = await this.base(REGISTRATIONS_TABLE_ID)
+        .select({
+          fields: [REGISTRATIONS_FIELD_IDS.event_id],
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      // Count registrations per event
+      for (const record of records) {
+        const eventIdArray = record.fields[REGISTRATIONS_FIELD_IDS.event_id] as string[] || [];
+        for (const eventId of eventIdArray) {
+          if (counts.has(eventId)) {
+            counts.set(eventId, (counts.get(eventId) || 0) + 1);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching registration counts:', error);
+    }
+
+    return counts;
+  }
+
+  /**
    * Transform an Airtable Event record to our Event type
    * Note: record.get() uses field NAMES, not field IDs
    */
