@@ -9,6 +9,9 @@ import RefreshBookingModal from './RefreshBookingModal';
 import OrderOverviewModal from './OrderOverviewModal';
 import EditBookingModal from './EditBookingModal';
 import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfirmModal';
+import StatusLight from './StatusLight';
+import AudioApprovalModal from './AudioApprovalModal';
+import { AudioStatusData } from '@/lib/types/audio-status';
 import { toast } from 'sonner';
 
 interface BookingDetailsBreakdownProps {
@@ -33,6 +36,29 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [audioStatus, setAudioStatus] = useState<AudioStatusData | null>(null);
+  const [audioStatusLoading, setAudioStatusLoading] = useState(false);
+  const [showAudioApprovalModal, setShowAudioApprovalModal] = useState(false);
+
+  // Fetch audio status on mount
+  useEffect(() => {
+    const fetchAudioStatus = async () => {
+      setAudioStatusLoading(true);
+      try {
+        const response = await fetch(`/api/admin/events/${encodeURIComponent(booking.code)}/audio-status`);
+        if (response.ok) {
+          const data = await response.json();
+          setAudioStatus(data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching audio status:', error);
+      } finally {
+        setAudioStatusLoading(false);
+      }
+    };
+
+    fetchAudioStatus();
+  }, [booking.code]);
 
   // Generate QR code on mount
   useEffect(() => {
@@ -336,13 +362,61 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         </div>
       </div>
 
+      {/* Audio Status Section */}
+      <div className="mt-6 pt-4 border-t border-gray-200">
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">Audio Status</h4>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          {audioStatusLoading ? (
+            <div className="flex items-center gap-2 text-gray-500">
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="text-sm">Loading audio status...</span>
+            </div>
+          ) : audioStatus ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <StatusLight
+                  label="Staff Upload"
+                  isComplete={audioStatus.staffUploadComplete}
+                />
+                <StatusLight
+                  label="Mix Master"
+                  isComplete={audioStatus.mixMasterUploadComplete}
+                />
+              </div>
+              <button
+                onClick={() => setShowAudioApprovalModal(true)}
+                disabled={!audioStatus.staffUploadComplete || !audioStatus.mixMasterUploadComplete}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  audioStatus.approvalStatus === 'approved'
+                    ? 'bg-green-500 text-white hover:bg-green-600'
+                    : audioStatus.approvalStatus === 'ready_for_approval'
+                    ? 'bg-orange-500 text-white hover:bg-orange-600'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                {audioStatus.approvalStatus === 'approved'
+                  ? 'Approved ✓'
+                  : audioStatus.approvalStatus === 'ready_for_approval'
+                  ? 'Review & Approve'
+                  : 'Pending'}
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Unable to load audio status</p>
+          )}
+        </div>
+      </div>
+
       {/* Actions Row */}
       <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between">
         {/* Left side - Delete button */}
         <div>
           <button
             onClick={() => setIsDeleteModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -355,7 +429,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         <div className="flex gap-3">
         <button
           onClick={() => setShowEditModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -365,7 +439,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         <button
           onClick={() => handleRefresh()}
           disabled={isRefreshing}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
         >
           {isRefreshing ? (
             <>
@@ -386,7 +460,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         </button>
         <button
           onClick={() => setShowPrintablesModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#F4A261] text-white rounded-lg hover:bg-[#E07B3A] transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-[#F4A261] text-white rounded-lg hover:bg-[#E07B3A] transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -395,7 +469,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         </button>
         <button
           onClick={() => setShowOrdersModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -404,7 +478,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         </button>
         <Link
           href={`/admin/events/${booking.code}`}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#94B8B3] text-white rounded-lg hover:bg-[#7da39e] transition-colors"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-[#94B8B3] text-white rounded-lg hover:bg-[#7da39e] transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -473,6 +547,29 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         onSuccess={() => {
           // Reload page to show updated data
           window.location.reload();
+        }}
+      />
+
+      {/* Audio Approval Modal */}
+      <AudioApprovalModal
+        isOpen={showAudioApprovalModal}
+        onClose={() => setShowAudioApprovalModal(false)}
+        eventId={booking.code}
+        schoolName={booking.schoolName}
+        onApprovalComplete={() => {
+          // Refresh audio status after approval
+          const fetchAudioStatus = async () => {
+            try {
+              const response = await fetch(`/api/admin/events/${encodeURIComponent(booking.code)}/audio-status`);
+              if (response.ok) {
+                const data = await response.json();
+                setAudioStatus(data.data);
+              }
+            } catch (error) {
+              console.error('Error refreshing audio status:', error);
+            }
+          };
+          fetchAudioStatus();
         }}
       />
     </div>
