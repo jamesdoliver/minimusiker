@@ -480,6 +480,15 @@ export async function PATCH(
 
       updatedEvent = await airtableService.updateEventFields(eventRecordId, fieldUpdates);
 
+      // Auto-assign/remove engineers based on schulsong toggle
+      if (body.is_schulsong !== undefined) {
+        try {
+          await airtableService.ensureDefaultEngineers(eventRecordId, body.is_schulsong);
+        } catch (engineerError) {
+          console.warn('Could not update engineer assignments:', engineerError);
+        }
+      }
+
       // Send cancellation notification if status changed to Cancelled
       if (hasStatusUpdate && body.status === 'Cancelled' && existingEvent?.status !== 'Cancelled') {
         try {

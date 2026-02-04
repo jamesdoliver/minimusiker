@@ -1,4 +1,5 @@
 import Airtable, { FieldSet, Table } from 'airtable';
+import { ENGINEER_IDS, getEngineerIdForTrack } from '@/lib/config/engineers';
 import {
   ParentJourney,
   AirtableRecord,
@@ -2156,7 +2157,8 @@ class AirtableService {
             totalParents: registrations.length,
             assignedStaffId,
             assignedStaffName,
-            assignedEngineerId: assignedEngineerIds?.[0],
+            assignedEngineerIds: assignedEngineerIds || [],
+            assignedEngineerId: assignedEngineerIds?.[0],  // Backwards compat
           });
         }
 
@@ -2341,6 +2343,7 @@ class AirtableService {
         const assignedStaffIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_staff] as string[];
         const assignedStaffId = assignedStaffIds?.[0];
         const simplybookBookingIds = eventRecord.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[];
+        const isSchulsong = eventRecord.fields[EVENTS_FIELD_IDS.is_schulsong] as boolean || false;
 
         // Get contact person from linked SchoolBooking as fallback
         let contactPerson: string | undefined;
@@ -2441,6 +2444,7 @@ class AirtableService {
           totalParents,
           assignedStaffId,
           assignedStaffName,
+          isSchulsong,
           classes,
           overallRegistrationRate: totalChildren > 0
             ? Math.round((totalParents / totalChildren) * 100)
@@ -3761,6 +3765,103 @@ class AirtableService {
   }
 
   /**
+   * Auto-assign engineer to event based on schulsong status
+   * - If hasSchulsongTracks is true, assign Micha (ENGINEER_IDS.MICHA)
+   * - Otherwise, assign Jakob (ENGINEER_IDS.JAKOB)
+   * - Does NOT override existing assignment
+   * @param eventId - The event_id to assign
+   * @param hasSchulsongTracks - Whether the upload contains schulsong tracks
+   * @returns true if assignment was made, false if already assigned or no engineer configured
+   */
+  async autoAssignEngineerForUpload(eventId: string, hasSchulsongTracks: boolean): Promise<boolean> {
+    if (!this.useNormalizedTables()) {
+      console.log('[autoAssignEngineer] Skipping - normalized tables not enabled');
+      return false;
+    }
+
+    try {
+      // Find the event
+      const events = await this.eventsTable!.select({
+        filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (events.length === 0) {
+        console.log(`[autoAssignEngineer] Event not found: ${eventId}`);
+        return false;
+      }
+
+      const eventRecord = events[0];
+      const existingEngineer = eventRecord.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[] | undefined;
+
+      // Don't override existing assignment
+      if (existingEngineer && existingEngineer.length > 0) {
+        console.log(`[autoAssignEngineer] Event ${eventId} already has engineer assigned: ${existingEngineer[0]}`);
+        return false;
+      }
+
+      // Get appropriate engineer based on schulsong flag
+      const engineerId = getEngineerIdForTrack(hasSchulsongTracks);
+
+      if (!engineerId) {
+        console.log(`[autoAssignEngineer] No engineer ID configured for schulsong=${hasSchulsongTracks}`);
+        return false;
+      }
+
+      // Assign the engineer
+      await this.eventsTable!.update(eventRecord.id, {
+        [EVENTS_FIELD_IDS.assigned_engineer]: [engineerId],
+      });
+
+      console.log(`[autoAssignEngineer] Assigned engineer ${engineerId} to event ${eventId} (schulsong=${hasSchulsongTracks})`);
+      return true;
+    } catch (error) {
+      console.error('[autoAssignEngineer] Error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Update event's approval status fields
+   * Called after admin approves/rejects tracks
+   * @param eventId - The event_id
+   * @param allTracksApproved - Whether all final tracks are approved
+   */
+  async updateEventApprovalStatus(eventId: string, allTracksApproved: boolean): Promise<void> {
+    if (!this.useNormalizedTables()) {
+      console.log('[updateEventApprovalStatus] Skipping - normalized tables not enabled');
+      return;
+    }
+
+    try {
+      // Find the event
+      const events = await this.eventsTable!.select({
+        filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (events.length === 0) {
+        console.log(`[updateEventApprovalStatus] Event not found: ${eventId}`);
+        return;
+      }
+
+      const eventRecord = events[0];
+      const adminApprovalStatus = allTracksApproved ? 'approved' : 'ready_for_approval';
+
+      // Update the event record
+      await this.eventsTable!.update(eventRecord.id, {
+        [EVENTS_FIELD_IDS.all_tracks_approved]: allTracksApproved,
+        [EVENTS_FIELD_IDS.admin_approval_status]: adminApprovalStatus,
+      });
+
+      console.log(`[updateEventApprovalStatus] Updated event ${eventId}: all_tracks_approved=${allTracksApproved}, status=${adminApprovalStatus}`);
+    } catch (error) {
+      console.error('[updateEventApprovalStatus] Error:', error);
+      throw new Error(`Failed to update event approval status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Get school event summaries filtered by assigned engineer
    * Used for Engineer Portal to show only assigned events
    */
@@ -3770,8 +3871,8 @@ class AirtableService {
       try {
         const allEvents = await this.getSchoolEventSummaries();
 
-        // Filter to only events assigned to this engineer
-        return allEvents.filter(event => event.assignedEngineerId === engineerId);
+        // Filter to only events assigned to this engineer (check array membership)
+        return allEvents.filter(event => event.assignedEngineerIds?.includes(engineerId));
       } catch (error) {
         console.error('Error fetching engineer event summaries:', error);
         throw new Error(`Failed to fetch engineer events: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -4950,6 +5051,117 @@ class AirtableService {
     return events;
   }
 
+  // ======================================================================
+  // ENGINEER AUTO-ASSIGNMENT METHODS
+  // ======================================================================
+
+  /**
+   * Add an engineer to an event (tracks auto vs manual assignment)
+   *
+   * @param eventRecordId - Airtable record ID of the Event
+   * @param engineerId - Personen record ID of the engineer
+   * @param isAutoAssigned - Whether this is an automatic assignment (vs manual)
+   */
+  async addEngineerToEvent(
+    eventRecordId: string,
+    engineerId: string,
+    isAutoAssigned: boolean = false
+  ): Promise<void> {
+    try {
+      const record = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
+      const currentEngineers = record.get('assigned_engineer') as string[] || [];
+      const autoAssigned = record.get('auto_assigned_engineers') as string[] || [];
+
+      // Only add if not already assigned
+      if (!currentEngineers.includes(engineerId)) {
+        const updates: Record<string, string[]> = {
+          [EVENTS_FIELD_IDS.assigned_engineer]: [...currentEngineers, engineerId],
+        };
+
+        // Track auto-assignment if applicable
+        if (isAutoAssigned && !autoAssigned.includes(engineerId)) {
+          updates[EVENTS_FIELD_IDS.auto_assigned_engineers] = [...autoAssigned, engineerId];
+        }
+
+        await this.base(EVENTS_TABLE_ID).update(eventRecordId, updates);
+        console.log(`Added engineer ${engineerId} to event ${eventRecordId} (auto: ${isAutoAssigned})`);
+      }
+    } catch (error) {
+      console.error('Error adding engineer to event:', error);
+      throw new Error(`Failed to add engineer to event: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Remove an engineer from an event (only if auto-assigned)
+   *
+   * This preserves manual assignments - only removes engineers that
+   * were auto-assigned (tracked in auto_assigned_engineers field).
+   *
+   * @param eventRecordId - Airtable record ID of the Event
+   * @param engineerId - Personen record ID of the engineer to remove
+   */
+  async removeAutoAssignedEngineer(eventRecordId: string, engineerId: string): Promise<void> {
+    try {
+      const record = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
+      const currentEngineers = record.get('assigned_engineer') as string[] || [];
+      const autoAssigned = record.get('auto_assigned_engineers') as string[] || [];
+
+      // Only remove if this engineer was auto-assigned
+      if (autoAssigned.includes(engineerId)) {
+        const newEngineers = currentEngineers.filter(id => id !== engineerId);
+        const newAutoAssigned = autoAssigned.filter(id => id !== engineerId);
+
+        await this.base(EVENTS_TABLE_ID).update(eventRecordId, {
+          [EVENTS_FIELD_IDS.assigned_engineer]: newEngineers,
+          [EVENTS_FIELD_IDS.auto_assigned_engineers]: newAutoAssigned,
+        });
+
+        console.log(`Removed auto-assigned engineer ${engineerId} from event ${eventRecordId}`);
+      } else {
+        console.log(`Engineer ${engineerId} not auto-assigned, preserving manual assignment`);
+      }
+    } catch (error) {
+      console.error('Error removing auto-assigned engineer:', error);
+      throw new Error(`Failed to remove engineer: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Ensure default engineers are assigned to an event
+   *
+   * Auto-assignment rules:
+   * - Jakob (ENGINEER_JAKOB_ID): Always assigned to ALL events (handles regular/Minimusikertag tracks)
+   * - Micha (ENGINEER_MICHA_ID): Only assigned when is_schulsong = true (handles schulsong tracks)
+   *
+   * When is_schulsong is toggled OFF, Micha is removed (only if auto-assigned, not manual).
+   *
+   * @param eventRecordId - Airtable record ID of the Event
+   * @param isSchulsong - Whether the event has schulsong enabled
+   */
+  async ensureDefaultEngineers(eventRecordId: string, isSchulsong: boolean): Promise<void> {
+    const JAKOB_ID = process.env.ENGINEER_JAKOB_ID;
+    const MICHA_ID = process.env.ENGINEER_MICHA_ID;
+
+    // Jakob always assigned (for regular tracks)
+    if (JAKOB_ID) {
+      await this.addEngineerToEvent(eventRecordId, JAKOB_ID, true);
+    } else {
+      console.warn('ENGINEER_JAKOB_ID not configured, skipping Jakob auto-assignment');
+    }
+
+    // Micha assigned only if schulsong
+    if (MICHA_ID) {
+      if (isSchulsong) {
+        await this.addEngineerToEvent(eventRecordId, MICHA_ID, true);
+      } else {
+        await this.removeAutoAssignedEngineer(eventRecordId, MICHA_ID);
+      }
+    } else {
+      console.warn('ENGINEER_MICHA_ID not configured, skipping Micha auto-assignment');
+    }
+  }
+
   /**
    * Get an Event by its linked SchoolBooking record ID
    * Used to get access_code for a booking
@@ -5017,6 +5229,7 @@ class AirtableService {
       event_type: (record.get('event_type') as Event['event_type']) || 'concert',
       assigned_staff: record.get('assigned_staff') as string[] | undefined,
       assigned_engineer: record.get('assigned_engineer') as string[] | undefined,
+      auto_assigned_engineers: record.get('auto_assigned_engineers') as string[] | undefined,
       created_at: record.get('created_at') as string || '',
       legacy_booking_id: record.get('legacy_booking_id') as string | undefined,
       simplybook_booking: record.get('simplybook_booking') as string[] | undefined,

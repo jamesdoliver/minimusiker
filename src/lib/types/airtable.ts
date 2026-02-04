@@ -399,7 +399,9 @@ export interface SchoolEventSummary {
   totalParents: number;
   assignedStaffId?: string;   // Personen record ID
   assignedStaffName?: string; // Staff name for display
-  assignedEngineerId?: string; // Personen record ID for engineer
+  assignedEngineerIds?: string[]; // All assigned engineer Personen record IDs
+  assignedEngineerId?: string; // First engineer (backwards compat)
+  isSchulsong?: boolean;      // Whether this event includes a schulsong
 }
 
 // Team staff member from Personen table
@@ -530,6 +532,7 @@ export const EVENTS_FIELD_IDS = {
   event_type: 'fldnWvlgaik73WwsE',
   assigned_staff: 'fldKFG7lVsO1w9Td3',  // Linked record → Personen
   assigned_engineer: 'fldHK6sQA3jrU6O2H',  // Linked record → Personen
+  auto_assigned_engineers: 'fldu8wnZ0MQ4k4KEg',  // Linked record → Personen (tracks auto-assigned engineers)
   created_at: 'fldnOuSFihr3HrJkF',
   legacy_booking_id: 'fldYrZSh7tdkwuWp4',  // Original booking_id from parent_journey_table
   simplybook_booking: 'fldK7vyxLd9MxgmES',  // Linked record → SchoolBookings
@@ -545,6 +548,9 @@ export const EVENTS_FIELD_IDS = {
   is_kita: 'flddRbQV0qoqR3KIr',             // Checkbox - shows 'K' circle
   is_schulsong: 'fld2ml1yiecD1a5ms',         // Checkbox - shows 'S' circle
   is_minimusikertag: 'fld2GuudFY4Rk6f8i',     // Checkbox - true = full event, false = schulsong-only
+  // Admin audio approval fields
+  all_tracks_approved: 'fldTODO_ALL_TRACKS_APPROVED', // Checkbox - True when admin approved ALL final tracks
+  admin_approval_status: 'fldTODO_ADMIN_APPROVAL_STATUS', // Single Select - pending | ready_for_approval | approved
 } as const;
 
 // Classes Table - 1 row per class
@@ -659,6 +665,7 @@ export interface Event {
   event_type?: string; // 'Minimusikertag' | 'Minimusikertag PLUS' | 'Minimusikertag Kita' (legacy: 'concert')
   assigned_staff?: string[];            // Linked record IDs → Personen
   assigned_engineer?: string[];         // Linked record IDs → Personen
+  auto_assigned_engineers?: string[];   // Linked record IDs → Personen (tracks which were auto-assigned)
   created_at: string;
   legacy_booking_id?: string;           // Original booking_id from parent_journey_table
   simplybook_booking?: string[];        // Linked record IDs → SchoolBookings
@@ -677,6 +684,9 @@ export interface Event {
   is_kita?: boolean;                    // Shows 'K' circle (or derived from event_type='Minimusikertag Kita')
   is_schulsong?: boolean;               // Shows 'S' circle
   is_minimusikertag?: boolean;          // true = full event, false = schulsong-only
+  // Admin audio approval fields
+  all_tracks_approved?: boolean;        // True when admin approved ALL final tracks
+  admin_approval_status?: 'pending' | 'ready_for_approval' | 'approved';
 }
 
 /**
