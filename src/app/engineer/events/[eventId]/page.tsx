@@ -368,7 +368,7 @@ export default function EngineerEventDetailPage() {
         </div>
 
         {/* Schulsong Section — shown for Micha when event has schulsong */}
-        {event.schulsongClass && event.classes.length === 0 && (
+        {event.schulsongClass && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               Schulsong

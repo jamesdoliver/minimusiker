@@ -113,7 +113,9 @@ export async function GET(
     }
 
     // Group audio files by class (excluding schulsong class from regular classes)
-    const classesWithAudio: EngineerClassView[] = eventDetail.classes
+    // Micha only handles schulsong — skip regular classes entirely for him
+    const isMichaEngineer = ENGINEER_IDS.MICHA && session.engineerId === ENGINEER_IDS.MICHA;
+    const classesWithAudio: EngineerClassView[] = isMichaEngineer ? [] : eventDetail.classes
       .filter((classDetail) => !schulsongClassView || classDetail.classId !== schulsongClassView.classId)
       .map((classDetail) => {
         const classAudioFiles = audioFilesWithUrls.filter(
