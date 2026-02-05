@@ -858,12 +858,23 @@ class TeacherService {
         const eventRecordId = eventRecords[0].id;
 
         // Query AudioFiles table by linked record (event_link)
-        const records = await this.base(AUDIO_FILES_TABLE)
+        let records = await this.base(AUDIO_FILES_TABLE)
           .select({
             filterByFormula: `{${AUDIO_FILES_LINKED_FIELD_IDS.event_link}} = '${eventRecordId}'`,
             sort: [{ field: 'uploaded_at', direction: 'desc' }],
           })
           .all();
+
+        // Fallback: query by text event_id field for audio files created before
+        // normalized tables were enabled or where event_link wasn't populated
+        if (records.length === 0) {
+          records = await this.base(AUDIO_FILES_TABLE)
+            .select({
+              filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
+              sort: [{ field: 'uploaded_at', direction: 'desc' }],
+            })
+            .all();
+        }
 
         return records.map((record) => this.transformAudioFileRecord(record));
       } catch (error) {
