@@ -47,6 +47,8 @@ export interface BookingWithDetails {
   eventRecordId?: string;        // Event record ID for registration lookup
   // Audio pipeline
   audioPipelineStage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved';
+  // Admin notes
+  adminNotes?: string;
 }
 
 // Staff member for dropdown
@@ -218,6 +220,8 @@ export async function GET(request: NextRequest) {
               eventRecordId: event.id,
               // Audio pipeline
               audioPipelineStage: event.audio_pipeline_stage,
+              // Admin notes
+              adminNotes: event.admin_notes,
             };
           }
         } catch (error) {

@@ -553,6 +553,8 @@ export const EVENTS_FIELD_IDS = {
   admin_approval_status: 'fldsO7ovNwD4TdtCw', // Single Select - pending | ready_for_approval | approved
   // Audio pipeline stage for admin bookings view
   audio_pipeline_stage: 'fldlW3jUcGmhbkhug', // Single Select - not_started | in_progress | ready_for_review | approved
+  // Admin notes
+  admin_notes: 'fldmzzlsrI5lKKx16', // Multiline text - free-text admin notes
 } as const;
 
 // Classes Table - 1 row per class
@@ -692,6 +694,8 @@ export interface Event {
   admin_approval_status?: 'pending' | 'ready_for_approval' | 'approved';
   // Audio pipeline stage for admin bookings view
   audio_pipeline_stage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved';
+  // Admin notes
+  admin_notes?: string;
 }
 
 /**

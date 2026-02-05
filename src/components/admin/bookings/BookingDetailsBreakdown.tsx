@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import QRCode from 'qrcode';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
@@ -39,6 +39,54 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
   const [audioStatus, setAudioStatus] = useState<AudioStatusData | null>(null);
   const [audioStatusLoading, setAudioStatusLoading] = useState(false);
   const [showAudioApprovalModal, setShowAudioApprovalModal] = useState(false);
+
+  // Admin notes state
+  const [notesText, setNotesText] = useState(booking.adminNotes || '');
+  const [notesSaveStatus, setNotesSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const notesTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync notes from prop when booking changes
+  useEffect(() => {
+    setNotesText(booking.adminNotes || '');
+  }, [booking.adminNotes]);
+
+  const handleNotesChange = useCallback((value: string) => {
+    setNotesText(value);
+    setNotesSaveStatus('idle');
+
+    if (notesTimerRef.current) {
+      clearTimeout(notesTimerRef.current);
+    }
+
+    notesTimerRef.current = setTimeout(async () => {
+      setNotesSaveStatus('saving');
+      try {
+        const res = await fetch(`/api/admin/events/${encodeURIComponent(booking.code)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ admin_notes: value }),
+        });
+        if (res.ok) {
+          setNotesSaveStatus('saved');
+        } else {
+          setNotesSaveStatus('idle');
+          toast.error('Failed to save notes');
+        }
+      } catch {
+        setNotesSaveStatus('idle');
+        toast.error('Failed to save notes');
+      }
+    }, 1000);
+  }, [booking.code]);
+
+  // Cleanup debounce timer
+  useEffect(() => {
+    return () => {
+      if (notesTimerRef.current) {
+        clearTimeout(notesTimerRef.current);
+      }
+    };
+  }, []);
 
   // Fetch audio status on mount
   useEffect(() => {
@@ -330,34 +378,21 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
                   : booking.startTime || '-'}
               </p>
             </div>
-            <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wide">Est. Children</label>
-              <p className="text-sm text-gray-900">{booking.numberOfChildren || '-'}</p>
+            <div onClick={(e) => e.stopPropagation()}>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Admin Notes</label>
+              <textarea
+                value={notesText}
+                onChange={(e) => handleNotesChange(e.target.value)}
+                rows={3}
+                className="mt-1 w-full text-sm text-gray-900 border border-gray-300 rounded-md px-3 py-2 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Add notes about this deal..."
+              />
+              {notesSaveStatus !== 'idle' && (
+                <p className={`text-xs mt-1 ${notesSaveStatus === 'saving' ? 'text-gray-400' : 'text-green-600'}`}>
+                  {notesSaveStatus === 'saving' ? 'Saving...' : 'Saved'}
+                </p>
+              )}
             </div>
-            <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wide">Size Category</label>
-              <p className="text-sm text-gray-900">{booking.costCategory || '-'}</p>
-            </div>
-            {/* Short URL for Parent Registration */}
-            {booking.shortUrl && (
-              <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">Parent Registration Link</label>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-mono text-blue-600">{booking.shortUrl}</p>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`https://${booking.shortUrl}`);
-                    }}
-                    className="p-1 hover:bg-gray-100 rounded transition-colors"
-                    title="Copy link"
-                  >
-                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

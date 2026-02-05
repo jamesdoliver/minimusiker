@@ -194,10 +194,11 @@ export async function PATCH(
       body.is_kita !== undefined ||
       body.is_schulsong !== undefined ||
       body.is_minimusikertag !== undefined;
+    const hasNotesUpdate = body.admin_notes !== undefined;
 
-    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates) {
+    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate) {
       return NextResponse.json(
-        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes' },
         { status: 400 }
       );
     }
@@ -525,6 +526,14 @@ export async function PATCH(
           console.warn('Could not send cancellation notification:', notificationError);
         }
       }
+    }
+
+    // Handle admin notes update
+    if (hasNotesUpdate) {
+      const base = airtableService['base'];
+      await base(EVENTS_TABLE_ID).update(eventRecordId, {
+        [EVENTS_FIELD_IDS.admin_notes]: body.admin_notes,
+      });
     }
 
     return NextResponse.json({

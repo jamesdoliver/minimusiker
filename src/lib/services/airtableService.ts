@@ -5228,6 +5228,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.is_schulsong,
           EVENTS_FIELD_IDS.is_minimusikertag,
           EVENTS_FIELD_IDS.audio_pipeline_stage,
+          EVENTS_FIELD_IDS.admin_notes,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -5316,6 +5317,8 @@ class AirtableService {
       is_minimusikertag: record.get('is_minimusikertag') as boolean | undefined,
       // Audio pipeline
       audio_pipeline_stage: record.get('audio_pipeline_stage') as Event['audio_pipeline_stage'] | undefined,
+      // Admin notes
+      admin_notes: record.get('admin_notes') as string | undefined,
     };
   }
 
