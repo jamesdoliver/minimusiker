@@ -354,7 +354,7 @@ async function getParentRecipientsForEvent(
               parent_first_name: parent.parent_first_name,
               child_name: registration.registered_child,
               class_name: className,
-              parent_portal_link: `${baseUrl}/parent`,
+              parent_portal_link: `${baseUrl}/familie`,
               _event_date_iso: eventData.eventDate,
             },
           });
@@ -475,8 +475,8 @@ export async function sendAutomatedEmail(
     event_date: '',
     event_link: `${baseUrl}/parent`,
     ...recipient.templateData,
-    teacher_portal_link: `${baseUrl}/teacher`,
-    parent_portal_link: `${baseUrl}/parent`,
+    teacher_portal_link: `${baseUrl}/paedagogen-login`,
+    parent_portal_link: `${baseUrl}/familie`,
   };
 
   // Substitute variables in subject and body
@@ -709,11 +709,11 @@ export function getPreviewTemplateData(): TemplateData {
     event_type: 'Schule',
     teacher_name: 'Frau Schmidt',
     teacher_first_name: 'Maria',
-    teacher_portal_link: 'https://minimusiker.app/teacher',
+    teacher_portal_link: 'https://minimusiker.app/paedagogen-login',
     parent_name: 'Max Mustermann',
     parent_first_name: 'Max',
     child_name: 'Lisa Mustermann',
-    parent_portal_link: 'https://minimusiker.app/parent',
+    parent_portal_link: 'https://minimusiker.app/familie',
     access_code: '12345',
     class_name: 'Klasse 3a',
     class_time: '10:00 Uhr',
@@ -751,19 +751,49 @@ export async function sendTestEmail(
         return { success: false, error: 'Event not found' };
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
-      const eventLink = event.access_code
-        ? `${baseUrl}/e/${event.access_code}`
-        : `${baseUrl}/parent`;
-      templateData = {
-        school_name: event.school_name || '',
-        event_date: formatDateGerman(event.event_date || ''),
-        event_type: event.is_kita ? 'KiTa' : 'Schule',
-        teacher_portal_link: `${baseUrl}/teacher`,
-        parent_portal_link: `${baseUrl}/parent`,
-        event_link: eventLink,
-        _event_date_iso: event.event_date,
+      // Build eventData for recipient fetching (same structure as production emails)
+      const eventData: EventThresholdMatch = {
+        eventId: eventId,
+        eventRecordId: event.id,
+        schoolName: event.school_name || '',
+        eventDate: event.event_date || '',
+        eventType: event.is_kita ? 'KiTa' : 'Schule',
+        daysUntilEvent: 0, // Not relevant for test emails
+        accessCode: event.access_code,
+        isKita: event.is_kita,
+        isMinimusikertag: event.is_minimusikertag,
+        isPlus: event.is_plus,
+        isSchulsong: event.is_schulsong,
       };
+
+      // Get recipients using the same pipeline as normal emails
+      // This ensures test emails have all the same variables (teacher_name, parent_name, etc.)
+      const recipients = await getRecipientsForEvent(
+        eventId,
+        event.id,
+        eventData,
+        template.audience
+      );
+
+      if (recipients.length > 0) {
+        // Use the first recipient's templateData (complete with teacher/parent info)
+        templateData = recipients[0].templateData;
+      } else {
+        // Fallback: build basic event data if no recipients found
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
+        const eventLink = event.access_code
+          ? `${baseUrl}/e/${event.access_code}`
+          : `${baseUrl}/parent`;
+        templateData = {
+          school_name: event.school_name || '',
+          event_date: formatDateGerman(event.event_date || ''),
+          event_type: event.is_kita ? 'KiTa' : 'Schule',
+          teacher_portal_link: `${baseUrl}/paedagogen-login`,
+          parent_portal_link: `${baseUrl}/familie`,
+          event_link: eventLink,
+          _event_date_iso: event.event_date,
+        };
+      }
     } else {
       // Use default preview data
       templateData = getPreviewTemplateData();
