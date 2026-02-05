@@ -3111,18 +3111,24 @@ class TeacherService {
    */
   async getOrCreateDefaultClassForEvent(eventRecordId: string): Promise<{ classId: string; recordId: string }> {
     // Find existing default class for this event
-    const existing = await this.base(CLASSES_TABLE_ID)
+    // Note: We filter by is_default in the formula, then check event linkage in JS
+    // because ARRAYJOIN on linked records returns display values, not record IDs
+    const defaultClasses = await this.base(CLASSES_TABLE_ID)
       .select({
-        filterByFormula: `AND(FIND('${eventRecordId}', ARRAYJOIN({${CLASSES_FIELD_IDS.event_id}})), {${CLASSES_FIELD_IDS.is_default}} = TRUE())`,
-        maxRecords: 1,
+        filterByFormula: `{${CLASSES_FIELD_IDS.is_default}} = TRUE()`,
         returnFieldsByFieldId: true,
       })
       .firstPage();
 
-    if (existing.length > 0) {
+    const existing = defaultClasses.find(record => {
+      const eventIds = record.fields[CLASSES_FIELD_IDS.event_id] as string[] | undefined;
+      return eventIds?.includes(eventRecordId);
+    });
+
+    if (existing) {
       return {
-        classId: existing[0].fields[CLASSES_FIELD_IDS.class_id] as string,
-        recordId: existing[0].id,
+        classId: existing.fields[CLASSES_FIELD_IDS.class_id] as string,
+        recordId: existing.id,
       };
     }
 
