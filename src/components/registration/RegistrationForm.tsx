@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import ChildInputRow from './ChildInputRow';
@@ -48,6 +48,9 @@ export default function RegistrationForm({
   const router = useRouter();
   const t = useTranslations('registration.form');
   const tEmailCheck = useTranslations('parentPortal.emailCheck');
+
+  // Synchronous guard to prevent double-clicks (useState is async and has a tiny race window)
+  const submissionInFlight = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -169,11 +172,17 @@ export default function RegistrationForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Synchronous guard - prevents double-clicks before React state updates
+    if (submissionInFlight.current) return;
+    submissionInFlight.current = true;
+
     setError(null);
 
     // Client-side validation
     if (!validateForm()) {
       setError(t('fixErrors'));
+      submissionInFlight.current = false; // Reset on validation failure
       return;
     }
 
@@ -201,12 +210,14 @@ export default function RegistrationForm({
       }
 
       // Success! Redirect to parent portal (session cookie is set by API)
+      // Note: Don't reset submissionInFlight on success - page redirects anyway
       setTimeout(() => {
         router.push(result.data.redirectUrl || '/familie');
       }, 1500);
     } catch (err) {
       console.error('Registration error:', err);
       setError(err instanceof Error ? err.message : 'Failed to register. Please try again.');
+      submissionInFlight.current = false; // Reset on error so user can retry
       setIsSubmitting(false);
     }
   };

@@ -151,6 +151,7 @@ function RegistrationPageContent() {
 
             if (detailsData.success && detailsData.data) {
               setEventDetails(detailsData.data);
+              setShowEmailStep(true); // Show EmailCheckStep before form for QR single-class flow
               setDiscoveryState((prev) => ({
                 ...prev,
                 classId: singleClass.classId,
@@ -235,6 +236,7 @@ function RegistrationPageContent() {
 
       if (data.success && data.data) {
         setEventDetails(data.data);
+        setShowEmailStep(true); // Show EmailCheckStep before form in discovery mode
         setCurrentStep('form');
       } else {
         setError('event_not_found');
@@ -306,6 +308,17 @@ function RegistrationPageContent() {
     setVerifiedEmail('');
     setParentData(null);
     setExistingChildren([]);
+  };
+
+  // Handler for going back from email step to class selection (discovery/QR flow)
+  const handleEmailStepBack = () => {
+    setShowEmailStep(false);
+    setEventDetails(null);
+    // For QR flow with multiple classes, go back to class selection
+    // For discovery mode, go back to class selection
+    if (isQrFlow || isDiscoveryMode) {
+      setCurrentStep('class');
+    }
   };
 
   const getStepNumber = (): number => {
@@ -576,12 +589,13 @@ function RegistrationPageContent() {
             )}
           </div>
 
-          {/* Email Check Step - Show first for direct link flow */}
+          {/* Email Check Step - Show first before form */}
           {showEmailStep && (
             <div className="bg-white shadow-lg rounded-lg p-8">
               <EmailCheckStep
                 eventId={effectiveEventId}
                 onEmailVerified={handleEmailVerified}
+                onBack={(isDiscoveryMode || isQrFlow) ? handleEmailStepBack : undefined}
               />
             </div>
           )}

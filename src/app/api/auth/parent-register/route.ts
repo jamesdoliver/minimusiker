@@ -73,15 +73,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Check if parent is already registered for this event
-    const isAlreadyRegistered = await getAirtableService().isParentRegisteredForEvent(
-      sanitizedData.parentEmail,
-      sanitizedData.eventId
+    // Step 2: Get existing children for this parent+event (per-child deduplication)
+    let existingChildren: Array<{
+      registrationId: string;
+      childName: string;
+      classId: string;
+      className?: string;
+    }> = [];
+
+    try {
+      existingChildren = await getAirtableService().getChildrenByParentEmailForEvent(
+        sanitizedData.parentEmail,
+        sanitizedData.eventId
+      );
+    } catch (error) {
+      console.error('[parent-register] Failed to fetch existing children, proceeding without dedup:', error);
+      // Fall through - will create all submitted children (same as before)
+    }
+
+    const existingNames = new Set(
+      existingChildren.map((c) => c.childName.toLowerCase().trim())
     );
 
-    if (isAlreadyRegistered) {
-      // Don't error - just log them in instead!
-      // Fetch their existing records to create session
+    // Partition: which children are new vs already registered?
+    const newChildren = sanitizedData.children.filter(
+      (c) => !existingNames.has(c.childName.toLowerCase().trim())
+    );
+
+    // Case A: ALL children already registered → just log parent in
+    if (newChildren.length === 0 && existingChildren.length > 0) {
+      // Fetch parent records for session data
       const existingRecords = await getAirtableService().getParentRecordsByEmail(
         sanitizedData.parentEmail
       );
@@ -89,7 +110,6 @@ export async function POST(request: NextRequest) {
       const mostRecentRecord = existingRecords[0];
 
       // Use the actual booking_id from the database as the event identifier
-      // Do NOT regenerate - hash variations cause event_id linking failures
       const eventId = mostRecentRecord.booking_id;
       const schoolId = generateSchoolId(mostRecentRecord.school_name);
 
@@ -99,7 +119,7 @@ export async function POST(request: NextRequest) {
         bookingId: record.booking_id,
         classId: record.class_id,
         class: record.class,
-        eventId: record.booking_id, // Use actual booking_id, not generated ID
+        eventId: record.booking_id,
         schoolName: record.school_name,
         eventType: record.event_type,
         bookingDate: record.booking_date,
@@ -147,14 +167,16 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
+    // Case B: Some or all children are new → create only the new ones
+
     // Step 3: Generate or reuse parent_id
     const existingParent = await getAirtableService().getParentByEmail(
       sanitizedData.parentEmail
     );
     const parentId = existingParent?.parent_id || generateParentId(sanitizedData.parentEmail);
 
-    // Step 4: Create parent_journey records (one per child)
-    const recordsToCreate = sanitizedData.children.map((child) => ({
+    // Step 4: Create parent_journey records (only for NEW children)
+    const recordsToCreate = newChildren.map((child) => ({
       parent_id: parentId,
       parent_email: sanitizedData.parentEmail,
       parent_first_name: sanitizedData.parentFirstName,
@@ -168,8 +190,6 @@ export async function POST(request: NextRequest) {
       main_teacher: eventDetails.teacherName,
       other_teachers: eventDetails.otherTeachers || '',
       registered_child: child.childName,
-      // Store grade level in notes field or add a new field in Airtable if needed
-      // For now, we'll just use the child name
     }));
 
     const createdRecords = await getAirtableService().createBulkParentJourneys(
@@ -182,17 +202,34 @@ export async function POST(request: NextRequest) {
     const eventId = sanitizedData.eventId;
     const schoolId = generateSchoolId(eventDetails.schoolName);
 
-    // Create children array for session
-    const sessionChildren = sanitizedData.children.map((child) => ({
-      childName: child.childName,
-      bookingId: sanitizedData.eventId,
-      classId: sanitizedData.classId,
-      class: eventDetails.className,
-      eventId: sanitizedData.eventId, // Use canonical booking_id
-      schoolName: eventDetails.schoolName,
-      eventType: eventDetails.eventType,
-      bookingDate: eventDetails.bookingDate,
-    }));
+    // Build session children from BOTH existing and newly created children
+    const sessionChildren = [
+      // Map existing children to session format
+      ...existingChildren.map((c) => ({
+        childName: c.childName,
+        bookingId: sanitizedData.eventId,
+        classId: c.classId,
+        class: c.className || eventDetails.className,
+        eventId: sanitizedData.eventId,
+        schoolName: eventDetails.schoolName,
+        eventType: eventDetails.eventType,
+        bookingDate: eventDetails.bookingDate,
+      })),
+      // Map newly created children to session format
+      ...newChildren.map((child) => ({
+        childName: child.childName,
+        bookingId: sanitizedData.eventId,
+        classId: sanitizedData.classId,
+        class: eventDetails.className,
+        eventId: sanitizedData.eventId,
+        schoolName: eventDetails.schoolName,
+        eventType: eventDetails.eventType,
+        bookingDate: eventDetails.bookingDate,
+      })),
+    ];
+
+    // Determine which child name to use for the legacy field
+    const firstChildName = sessionChildren[0]?.childName || newChildren[0]?.childName || sanitizedData.children[0].childName;
 
     const sessionData: ParentSession = {
       parentId,
@@ -201,7 +238,7 @@ export async function POST(request: NextRequest) {
       bookingId: sanitizedData.eventId,
       schoolName: eventDetails.schoolName,
       eventType: eventDetails.eventType,
-      childName: sanitizedData.children[0].childName, // Use first child for legacy field
+      childName: firstChildName,
       bookingDate: eventDetails.bookingDate,
       eventId,
       schoolId,
@@ -215,16 +252,19 @@ export async function POST(request: NextRequest) {
     });
 
     // Step 7: Send welcome email (fire and forget - don't block registration)
-    try {
-      await getEmailService().sendParentWelcome(sanitizedData.parentEmail, {
-        parentName: sanitizedData.parentFirstName,
-        childName: sanitizedData.children.map(c => c.childName).join(', '),
-        schoolName: eventDetails.schoolName,
-      });
-      console.log('[parent-register] Welcome email sent to:', sanitizedData.parentEmail);
-    } catch (emailError) {
-      // Log but don't fail registration if email fails
-      console.error('[parent-register] Failed to send welcome email:', emailError);
+    // Only send if there are new children being registered
+    if (newChildren.length > 0) {
+      try {
+        await getEmailService().sendParentWelcome(sanitizedData.parentEmail, {
+          parentName: sanitizedData.parentFirstName,
+          childName: newChildren.map((c) => c.childName).join(', '),
+          schoolName: eventDetails.schoolName,
+        });
+        console.log('[parent-register] Welcome email sent to:', sanitizedData.parentEmail);
+      } catch (emailError) {
+        // Log but don't fail registration if email fails
+        console.error('[parent-register] Failed to send welcome email:', emailError);
+      }
     }
 
     // Step 8: Return success with session
