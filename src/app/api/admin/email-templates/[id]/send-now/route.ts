@@ -61,7 +61,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { eventIds, preview } = body as { eventIds: string[]; preview?: boolean };
+    const { eventIds, preview, forceResend } = body as { eventIds: string[]; preview?: boolean; forceResend?: boolean };
 
     if (!eventIds || !Array.isArray(eventIds) || eventIds.length === 0) {
       return NextResponse.json(
@@ -254,7 +254,7 @@ export async function POST(
       );
 
       for (const recipient of recipients) {
-        const result = await sendAutomatedEmail(template, recipient);
+        const result = await sendAutomatedEmail(template, recipient, { skipDuplicateCheck: forceResend });
         details.push({
           eventId: event.event_id,
           email: recipient.email,

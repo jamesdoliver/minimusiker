@@ -128,6 +128,7 @@ export default function AdminEmails() {
   const [sendNowPreview, setSendNowPreview] = useState<SendNowPreviewData | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [expandedPreviewEvents, setExpandedPreviewEvents] = useState<Set<string>>(new Set());
+  const [forceResend, setForceResend] = useState(false);
   const [newLogIds, setNewLogIds] = useState<Set<string>>(new Set());
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previousLogIdsRef = useRef<Set<string>>(new Set());
@@ -288,6 +289,7 @@ export default function AdminEmails() {
     setSendNowResult(null);
     setSendNowPreview(null);
     setExpandedPreviewEvents(new Set());
+    setForceResend(false);
   }, []);
 
   const toggleSendNowEvent = useCallback((eventId: string) => {
@@ -351,11 +353,15 @@ export default function AdminEmails() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventIds: Array.from(sendNowSelectedEventIds) }),
+        body: JSON.stringify({
+          eventIds: Array.from(sendNowSelectedEventIds),
+          forceResend,
+        }),
       });
       const data = await response.json();
       if (data.success) {
         setSendNowResult(data.data);
+        setForceResend(false); // Reset after sending
         fetchLogs();
       } else {
         alert(data.error || 'Fehler beim Senden');
@@ -366,7 +372,7 @@ export default function AdminEmails() {
     } finally {
       setIsSending(false);
     }
-  }, [sendNowTemplateId, sendNowSelectedEventIds, fetchLogs]);
+  }, [sendNowTemplateId, sendNowSelectedEventIds, forceResend, fetchLogs]);
 
   useEffect(() => {
     fetchTemplates();
@@ -961,22 +967,33 @@ export default function AdminEmails() {
                     Schließen
                   </button>
                 ) : sendNowPreview ? (
-                  /* Preview: back and send buttons */
-                  <>
-                    <button
-                      onClick={goBackToEventSelection}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                    >
-                      Zurück
-                    </button>
-                    <button
-                      onClick={executeSendNow}
-                      disabled={isSending || sendNowPreview.summary.totalRecipients === 0}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    >
-                      {isSending ? 'Sendet...' : `Jetzt senden (${sendNowPreview.summary.totalRecipients})`}
-                    </button>
-                  </>
+                  /* Preview: back and send buttons with force resend option */
+                  <div className="flex flex-col gap-3 w-full">
+                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={forceResend}
+                        onChange={(e) => setForceResend(e.target.checked)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <span>Erneut senden (Duplikatprüfung überspringen)</span>
+                    </label>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={goBackToEventSelection}
+                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                      >
+                        Zurück
+                      </button>
+                      <button
+                        onClick={executeSendNow}
+                        disabled={isSending || sendNowPreview.summary.totalRecipients === 0}
+                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      >
+                        {isSending ? 'Sendet...' : `Jetzt senden (${sendNowPreview.summary.totalRecipients})`}
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   /* Event selection: cancel and preview buttons */
                   <>

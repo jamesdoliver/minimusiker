@@ -461,12 +461,18 @@ export async function getRecipientsForEvent(
 
 /**
  * Send a single automated email
+ * @param template - The email template to send
+ * @param recipient - The recipient to send to
+ * @param options - Optional settings
+ * @param options.skipDuplicateCheck - If true, skip the duplicate check and send even if already sent
  */
 export async function sendAutomatedEmail(
   template: EmailTemplate,
-  recipient: EmailRecipient
+  recipient: EmailRecipient,
+  options?: { skipDuplicateCheck?: boolean }
 ): Promise<EmailSendResult> {
   const airtable = getAirtableService();
+  const { skipDuplicateCheck = false } = options || {};
 
   // Build full template data with defaults
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
@@ -483,32 +489,34 @@ export async function sendAutomatedEmail(
   const subject = substituteTemplateVariables(template.subject, fullData);
   const bodyHtml = substituteTemplateVariables(template.bodyHtml, fullData);
 
-  // Check if already sent
-  const alreadySent = await airtable.hasEmailBeenSent(
-    template.name,
-    recipient.eventId,
-    recipient.email
-  );
+  // Check if already sent (unless skipDuplicateCheck is true)
+  if (!skipDuplicateCheck) {
+    const alreadySent = await airtable.hasEmailBeenSent(
+      template.name,
+      recipient.eventId,
+      recipient.email
+    );
 
-  if (alreadySent) {
-    // Log as skipped
-    await airtable.createEmailLog({
-      templateName: template.name,
-      eventId: recipient.eventId,
-      recipientEmail: recipient.email,
-      recipientType: recipient.type,
-      status: 'skipped',
-      errorMessage: 'Email already sent for this template/event/recipient combination',
-    });
+    if (alreadySent) {
+      // Log as skipped
+      await airtable.createEmailLog({
+        templateName: template.name,
+        eventId: recipient.eventId,
+        recipientEmail: recipient.email,
+        recipientType: recipient.type,
+        status: 'skipped',
+        errorMessage: 'Email already sent for this template/event/recipient combination',
+      });
 
-    return {
-      recipientEmail: recipient.email,
-      recipientType: recipient.type,
-      eventId: recipient.eventId,
-      templateName: template.name,
-      success: false,
-      error: 'Already sent',
-    };
+      return {
+        recipientEmail: recipient.email,
+        recipientType: recipient.type,
+        eventId: recipient.eventId,
+        templateName: template.name,
+        success: false,
+        error: 'Already sent',
+      };
+    }
   }
 
   // Send the email
