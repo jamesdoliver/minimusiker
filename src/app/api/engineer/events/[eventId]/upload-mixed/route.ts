@@ -22,7 +22,7 @@ export async function POST(
     }
 
     const eventId = decodeURIComponent(params.eventId);
-    const { classId, filename, type, contentType } = await request.json();
+    const { classId, filename, type, contentType, format } = await request.json();
 
     // Validate required fields
     if (!classId || typeof classId !== 'string') {
@@ -70,11 +70,14 @@ export async function POST(
 
     // Generate presigned URL for upload
     const r2Service = getR2Service();
+    const resolvedFormat = (format === 'wav' ? 'wav' : 'mp3') as 'mp3' | 'wav';
+    const resolvedContentType = contentType || (resolvedFormat === 'wav' ? 'audio/wav' : 'audio/mpeg');
     const { uploadUrl, key } = await r2Service.generateMixedAudioUploadUrl(
       eventId,
       classId,
       type,
-      contentType || 'audio/mpeg'
+      resolvedContentType,
+      resolvedFormat
     );
 
     return NextResponse.json({
@@ -154,10 +157,11 @@ export async function PUT(
       );
     }
 
-    // Check if an existing audio file record exists for this class and type
+    // Check if an existing audio file record exists for this class, type, and exact R2 key
+    // Match by r2Key to allow separate MP3 and WAV final files
     const teacherService = getTeacherService();
     const existingFiles = await teacherService.getAudioFilesByClassId(classId);
-    const existingFile = existingFiles.find((f) => f.type === type);
+    const existingFile = existingFiles.find((f) => f.type === type && f.r2Key === r2Key);
 
     let audioFile;
     if (existingFile) {

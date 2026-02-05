@@ -59,7 +59,8 @@ export interface EngineerClassView {
   className: string;
   rawFiles: AudioFileWithUrl[];
   previewFile?: AudioFileWithUrl;
-  finalFile?: AudioFileWithUrl;
+  finalMp3File?: AudioFileWithUrl;
+  finalWavFile?: AudioFileWithUrl;
 }
 
 /**
@@ -73,6 +74,7 @@ export interface EngineerEventDetail {
   classes: EngineerClassView[];
   mixingStatus: EngineerMixingStatus;
   isSchulsong?: boolean;
+  schulsongClass?: EngineerClassView;
 }
 
 // =============================================================================
@@ -95,6 +97,7 @@ export interface UploadMixedRequest {
   filename: string;
   type: 'preview' | 'final';
   contentType?: string;
+  format?: 'mp3' | 'wav';
 }
 
 /**
@@ -116,6 +119,7 @@ export interface ConfirmMixedUploadRequest {
   fileSizeBytes?: number;
   durationSeconds?: number;
   isSchulsong?: boolean;
+  format?: 'mp3' | 'wav';
 }
 
 /**

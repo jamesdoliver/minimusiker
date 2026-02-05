@@ -206,7 +206,7 @@ export default function AudioApprovalModal({
 
                 return (
                   <div
-                    key={track.songId}
+                    key={track.audioFileId || track.songId}
                     className={`border rounded-lg p-4 ${
                       track.hasFinalAudio ? 'border-gray-200' : 'border-gray-100 bg-gray-50'
                     }`}

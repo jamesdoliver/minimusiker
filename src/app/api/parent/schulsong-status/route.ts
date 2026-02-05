@@ -124,6 +124,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const extension = schulsongFile.r2Key.endsWith('.wav') ? 'wav' : 'mp3';
+
     return NextResponse.json({
       success: true,
       isSchulsong: true,
@@ -131,6 +133,7 @@ export async function GET(request: NextRequest) {
       hasAudio: true,
       audioUrl,
       downloadUrl,
+      filename: `schulsong.${extension}`,
     });
   } catch (error) {
     console.error('Error fetching schulsong status:', error);

@@ -1095,15 +1095,19 @@ class TeacherService {
 
   /**
    * Get the schulsong audio file for an event
-   * Returns the first audio file with is_schulsong=true, type=final, status=ready
+   * Returns the audio file with is_schulsong=true, type=final, status=ready
+   * Prefers MP3 for web playback when both MP3 and WAV exist
    */
   async getSchulsongAudioFile(eventId: string): Promise<AudioFile | null> {
     try {
       const allFiles = await this.getAudioFilesByEventId(eventId);
-      const schulsongFile = allFiles.find(
+      const schulsongFiles = allFiles.filter(
         (f) => f.isSchulsong && f.type === 'final' && f.status === 'ready'
       );
-      return schulsongFile || null;
+      // Prefer MP3 for web playback; fall back to any format
+      return schulsongFiles.find(f => f.r2Key.endsWith('.mp3'))
+        || schulsongFiles[0]
+        || null;
     } catch (error) {
       console.error('Error getting schulsong audio file:', error);
       return null;
@@ -1482,6 +1486,59 @@ class TeacherService {
       };
     } catch (error) {
       console.error('Error creating default class:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Ensure a virtual "Schulsong" class exists for the event (idempotent).
+   * Used by the engineer portal to give schulsong audio a dedicated classId.
+   */
+  async ensureSchulsongClass(data: {
+    eventId: string;
+    schoolName: string;
+    bookingDate: string;
+  }): Promise<TeacherClassView | null> {
+    const SCHULSONG_CLASS_NAME = 'Schulsong';
+
+    try {
+      const classId = generateClassId(data.schoolName, data.bookingDate, SCHULSONG_CLASS_NAME);
+
+      // Check if class already exists (idempotency)
+      const existingRecords = await this.base(CLASSES_TABLE_ID)
+        .select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (existingRecords.length > 0) {
+        return {
+          classId,
+          className: SCHULSONG_CLASS_NAME,
+          numChildren: 0,
+          songs: [],
+          audioStatus: {
+            hasRawAudio: false,
+            hasPreview: false,
+            hasFinal: false,
+          },
+          classType: 'teacher_song',
+        };
+      }
+
+      // Create via existing createClass method
+      return await this.createClass({
+        eventId: data.eventId,
+        className: SCHULSONG_CLASS_NAME,
+        teacherEmail: '',
+        teacherName: '',
+        numChildren: 0,
+        classType: 'teacher_song',
+      });
+    } catch (error) {
+      console.error('Error ensuring schulsong class:', error);
       return null;
     }
   }
@@ -3302,10 +3359,13 @@ class TeacherService {
       }
 
       // Get all audio files for the event and find the schulsong file
+      // Prefer MP3 for web playback when both MP3 and WAV exist
       const allFiles = await this.getAudioFilesByEventId(eventId);
-      const schulsongFile = allFiles.find(
+      const schulsongFiles = allFiles.filter(
         (f) => f.isSchulsong && f.type === 'final' && f.status === 'ready'
       );
+      const schulsongFile = schulsongFiles.find(f => f.r2Key.endsWith('.mp3'))
+        || schulsongFiles[0];
 
       // If no schulsong file OR admin hasn't approved it yet -> waiting
       if (!schulsongFile || schulsongFile.approvalStatus !== 'approved') {

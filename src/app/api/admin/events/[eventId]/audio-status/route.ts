@@ -76,12 +76,48 @@ export async function GET(
       });
     }
 
+    // Add schulsong audio files that aren't linked to songs
+    const schulsongFiles = audioFiles.filter(
+      (f) => f.isSchulsong && f.type === 'final' && !f.songId
+    );
+    // Prefer MP3 to avoid duplicates when both formats exist
+    const schulsongFinal = schulsongFiles.find(f => f.r2Key.endsWith('.mp3'))
+      || schulsongFiles[0];
+
+    if (schulsongFinal) {
+      let schulsongAudioUrl: string | undefined;
+      if (schulsongFinal.r2Key) {
+        try {
+          schulsongAudioUrl = await r2Service.generateSignedUrl(schulsongFinal.r2Key, 3600);
+        } catch (err) {
+          console.error(`Error generating URL for schulsong ${schulsongFinal.r2Key}:`, err);
+        }
+      }
+
+      tracks.push({
+        audioFileId: schulsongFinal.id,
+        songId: '',
+        songTitle: 'Schulsong',
+        className: 'Schulsong',
+        classId: schulsongFinal.classId,
+        hasRawAudio: false,
+        hasFinalAudio: true,
+        approvalStatus: schulsongFinal.approvalStatus || 'pending',
+        rejectionComment: schulsongFinal.rejectionComment,
+        finalAudioUrl: schulsongAudioUrl,
+        finalAudioR2Key: schulsongFinal.r2Key,
+        isSchulsong: true,
+      });
+    }
+
     // Calculate counts
     const expectedSongCount = songs.length;
     const staffUploadedCount = tracks.filter(t => t.hasRawAudio).length;
     const mixMasterUploadedCount = tracks.filter(t => t.hasFinalAudio).length;
-    const staffUploadComplete = staffUploadedCount >= expectedSongCount && expectedSongCount > 0;
-    const mixMasterUploadComplete = mixMasterUploadedCount >= expectedSongCount && expectedSongCount > 0;
+    // For schulsong-only events (0 songs), upload gates pass if the schulsong final exists
+    const hasSchulsongOnly = expectedSongCount === 0 && !!schulsongFinal;
+    const staffUploadComplete = hasSchulsongOnly || (staffUploadedCount >= expectedSongCount && expectedSongCount > 0);
+    const mixMasterUploadComplete = hasSchulsongOnly || (mixMasterUploadedCount >= expectedSongCount && expectedSongCount > 0);
 
     // Check if all tracks are approved
     const tracksWithFinal = tracks.filter(t => t.hasFinalAudio);

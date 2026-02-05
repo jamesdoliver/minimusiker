@@ -18,6 +18,7 @@ interface SchulsongStatus {
   hasAudio?: boolean;
   audioUrl?: string;
   downloadUrl?: string;
+  filename?: string;
 }
 
 export default function SchulsongSection({ eventId }: SchulsongSectionProps) {
@@ -75,6 +76,7 @@ export default function SchulsongSection({ eventId }: SchulsongSectionProps) {
               <SchulsongWaveformPlayer
                 audioUrl={status.audioUrl}
                 downloadUrl={status.downloadUrl}
+                filename={status.filename}
               />
             ) : (
               /* No audio yet — show coming soon message */

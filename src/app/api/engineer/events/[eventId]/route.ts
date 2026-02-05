@@ -82,42 +82,75 @@ export async function GET(
       })
     );
 
-    // Group audio files by class
-    const classesWithAudio: EngineerClassView[] = eventDetail.classes.map(
-      (classDetail) => {
+    // Check if event has schulsong feature enabled
+    const isSchulsong = await getAirtableService().getEventIsSchulsong(eventId);
+
+    // Auto-create schulsong class if event has schulsong enabled
+    let schulsongClassView: EngineerClassView | undefined;
+    if (isSchulsong) {
+      const schulsongClass = await teacherService.ensureSchulsongClass({
+        eventId,
+        schoolName: eventDetail.schoolName,
+        bookingDate: eventDetail.eventDate,
+      });
+      if (schulsongClass) {
+        const schulsongAudioFiles = audioFilesWithUrls.filter(
+          (f) => f.classId === schulsongClass.classId
+        );
+        schulsongClassView = {
+          classId: schulsongClass.classId,
+          className: 'Schulsong',
+          rawFiles: schulsongAudioFiles.filter((f) => f.type === 'raw'),
+          previewFile: schulsongAudioFiles.find((f) => f.type === 'preview'),
+          finalMp3File: schulsongAudioFiles.find(
+            (f) => f.type === 'final' && f.r2Key.endsWith('.mp3')
+          ),
+          finalWavFile: schulsongAudioFiles.find(
+            (f) => f.type === 'final' && f.r2Key.endsWith('.wav')
+          ),
+        };
+      }
+    }
+
+    // Group audio files by class (excluding schulsong class from regular classes)
+    const classesWithAudio: EngineerClassView[] = eventDetail.classes
+      .filter((classDetail) => !schulsongClassView || classDetail.classId !== schulsongClassView.classId)
+      .map((classDetail) => {
         const classAudioFiles = audioFilesWithUrls.filter(
           (f) => f.classId === classDetail.classId
         );
 
         const rawFiles = classAudioFiles.filter((f) => f.type === 'raw');
         const previewFile = classAudioFiles.find((f) => f.type === 'preview');
-        const finalFile = classAudioFiles.find((f) => f.type === 'final');
+        const finalMp3File = classAudioFiles.find(
+          (f) => f.type === 'final' && f.r2Key.endsWith('.mp3')
+        );
+        const finalWavFile = classAudioFiles.find(
+          (f) => f.type === 'final' && f.r2Key.endsWith('.wav')
+        );
 
         return {
           classId: classDetail.classId,
           className: classDetail.className,
           rawFiles,
           previewFile,
-          finalFile,
+          finalMp3File,
+          finalWavFile,
         };
-      }
-    );
+      });
 
     // Determine overall mixing status
     const hasAnyRaw = classesWithAudio.some((c) => c.rawFiles.length > 0);
     const allHavePreview = classesWithAudio.every((c) => c.previewFile);
-    const allHaveFinal = classesWithAudio.every((c) => c.finalFile);
+    const allHaveFinal = classesWithAudio.every((c) => c.finalMp3File || c.finalWavFile);
     const someHavePreview = classesWithAudio.some((c) => c.previewFile);
 
     let mixingStatus: EngineerMixingStatus = 'pending';
     if (allHavePreview && allHaveFinal && classesWithAudio.length > 0) {
       mixingStatus = 'completed';
-    } else if (someHavePreview || (hasAnyRaw && classesWithAudio.some((c) => c.finalFile))) {
+    } else if (someHavePreview || (hasAnyRaw && classesWithAudio.some((c) => c.finalMp3File || c.finalWavFile))) {
       mixingStatus = 'in-progress';
     }
-
-    // Check if event has schulsong feature enabled
-    const isSchulsong = await getAirtableService().getEventIsSchulsong(eventId);
 
     const response: EngineerEventDetail = {
       eventId: eventDetail.eventId,
@@ -127,6 +160,7 @@ export async function GET(
       classes: classesWithAudio,
       mixingStatus,
       isSchulsong,
+      schulsongClass: schulsongClassView,
     };
 
     return NextResponse.json({

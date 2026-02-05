@@ -725,10 +725,12 @@ class R2Service {
     eventId: string,
     classId: string,
     type: 'preview' | 'final',
-    contentType: string = 'audio/mpeg'
+    contentType: string = 'audio/mpeg',
+    format: 'mp3' | 'wav' = 'mp3'
   ): Promise<{ uploadUrl: string; key: string }> {
-    // Mixed audio goes to recordings/{eventId}/{classId}/{type}.mp3
-    const key = `recordings/${eventId}/${classId}/${type}.mp3`;
+    // Mixed audio goes to recordings/{eventId}/{classId}/{type}.{ext}
+    const extension = type === 'preview' ? 'mp3' : format;
+    const key = `recordings/${eventId}/${classId}/${type}.${extension}`;
 
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
@@ -750,9 +752,11 @@ class R2Service {
   async getMixedAudioUrl(
     eventId: string,
     classId: string,
-    type: 'preview' | 'final'
+    type: 'preview' | 'final',
+    format: 'mp3' | 'wav' = 'mp3'
   ): Promise<string | null> {
-    const key = `recordings/${eventId}/${classId}/${type}.mp3`;
+    const extension = type === 'preview' ? 'mp3' : format;
+    const key = `recordings/${eventId}/${classId}/${type}.${extension}`;
 
     if (await this.fileExists(key)) {
       const expiresIn = type === 'preview' ? 1800 : 86400; // 30 min for preview, 24h for final

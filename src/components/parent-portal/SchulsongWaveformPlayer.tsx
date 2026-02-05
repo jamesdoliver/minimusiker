@@ -6,9 +6,10 @@ import { useTranslations } from 'next-intl';
 interface SchulsongWaveformPlayerProps {
   audioUrl: string;
   downloadUrl?: string;
+  filename?: string;
 }
 
-export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl }: SchulsongWaveformPlayerProps) {
+export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl, filename }: SchulsongWaveformPlayerProps) {
   const t = useTranslations('schulsong');
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<any>(null);
@@ -86,7 +87,7 @@ export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl }: Schul
     if (downloadUrl) {
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = 'schulsong.mp3';
+      a.download = filename || 'schulsong.mp3';
       a.target = '_blank';
       document.body.appendChild(a);
       a.click();
