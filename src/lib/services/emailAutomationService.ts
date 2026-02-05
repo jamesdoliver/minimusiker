@@ -416,7 +416,9 @@ async function getNonBuyerRecipientsForEvent(
   const allParents = await getParentRecipientsForEvent(eventId, eventRecordId, eventData);
   // Use eventRecordId for order lookup via linked record field
   const paidEmails = await getPaidParentEmailsForEvent(eventRecordId);
-  return allParents.filter(p => !paidEmails.has(p.email.toLowerCase()));
+  return allParents
+    .filter(p => !paidEmails.has(p.email.toLowerCase()))
+    .map(p => ({ ...p, type: 'non-buyer' as const }));
 }
 
 /**

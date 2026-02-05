@@ -82,7 +82,7 @@ export interface EmailLog {
   templateName: string;                          // Name of template used
   eventId: string;                               // Event identifier (or linked record ID)
   recipientEmail: string;                        // Email address sent to
-  recipientType: 'teacher' | 'parent';           // Type of recipient
+  recipientType: 'teacher' | 'parent' | 'non-buyer'; // Type of recipient
   sentAt: string;                                // ISO timestamp
   status: 'sent' | 'failed' | 'skipped';         // Send status
   errorMessage?: string;                         // Error details if failed
@@ -134,7 +134,7 @@ export interface CreateEmailLogInput {
   templateName: string;
   eventId: string;
   recipientEmail: string;
-  recipientType: 'teacher' | 'parent';
+  recipientType: 'teacher' | 'parent' | 'non-buyer';
   status: 'sent' | 'failed' | 'skipped';
   errorMessage?: string;
   resendMessageId?: string;
@@ -191,7 +191,7 @@ export interface TemplateData {
 export interface EmailRecipient {
   email: string;
   name?: string;
-  type: 'teacher' | 'parent';
+  type: 'teacher' | 'parent' | 'non-buyer';
   eventId: string;
   classId?: string;
   // Additional data for template substitution
@@ -207,7 +207,7 @@ export interface EmailRecipient {
  */
 export interface EmailSendResult {
   recipientEmail: string;
-  recipientType: 'teacher' | 'parent';
+  recipientType: 'teacher' | 'parent' | 'non-buyer';
   eventId: string;
   templateName: string;
   success: boolean;

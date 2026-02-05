@@ -18,13 +18,14 @@ export async function GET(): Promise<NextResponse> {
 
     const now = new Date();
     const pastCutoff = new Date(now);
-    pastCutoff.setDate(pastCutoff.getDate() - 30);
+    pastCutoff.setDate(pastCutoff.getDate() - 60);
     const futureCutoff = new Date(now);
-    futureCutoff.setDate(futureCutoff.getDate() + 120);
+    futureCutoff.setDate(futureCutoff.getDate() + 40);
 
     const filtered = events
       .filter((event) => {
         if (!event.event_date) return false;
+        if (event.status !== 'Confirmed') return false;
         const d = new Date(event.event_date);
         return d >= pastCutoff && d <= futureCutoff;
       })

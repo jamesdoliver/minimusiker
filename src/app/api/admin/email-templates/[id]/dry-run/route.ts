@@ -127,12 +127,14 @@ export async function GET(
             name: recipient.name,
             eventId: recipient.eventId,
           });
+        } else if (recipient.type === 'non-buyer') {
+          allNonBuyers.push({
+            email: recipient.email,
+            name: recipient.name,
+            eventId: recipient.eventId,
+            childName: recipient.templateData?.child_name,
+          });
         } else {
-          // Parent-type recipients: categorize as parent or non-buyer
-          // Non-buyer recipients come from the 'non-buyer' audience and are already
-          // filtered by getRecipientsForEvent. We need to distinguish them here.
-          // Since both parent and non-buyer recipients have type 'parent', we track
-          // them all as parents and let the UI show the counts.
           allParents.push({
             email: recipient.email,
             name: recipient.name,
@@ -160,7 +162,7 @@ export async function GET(
         },
         summary: {
           totalEvents: matchingEvents.length,
-          totalRecipients: allTeachers.length + allParents.length,
+          totalRecipients: allTeachers.length + allParents.length + allNonBuyers.length,
           teacherCount: allTeachers.length,
           parentCount: allParents.length,
           nonBuyerCount: allNonBuyers.length,

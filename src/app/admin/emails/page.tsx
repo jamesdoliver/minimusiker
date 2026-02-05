@@ -58,6 +58,33 @@ interface SendNowResult {
   details: Array<{ eventId: string; email: string; status: string; error?: string }>;
 }
 
+interface SendNowPreviewRecipients {
+  teachers: Array<{ email: string; name?: string }>;
+  parents: Array<{ email: string; name?: string; childName?: string }>;
+  nonBuyers: Array<{ email: string; name?: string; childName?: string }>;
+}
+
+interface SendNowPreviewEvent {
+  eventId: string;
+  schoolName: string;
+  eventDate: string;
+  skipped: boolean;
+  skipReason?: string;
+  recipients: SendNowPreviewRecipients;
+}
+
+interface SendNowPreviewData {
+  preview: boolean;
+  events: SendNowPreviewEvent[];
+  summary: {
+    totalRecipients: number;
+    teacherCount: number;
+    parentCount: number;
+    nonBuyerCount: number;
+    skippedEvents: number;
+  };
+}
+
 interface DryRunData {
   template: {
     id: string;
@@ -98,6 +125,9 @@ export default function AdminEmails() {
   const [isSendNowLoading, setIsSendNowLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendNowResult, setSendNowResult] = useState<SendNowResult | null>(null);
+  const [sendNowPreview, setSendNowPreview] = useState<SendNowPreviewData | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [expandedPreviewEvents, setExpandedPreviewEvents] = useState<Set<string>>(new Set());
   const [newLogIds, setNewLogIds] = useState<Set<string>>(new Set());
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previousLogIdsRef = useRef<Set<string>>(new Set());
@@ -256,6 +286,8 @@ export default function AdminEmails() {
     setSendNowEvents([]);
     setSendNowSelectedEventIds(new Set());
     setSendNowResult(null);
+    setSendNowPreview(null);
+    setExpandedPreviewEvents(new Set());
   }, []);
 
   const toggleSendNowEvent = useCallback((eventId: string) => {
@@ -268,6 +300,47 @@ export default function AdminEmails() {
       }
       return next;
     });
+  }, []);
+
+  const togglePreviewEvent = useCallback((eventId: string) => {
+    setExpandedPreviewEvents((prev) => {
+      const next = new Set(prev);
+      if (next.has(eventId)) {
+        next.delete(eventId);
+      } else {
+        next.add(eventId);
+      }
+      return next;
+    });
+  }, []);
+
+  const fetchPreview = useCallback(async () => {
+    if (!sendNowTemplateId || sendNowSelectedEventIds.size === 0) return;
+    setIsPreviewLoading(true);
+    try {
+      const response = await fetch(`/api/admin/email-templates/${sendNowTemplateId}/send-now`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventIds: Array.from(sendNowSelectedEventIds), preview: true }),
+      });
+      const data = await response.json();
+      if (data.success && data.data.preview) {
+        setSendNowPreview(data.data);
+      } else {
+        alert(data.error || 'Fehler beim Laden der Vorschau');
+      }
+    } catch (err) {
+      console.error('Error fetching preview:', err);
+      alert('Fehler beim Laden der Vorschau');
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  }, [sendNowTemplateId, sendNowSelectedEventIds]);
+
+  const goBackToEventSelection = useCallback(() => {
+    setSendNowPreview(null);
+    setExpandedPreviewEvents(new Set());
   }, []);
 
   const executeSendNow = useCallback(async () => {
@@ -678,7 +751,8 @@ export default function AdminEmails() {
               <div className="border-b border-gray-200 px-6 py-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Jetzt senden: {templatesData?.templates.find(t => t.id === sendNowTemplateId)?.name}
+                    {sendNowPreview ? 'Vorschau: ' : 'Jetzt senden: '}
+                    {templatesData?.templates.find(t => t.id === sendNowTemplateId)?.name}
                   </h3>
                   <button
                     onClick={closeSendNowModal}
@@ -691,11 +765,12 @@ export default function AdminEmails() {
 
               {/* Modal Content */}
               <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
-                {isSendNowLoading ? (
+                {isSendNowLoading || isPreviewLoading ? (
                   <div className="flex justify-center py-8">
                     <LoadingSpinner />
                   </div>
                 ) : sendNowResult ? (
+                  /* Results view */
                   <div className="space-y-4">
                     <h4 className="font-medium text-gray-900">Ergebnis</h4>
                     <div className="grid grid-cols-3 gap-3">
@@ -713,11 +788,133 @@ export default function AdminEmails() {
                       </div>
                     </div>
                   </div>
+                ) : sendNowPreview ? (
+                  /* Preview view */
+                  <div className="space-y-4">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-purple-50 rounded-lg p-2 text-center">
+                        <p className="text-lg font-bold text-purple-700">{sendNowPreview.summary.teacherCount}</p>
+                        <p className="text-xs text-purple-600">Lehrer</p>
+                      </div>
+                      <div className="bg-orange-50 rounded-lg p-2 text-center">
+                        <p className="text-lg font-bold text-orange-700">{sendNowPreview.summary.parentCount}</p>
+                        <p className="text-xs text-orange-600">Eltern</p>
+                      </div>
+                      <div className="bg-amber-50 rounded-lg p-2 text-center">
+                        <p className="text-lg font-bold text-amber-700">{sendNowPreview.summary.nonBuyerCount}</p>
+                        <p className="text-xs text-amber-600">Non-Buyer</p>
+                      </div>
+                    </div>
+
+                    {/* Event list with expandable details */}
+                    <div className="space-y-2">
+                      {sendNowPreview.events.map((event) => (
+                        <div
+                          key={event.eventId}
+                          className={`rounded-lg border ${event.skipped ? 'border-yellow-200 bg-yellow-50' : 'border-gray-200 bg-white'}`}
+                        >
+                          <button
+                            onClick={() => !event.skipped && togglePreviewEvent(event.eventId)}
+                            className={`w-full p-3 text-left ${!event.skipped ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'}`}
+                            disabled={event.skipped}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-medium truncate ${event.skipped ? 'text-yellow-800' : 'text-gray-900'}`}>
+                                  {!event.skipped && (
+                                    <span className="mr-1">{expandedPreviewEvents.has(event.eventId) ? '▼' : '▶'}</span>
+                                  )}
+                                  {event.skipped && <span className="mr-1">⚠</span>}
+                                  {event.schoolName}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {event.eventDate && new Date(event.eventDate).toLocaleDateString('de-DE', {
+                                    day: '2-digit',
+                                    month: 'long',
+                                    year: 'numeric',
+                                  })}
+                                </p>
+                              </div>
+                              {event.skipped ? (
+                                <span className="text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded">
+                                  {event.skipReason || 'Übersprungen'}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-gray-500">
+                                  {event.recipients.teachers.length + event.recipients.parents.length + event.recipients.nonBuyers.length} Empfänger
+                                </span>
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Expanded recipient details */}
+                          {!event.skipped && expandedPreviewEvents.has(event.eventId) && (
+                            <div className="px-3 pb-3 pt-0 border-t border-gray-100">
+                              {event.recipients.teachers.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium text-purple-700 mb-1">
+                                    Lehrer ({event.recipients.teachers.length})
+                                  </p>
+                                  <div className="text-xs text-gray-600 space-y-0.5">
+                                    {event.recipients.teachers.map((t, i) => (
+                                      <div key={i}>{t.name || t.email} <span className="text-gray-400">({t.email})</span></div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {event.recipients.parents.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium text-orange-700 mb-1">
+                                    Eltern ({event.recipients.parents.length})
+                                  </p>
+                                  <div className="text-xs text-gray-600">
+                                    {event.recipients.parents.length <= 5 ? (
+                                      event.recipients.parents.map((p, i) => (
+                                        <div key={i}>{p.name || p.email} {p.childName && <span className="text-gray-400">(Kind: {p.childName})</span>}</div>
+                                      ))
+                                    ) : (
+                                      <span>{event.recipients.parents.length} Empfänger</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              {event.recipients.nonBuyers.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium text-amber-700 mb-1">
+                                    Non-Buyer ({event.recipients.nonBuyers.length})
+                                  </p>
+                                  <div className="text-xs text-gray-600">
+                                    {event.recipients.nonBuyers.length <= 5 ? (
+                                      event.recipients.nonBuyers.map((p, i) => (
+                                        <div key={i}>{p.name || p.email} {p.childName && <span className="text-gray-400">(Kind: {p.childName})</span>}</div>
+                                      ))
+                                    ) : (
+                                      <span>{event.recipients.nonBuyers.length} Empfänger</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Skipped events summary */}
+                    {sendNowPreview.summary.skippedEvents > 0 && (
+                      <p className="text-xs text-yellow-700 text-center">
+                        {sendNowPreview.summary.skippedEvents} Event(s) übersprungen (passen nicht zu Template-Filter)
+                      </p>
+                    )}
+                  </div>
                 ) : sendNowEvents.length === 0 ? (
+                  /* No events found */
                   <div className="text-center py-8 text-gray-500">
                     Keine Veranstaltungen im Zeitfenster gefunden
                   </div>
                 ) : (
+                  /* Event selection view */
                   <div className="space-y-2">
                     <p className="text-sm text-gray-500 mb-3">
                       Wähle die Veranstaltungen aus, an deren Empfänger die E-Mail gesendet werden soll:
@@ -755,20 +952,48 @@ export default function AdminEmails() {
 
               {/* Modal Footer */}
               <div className="border-t border-gray-200 px-6 py-4 flex gap-3">
-                <button
-                  onClick={closeSendNowModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                >
-                  {sendNowResult ? 'Schließen' : 'Abbrechen'}
-                </button>
-                {!sendNowResult && (
+                {sendNowResult ? (
+                  /* Results: just close button */
                   <button
-                    onClick={executeSendNow}
-                    disabled={sendNowSelectedEventIds.size === 0 || isSending}
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    onClick={closeSendNowModal}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                   >
-                    {isSending ? 'Sendet...' : `Senden (${sendNowSelectedEventIds.size} Events)`}
+                    Schließen
                   </button>
+                ) : sendNowPreview ? (
+                  /* Preview: back and send buttons */
+                  <>
+                    <button
+                      onClick={goBackToEventSelection}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    >
+                      Zurück
+                    </button>
+                    <button
+                      onClick={executeSendNow}
+                      disabled={isSending || sendNowPreview.summary.totalRecipients === 0}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {isSending ? 'Sendet...' : `Jetzt senden (${sendNowPreview.summary.totalRecipients})`}
+                    </button>
+                  </>
+                ) : (
+                  /* Event selection: cancel and preview buttons */
+                  <>
+                    <button
+                      onClick={closeSendNowModal}
+                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      onClick={fetchPreview}
+                      disabled={sendNowSelectedEventIds.size === 0 || isPreviewLoading}
+                      className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {isPreviewLoading ? 'Lädt...' : `Vorschau (${sendNowSelectedEventIds.size} Events)`}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
