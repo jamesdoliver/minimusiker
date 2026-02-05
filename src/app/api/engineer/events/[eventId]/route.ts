@@ -3,6 +3,7 @@ import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
+import { ENGINEER_IDS } from '@/lib/config/engineers';
 import {
   EngineerEventDetail,
   EngineerClassView,
@@ -47,7 +48,20 @@ export async function GET(
 
     // Get audio files for this event
     const teacherService = getTeacherService();
-    const audioFiles = await teacherService.getAudioFilesByEventId(eventId);
+    let audioFiles = await teacherService.getAudioFilesByEventId(eventId);
+
+    // Filter audio files based on engineer role (Micha=schulsong, Jakob=regular)
+    // Only filter if engineer IDs are configured
+    if (ENGINEER_IDS.MICHA && ENGINEER_IDS.JAKOB) {
+      if (session.engineerId === ENGINEER_IDS.MICHA) {
+        // Micha only sees schulsong tracks
+        audioFiles = audioFiles.filter(f => f.isSchulsong === true);
+      } else if (session.engineerId === ENGINEER_IDS.JAKOB) {
+        // Jakob only sees non-schulsong (regular) tracks
+        audioFiles = audioFiles.filter(f => !f.isSchulsong);
+      }
+      // If engineer is neither Micha nor Jakob, show all files (admin/fallback case)
+    }
 
     // Generate signed URLs for all audio files
     const r2Service = getR2Service();

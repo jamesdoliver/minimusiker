@@ -12,6 +12,7 @@ interface BatchUploadModalProps {
   classId: string;
   songs: Song[];
   onUploadComplete?: () => void;
+  eventIsSchulsong?: boolean;
 }
 
 export default function BatchUploadModal({
@@ -21,12 +22,14 @@ export default function BatchUploadModal({
   classId,
   songs,
   onUploadComplete,
+  eventIsSchulsong,
 }: BatchUploadModalProps) {
   const [step, setStep] = useState<'upload' | 'review' | 'confirming'>('upload');
   const [uploading, setUploading] = useState(false);
   const [uploadId, setUploadId] = useState<string | null>(null);
   const [matches, setMatches] = useState<AutoMatchResult[]>([]);
   const [editedMatches, setEditedMatches] = useState<Map<string, string>>(new Map());
+  const [isSchulsongUpload, setIsSchulsongUpload] = useState(false);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -95,6 +98,7 @@ export default function BatchUploadModal({
           body: JSON.stringify({
             uploadId,
             confirmedMatches,
+            isSchulsong: isSchulsongUpload,
           }),
         }
       );
@@ -124,6 +128,7 @@ export default function BatchUploadModal({
     setUploadId(null);
     setMatches([]);
     setEditedMatches(new Map());
+    setIsSchulsongUpload(false);
     onClose();
   };
 
@@ -216,6 +221,26 @@ export default function BatchUploadModal({
                   />
                 </label>
               </div>
+
+              {/* Schulsong checkbox - only show when event is schulsong */}
+              {eventIsSchulsong && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isSchulsongUpload}
+                      onChange={(e) => setIsSchulsongUpload(e.target.checked)}
+                      className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+                    />
+                    <div>
+                      <span className="font-medium text-amber-800">Mark as Schulsong tracks</span>
+                      <p className="text-sm text-amber-700 mt-0.5">
+                        These files will be assigned to the Schulsong engineer (Micha)
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
 
               {uploading && (
                 <div className="text-center">

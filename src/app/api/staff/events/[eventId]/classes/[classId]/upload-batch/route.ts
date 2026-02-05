@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { autoMatchFiles, getMatchSummary } from '@/lib/utils/autoMatch';
 import AdmZip from 'adm-zip';
 
@@ -157,7 +158,7 @@ export async function PUT(
     const eventId = decodeURIComponent(params.eventId);
     const classId = decodeURIComponent(params.classId);
 
-    const { uploadId, confirmedMatches } = await request.json();
+    const { uploadId, confirmedMatches, isSchulsong } = await request.json();
 
     if (!uploadId || !Array.isArray(confirmedMatches)) {
       return NextResponse.json(
@@ -217,9 +218,24 @@ export async function PUT(
         filename,
         uploadedBy: session.staffId,
         status: 'ready',
+        isSchulsong: isSchulsong || false,
       });
 
       audioFiles.push(audioFile);
+    }
+
+    // Auto-assign engineer and update pipeline stage
+    if (audioFiles.length > 0) {
+      try {
+        await getAirtableService().autoAssignEngineerForUpload(eventId, isSchulsong || false);
+      } catch (error) {
+        console.error('Error auto-assigning engineer:', error);
+      }
+      try {
+        await getAirtableService().updateEventAudioPipelineStage(eventId, 'in_progress');
+      } catch (error) {
+        console.error('Error updating audio pipeline stage:', error);
+      }
     }
 
     return NextResponse.json({

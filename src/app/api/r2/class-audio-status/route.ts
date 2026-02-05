@@ -10,6 +10,8 @@ interface AudioStatusResponse {
   audioUrl?: string;
   schoolLogoUrl?: string;
   expiresAt?: string;
+  notYetVisible?: boolean;
+  visibleAfter?: string;
 }
 
 export async function GET(request: NextRequest) {
@@ -37,8 +39,20 @@ export async function GET(request: NextRequest) {
     const airtableService = getAirtableService();
     const isR2Enabled = process.env.ENABLE_DIGITAL_DELIVERY === 'true';
 
-    // First, check if the event is published (engineer must toggle this)
-    const isPublished = await airtableService.getEventPublishStatus(eventId);
+    // Fetch event to check approval status and event date
+    const event = await airtableService.getEventByEventId(eventId);
+    const allTracksApproved = event?.all_tracks_approved === true;
+
+    // Check if 7 days have passed since the event date
+    const eventDate = event?.event_date ? new Date(event.event_date) : null;
+    const sevenDaysAfter = eventDate ? new Date(eventDate) : null;
+    if (sevenDaysAfter) {
+      sevenDaysAfter.setDate(sevenDaysAfter.getDate() + 7);
+    }
+    const hasWaitingPeriodPassed = sevenDaysAfter ? new Date() >= sevenDaysAfter : false;
+
+    // Audio is visible only when admin approved ALL tracks AND 7 days have passed
+    const isVisible = allTracksApproved && hasWaitingPeriodPassed;
 
     // Check for final audio in the new structure
     // Path: events/{eventId}/classes/{classId}/final/final.mp3
@@ -71,11 +85,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Audio is only available if file exists AND event is published
-    const hasAudio = hasAudioFile && isPublished;
+    // Audio is only available if file exists AND visibility conditions are met
+    const hasAudio = hasAudioFile && isVisible;
 
-    // Clear audioUrl if not published (don't expose URL to unpublished audio)
-    if (!isPublished) {
+    // Clear audioUrl if not visible (don't expose URL to non-visible audio)
+    if (!isVisible) {
       audioUrl = undefined;
     }
 
@@ -110,6 +124,11 @@ export async function GET(request: NextRequest) {
       audioUrl,
       schoolLogoUrl,
       expiresAt: hasAudio ? new Date(Date.now() + 3600 * 1000).toISOString() : undefined,
+      // If audio file exists but not visible yet, indicate when it will be visible
+      notYetVisible: hasAudioFile && !isVisible,
+      visibleAfter: hasAudioFile && !isVisible && sevenDaysAfter
+        ? sevenDaysAfter.toISOString()
+        : undefined,
     };
 
     return NextResponse.json<ApiResponse<AudioStatusResponse>>({

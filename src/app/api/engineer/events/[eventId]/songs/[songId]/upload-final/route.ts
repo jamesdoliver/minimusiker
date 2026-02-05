@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 /**
  * POST /api/engineer/events/[eventId]/songs/[songId]/upload-final
@@ -136,6 +137,24 @@ export async function PUT(
       durationSeconds,
       status: 'ready',
     });
+
+    // Check if ALL songs now have final audio → transition to ready_for_review
+    try {
+      const allSongs = await teacherService.getSongsByEventId(eventId);
+      const allAudioFiles = await teacherService.getAudioFilesByEventId(eventId);
+      const finalFiles = allAudioFiles.filter(f => f.type === 'final');
+      // Check: every class that has songs also has at least one final audio file
+      const classIdsWithSongs = new Set(allSongs.map(s => s.classId));
+      const classIdsWithFinal = new Set(finalFiles.map(f => f.classId));
+      const allClassesHaveFinal = classIdsWithSongs.size > 0 &&
+        [...classIdsWithSongs].every(cid => classIdsWithFinal.has(cid));
+
+      if (allClassesHaveFinal) {
+        await getAirtableService().updateEventAudioPipelineStage(eventId, 'ready_for_review');
+      }
+    } catch (e) {
+      console.error('Error checking/updating audio pipeline stage:', e);
+    }
 
     return NextResponse.json({
       success: true,

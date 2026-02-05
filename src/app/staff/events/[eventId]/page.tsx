@@ -30,9 +30,10 @@ interface ClassSongUploadCardProps {
   cls: EventClassDetail;
   eventId: string;
   onRefresh: () => void;
+  eventIsSchulsong?: boolean;
 }
 
-function ClassSongUploadCard({ cls, eventId, onRefresh }: ClassSongUploadCardProps) {
+function ClassSongUploadCard({ cls, eventId, onRefresh, eventIsSchulsong }: ClassSongUploadCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [songs, setSongs] = useState<SongWithAudio[]>([]);
   const [isLoadingSongs, setIsLoadingSongs] = useState(false);
@@ -170,6 +171,7 @@ function ClassSongUploadCard({ cls, eventId, onRefresh }: ClassSongUploadCardPro
         classId={cls.classId}
         songs={songs}
         onUploadComplete={handleUploadComplete}
+        eventIsSchulsong={eventIsSchulsong}
       />
     </>
   );
@@ -406,6 +408,7 @@ export default function StaffEventDetailPage() {
                   cls={cls}
                   eventId={event.eventId}
                   onRefresh={handleRefresh}
+                  eventIsSchulsong={event.isSchulsong}
                 />
               ))}
             </div>

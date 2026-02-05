@@ -45,6 +45,8 @@ export interface BookingWithDetails {
   // Registration tracking
   registrationCount?: number;    // Count of registrations for linked event
   eventRecordId?: string;        // Event record ID for registration lookup
+  // Audio pipeline
+  audioPipelineStage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved';
 }
 
 // Staff member for dropdown
@@ -214,6 +216,8 @@ export async function GET(request: NextRequest) {
               assignedStaffNames: event.assigned_staff?.map(id => staffMap.get(id)).filter(Boolean) as string[],
               // Event record ID for registration lookup
               eventRecordId: event.id,
+              // Audio pipeline
+              audioPipelineStage: event.audio_pipeline_stage,
             };
           }
         } catch (error) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 /**
  * POST /api/staff/events/[eventId]/songs/[songId]/upload-raw
@@ -136,6 +137,13 @@ export async function PUT(
       durationSeconds,
       status: 'ready',
     });
+
+    // Update audio pipeline stage to in_progress
+    try {
+      await getAirtableService().updateEventAudioPipelineStage(eventId, 'in_progress');
+    } catch (e) {
+      console.error('Error updating audio pipeline stage:', e);
+    }
 
     return NextResponse.json({
       success: true,

@@ -2,7 +2,6 @@
 
 import { useState, Fragment } from 'react';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
-import BookingStatusBadge from './BookingStatusBadge';
 import BookingDetailsBreakdown from './BookingDetailsBreakdown';
 import StatusCircle from './StatusCircle';
 import EventTypeCircles from './EventTypeCircles';
@@ -10,6 +9,31 @@ import { RegistrationProgress } from './RegistrationProgress';
 
 // Computed status type for styling
 type ComputedStatus = 'confirmed' | 'completed' | 'onHold';
+
+function AudioPipelineIndicator({ stage, eventDate }: { stage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved'; eventDate?: string }) {
+  let isFuture = false;
+  if (eventDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const eventDay = new Date(eventDate + 'T00:00:00');
+    eventDay.setHours(0, 0, 0, 0);
+    isFuture = eventDay > today;
+  }
+
+  if (isFuture || !stage || stage === 'not_started') {
+    return <span title="Event hasn't happened yet" className="text-gray-400">&#x23F3;</span>;
+  }
+  if (stage === 'in_progress') {
+    return <span title="Audio in progress — waiting for uploads">&#x26A0;&#xFE0F;</span>;
+  }
+  if (stage === 'ready_for_review') {
+    return <span title="Ready for admin review">&#x1F3A7;</span>;
+  }
+  if (stage === 'approved') {
+    return <span title="Audio approved">&#x2705;</span>;
+  }
+  return <span>—</span>;
+}
 
 interface BookingsTableProps {
   bookings: BookingWithDetails[];
@@ -29,21 +53,6 @@ function ChevronIcon({ isOpen }: { isOpen: boolean }) {
     >
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
     </svg>
-  );
-}
-
-function CategoryBadge({ category }: { category: string }) {
-  const isLarge = category === '>150 children';
-  return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        isLarge
-          ? 'bg-purple-100 text-purple-800 border border-purple-200'
-          : 'bg-blue-100 text-blue-800 border border-blue-200'
-      }`}
-    >
-      {isLarge ? '>150' : '<150'}
-    </span>
   );
 }
 
@@ -100,7 +109,7 @@ export default function BookingsTable({ bookings, onEventDeleted, getComputedSta
                 Registration
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Children
+                Audio
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
@@ -144,9 +153,10 @@ export default function BookingsTable({ bookings, onEventDeleted, getComputedSta
                       />
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className="text-sm font-medium text-gray-900">
-                        {booking.numberOfChildren || '-'}
-                      </span>
+                      <AudioPipelineIndicator
+                        stage={booking.audioPipelineStage}
+                        eventDate={booking.bookingDate}
+                      />
                     </td>
                     <td className="px-6 py-4 text-center">
                       <StatusCircle status={booking.eventStatus} />

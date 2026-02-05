@@ -70,6 +70,15 @@ export async function POST(
     const airtableService = getAirtableService();
     await airtableService.updateEventApprovalStatus(eventId, allTracksApproved);
 
+    // Update audio pipeline stage
+    const hasRejectedTracks = finalFiles.some(f => f.approvalStatus === 'rejected');
+    if (allTracksApproved) {
+      await airtableService.updateEventAudioPipelineStage(eventId, 'approved');
+    } else if (hasRejectedTracks) {
+      // Rejected tracks means engineer needs to redo work
+      await airtableService.updateEventAudioPipelineStage(eventId, 'in_progress');
+    }
+
     // Determine the overall approval status
     let adminApprovalStatus: AdminApprovalStatus = 'pending';
     if (allTracksApproved) {

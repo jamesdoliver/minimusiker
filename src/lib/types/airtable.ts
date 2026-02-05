@@ -549,8 +549,10 @@ export const EVENTS_FIELD_IDS = {
   is_schulsong: 'fld2ml1yiecD1a5ms',         // Checkbox - shows 'S' circle
   is_minimusikertag: 'fld2GuudFY4Rk6f8i',     // Checkbox - true = full event, false = schulsong-only
   // Admin audio approval fields
-  all_tracks_approved: 'fldTODO_ALL_TRACKS_APPROVED', // Checkbox - True when admin approved ALL final tracks
-  admin_approval_status: 'fldTODO_ADMIN_APPROVAL_STATUS', // Single Select - pending | ready_for_approval | approved
+  all_tracks_approved: 'flduTvUyy0DQmCN15', // Checkbox - True when admin approved ALL final tracks
+  admin_approval_status: 'fldsO7ovNwD4TdtCw', // Single Select - pending | ready_for_approval | approved
+  // Audio pipeline stage for admin bookings view
+  audio_pipeline_stage: 'fldlW3jUcGmhbkhug', // Single Select - not_started | in_progress | ready_for_review | approved
 } as const;
 
 // Classes Table - 1 row per class
@@ -688,6 +690,8 @@ export interface Event {
   // Admin audio approval fields
   all_tracks_approved?: boolean;        // True when admin approved ALL final tracks
   admin_approval_status?: 'pending' | 'ready_for_approval' | 'approved';
+  // Audio pipeline stage for admin bookings view
+  audio_pipeline_stage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved';
 }
 
 /**

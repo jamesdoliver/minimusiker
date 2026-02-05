@@ -3862,6 +3862,40 @@ class AirtableService {
   }
 
   /**
+   * Update the audio pipeline stage for an event
+   * Called at each pipeline transition point (staff upload, engineer final, admin approve)
+   */
+  async updateEventAudioPipelineStage(
+    eventId: string,
+    stage: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved'
+  ): Promise<void> {
+    if (!this.useNormalizedTables()) {
+      return;
+    }
+
+    try {
+      const events = await this.eventsTable!.select({
+        filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (events.length === 0) {
+        console.log(`[updateEventAudioPipelineStage] Event not found: ${eventId}`);
+        return;
+      }
+
+      await this.eventsTable!.update(events[0].id, {
+        [EVENTS_FIELD_IDS.audio_pipeline_stage]: stage,
+      });
+
+      console.log(`[updateEventAudioPipelineStage] Updated event ${eventId}: stage=${stage}`);
+    } catch (error) {
+      console.error('[updateEventAudioPipelineStage] Error:', error);
+      // Don't throw - pipeline stage updates are non-critical
+    }
+  }
+
+  /**
    * Get school event summaries filtered by assigned engineer
    * Used for Engineer Portal to show only assigned events
    */
@@ -5192,6 +5226,8 @@ class AirtableService {
           EVENTS_FIELD_IDS.is_plus,
           EVENTS_FIELD_IDS.is_kita,
           EVENTS_FIELD_IDS.is_schulsong,
+          EVENTS_FIELD_IDS.is_minimusikertag,
+          EVENTS_FIELD_IDS.audio_pipeline_stage,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -5278,6 +5314,8 @@ class AirtableService {
       is_kita: record.get('is_kita') as boolean | undefined,
       is_schulsong: record.get('is_schulsong') as boolean | undefined,
       is_minimusikertag: record.get('is_minimusikertag') as boolean | undefined,
+      // Audio pipeline
+      audio_pipeline_stage: record.get('audio_pipeline_stage') as Event['audio_pipeline_stage'] | undefined,
     };
   }
 
