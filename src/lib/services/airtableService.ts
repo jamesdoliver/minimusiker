@@ -4012,10 +4012,12 @@ class AirtableService {
   async isEngineerAssignedToEvent(engineerId: string, bookingId: string): Promise<boolean> {
     if (this.useNormalizedTables()) {
       // NEW: Query Events table
+      this.ensureNormalizedTablesInitialized();
       try {
         const events = await this.eventsTable!.select({
           filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
           maxRecords: 1,
+          returnFieldsByFieldId: true,
         }).firstPage();
 
         if (events.length === 0) return false;
