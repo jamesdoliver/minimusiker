@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   HeadObjectCommand,
   CopyObjectCommand,
+  PutBucketCorsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -1956,6 +1957,39 @@ class R2Service {
       uploadUrl,
       key,
     };
+  }
+
+  // ========================================
+  // CORS Configuration
+  // ========================================
+
+  /**
+   * Configure CORS rules on the R2 bucket to allow browser presigned URL uploads.
+   * Call once after deploy (via admin endpoint). Rules persist on the bucket.
+   */
+  async configureBucketCors(): Promise<void> {
+    const allowedOrigins = [
+      'https://www.minimusiker.app',
+      'https://minimusiker.app',
+    ];
+    if (process.env.NODE_ENV === 'development') {
+      allowedOrigins.push('http://localhost:3000');
+    }
+
+    const command = new PutBucketCorsCommand({
+      Bucket: this.bucketName,
+      CORSConfiguration: {
+        CORSRules: [{
+          AllowedOrigins: allowedOrigins,
+          AllowedMethods: ['GET', 'PUT', 'HEAD'],
+          AllowedHeaders: ['*'],
+          ExposeHeaders: ['ETag'],
+          MaxAgeSeconds: 3600,
+        }],
+      },
+    });
+
+    await this.client.send(command);
   }
 
   // ========================================
