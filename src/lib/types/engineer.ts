@@ -75,6 +75,7 @@ export interface EngineerEventDetail {
   mixingStatus: EngineerMixingStatus;
   isSchulsong?: boolean;
   schulsongClass?: EngineerClassView;
+  audioPipelineStage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved';
 }
 
 // =============================================================================

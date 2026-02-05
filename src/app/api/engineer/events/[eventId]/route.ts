@@ -154,6 +154,20 @@ export async function GET(
       mixingStatus = 'in-progress';
     }
 
+    // Schulsong-only override: if there are no regular classes, derive status from schulsong
+    if (schulsongClassView && classesWithAudio.length === 0) {
+      const hasSchulsongFinal = !!(schulsongClassView.finalMp3File || schulsongClassView.finalWavFile);
+      if (hasSchulsongFinal) {
+        mixingStatus = 'completed';
+      } else if (schulsongClassView.rawFiles.length > 0) {
+        mixingStatus = 'in-progress';
+      }
+    }
+
+    // Fetch audio_pipeline_stage from the event record
+    const eventRecord = await getAirtableService().getEventByEventId(eventId);
+    const audioPipelineStage = eventRecord?.audio_pipeline_stage;
+
     const response: EngineerEventDetail = {
       eventId: eventDetail.eventId,
       schoolName: eventDetail.schoolName,
@@ -163,6 +177,7 @@ export async function GET(
       mixingStatus,
       isSchulsong,
       schulsongClass: schulsongClassView,
+      audioPipelineStage,
     };
 
     return NextResponse.json({

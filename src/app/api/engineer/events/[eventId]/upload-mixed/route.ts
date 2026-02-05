@@ -205,7 +205,10 @@ export async function PUT(
         const allClassesHaveFinal = classIdsWithSongs.size > 0 &&
           [...classIdsWithSongs].every(cid => classIdsWithFinal.has(cid));
 
-        if (allClassesHaveFinal) {
+        const hasSchulsongOnly = classIdsWithSongs.size === 0 &&
+          finalFiles.some(f => f.isSchulsong);
+
+        if (allClassesHaveFinal || hasSchulsongOnly) {
           await getAirtableService().updateEventAudioPipelineStage(eventId, 'ready_for_review');
         }
       } catch (e) {

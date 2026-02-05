@@ -336,7 +336,28 @@ export default function EngineerEventDetailPage() {
             </div>
             <div>
               <p className="text-sm text-gray-500">Status</p>
-              <p className="font-medium capitalize">{event.mixingStatus.replace('-', ' ')}</p>
+              {(() => {
+                const stage = event.audioPipelineStage;
+                if (stage === 'approved') {
+                  return (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Approved
+                    </span>
+                  );
+                }
+                if (stage === 'ready_for_review') {
+                  return (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                      In Review
+                    </span>
+                  );
+                }
+                return (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                    {event.mixingStatus === 'completed' ? 'Completed' : event.mixingStatus === 'in-progress' ? 'In Progress' : 'Pending'}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 

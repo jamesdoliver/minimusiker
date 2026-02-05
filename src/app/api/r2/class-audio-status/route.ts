@@ -62,24 +62,22 @@ export async function GET(request: NextRequest) {
     let audioUrl: string | undefined;
 
     if (isR2Enabled) {
-      hasAudioFile = await r2Service.fileExistsInAssetsBucket(finalAudioKey);
-
-      if (hasAudioFile) {
-        // Generate signed URL (1 hour expiry for preview playback)
-        audioUrl = await r2Service.generateSignedUrlForAssetsBucket(finalAudioKey, 3600);
+      // Primary: check minimusiker bucket (where engineer uploads land)
+      const recordingsKey = `recordings/${eventId}/${classId}/final.mp3`;
+      if (await r2Service.fileExists(recordingsKey)) {
+        hasAudioFile = true;
+        audioUrl = await r2Service.generateSignedUrl(recordingsKey, 3600);
       } else {
-        // Fallback: check legacy paths
-        // Try: recordings/{eventId}/{classId}/final.mp3
-        const legacyKey1 = `recordings/${eventId}/${classId}/final.mp3`;
-        if (await r2Service.fileExists(legacyKey1)) {
+        // Legacy fallback: assets bucket structured path
+        if (await r2Service.fileExistsInAssetsBucket(finalAudioKey)) {
           hasAudioFile = true;
-          audioUrl = await r2Service.generateSignedUrl(legacyKey1, 3600);
+          audioUrl = await r2Service.generateSignedUrlForAssetsBucket(finalAudioKey, 3600);
         } else {
-          // Try: events/{eventId}/{classId}/full.mp3
-          const legacyKey2 = `events/${eventId}/${classId}/full.mp3`;
-          if (await r2Service.fileExists(legacyKey2)) {
+          // Legacy fallback: events/{eventId}/{classId}/full.mp3
+          const legacyKey = `events/${eventId}/${classId}/full.mp3`;
+          if (await r2Service.fileExists(legacyKey)) {
             hasAudioFile = true;
-            audioUrl = await r2Service.generateSignedUrl(legacyKey2, 3600);
+            audioUrl = await r2Service.generateSignedUrl(legacyKey, 3600);
           }
         }
       }
