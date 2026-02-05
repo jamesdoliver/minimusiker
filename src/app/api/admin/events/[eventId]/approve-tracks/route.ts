@@ -33,6 +33,11 @@ export async function POST(
       );
     }
 
+    // Resolve the real event_id (handles SimplyBook ID → real event_id resolution)
+    const airtableService = getAirtableService();
+    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const resolvedEventId = eventDetail?.eventId || eventId;
+
     const teacherService = getTeacherService();
     const updatedTracks: { audioFileId: string; approvalStatus: 'pending' | 'approved' | 'rejected' }[] = [];
 
@@ -59,7 +64,7 @@ export async function POST(
     }
 
     // Re-fetch all audio files for the event to check overall status
-    const audioFiles = await teacherService.getAudioFilesByEventId(eventId);
+    const audioFiles = await teacherService.getAudioFilesByEventId(resolvedEventId);
     const finalFiles = audioFiles.filter(f => f.type === 'final');
 
     // Check if ALL final tracks are approved
@@ -67,16 +72,15 @@ export async function POST(
       finalFiles.every(f => f.approvalStatus === 'approved');
 
     // Update event's all_tracks_approved and admin_approval_status
-    const airtableService = getAirtableService();
-    await airtableService.updateEventApprovalStatus(eventId, allTracksApproved);
+    await airtableService.updateEventApprovalStatus(resolvedEventId, allTracksApproved);
 
     // Update audio pipeline stage
     const hasRejectedTracks = finalFiles.some(f => f.approvalStatus === 'rejected');
     if (allTracksApproved) {
-      await airtableService.updateEventAudioPipelineStage(eventId, 'approved');
+      await airtableService.updateEventAudioPipelineStage(resolvedEventId, 'approved');
     } else if (hasRejectedTracks) {
       // Rejected tracks means engineer needs to redo work
-      await airtableService.updateEventAudioPipelineStage(eventId, 'in_progress');
+      await airtableService.updateEventAudioPipelineStage(resolvedEventId, 'in_progress');
     }
 
     // Determine the overall approval status

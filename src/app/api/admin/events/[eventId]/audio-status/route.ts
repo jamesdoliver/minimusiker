@@ -28,12 +28,15 @@ export async function GET(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
+    // Use the resolved event_id (handles SimplyBook ID → real event_id resolution)
+    const resolvedEventId = eventDetail.eventId;
+
     // Get songs for this event
     const teacherService = getTeacherService();
-    const songs = await teacherService.getSongsByEventId(eventId);
+    const songs = await teacherService.getSongsByEventId(resolvedEventId);
 
     // Get audio files for this event
-    const audioFiles = await teacherService.getAudioFilesByEventId(eventId);
+    const audioFiles = await teacherService.getAudioFilesByEventId(resolvedEventId);
 
     // Get R2 service for generating signed URLs
     const r2Service = getR2Service();

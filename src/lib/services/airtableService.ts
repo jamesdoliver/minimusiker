@@ -2432,8 +2432,9 @@ class AirtableService {
           }
         }
 
+        const resolvedEventId = eventRecord.fields[EVENTS_FIELD_IDS.event_id] as string || eventId;
         return {
-          eventId,
+          eventId: resolvedEventId,
           schoolName,
           eventDate,
           eventType,
