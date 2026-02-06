@@ -15,6 +15,8 @@ import {
   sendNewBookingNotification,
   sendDateChangeNotification,
   sendCancellationNotification,
+  sendSchulsongTeacherApprovedNotification,
+  SchulsongTeacherApprovedData,
 } from './resendService';
 
 // Airtable table ID for NotificationSettings
@@ -168,6 +170,42 @@ export async function triggerCancellationNotification(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[NotificationService] Error in triggerCancellationNotification:', error);
+    return { sent: false, error: errorMessage };
+  }
+}
+
+/**
+ * Send schulsong teacher approved notification if enabled
+ */
+export async function triggerSchulsongTeacherApprovedNotification(
+  data: SchulsongTeacherApprovedData
+): Promise<{ sent: boolean; error?: string }> {
+  try {
+    const settings = await getNotificationSettings('schulsong_teacher_approved');
+
+    if (!settings || !settings.enabled) {
+      console.log('[NotificationService] Schulsong teacher approved notification disabled or not configured');
+      return { sent: false };
+    }
+
+    const recipients = parseRecipientEmails(settings.recipientEmails);
+    if (recipients.length === 0) {
+      console.log('[NotificationService] No recipients configured for schulsong teacher approved notification');
+      return { sent: false };
+    }
+
+    const result = await sendSchulsongTeacherApprovedNotification(recipients, data);
+
+    if (result.success) {
+      console.log(`[NotificationService] Schulsong teacher approved notification sent to ${recipients.length} recipients`);
+      return { sent: true };
+    } else {
+      console.error('[NotificationService] Failed to send schulsong teacher approved notification:', result.error);
+      return { sent: false, error: result.error };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[NotificationService] Error in triggerSchulsongTeacherApprovedNotification:', error);
     return { sent: false, error: errorMessage };
   }
 }

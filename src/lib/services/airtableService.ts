@@ -3863,6 +3863,35 @@ class AirtableService {
   }
 
   /**
+   * Set or clear schulsong_released_at on an event
+   * Called when admin approves (sets date) or rejects (clears) schulsong
+   */
+  async setSchulsongReleasedAt(eventId: string, releasedAt: string | null): Promise<void> {
+    try {
+      const events = await this.base(EVENTS_TABLE_ID).select({
+        filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (events.length === 0) {
+        console.log(`[setSchulsongReleasedAt] Event not found: ${eventId}`);
+        return;
+      }
+
+      // Airtable SDK doesn't accept null — use undefined to clear a field
+      const fieldValue = releasedAt ?? undefined;
+      await this.base(EVENTS_TABLE_ID).update(events[0].id, {
+        [EVENTS_FIELD_IDS.schulsong_released_at]: fieldValue,
+      } as Record<string, string | undefined>);
+
+      console.log(`[setSchulsongReleasedAt] Updated event ${eventId}: schulsong_released_at=${releasedAt}`);
+    } catch (error) {
+      console.error('[setSchulsongReleasedAt] Error:', error);
+      throw new Error(`Failed to set schulsong released at: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Update the audio pipeline stage for an event
    * Called at each pipeline transition point (staff upload, engineer final, admin approve)
    */
@@ -5318,10 +5347,15 @@ class AirtableService {
       is_kita: record.get('is_kita') as boolean | undefined,
       is_schulsong: record.get('is_schulsong') as boolean | undefined,
       is_minimusikertag: record.get('is_minimusikertag') as boolean | undefined,
+      // Audio approval fields
+      all_tracks_approved: record.get('all_tracks_approved') as boolean | undefined,
+      admin_approval_status: record.get('admin_approval_status') as Event['admin_approval_status'] | undefined,
       // Audio pipeline
       audio_pipeline_stage: record.get('audio_pipeline_stage') as Event['audio_pipeline_stage'] | undefined,
       // Admin notes
       admin_notes: record.get('admin_notes') as string | undefined,
+      // Schulsong release date
+      schulsong_released_at: record.get('schulsong_released_at') as string | undefined,
     };
   }
 

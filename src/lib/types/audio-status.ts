@@ -30,6 +30,7 @@ export interface TrackApprovalInfo {
   finalAudioUrl?: string;
   finalAudioR2Key?: string;
   isSchulsong?: boolean;
+  teacherApprovedAt?: string;
 }
 
 /**

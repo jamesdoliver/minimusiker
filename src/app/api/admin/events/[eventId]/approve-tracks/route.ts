@@ -64,8 +64,9 @@ export async function POST(
     }
 
     // Re-fetch all audio files for the event to check overall status
+    // Exclude schulsong — its approval is managed separately via approve-schulsong
     const audioFiles = await teacherService.getAudioFilesByEventId(resolvedEventId);
-    const finalFiles = audioFiles.filter(f => f.type === 'final');
+    const finalFiles = audioFiles.filter(f => f.type === 'final' && !f.isSchulsong);
 
     // Check if ALL final tracks are approved
     const allTracksApproved = finalFiles.length > 0 &&

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { triggerSchulsongTeacherApprovedNotification } from '@/lib/services/notificationService';
 
 /**
  * POST /api/teacher/events/[eventId]/schulsong-approve
@@ -10,7 +12,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
  * - Teacher must be authenticated
  * - Event must have is_schulsong = true
  * - Schulsong file must exist (type=final, status=ready)
- * - Admin must have approved (approval_status='approved')
+ *
+ * After approval, sends email to admins (fire-and-forget).
  *
  * Returns:
  * - success: boolean
@@ -34,6 +37,19 @@ export async function POST(
     // Approve the schulsong
     const result = await teacherService.approveSchulsongAsTeacher(eventId);
 
+    // Send notification email to admins (fire-and-forget)
+    const airtableService = getAirtableService();
+    const event = await airtableService.getEventByEventId(eventId);
+    if (event) {
+      triggerSchulsongTeacherApprovedNotification({
+        schoolName: event.school_name,
+        eventDate: event.event_date,
+        eventId,
+      }).catch((err) => {
+        console.error('[schulsong-approve] Failed to send notification:', err);
+      });
+    }
+
     return NextResponse.json({
       success: true,
       approvedAt: result.approvedAt,
@@ -48,8 +64,6 @@ export async function POST(
     let statusCode = 500;
     if (errorMessage.includes('not found') || errorMessage.includes('No schulsong')) {
       statusCode = 404;
-    } else if (errorMessage.includes('not been approved by admin')) {
-      statusCode = 400;
     } else if (errorMessage.includes('not have schulsong feature')) {
       statusCode = 400;
     }

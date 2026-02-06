@@ -555,6 +555,8 @@ export const EVENTS_FIELD_IDS = {
   audio_pipeline_stage: 'fldlW3jUcGmhbkhug', // Single Select - not_started | in_progress | ready_for_review | approved
   // Admin notes
   admin_notes: 'fldmzzlsrI5lKKx16', // Multiline text - free-text admin notes
+  // Schulsong release date (set when admin approves schulsong after teacher approval)
+  schulsong_released_at: 'fldIQeyEpW9lpmg5K', // DateTime - next workday 8am CET
 } as const;
 
 // Classes Table - 1 row per class
@@ -696,6 +698,8 @@ export interface Event {
   audio_pipeline_stage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved';
   // Admin notes
   admin_notes?: string;
+  // Schulsong release date (set when admin approves schulsong after teacher approval)
+  schulsong_released_at?: string;
 }
 
 /**

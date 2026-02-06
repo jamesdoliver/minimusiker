@@ -12,6 +12,19 @@ interface AudioApprovalModalProps {
   onApprovalComplete?: () => void;
 }
 
+interface SchulsongStatusData {
+  hasSchulsong: boolean;
+  schulsongFile?: {
+    audioFileId: string;
+    filename: string;
+    approvalStatus: 'pending' | 'approved' | 'rejected';
+    rejectionComment?: string;
+    teacherApprovedAt?: string;
+    audioUrl?: string;
+  };
+  releasedAt?: string;
+}
+
 export default function AudioApprovalModal({
   isOpen,
   onClose,
@@ -29,9 +42,16 @@ export default function AudioApprovalModal({
   const [showRejectInput, setShowRejectInput] = useState<string | null>(null);
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
 
+  // Schulsong state
+  const [schulsongStatus, setSchulsongStatus] = useState<SchulsongStatusData | null>(null);
+  const [schulsongSaving, setSchulsongSaving] = useState(false);
+  const [schulsongRejectComment, setSchulsongRejectComment] = useState('');
+  const [showSchulsongRejectInput, setShowSchulsongRejectInput] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       fetchAudioStatus();
+      fetchSchulsongStatus();
     }
   }, [isOpen, eventId]);
 
@@ -61,6 +81,64 @@ export default function AudioApprovalModal({
       toast.error('Failed to load audio status');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSchulsongStatus = async () => {
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/schulsong-status`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setSchulsongStatus(data);
+    } catch (error) {
+      console.error('Error fetching schulsong status:', error);
+    }
+  };
+
+  const handleSchulsongApprove = async () => {
+    try {
+      setSchulsongSaving(true);
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/approve-schulsong`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to approve schulsong');
+      }
+      const result = await response.json();
+      toast.success('Schulsong approved!');
+      await fetchSchulsongStatus();
+      if (onApprovalComplete) onApprovalComplete();
+    } catch (error) {
+      console.error('Error approving schulsong:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to approve schulsong');
+    } finally {
+      setSchulsongSaving(false);
+    }
+  };
+
+  const handleSchulsongReject = async () => {
+    try {
+      setSchulsongSaving(true);
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/approve-schulsong`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: schulsongRejectComment || undefined }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to reject schulsong');
+      }
+      toast.success('Schulsong rejected');
+      setShowSchulsongRejectInput(false);
+      setSchulsongRejectComment('');
+      await fetchSchulsongStatus();
+      if (onApprovalComplete) onApprovalComplete();
+    } catch (error) {
+      console.error('Error rejecting schulsong:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to reject schulsong');
+    } finally {
+      setSchulsongSaving(false);
     }
   };
 
@@ -144,7 +222,21 @@ export default function AudioApprovalModal({
     }
   };
 
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('de-DE', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   if (!isOpen) return null;
+
+  const schulsongFile = schulsongStatus?.schulsongFile;
+  const showSchulsongSection = schulsongStatus?.hasSchulsong && schulsongFile;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -168,6 +260,109 @@ export default function AudioApprovalModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
+          {/* Schulsong Section (separate from regular tracks) */}
+          {showSchulsongSection && (
+            <div className="mb-6 border border-amber-200 rounded-lg p-4 bg-amber-50/50">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 font-medium">
+                    Schulsong
+                  </span>
+                  <span className="text-sm text-gray-500">{schulsongFile.filename}</span>
+                </div>
+                {schulsongFile.approvalStatus === 'approved' && schulsongStatus.releasedAt && (
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">
+                    Release: {formatDate(schulsongStatus.releasedAt)}
+                  </span>
+                )}
+                {schulsongFile.approvalStatus === 'approved' && !schulsongStatus.releasedAt && (
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">Approved</span>
+                )}
+                {schulsongFile.approvalStatus === 'rejected' && (
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700">Rejected</span>
+                )}
+                {schulsongFile.approvalStatus === 'pending' && (
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">Pending</span>
+                )}
+              </div>
+
+              {/* Teacher approval status */}
+              <div className="mb-3 text-sm">
+                {schulsongFile.teacherApprovedAt ? (
+                  <span className="text-green-700">
+                    Lehrer freigegeben am {formatDate(schulsongFile.teacherApprovedAt)}
+                  </span>
+                ) : (
+                  <span className="text-gray-500">Warten auf Lehrer-Freigabe</span>
+                )}
+              </div>
+
+              {/* Audio player */}
+              {schulsongFile.audioUrl && (
+                <div className="mb-3">
+                  <audio controls className="w-full h-10" src={schulsongFile.audioUrl}>
+                    Your browser does not support the audio element.
+                  </audio>
+                </div>
+              )}
+
+              {/* Rejection comment display */}
+              {schulsongFile.approvalStatus === 'rejected' && schulsongFile.rejectionComment && (
+                <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                  Rejection reason: {schulsongFile.rejectionComment}
+                </div>
+              )}
+
+              {/* Action buttons — only if teacher has approved and admin hasn't yet approved */}
+              {schulsongFile.teacherApprovedAt && schulsongFile.approvalStatus !== 'approved' && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleSchulsongApprove}
+                      disabled={schulsongSaving}
+                      className="px-3 py-1.5 rounded text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                    >
+                      {schulsongSaving ? 'Saving...' : 'Freigeben'}
+                    </button>
+                    <button
+                      onClick={() => setShowSchulsongRejectInput(!showSchulsongRejectInput)}
+                      disabled={schulsongSaving}
+                      className="px-3 py-1.5 rounded text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors disabled:opacity-50"
+                    >
+                      Ablehnen
+                    </button>
+                  </div>
+
+                  {showSchulsongRejectInput && (
+                    <div>
+                      <textarea
+                        value={schulsongRejectComment}
+                        onChange={(e) => setSchulsongRejectComment(e.target.value)}
+                        placeholder="Grund für Ablehnung..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        rows={2}
+                      />
+                      <button
+                        onClick={handleSchulsongReject}
+                        disabled={schulsongSaving}
+                        className="mt-2 px-3 py-1.5 rounded text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                      >
+                        {schulsongSaving ? 'Saving...' : 'Ablehnung bestätigen'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Info: teacher hasn't approved yet */}
+              {!schulsongFile.teacherApprovedAt && schulsongFile.approvalStatus !== 'approved' && (
+                <p className="text-xs text-gray-500">
+                  Der Lehrer muss den Schulsong zuerst freigeben, bevor Sie ihn prüfen können.
+                </p>
+              )}
+            </div>
+          )}
+
           {loading ? (
             <div className="text-center py-12">
               <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent" />
@@ -215,11 +410,6 @@ export default function AudioApprovalModal({
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-medium text-gray-900">{track.songTitle}</h4>
-                          {track.isSchulsong && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700">
-                              Schulsong
-                            </span>
-                          )}
                         </div>
                         <p className="text-sm text-gray-500">{track.className}</p>
                       </div>

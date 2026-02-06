@@ -49,15 +49,10 @@ export async function GET(request: NextRequest) {
     const isSchulsong = event?.is_schulsong === true;
     const isMinimusikertag = event?.is_minimusikertag === true;
     const isPlus = event?.is_plus === true;
-    const allTracksApproved = event?.all_tracks_approved === true;
 
-    // Check if 7 days have passed since the event date
-    const eventDate = event?.event_date ? new Date(event.event_date) : null;
-    const sevenDaysAfter = eventDate ? new Date(eventDate) : null;
-    if (sevenDaysAfter) {
-      sevenDaysAfter.setDate(sevenDaysAfter.getDate() + 7);
-    }
-    const hasWaitingPeriodPassed = sevenDaysAfter ? new Date() >= sevenDaysAfter : false;
+    // Schulsong visibility is controlled by schulsong_released_at (set when admin approves)
+    const releasedAt = event?.schulsong_released_at ? new Date(event.schulsong_released_at) : null;
+    const isVisible = releasedAt !== null && new Date() >= releasedAt;
 
     if (!isSchulsong) {
       return NextResponse.json({
@@ -70,15 +65,6 @@ export async function GET(request: NextRequest) {
 
     // Find the schulsong audio file (is_schulsong=true, type=final, status=ready)
     const schulsongFile = await teacherService.getSchulsongAudioFile(eventId);
-
-    // Check teacher approval status
-    const teacherApproved = !!schulsongFile?.teacherApprovedAt;
-
-    // Audio is visible only when:
-    // 1. Admin approved ALL tracks AND
-    // 2. Teacher approved the schulsong AND
-    // 3. 7 days have passed since event date
-    const isVisible = allTracksApproved && teacherApproved && hasWaitingPeriodPassed;
 
     if (!schulsongFile) {
       return NextResponse.json({
@@ -125,7 +111,9 @@ export async function GET(request: NextRequest) {
         isPlus,
         hasAudio: false,
         notYetVisible: true,
-        visibleAfter: sevenDaysAfter?.toISOString(),
+        // If releasedAt is set (admin approved, waiting for timer), show date
+        // If null (still in approval process), no date available
+        visibleAfter: releasedAt?.toISOString(),
       });
     }
 

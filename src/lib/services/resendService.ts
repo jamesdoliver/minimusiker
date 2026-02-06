@@ -776,3 +776,145 @@ export async function sendCancellationNotification(
     };
   }
 }
+
+// ============================================================================
+// SCHULSONG TEACHER APPROVED NOTIFICATION
+// ============================================================================
+
+export interface SchulsongTeacherApprovedData {
+  schoolName: string;
+  eventDate: string;
+  eventId: string;
+}
+
+function getSchulsongTeacherApprovedTemplate(data: SchulsongTeacherApprovedData): string {
+  const adminUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://app.minimusiker.de'}/admin/bookings`;
+  return `
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schulsong freigegeben</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #F9F6EE;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F9F6EE;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #1e3a4c; padding: 32px 40px; border-radius: 12px 12px 0 0; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Minimusiker</h1>
+              <p style="margin: 8px 0 0 0; color: #94B8B3; font-size: 14px;">Admin Benachrichtigung</p>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+                Schulsong vom Lehrer freigegeben
+              </h2>
+
+              <p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.5;">
+                Der Lehrer hat den Schulsong freigegeben. Bitte prüfen und bestätigen Sie die Veröffentlichung.
+              </p>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+                    <strong style="color: #2F4858;">Schule:</strong>
+                    <span style="color: #4a5568; float: right;">${data.schoolName}</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+                    <strong style="color: #2F4858;">Datum:</strong>
+                    <span style="color: #4a5568; float: right;">${formatDateGerman(data.eventDate)}</span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA Button -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td align="center" style="padding: 8px 0;">
+                    <a href="${adminUrl}" style="display: inline-block; padding: 14px 32px; background-color: #1e3a4c; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                      Im Admin-Bereich prüfen
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 40px 32px 40px; text-align: center; border-top: 1px solid #e8e8e8;">
+              <p style="margin: 0; color: #cbd5e0; font-size: 12px;">
+                &copy; ${new Date().getFullYear()} Minimusiker - Admin Benachrichtigung
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`.trim();
+}
+
+/**
+ * Send schulsong teacher approved notification to configured recipients
+ */
+export async function sendSchulsongTeacherApprovedNotification(
+  recipients: string[],
+  data: SchulsongTeacherApprovedData
+): Promise<SendEmailResult> {
+  if (recipients.length === 0) {
+    return { success: true, messageId: 'no-recipients' };
+  }
+
+  const html = getSchulsongTeacherApprovedTemplate(data);
+  const subject = `Schulsong freigegeben: ${data.schoolName} - ${formatDateGerman(data.eventDate)}`;
+
+  // Development fallback
+  if (!process.env.RESEND_API_KEY) {
+    console.log('========================================');
+    console.log('SCHULSONG TEACHER APPROVED NOTIFICATION (Resend not configured):');
+    console.log('To:', recipients.join(', '));
+    console.log('Subject:', subject);
+    console.log('School:', data.schoolName);
+    console.log('Date:', data.eventDate);
+    console.log('========================================');
+    return { success: true, messageId: 'dev-mode' };
+  }
+
+  try {
+    const resend = getResendClient();
+    const { data: resendData, error } = await resend.emails.send({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: recipients,
+      subject,
+      html,
+    });
+
+    if (error) {
+      console.error('Resend schulsong teacher approved notification error:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`[Notification] Schulsong teacher approved notification sent to ${recipients.length} recipients`);
+    return { success: true, messageId: resendData?.id };
+  } catch (error) {
+    console.error('Resend schulsong teacher approved notification error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown email error',
+    };
+  }
+}

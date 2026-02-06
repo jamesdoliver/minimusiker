@@ -291,8 +291,8 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
           {/* Approval Instructions */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-sm text-yellow-800">
-              Bitte hören Sie sich den Schulsong an und geben Sie ihn frei, damit er 7 Tage nach
-              dem Event für die Eltern verfügbar wird.
+              Bitte hören Sie sich den Schulsong an und geben Sie ihn frei, damit er nach Prüfung
+              für die Eltern verfügbar wird.
             </p>
           </div>
 
@@ -388,9 +388,10 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
                   Der Schulsong wurde freigegeben
                 </p>
                 <p className="text-sm text-green-700 mt-1">
-                  {availableToParentsAt && (
-                    <>Der Song wird ab {formatDate(availableToParentsAt)} für Eltern verfügbar.</>
-                  )}
+                  {availableToParentsAt
+                    ? <>Der Song wird ab {formatDate(availableToParentsAt)} für Eltern verfügbar.</>
+                    : <>Der Schulsong wird geprüft und bald für Eltern verfügbar.</>
+                  }
                 </p>
               </div>
             </div>

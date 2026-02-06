@@ -1093,6 +1093,22 @@ class TeacherService {
   }
 
   /**
+   * Clear teacher_approved_at on an audio file
+   * Used when admin rejects schulsong — teacher must re-approve after fix
+   */
+  async clearTeacherApprovedAt(audioFileId: string): Promise<void> {
+    try {
+      // Use empty string to clear the field — Airtable SDK doesn't accept null
+      await this.base(AUDIO_FILES_TABLE).update(audioFileId, {
+        [AUDIO_FILES_FIELD_IDS.teacher_approved_at]: '',
+      });
+    } catch (error) {
+      console.error('Error clearing teacher_approved_at:', error);
+      throw new Error(`Failed to clear teacher approval: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Delete audio file record
    */
   async deleteAudioFile(audioFileId: string): Promise<void> {
@@ -3367,13 +3383,8 @@ class TeacherService {
         return { hasSchulsong: false, status: 'waiting' };
       }
 
-      // Calculate when audio will be available to parents (event_date + 7 days)
-      let availableToParentsAt: string | undefined;
-      if (event.event_date) {
-        const eventDate = new Date(event.event_date);
-        eventDate.setDate(eventDate.getDate() + 7);
-        availableToParentsAt = eventDate.toISOString();
-      }
+      // Use schulsong_released_at from event (set when admin approves after teacher)
+      const availableToParentsAt = event.schulsong_released_at || undefined;
 
       // Get all audio files for the event and find the schulsong file
       // Prefer MP3 for web playback when both MP3 and WAV exist
@@ -3384,12 +3395,11 @@ class TeacherService {
       const schulsongFile = schulsongFiles.find(f => f.r2Key.endsWith('.mp3'))
         || schulsongFiles[0];
 
-      // If no schulsong file OR admin hasn't approved it yet -> waiting
-      if (!schulsongFile || schulsongFile.approvalStatus !== 'approved') {
+      // If no schulsong file -> waiting
+      if (!schulsongFile) {
         return {
           hasSchulsong: true,
           status: 'waiting',
-          availableToParentsAt,
         };
       }
 
@@ -3404,12 +3414,11 @@ class TeacherService {
         };
       }
 
-      // Admin approved but teacher hasn't -> ready_for_approval
+      // File exists but teacher hasn't approved -> ready_for_approval
       return {
         hasSchulsong: true,
         status: 'ready_for_approval',
         audioUrl: schulsongFile.r2Key, // Will be signed by API route
-        availableToParentsAt,
       };
     } catch (error) {
       console.error('Error getting schulsong status for teacher:', error);
@@ -3438,11 +3447,6 @@ class TeacherService {
 
       if (!schulsongFile) {
         throw new Error('No schulsong audio file found');
-      }
-
-      // Verify admin has approved
-      if (schulsongFile.approvalStatus !== 'approved') {
-        throw new Error('Schulsong has not been approved by admin yet');
       }
 
       // Check if already approved by teacher
