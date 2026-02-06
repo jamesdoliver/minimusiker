@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import ImageCanvas from './LogoCanvas';
 import DraggableText from './DraggableText';
 import DraggableQrCode from './DraggableQrCode';
@@ -60,16 +60,63 @@ export default function PrintableEditor({
   const [templateExists, setTemplateExists] = useState(true);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
-  // Handle image canvas load - store scale factor for later PDF conversion
+  // Measure the right panel's available height for the canvas
+  const rightPanelRef = useRef<HTMLDivElement>(null);
+  const [panelHeight, setPanelHeight] = useState<number>(600);
+
+  useEffect(() => {
+    const el = rightPanelRef.current;
+    if (!el) return;
+    const measure = () => {
+      const style = getComputedStyle(el);
+      const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      setPanelHeight(el.clientHeight - paddingY);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Handle image canvas load - store scale factor and rescale elements if needed
   const handleCanvasLoad = useCallback(
     (dims: { width: number; height: number; scale: number }) => {
       setCanvasDimensions(dims);
       setTemplateExists(true);
-      // Store scale in editor state for PDF generation
-      if (editorState.canvasScale !== dims.scale) {
+
+      const oldScale = editorState.canvasScale ?? 1;
+      const newScale = dims.scale;
+
+      if (oldScale !== newScale) {
+        // Rescale all text element positions, sizes, font sizes, and QR positions
+        // This handles the initial scale=1 → actual scale transition, and window resizes
+        const ratio = newScale / oldScale;
+        const rescaledElements = editorState.textElements.map((el) => ({
+          ...el,
+          position: {
+            x: el.position.x * ratio,
+            y: el.position.y * ratio,
+          },
+          size: {
+            width: el.size.width * ratio,
+            height: el.size.height * ratio,
+          },
+          fontSize: el.fontSize * ratio,
+        }));
+
+        const rescaledQr = editorState.qrPosition
+          ? {
+              x: editorState.qrPosition.x * ratio,
+              y: editorState.qrPosition.y * ratio,
+              size: editorState.qrPosition.size * ratio,
+            }
+          : editorState.qrPosition;
+
         onEditorStateChange({
           ...editorState,
-          canvasScale: dims.scale,
+          canvasScale: newScale,
+          textElements: rescaledElements,
+          qrPosition: rescaledQr,
         });
       }
     },
@@ -260,7 +307,7 @@ export default function PrintableEditor({
   const isLogoType = itemConfig.type === 'tshirt' || itemConfig.type === 'hoodie';
 
   return (
-    <div className="flex gap-6 h-full min-h-0">
+    <div className="flex gap-6 flex-1 min-h-0 overflow-hidden">
       {/* Font face styles - loaded from API */}
       <style jsx global>{`
         @font-face {
@@ -310,11 +357,12 @@ export default function PrintableEditor({
       </div>
 
       {/* Right panel - Canvas with overlays */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50 flex items-start justify-center">
-        <div className="relative w-full max-w-2xl">
+      <div ref={rightPanelRef} className="flex-1 min-h-0 overflow-hidden p-4 bg-gray-50 flex items-center justify-center">
+        <div className="relative w-full max-w-2xl max-h-full overflow-hidden">
           {/* Canvas background - Image preview for all types */}
           <ImageCanvas
             templateType={itemConfig.type}
+            maxHeight={panelHeight}
             onLoad={handleCanvasLoad}
             onError={handleCanvasError}
           />

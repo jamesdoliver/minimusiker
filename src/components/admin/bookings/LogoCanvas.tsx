@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import Image from 'next/image';
 import { getPrintableConfig, PrintableItemType } from '@/lib/config/printableTextConfig';
 
 interface ImageCanvasProps {
   templateType: PrintableItemType;
+  maxHeight?: number;
   onLoad?: (dimensions: { width: number; height: number; scale: number }) => void;
   onError?: (error: string) => void;
   className?: string;
@@ -14,20 +14,19 @@ interface ImageCanvasProps {
 /**
  * ImageCanvas - Renders a PNG preview image for any printable type
  *
- * Replaces the PDF-based editor with a simpler image-based approach:
- * - Loads the preview PNG from the config's previewImage path
- * - Scales to fit container while maintaining aspect ratio
- * - Reports dimensions and scale factor to parent (for coordinate conversion)
- * - Consistent API with the old PdfCanvas (onLoad callback with dimensions)
+ * Uses a native <img> with CSS containment (max-width/max-height + object-fit)
+ * so the image fits within available space. After load, measures the actual
+ * rendered size to report accurate dimensions/scale to the parent.
  */
 export default function ImageCanvas({
   templateType,
+  maxHeight,
   onLoad,
   onError,
   className = '',
 }: ImageCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState<number>(500);
+  const imgRef = useRef<HTMLImageElement>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -37,12 +36,6 @@ export default function ImageCanvas({
   // Use config dimensions or fallback
   const previewDimensions = config?.previewDimensions ?? { width: 1414, height: 2000 };
   const previewImage = config?.previewImage ?? '/images/printable_blank_logo/printable_logo_blank.png';
-
-  // Calculate dimensions based on container width
-  const aspectRatio = previewDimensions.height / previewDimensions.width;
-  const displayWidth = containerWidth;
-  const displayHeight = containerWidth * aspectRatio;
-  const scale = displayWidth / previewDimensions.width;
 
   // Reset state when template type changes
   useEffect(() => {
@@ -64,28 +57,42 @@ export default function ImageCanvas({
     return () => clearTimeout(timeoutId);
   }, [templateType, imageLoaded, hasError, onError, config?.name]);
 
-  // Measure container width
-  useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.clientWidth || 500);
-      }
-    };
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
+  // Measure the actual rendered image size and report to parent
+  const reportDimensions = useCallback(() => {
+    const img = imgRef.current;
+    if (!img || !imageLoaded) return;
 
-  // Notify parent when dimensions change and image is loaded
+    const rect = img.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    const scale = width / previewDimensions.width;
+
+    onLoad?.({ width, height, scale });
+  }, [imageLoaded, previewDimensions.width, onLoad]);
+
+  // Report dimensions whenever the image loads or the container resizes
   useEffect(() => {
-    if (imageLoaded && onLoad) {
-      onLoad({
-        width: displayWidth,
-        height: displayHeight,
-        scale: scale,
-      });
+    if (!imageLoaded) return;
+
+    // Report initial dimensions
+    reportDimensions();
+
+    // Watch for container size changes (window resize, layout shifts)
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver(reportDimensions);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [imageLoaded, reportDimensions]);
+
+  // Also re-report when maxHeight changes
+  useEffect(() => {
+    if (imageLoaded) {
+      // Small delay to let CSS recalculate after maxHeight prop changes
+      requestAnimationFrame(reportDimensions);
     }
-  }, [imageLoaded, displayWidth, displayHeight, scale, onLoad]);
+  }, [maxHeight, imageLoaded, reportDimensions]);
 
   const handleImageLoad = useCallback(() => {
     setImageLoaded(true);
@@ -126,13 +133,21 @@ export default function ImageCanvas({
     );
   }
 
+  // Compute a placeholder height for the loading state
+  const aspectRatio = previewDimensions.height / previewDimensions.width;
+  const placeholderHeight = maxHeight ? Math.min(500 * aspectRatio, maxHeight) : 500 * aspectRatio;
+
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div
+      ref={containerRef}
+      className={`relative ${className}`}
+      style={{ maxHeight: maxHeight ? `${maxHeight}px` : undefined }}
+    >
       {/* Loading state */}
       {!imageLoaded && (
         <div
           className="flex items-center justify-center bg-gray-100 rounded-lg"
-          style={{ width: displayWidth, height: displayHeight, minHeight: '300px' }}
+          style={{ width: '100%', height: placeholderHeight, minHeight: '300px' }}
         >
           <div className="flex flex-col items-center gap-3">
             <svg className="w-8 h-8 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
@@ -144,17 +159,22 @@ export default function ImageCanvas({
         </div>
       )}
 
-      {/* Template preview image */}
-      <Image
+      {/* Template preview image - CSS controls sizing */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={imgRef}
         src={previewImage}
         alt={`${config?.name ?? 'Template'} preview`}
-        width={displayWidth}
-        height={displayHeight}
         onLoad={handleImageLoad}
         onError={handleImageError}
         className={`rounded-lg shadow-md ${imageLoaded ? '' : 'hidden'}`}
-        priority
-        unoptimized // Preserve exact pixel dimensions for coordinate mapping
+        style={{
+          maxWidth: '100%',
+          maxHeight: maxHeight ? `${maxHeight}px` : '100%',
+          width: 'auto',
+          height: 'auto',
+          display: imageLoaded ? 'block' : 'none',
+        }}
       />
     </div>
   );

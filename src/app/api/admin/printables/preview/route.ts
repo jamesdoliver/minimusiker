@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
         height: pdfSize.height,
         fontSize: element.fontSize / scale,
         color,
+        fontFamily: element.fontFamily,
       };
     });
 

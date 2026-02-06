@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
 import {
   PrintableItemType,
@@ -98,6 +98,9 @@ export default function ConfirmPrintablesModal({
   // Preview download state
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Guard: prevent async status load from overwriting user interactions
+  const userHasInteracted = useRef(false);
+
   // Current item config
   const currentItem = PRINTABLE_ITEMS[currentStep];
   const currentEditorState = itemEditorStates[currentItem.type];
@@ -105,6 +108,7 @@ export default function ConfirmPrintablesModal({
   // Run health check and load status when modal opens
   useEffect(() => {
     if (isOpen) {
+      userHasInteracted.current = false;
       setCurrentStep(0);
       setItemEditorStates(initializeAllItemsEditorState(booking.schoolName, booking.bookingDate));
       // Reset all items to pending
@@ -142,8 +146,17 @@ export default function ConfirmPrintablesModal({
         return;
       }
       const data = await response.json();
-      if (data.status) {
-        setItemsStatus(data.status);
+      if (data.status && !userHasInteracted.current) {
+        // Merge: only update keys present in API response, keep missing keys as 'pending'
+        setItemsStatus((prev) => {
+          const merged = { ...prev };
+          PRINTABLE_ITEMS.forEach((item) => {
+            if (data.status[item.type]) {
+              merged[item.type] = data.status[item.type];
+            }
+          });
+          return merged;
+        });
 
         // Find the first pending or skipped item to jump to
         const firstPendingOrSkippedIndex = PRINTABLE_ITEMS.findIndex(
@@ -196,6 +209,7 @@ export default function ConfirmPrintablesModal({
 
   // Handle confirm current item and go to next
   const handleConfirmAndNext = () => {
+    userHasInteracted.current = true;
     setItemsStatus((prev) => ({
       ...prev,
       [currentItem.type]: 'confirmed',
@@ -208,6 +222,7 @@ export default function ConfirmPrintablesModal({
 
   // Handle skip current item and go to next
   const handleSkip = () => {
+    userHasInteracted.current = true;
     setItemsStatus((prev) => ({
       ...prev,
       [currentItem.type]: 'skipped',
@@ -588,7 +603,7 @@ export default function ConfirmPrintablesModal({
         )}
 
         {/* Main content - PrintableEditor */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
           <PrintableEditor
             itemConfig={currentItem}
             schoolName={booking.schoolName}
