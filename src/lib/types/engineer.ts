@@ -66,6 +66,13 @@ export interface EngineerClassView {
 /**
  * Full event detail for engineer event page
  */
+export interface LogicProjectInfo {
+  projectType: 'schulsong' | 'minimusiker';
+  filename: string;
+  fileSizeBytes?: number;
+  uploadedAt?: string;
+}
+
 export interface EngineerEventDetail {
   eventId: string;
   schoolName: string;
@@ -76,6 +83,7 @@ export interface EngineerEventDetail {
   isSchulsong?: boolean;
   schulsongClass?: EngineerClassView;
   audioPipelineStage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved';
+  logicProjects?: LogicProjectInfo[];
 }
 
 // =============================================================================

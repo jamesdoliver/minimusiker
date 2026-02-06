@@ -124,7 +124,7 @@ export interface Song {
 /**
  * Audio file types
  */
-export type AudioFileType = 'raw' | 'preview' | 'final';
+export type AudioFileType = 'raw' | 'preview' | 'final' | 'logic-project-schulsong' | 'logic-project-minimusiker';
 
 /**
  * Audio file status

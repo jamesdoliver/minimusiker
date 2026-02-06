@@ -859,6 +859,44 @@ class R2Service {
   }
 
   // ========================================
+  // Logic Pro Project Methods
+  // ========================================
+
+  /**
+   * Generate presigned URL for uploading a Logic Pro project ZIP
+   * Path: recordings/{eventId}/logic-projects/{projectType}/{timestamp}_{filename}.zip
+   */
+  async generateLogicProjectUploadUrl(
+    eventId: string,
+    projectType: 'schulsong' | 'minimusiker',
+    filename: string
+  ): Promise<{ uploadUrl: string; key: string }> {
+    const timestamp = Date.now();
+    const projectLabel = projectType === 'schulsong' ? 'schulsong_project' : 'minimusiker_project';
+    const key = `recordings/${eventId}/logic-projects/${projectType}/${timestamp}_${projectLabel}.zip`;
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: 'application/zip',
+    });
+
+    const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: 10800 });
+
+    return {
+      uploadUrl,
+      key,
+    };
+  }
+
+  /**
+   * Generate presigned download URL for a Logic Pro project
+   */
+  async generateLogicProjectDownloadUrl(key: string): Promise<string> {
+    return this.generateSignedUrl(key, 10800);
+  }
+
+  // ========================================
   // Song-Level Audio Methods
   // ========================================
 

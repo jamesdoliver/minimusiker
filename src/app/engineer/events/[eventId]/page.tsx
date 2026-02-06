@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { EngineerEventDetail, EngineerClassView, AudioFileWithUrl } from '@/lib/types/engineer';
+import { EngineerEventDetail, EngineerClassView, AudioFileWithUrl, LogicProjectInfo } from '@/lib/types/engineer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 function formatDate(dateStr: string): string {
@@ -21,7 +21,8 @@ function formatFileSize(bytes: number | undefined): string {
   if (!bytes) return 'Unknown size';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
 interface ClassUploadState {
@@ -41,6 +42,7 @@ export default function EngineerEventDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadStates, setUploadStates] = useState<Record<string, ClassUploadState>>({});
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [downloadingProject, setDownloadingProject] = useState<string | null>(null);
   const [togglingSchulsong, setTogglingSchulsong] = useState<string | null>(null);
 
   const handleToggleSchulsong = async (audioFileId: string, currentValue: boolean) => {
@@ -145,6 +147,25 @@ export default function EngineerEventDetailPage() {
       alert('Failed to download ZIP file');
     } finally {
       setIsDownloadingZip(false);
+    }
+  };
+
+  const handleDownloadLogicProject = async (projectType: 'schulsong' | 'minimusiker') => {
+    setDownloadingProject(projectType);
+    try {
+      const response = await fetch(
+        `/api/engineer/events/${encodeURIComponent(eventId)}/download-logic-project?projectType=${projectType}`
+      );
+      if (!response.ok) {
+        throw new Error('Failed to get download URL');
+      }
+      const data = await response.json();
+      window.open(data.downloadUrl, '_blank');
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Failed to download Logic Pro project');
+    } finally {
+      setDownloadingProject(null);
     }
   };
 
@@ -361,12 +382,51 @@ export default function EngineerEventDetailPage() {
             </div>
           </div>
 
-          {/* Download all button */}
+          {/* Logic Pro Project Downloads */}
+          {event.logicProjects && event.logicProjects.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <h4 className="text-sm font-medium text-gray-700 mb-3">Logic Pro Projects</h4>
+              <div className="flex flex-wrap gap-3">
+                {event.logicProjects.map((project) => (
+                  <button
+                    key={project.projectType}
+                    onClick={() => handleDownloadLogicProject(project.projectType)}
+                    disabled={downloadingProject === project.projectType}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {downloadingProject === project.projectType ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Preparing...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Download {project.projectType === 'schulsong' ? 'Schulsong' : 'MiniMusiker'} Project
+                        {project.fileSizeBytes && (
+                          <span className="text-purple-200 text-xs">
+                            ({formatFileSize(project.fileSizeBytes)})
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Download all raw files button (legacy fallback) */}
           <div className="mt-4 pt-4 border-t border-gray-100">
             <button
               onClick={() => handleDownloadAllZip()}
               disabled={isDownloadingZip}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
             >
               {isDownloadingZip ? (
                 <>

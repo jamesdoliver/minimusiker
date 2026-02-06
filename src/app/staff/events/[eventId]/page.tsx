@@ -3,13 +3,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { SchoolEventDetail, EventClassDetail } from '@/lib/types/airtable';
-import { SongWithAudio, Song } from '@/lib/types/teacher';
+import { SchoolEventDetail } from '@/lib/types/airtable';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EventBadge from '@/components/admin/EventBadge';
 import StatsPill from '@/components/admin/StatsPill';
-import SongAudioRow from '@/components/shared/audio-management/SongAudioRow';
-import BatchUploadModal from '@/components/shared/audio-management/BatchUploadModal';
+import LogicProjectUploadSection from '@/components/staff/LogicProjectUploadSection';
 
 function formatDate(dateString: string): string {
   if (!dateString) return 'No date';
@@ -26,164 +24,12 @@ function formatDate(dateString: string): string {
   }
 }
 
-interface ClassSongUploadCardProps {
-  cls: EventClassDetail;
-  eventId: string;
-  onRefresh: () => void;
-  eventIsSchulsong?: boolean;
-}
-
-function ClassSongUploadCard({ cls, eventId, onRefresh, eventIsSchulsong }: ClassSongUploadCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [songs, setSongs] = useState<SongWithAudio[]>([]);
-  const [isLoadingSongs, setIsLoadingSongs] = useState(false);
-  const [showBatchModal, setShowBatchModal] = useState(false);
-
-  const fetchSongs = useCallback(async () => {
-    try {
-      setIsLoadingSongs(true);
-      const response = await fetch(
-        `/api/staff/events/${encodeURIComponent(eventId)}/classes/${encodeURIComponent(cls.classId)}/songs`
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setSongs(data.songs || []);
-      }
-    } catch (error) {
-      console.error('Error fetching songs:', error);
-    } finally {
-      setIsLoadingSongs(false);
-    }
-  }, [eventId, cls.classId]);
-
-  useEffect(() => {
-    if (isExpanded) {
-      fetchSongs();
-    }
-  }, [isExpanded, fetchSongs]);
-
-  const handleUploadComplete = () => {
-    fetchSongs();
-    onRefresh();
-  };
-
-  const totalRawFiles = songs.reduce((sum, song) => sum + song.rawAudioFiles.length, 0);
-
-  return (
-    <>
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {/* Class Header */}
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-[#94B8B3]/20 flex items-center justify-center">
-              <svg className="w-5 h-5 text-[#5a8a82]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-              </svg>
-            </div>
-            <div className="text-left">
-              <h3 className="font-semibold text-gray-900">{cls.className}</h3>
-              <p className="text-sm text-gray-500">
-                {cls.totalChildren} children · {songs.length} songs · {totalRawFiles} raw files
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {totalRawFiles > 0 && (
-              <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
-                {totalRawFiles} files
-              </span>
-            )}
-            <svg
-              className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        </button>
-
-        {/* Expanded Content */}
-        {isExpanded && (
-          <div className="border-t border-gray-100 px-5 py-4">
-            {/* Batch Upload Button */}
-            <div className="mb-4 flex justify-end">
-              <button
-                onClick={() => setShowBatchModal(true)}
-                disabled={songs.length === 0}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  songs.length === 0
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                📦 Batch Upload (ZIP)
-              </button>
-            </div>
-
-            {/* Songs List */}
-            {isLoadingSongs ? (
-              <div className="py-8 text-center">
-                <LoadingSpinner size="md" />
-                <p className="mt-2 text-sm text-gray-500">Loading songs...</p>
-              </div>
-            ) : songs.length === 0 ? (
-              <div className="py-8 text-center">
-                <p className="text-gray-500">
-                  No songs added to this class yet. Songs must be added by the teacher or admin.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-0">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">
-                  Upload Raw Audio Per Song:
-                </h4>
-                {songs.map((song) => (
-                  <SongAudioRow
-                    key={song.id}
-                    song={song}
-                    eventId={eventId}
-                    variant="staff"
-                    onUploadComplete={handleUploadComplete}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Batch Upload Modal */}
-      <BatchUploadModal
-        isOpen={showBatchModal}
-        onClose={() => setShowBatchModal(false)}
-        eventId={eventId}
-        classId={cls.classId}
-        songs={songs}
-        onUploadComplete={handleUploadComplete}
-        eventIsSchulsong={eventIsSchulsong}
-      />
-    </>
-  );
-}
-
 export default function StaffEventDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [event, setEvent] = useState<SchoolEventDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const eventId = params.eventId as string;
 
@@ -217,10 +63,6 @@ export default function StaffEventDetailPage() {
       fetchEventDetail();
     }
   }, [eventId, fetchEventDetail]);
-
-  const handleRefresh = () => {
-    setRefreshKey((prev) => prev + 1);
-  };
 
   if (isLoading) {
     return (
@@ -386,34 +228,8 @@ export default function StaffEventDetailPage() {
           )}
         </div>
 
-        {/* Song-Level Audio Upload Section */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            Raw Audio Upload
-            <span className="ml-2 text-sm font-normal text-gray-500">
-              (Upload recordings per song)
-            </span>
-          </h2>
-
-          {event.classes.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
-              <div className="text-3xl mb-3">🎵</div>
-              <p className="text-gray-600">No classes available for audio upload.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {event.classes.map((cls) => (
-                <ClassSongUploadCard
-                  key={`${cls.classId}-${refreshKey}`}
-                  cls={cls}
-                  eventId={event.eventId}
-                  onRefresh={handleRefresh}
-                  eventIsSchulsong={event.isSchulsong}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Logic Pro Project Upload Section */}
+        <LogicProjectUploadSection eventId={event.eventId} />
       </div>
     </div>
   );

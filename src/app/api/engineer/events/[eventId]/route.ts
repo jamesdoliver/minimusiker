@@ -9,6 +9,7 @@ import {
   EngineerClassView,
   AudioFileWithUrl,
   EngineerMixingStatus,
+  LogicProjectInfo,
 } from '@/lib/types/engineer';
 
 /**
@@ -48,7 +49,13 @@ export async function GET(
 
     // Get audio files for this event
     const teacherService = getTeacherService();
-    let audioFiles = await teacherService.getAudioFilesByEventId(eventId);
+    const allAudioFiles = await teacherService.getAudioFilesByEventId(eventId);
+
+    // Separate logic project files (event-level, visible to all engineers)
+    // before applying role-based filtering to regular audio files
+    let audioFiles = allAudioFiles.filter(
+      f => f.type !== 'logic-project-schulsong' && f.type !== 'logic-project-minimusiker'
+    );
 
     // Filter audio files based on engineer role (Micha=schulsong, Jakob=regular)
     // Only filter if engineer IDs are configured
@@ -63,7 +70,7 @@ export async function GET(
       // If engineer is neither Micha nor Jakob, show all files (admin/fallback case)
     }
 
-    // Generate signed URLs for all audio files
+    // Generate signed URLs for regular audio files (logic projects excluded — they use separate download route)
     const r2Service = getR2Service();
     const audioFilesWithUrls: AudioFileWithUrl[] = await Promise.all(
       audioFiles.map(async (file) => {
@@ -168,6 +175,16 @@ export async function GET(
     const eventRecord = await getAirtableService().getEventByEventId(eventId);
     const audioPipelineStage = eventRecord?.audio_pipeline_stage;
 
+    // Extract logic project files from the unfiltered list (visible to all engineers)
+    const logicProjects: LogicProjectInfo[] = allAudioFiles
+      .filter(f => f.type === 'logic-project-schulsong' || f.type === 'logic-project-minimusiker')
+      .map(f => ({
+        projectType: f.type === 'logic-project-schulsong' ? 'schulsong' as const : 'minimusiker' as const,
+        filename: f.filename,
+        fileSizeBytes: f.fileSizeBytes,
+        uploadedAt: f.uploadedAt,
+      }));
+
     const response: EngineerEventDetail = {
       eventId: eventDetail.eventId,
       schoolName: eventDetail.schoolName,
@@ -178,6 +195,7 @@ export async function GET(
       isSchulsong,
       schulsongClass: schulsongClassView,
       audioPipelineStage,
+      logicProjects: logicProjects.length > 0 ? logicProjects : undefined,
     };
 
     return NextResponse.json({
