@@ -330,6 +330,97 @@ class R2Service {
   }
 
   /**
+   * Targeted health check - only verifies templates and fonts needed for specific item types.
+   * Used by the generate route to allow partial generation when some templates are missing.
+   */
+  async checkAssetsForTypes(templateTypes: TemplateType[]): Promise<{
+    healthy: boolean;
+    bucketAccessible: boolean;
+    templatesFound: string[];
+    templatesMissing: string[];
+    fontsFound: string[];
+    fontsMissing: string[];
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+    const templatesFound: string[] = [];
+    const templatesMissing: string[] = [];
+    const fontsFound: string[] = [];
+    const fontsMissing: string[] = [];
+    let bucketAccessible = false;
+
+    // Check bucket accessibility
+    try {
+      const firstType = templateTypes[0] || 'flyer1';
+      const testKey = `${R2_PATHS.TEMPLATES}/${TEMPLATE_FILENAMES[firstType]}`;
+      const command = new HeadObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: testKey,
+      });
+      await this.client.send(command);
+      bucketAccessible = true;
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'name' in error && error.name === 'NotFound') {
+        bucketAccessible = true;
+      } else if (error && typeof error === 'object' && '$metadata' in error) {
+        const awsError = error as { $metadata?: { httpStatusCode?: number } };
+        if (awsError.$metadata?.httpStatusCode === 404) {
+          bucketAccessible = true;
+        } else {
+          bucketAccessible = false;
+          errors.push(`Bucket access error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      } else {
+        bucketAccessible = false;
+        errors.push(`Bucket access error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    // Only check the requested templates (clothing templates are always optional)
+    const optionalTypes: TemplateType[] = ['tshirt-print', 'hoodie-print'];
+
+    for (const templateType of templateTypes) {
+      const filename = TEMPLATE_FILENAMES[templateType];
+      const key = `${R2_PATHS.TEMPLATES}/${filename}`;
+      const exists = await this.fileExistsInAssetsBucket(key);
+      if (exists) {
+        templatesFound.push(templateType);
+      } else {
+        templatesMissing.push(templateType);
+        if (!optionalTypes.includes(templateType)) {
+          errors.push(`Missing template: ${templateType}`);
+        }
+      }
+    }
+
+    // Always check all fonts (both are needed for generation)
+    const allFontNames: FontName[] = ['fredoka', 'springwood-display'];
+    for (const fontName of allFontNames) {
+      const filename = FONT_FILENAMES[fontName];
+      const key = `${R2_PATHS.FONTS}/${filename}`;
+      const exists = await this.fileExistsInAssetsBucket(key);
+      if (exists) {
+        fontsFound.push(fontName);
+      } else {
+        fontsMissing.push(fontName);
+        errors.push(`Missing font: ${fontName}`);
+      }
+    }
+
+    const healthy = bucketAccessible && errors.length === 0;
+
+    return {
+      healthy,
+      bucketAccessible,
+      templatesFound,
+      templatesMissing,
+      fontsFound,
+      fontsMissing,
+      errors,
+    };
+  }
+
+  /**
    * Upload a recording file to R2 (LEGACY - for backward compatibility)
    * For new implementations, use uploadRecordingWithClassId
    */

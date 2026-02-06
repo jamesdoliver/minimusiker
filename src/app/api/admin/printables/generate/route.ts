@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getPrintableService, PrintableItemConfig, TextElementConfig } from '@/lib/services/printableService';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { getR2Service, PrintableType } from '@/lib/services/r2Service';
+import { getR2Service, PrintableType, TemplateType } from '@/lib/services/r2Service';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import {
   PrintableItemType,
@@ -94,26 +94,29 @@ export async function POST(request: NextRequest) {
     const airtableService = getAirtableService();
     const r2Service = getR2Service();
 
-    // Pre-flight health check - verify templates and fonts are available
-    const healthCheck = await r2Service.checkAssetsHealth();
-    if (!healthCheck.healthy) {
-      console.error('[printables/generate] Health check failed:', healthCheck.errors);
+    // Pre-flight health check - only verify templates needed for the items being generated
+    // This allows generating flyers even when button/minicard templates don't exist yet
+    const confirmedTypes = items
+      .filter(item => item.status !== 'skipped')
+      .map(item => itemTypeToR2Type(item.type) as TemplateType);
 
-      // Check what's specifically missing
-      const missingTemplates = healthCheck.templatesMissing;
-      const missingFonts = healthCheck.fontsMissing;
+    if (confirmedTypes.length > 0) {
+      const healthCheck = await r2Service.checkAssetsForTypes(confirmedTypes);
+      if (!healthCheck.healthy) {
+        console.error('[printables/generate] Health check failed:', healthCheck.errors);
 
-      return NextResponse.json({
-        success: false,
-        partialSuccess: false,
-        error: 'Pre-flight check failed: missing required assets',
-        healthCheck: {
-          bucketAccessible: healthCheck.bucketAccessible,
-          missingTemplates,
-          missingFonts,
-        },
-        errors: healthCheck.errors,
-      }, { status: 400 });
+        return NextResponse.json({
+          success: false,
+          partialSuccess: false,
+          error: 'Pre-flight check failed: missing required assets',
+          healthCheck: {
+            bucketAccessible: healthCheck.bucketAccessible,
+            missingTemplates: healthCheck.templatesMissing,
+            missingFonts: healthCheck.fontsMissing,
+          },
+          errors: healthCheck.errors,
+        }, { status: 400 });
+      }
     }
 
     // Determine the actual event_id

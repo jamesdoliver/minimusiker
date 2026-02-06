@@ -87,3 +87,6 @@ Thumbs.db
 # Worktrees
 .worktrees/
 .env.vercel
+
+# Shopify exports (contains customer data)
+/shopify/
