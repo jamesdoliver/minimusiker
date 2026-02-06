@@ -413,8 +413,11 @@ export default function ConfirmPrintablesModal({
   // Check if on last step
   const isLastStep = currentStep === TOTAL_PRINTABLE_ITEMS - 1;
 
-  // Check if health check passed
-  const healthOk = healthCheck?.healthy ?? false;
+  // Check if health check passed - only gate on fonts (universally required).
+  // Template availability is checked per-item by the generate route.
+  const healthOk = healthCheck
+    ? healthCheck.bucketAccessible && healthCheck.fontsMissing.length === 0
+    : false;
 
   // Current item status
   const currentItemStatus = itemsStatus[currentItem.type];

@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
       }
 
       return {
-        type: item.type,
+        type: itemTypeToR2Type(item.type),
         textElements: textElementConfigs,
         qrPosition: qrPositionPdf,
       };

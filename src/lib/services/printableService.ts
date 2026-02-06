@@ -342,9 +342,14 @@ class PrintableService {
       }
     }
 
-    // Generate mockups (still use default positions for mockups)
-    const mockupResults = await this.generateMockups(eventId, schoolName);
-    results.push(...mockupResults);
+    // Generate mockups only if clothing items were included
+    const hasClothing = itemConfigs.some(c =>
+      c.type === 'tshirt-print' || c.type === 'hoodie-print'
+    );
+    if (hasClothing) {
+      const mockupResults = await this.generateMockups(eventId, schoolName);
+      results.push(...mockupResults);
+    }
 
     // Collect errors
     for (const result of results) {
