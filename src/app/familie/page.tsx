@@ -17,6 +17,7 @@ import { CartProvider } from '@/lib/contexts/CartContext';
 import { CartDrawer } from '@/components/shop';
 import { ManageChildren } from '@/components/parent';
 import { ParentSession } from '@/lib/types';
+import { ShopProfile, MINIMUSIKERTAG_PROFILE, resolveShopProfile } from '@/lib/config/shopProfiles';
 
 // Audio status response type
 interface AudioStatus {
@@ -73,7 +74,7 @@ function ParentPortalContent() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [groups, setGroups] = useState<ParentGroup[]>([]);
   const [groupAudioStatuses, setGroupAudioStatuses] = useState<Record<string, AudioStatus>>({});
-  const [isSchulsongOnly, setIsSchulsongOnly] = useState(false);
+  const [shopProfile, setShopProfile] = useState<ShopProfile>(MINIMUSIKERTAG_PROFILE);
   const [collections, setCollections] = useState<ParentCollection[]>([]);
   const [collectionAudioStatuses, setCollectionAudioStatuses] = useState<Record<string, AudioStatus>>({});
   const [activeTab, setActiveTab] = useState<ContentTab>('class');
@@ -177,9 +178,11 @@ function ParentPortalContent() {
         );
         if (response.ok) {
           const data = await response.json();
-          // Schulsong-only = has schulsong but is NOT a minimusikertag
-          const schulsongOnly = data.isSchulsong === true && !data.isMinimusikertag;
-          setIsSchulsongOnly(schulsongOnly);
+          setShopProfile(resolveShopProfile({
+            isMinimusikertag: data.isMinimusikertag,
+            isPlus: data.isPlus,
+            isSchulsong: data.isSchulsong,
+          }));
         }
       } catch (err) {
         console.error('Error fetching schulsong status:', err);
@@ -188,6 +191,9 @@ function ParentPortalContent() {
 
     fetchSchulsongStatus();
   }, [session, eventId]);
+
+  // Derive isSchulsongOnly from shop profile for non-shop UI sections
+  const isSchulsongOnly = shopProfile.profileType === 'schulsong-only';
 
   // Fetch groups for the current class
   const fetchGroups = useCallback(async (clsId: string, evtId: string) => {
@@ -890,7 +896,7 @@ function ParentPortalContent() {
             parentEmail={session.email}
             schoolName={schoolName}
             children={children}
-            isSchulsongOnly={isSchulsongOnly}
+            shopProfile={shopProfile}
           />
         </section>
 

@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
     const event = await airtableService.getEventByEventId(eventId);
     const isSchulsong = event?.is_schulsong === true;
     const isMinimusikertag = event?.is_minimusikertag === true;
+    const isPlus = event?.is_plus === true;
     const allTracksApproved = event?.all_tracks_approved === true;
 
     // Check if 7 days have passed since the event date
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
         success: true,
         isSchulsong: false,
         isMinimusikertag,
+        isPlus,
       });
     }
 
@@ -83,6 +85,7 @@ export async function GET(request: NextRequest) {
         success: true,
         isSchulsong: true,
         isMinimusikertag,
+        isPlus,
         hasAudio: false,
       });
     }
@@ -108,6 +111,7 @@ export async function GET(request: NextRequest) {
         success: true,
         isSchulsong: true,
         isMinimusikertag,
+        isPlus,
         hasAudio: false,
       });
     }
@@ -118,6 +122,7 @@ export async function GET(request: NextRequest) {
         success: true,
         isSchulsong: true,
         isMinimusikertag,
+        isPlus,
         hasAudio: false,
         notYetVisible: true,
         visibleAfter: sevenDaysAfter?.toISOString(),
@@ -130,6 +135,7 @@ export async function GET(request: NextRequest) {
       success: true,
       isSchulsong: true,
       isMinimusikertag,
+      isPlus,
       hasAudio: true,
       audioUrl,
       downloadUrl,

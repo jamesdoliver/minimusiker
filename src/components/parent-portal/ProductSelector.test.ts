@@ -9,18 +9,10 @@
  */
 
 import { canOrderPersonalizedClothing, PERSONALIZED_CLOTHING_CUTOFF_DAYS } from '@/lib/utils/eventTimeline';
+import { MINIMUSIKERTAG_PROFILE, resolveShopProfile } from '@/lib/config/shopProfiles';
 
-// Mock the variant map structure from ProductSelector
-const SHOPIFY_VARIANT_MAP: Record<string, string> = {
-  // Standard T-Shirt
-  'tshirt-standard-98/104 (3-4J)': 'gid://shopify/ProductVariant/53328491512154',
-  // Personalized T-Shirt
-  'tshirt-personalized-98/104 (3-4J)': 'gid://shopify/ProductVariant/53328502194522',
-  // Standard Hoodie
-  'hoodie-standard-116 (5-6 J)': 'gid://shopify/ProductVariant/53325998948698',
-  // Personalized Hoodie
-  'hoodie-personalized-116 (5-6 J)': 'gid://shopify/ProductVariant/53328494788954',
-};
+// Use the variant map from the minimusikertag profile (source of truth)
+const SHOPIFY_VARIANT_MAP = MINIMUSIKERTAG_PROFILE.shopifyVariantMap;
 
 // Helper to simulate checkout line item creation (mirrors ProductSelector logic)
 function createLineItems(
@@ -270,5 +262,35 @@ describe('ProductSelector Discount Compatibility', () => {
       // Banner should NOT show
       expect(daysUntilEvent > 0).toBe(false);
     });
+  });
+});
+
+describe('resolveShopProfile', () => {
+  it('returns minimusikertag for default flags', () => {
+    const profile = resolveShopProfile({ isMinimusikertag: true });
+    expect(profile.profileType).toBe('minimusikertag');
+  });
+
+  it('returns plus when isPlus is true', () => {
+    const profile = resolveShopProfile({ isPlus: true, isMinimusikertag: true });
+    expect(profile.profileType).toBe('plus');
+    expect(profile.shopifyTagFilter).toBe('PLUS');
+  });
+
+  it('returns schulsong-only when isSchulsong=true and isMinimusikertag=false', () => {
+    const profile = resolveShopProfile({ isSchulsong: true, isMinimusikertag: false });
+    expect(profile.profileType).toBe('schulsong-only');
+    expect(profile.audioProducts).toHaveLength(0);
+  });
+
+  it('returns minimusikertag (not schulsong-only) when both isSchulsong and isMinimusikertag are true', () => {
+    const profile = resolveShopProfile({ isSchulsong: true, isMinimusikertag: true });
+    expect(profile.profileType).toBe('minimusikertag');
+    expect(profile.audioProducts.length).toBeGreaterThan(0);
+  });
+
+  it('schulsong-only takes priority over plus', () => {
+    const profile = resolveShopProfile({ isPlus: true, isSchulsong: true, isMinimusikertag: false });
+    expect(profile.profileType).toBe('schulsong-only');
   });
 });

@@ -8,15 +8,13 @@ import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/
 import { useProducts } from '@/lib/hooks/useProducts';
 import { Product } from '@/lib/types/airtable';
 import { canOrderPersonalizedClothing, getDaysUntilEvent, SCHULSONG_CLOTHING_CUTOFF_DAYS } from '@/lib/utils/eventTimeline';
+import { ShopProfile, AudioProductId, ClothingProductId, AudioProduct, ClothingProduct } from '@/lib/config/shopProfiles';
 import AudioProductCard from './AudioProductCard';
 import ClothingProductCard from './ClothingProductCard';
 
 // ============================================================================
 // TYPES
 // ============================================================================
-
-type AudioProductId = 'minicard' | 'cd' | 'tonie' | 'minicard-cd-bundle';
-type ClothingProductId = 'tshirt' | 'hoodie' | 'tshirt-hoodie';
 
 interface AudioSelection {
   productId: AudioProductId;
@@ -44,176 +42,9 @@ interface ProductSelectorProps {
   parentEmail?: string;
   schoolName: string;
   children?: ParentSessionChild[];
-  isSchulsongOnly?: boolean;
+  shopProfile: ShopProfile;
   onCheckout?: (selection: ProductSelection, total: number) => void;
 }
-
-// ============================================================================
-// PRODUCT DEFINITIONS
-// ============================================================================
-
-interface AudioProduct {
-  id: AudioProductId;
-  name: string;
-  description: string;
-  price: number;
-  imageEmoji: string;
-  savings?: number;
-}
-
-// Shopify variant ID mapping for products
-const SHOPIFY_VARIANT_MAP: Record<string, string> = {
-  // Audio products
-  'minicard': 'gid://shopify/ProductVariant/53258099720538',
-  'cd': 'gid://shopify/ProductVariant/53258098639194',
-  'tonie': 'gid://shopify/ProductVariant/53271523557722',
-  'minicard-cd-bundle': 'gid://shopify/ProductVariant/53327238824282',
-
-  // Standard T-Shirt sizes (Minimusiker T-Shirt) - match TSHIRT_SIZES from stock.ts
-  'tshirt-standard-98/104 (3-4J)': 'gid://shopify/ProductVariant/53328491512154',
-  'tshirt-standard-110/116 (5-6J)': 'gid://shopify/ProductVariant/53328491544922',
-  'tshirt-standard-122/128 (7-8J)': 'gid://shopify/ProductVariant/53328491577690',
-  'tshirt-standard-134/146 (9-11J)': 'gid://shopify/ProductVariant/53328491610458',
-  'tshirt-standard-152/164 (12-14J)': 'gid://shopify/ProductVariant/53328491643226',
-
-  // Personalised T-Shirt sizes (T-Shirt Personalisiert) - match TSHIRT_SIZES from stock.ts
-  'tshirt-personalized-98/104 (3-4J)': 'gid://shopify/ProductVariant/53328502194522',
-  'tshirt-personalized-110/116 (5-6J)': 'gid://shopify/ProductVariant/53328502227290',
-  'tshirt-personalized-122/128 (7-8J)': 'gid://shopify/ProductVariant/53328502260058',
-  'tshirt-personalized-134/146 (9-11J)': 'gid://shopify/ProductVariant/53328502292826',
-  'tshirt-personalized-152/164 (12-14J)': 'gid://shopify/ProductVariant/53328502325594',
-
-  // Standard Hoodie sizes (Minimusiker Hoodie) - match HOODIE_SIZES from stock.ts
-  'hoodie-standard-116 (5-6 J)': 'gid://shopify/ProductVariant/53325998948698',
-  'hoodie-standard-128 (7-8 J)': 'gid://shopify/ProductVariant/53325998981466',
-  'hoodie-standard-140 (9-11 J)': 'gid://shopify/ProductVariant/53325999014234',
-  'hoodie-standard-152 (12-13 J)': 'gid://shopify/ProductVariant/53325999047002',
-  'hoodie-standard-164 (14-15 J)': 'gid://shopify/ProductVariant/53325999079770',
-
-  // Personalised Hoodie sizes (Hoodie Personalisiert) - match HOODIE_SIZES from stock.ts
-  'hoodie-personalized-116 (5-6 J)': 'gid://shopify/ProductVariant/53328494788954',
-  'hoodie-personalized-128 (7-8 J)': 'gid://shopify/ProductVariant/53328494821722',
-  'hoodie-personalized-140 (9-11 J)': 'gid://shopify/ProductVariant/53328494854490',
-  'hoodie-personalized-152 (12-13 J)': 'gid://shopify/ProductVariant/53328494887258',
-  'hoodie-personalized-164 (14-15 J)': 'gid://shopify/ProductVariant/53328494920026',
-};
-
-const AUDIO_PRODUCTS: AudioProduct[] = [
-  {
-    id: 'minicard',
-    name: 'Minicard',
-    description: 'Kompakte Karte mit QR-Code zum Abspielen',
-    price: 17.00,
-    imageEmoji: '💳',
-  },
-  {
-    id: 'cd',
-    name: 'CD',
-    description: 'Die klassische CD für deinen CD-Player - im plastikfreien Digifile mit Liederliste',
-    price: 19.00,
-    imageEmoji: '💿',
-  },
-  {
-    id: 'tonie',
-    name: 'Tonie',
-    description: 'Kreativ-Tonie mit Minicard',
-    price: 29.00,
-    imageEmoji: '🎵',
-  },
-  {
-    id: 'minicard-cd-bundle',
-    name: 'Minicard + CD',
-    description: 'Beide Formate zum Sparpreis',
-    price: 27.00,
-    savings: 9,
-    imageEmoji: '🎁',
-  },
-];
-
-interface ClothingProduct {
-  id: ClothingProductId;
-  name: string;
-  description: string;
-  price: number;
-  imageSrc: string;
-  showTshirtSize: boolean;
-  showHoodieSize: boolean;
-  savings?: number;
-  isPersonalized?: boolean;
-}
-
-// Standard clothing products (shown when ≤19 days before event)
-const STANDARD_CLOTHING_PRODUCTS: ClothingProduct[] = [
-  {
-    id: 'tshirt',
-    name: 'T-Shirt',
-    description: 'Minimusiker T-Shirt mit Mini',
-    price: 25.00,
-    imageSrc: '/images/familie_portal/T-Shirt Fallback Picture.png',
-    showTshirtSize: true,
-    showHoodieSize: false,
-    isPersonalized: false,
-  },
-  {
-    id: 'hoodie',
-    name: 'Hoodie',
-    description: 'Kuscheliger Hoodie mit Minimusiker Design',
-    price: 49.00,
-    imageSrc: '/images/familie_portal/Hoodie Fallback Picture.png',
-    showTshirtSize: false,
-    showHoodieSize: true,
-    isPersonalized: false,
-  },
-  {
-    id: 'tshirt-hoodie',
-    name: 'T-Shirt & Hoodie',
-    description: 'Das komplette Minimusiker Set',
-    price: 59.00,
-    imageSrc: '/images/products/tshirt&hoodie_bundle pic.jpeg',
-    showTshirtSize: true,
-    showHoodieSize: true,
-    savings: 15,
-    isPersonalized: false,
-  },
-];
-
-// Personalized clothing products (shown when >19 days before event)
-const PERSONALIZED_CLOTHING_PRODUCTS: ClothingProduct[] = [
-  {
-    id: 'tshirt',
-    name: 'Minimusiker Schul-T-Shirt',
-    description: 'Der gemütliche Minimusiker Schul-T-Shirt – extra für eure Schule gemacht',
-    price: 25.00,
-    imageSrc: '/images/familie_portal/T-Shirt Fallback Picture.png',
-    showTshirtSize: true,
-    showHoodieSize: false,
-    isPersonalized: true,
-  },
-  {
-    id: 'hoodie',
-    name: 'Minimusiker Schul-Hoodie',
-    description: 'Der gemütliche Minimusiker Schul-Hoodie – extra für eure Schule gemacht',
-    price: 49.00,
-    imageSrc: '/images/familie_portal/Hoodie Fallback Picture.png',
-    showTshirtSize: false,
-    showHoodieSize: true,
-    isPersonalized: true,
-  },
-  {
-    id: 'tshirt-hoodie',
-    name: 'Minimusiker Schul-T-Shirt & Schul-Hoodie Bundle',
-    description: 'Das komplette Minimusiker Schul-Set – extra für eure Schule gemacht',
-    price: 59.00,
-    imageSrc: '/images/products/tshirt&hoodie_bundle pic.jpeg',
-    showTshirtSize: true,
-    showHoodieSize: true,
-    savings: 15,
-    isPersonalized: true,
-  },
-];
-
-// Backwards compatibility - default to standard
-const CLOTHING_PRODUCTS = STANDARD_CLOTHING_PRODUCTS;
 
 const COMBO_DISCOUNT_PERCENT = 10;
 
@@ -225,20 +56,24 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
-function getAudioProduct(id: AudioProductId) {
-  return AUDIO_PRODUCTS.find(p => p.id === id);
+function getAudioProduct(audioProducts: AudioProduct[], id: AudioProductId) {
+  return audioProducts.find(p => p.id === id);
 }
 
-function getClothingProduct(id: ClothingProductId) {
-  return CLOTHING_PRODUCTS.find(p => p.id === id);
+function getClothingProduct(clothingProducts: ClothingProduct[], id: ClothingProductId) {
+  return clothingProducts.find(p => p.id === id);
 }
 
-function calculateTotal(selection: ProductSelection) {
+function calculateTotal(
+  selection: ProductSelection,
+  audioProducts: AudioProduct[],
+  clothingProducts: ClothingProduct[],
+) {
   let subtotal = 0;
 
   // Audio products (sum all selected with quantities)
   selection.audioProducts.forEach((item) => {
-    const product = getAudioProduct(item.productId);
+    const product = getAudioProduct(audioProducts, item.productId);
     if (product) {
       subtotal += product.price * item.quantity;
     }
@@ -246,7 +81,7 @@ function calculateTotal(selection: ProductSelection) {
 
   // Clothing (sum all items)
   selection.clothing.forEach((item) => {
-    const product = getClothingProduct(item.productId);
+    const product = getClothingProduct(clothingProducts, item.productId);
     if (product) {
       subtotal += product.price * item.quantity;
     }
@@ -274,11 +109,13 @@ function calculateTotal(selection: ProductSelection) {
 interface OrderSummaryProps {
   selection: ProductSelection;
   totals: ReturnType<typeof calculateTotal>;
+  audioProducts: AudioProduct[];
+  clothingProducts: ClothingProduct[];
   onCheckout: () => void;
   isProcessing: boolean;
 }
 
-function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSummaryProps) {
+function OrderSummary({ selection, totals, audioProducts, clothingProducts, onCheckout, isProcessing }: OrderSummaryProps) {
   const t = useTranslations('orderSummary');
 
   const hasItems = selection.audioProducts.length > 0 || selection.clothing.length > 0;
@@ -299,7 +136,7 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
         <div className="space-y-2">
           {/* Audio Line Items */}
           {selection.audioProducts.map((item) => {
-            const product = getAudioProduct(item.productId);
+            const product = getAudioProduct(audioProducts, item.productId);
             if (!product) return null;
             return (
               <div key={item.productId} className="flex justify-between text-sm">
@@ -316,7 +153,7 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
 
           {/* Clothing Line Items */}
           {selection.clothing.map((item) => {
-            const product = getClothingProduct(item.productId);
+            const product = getClothingProduct(clothingProducts, item.productId);
             if (!product) return null;
             return (
               <div key={item.id} className="flex justify-between text-sm">
@@ -417,6 +254,12 @@ function OrderSummary({ selection, totals, onCheckout, isProcessing }: OrderSumm
 // MAIN PRODUCT SELECTOR COMPONENT
 // ============================================================================
 
+// Helper to extract the numeric part from a Shopify variant GID
+function extractVariantNumericId(gid: string): string | null {
+  const match = gid.match(/\/(\d+)$/);
+  return match ? match[1] : null;
+}
+
 // Helper to find Shopify product image by variant ID
 function findProductImageByVariantId(products: Product[], variantIdSubstring: string): string | null {
   for (const product of products) {
@@ -438,7 +281,7 @@ export default function ProductSelector({
   parentEmail,
   schoolName,
   children = [],
-  isSchulsongOnly = false,
+  shopProfile,
   onCheckout,
 }: ProductSelectorProps) {
   const t = useTranslations('productSelector');
@@ -447,6 +290,9 @@ export default function ProductSelector({
     clothing: [],
   });
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Derive isSchulsongOnly from profile
+  const isSchulsongOnly = shopProfile.audioProducts.length === 0;
 
   // Determine if personalized products should be shown
   // Schulsong-only events get an extended deadline (-7 days instead of -4)
@@ -458,33 +304,35 @@ export default function ProductSelector({
   // Select the appropriate clothing products based on time until event
   const activeClothingProducts = useMemo(
     () => showPersonalized
-      ? PERSONALIZED_CLOTHING_PRODUCTS
-      : STANDARD_CLOTHING_PRODUCTS,
-    [showPersonalized]
+      ? shopProfile.personalizedClothingProducts
+      : shopProfile.standardClothingProducts,
+    [showPersonalized, shopProfile]
   );
 
-  // Fetch products from Shopify for images (use 'all' to get all products)
-  const { products: shopifyProducts } = useProducts({ tagFilter: 'all' });
+  // Fetch products from Shopify for images
+  const { products: shopifyProducts } = useProducts({ tagFilter: shopProfile.shopifyTagFilter });
 
-  // Get Shopify product images for audio items
+  // Get Shopify product images for audio items (derived from variant map)
   const audioImages = useMemo(() => {
-    if (!shopifyProducts || shopifyProducts.length === 0) {
-      return {
-        minicard: null,
-        cd: null,
-        tonie: null,
-        'minicard-cd-bundle': null,
-      };
+    const defaultImages: Record<string, string | null> = {};
+    for (const product of shopProfile.audioProducts) {
+      defaultImages[product.id] = null;
     }
 
-    // Extract variant ID substrings from our mapping (the numeric part)
-    return {
-      minicard: findProductImageByVariantId(shopifyProducts, '53258099720538'),
-      cd: findProductImageByVariantId(shopifyProducts, '53258098639194'),
-      tonie: findProductImageByVariantId(shopifyProducts, '53271523557722'),
-      'minicard-cd-bundle': findProductImageByVariantId(shopifyProducts, '53327238824282'),
-    };
-  }, [shopifyProducts]);
+    if (!shopifyProducts || shopifyProducts.length === 0) {
+      return defaultImages;
+    }
+
+    const images: Record<string, string | null> = {};
+    for (const product of shopProfile.audioProducts) {
+      const variantGid = shopProfile.shopifyVariantMap[product.id];
+      const numericId = variantGid ? extractVariantNumericId(variantGid) : null;
+      images[product.id] = numericId
+        ? findProductImageByVariantId(shopifyProducts, numericId)
+        : null;
+    }
+    return images;
+  }, [shopifyProducts, shopProfile]);
 
   // Get Shopify product images for clothing items
   // Uses different variant IDs based on whether showing personalized or standard products
@@ -498,10 +346,11 @@ export default function ProductSelector({
     }
 
     // Use different variant IDs based on personalized vs standard
-    // Personalized T-Shirt: 53328502194522, Standard T-Shirt: 53328491512154
-    // Personalized Hoodie: 53328494788954, Standard Hoodie: 53325998948698
-    const tshirtVariantId = showPersonalized ? '53328502194522' : '53328491512154';
-    const hoodieVariantId = showPersonalized ? '53328494788954' : '53325998948698';
+    const variantPrefix = showPersonalized ? 'personalized' : 'standard';
+    const tshirtVariantGid = shopProfile.shopifyVariantMap[`tshirt-${variantPrefix}-98/104 (3-4J)`];
+    const hoodieVariantGid = shopProfile.shopifyVariantMap[`hoodie-${variantPrefix}-116 (5-6 J)`];
+    const tshirtNumericId = tshirtVariantGid ? extractVariantNumericId(tshirtVariantGid) : null;
+    const hoodieNumericId = hoodieVariantGid ? extractVariantNumericId(hoodieVariantGid) : null;
 
     // Find bundle product by searching for a product with "bundle" or "set" in title
     const bundleImage = shopifyProducts.find(p =>
@@ -512,13 +361,16 @@ export default function ProductSelector({
     )?.images?.[0]?.url;
 
     return {
-      tshirt: findProductImageByVariantId(shopifyProducts, tshirtVariantId) || '/images/familie_portal/T-Shirt Fallback Picture.png',
-      hoodie: findProductImageByVariantId(shopifyProducts, hoodieVariantId) || '/images/familie_portal/Hoodie Fallback Picture.png',
+      tshirt: (tshirtNumericId && findProductImageByVariantId(shopifyProducts, tshirtNumericId)) || '/images/familie_portal/T-Shirt Fallback Picture.png',
+      hoodie: (hoodieNumericId && findProductImageByVariantId(shopifyProducts, hoodieNumericId)) || '/images/familie_portal/Hoodie Fallback Picture.png',
       'tshirt-hoodie': bundleImage || '/images/familie_portal/Hoodie and T-Shirt Picture.jpeg',
     };
-  }, [shopifyProducts, showPersonalized]);
+  }, [shopifyProducts, showPersonalized, shopProfile]);
 
-  const totals = useMemo(() => calculateTotal(selection), [selection]);
+  const totals = useMemo(
+    () => calculateTotal(selection, shopProfile.audioProducts, activeClothingProducts),
+    [selection, shopProfile.audioProducts, activeClothingProducts]
+  );
 
   // Audio selection handlers
   const handleAudioToggle = (productId: string) => {
@@ -594,7 +446,7 @@ export default function ProductSelector({
 
       // Add audio products
       selection.audioProducts.forEach((item) => {
-        const variantId = SHOPIFY_VARIANT_MAP[item.productId];
+        const variantId = shopProfile.shopifyVariantMap[item.productId];
         if (variantId) {
           lineItems.push({ variantId, quantity: item.quantity, productType: 'audio' });
         }
@@ -606,19 +458,19 @@ export default function ProductSelector({
 
       selection.clothing.forEach((item) => {
         if (item.productId === 'tshirt' && item.tshirtSize) {
-          const variantId = SHOPIFY_VARIANT_MAP[`tshirt-${variantPrefix}-${item.tshirtSize}`];
+          const variantId = shopProfile.shopifyVariantMap[`tshirt-${variantPrefix}-${item.tshirtSize}`];
           if (variantId) {
             lineItems.push({ variantId, quantity: item.quantity, productType: 'tshirt' });
           }
         } else if (item.productId === 'hoodie' && item.hoodieSize) {
-          const variantId = SHOPIFY_VARIANT_MAP[`hoodie-${variantPrefix}-${item.hoodieSize}`];
+          const variantId = shopProfile.shopifyVariantMap[`hoodie-${variantPrefix}-${item.hoodieSize}`];
           if (variantId) {
             lineItems.push({ variantId, quantity: item.quantity, productType: 'hoodie' });
           }
         } else if (item.productId === 'tshirt-hoodie' && item.tshirtSize && item.hoodieSize) {
           // Bundle: add both t-shirt and hoodie as separate line items with their types
-          const tshirtVariantId = SHOPIFY_VARIANT_MAP[`tshirt-${variantPrefix}-${item.tshirtSize}`];
-          const hoodieVariantId = SHOPIFY_VARIANT_MAP[`hoodie-${variantPrefix}-${item.hoodieSize}`];
+          const tshirtVariantId = shopProfile.shopifyVariantMap[`tshirt-${variantPrefix}-${item.tshirtSize}`];
+          const hoodieVariantId = shopProfile.shopifyVariantMap[`hoodie-${variantPrefix}-${item.hoodieSize}`];
           if (tshirtVariantId) {
             lineItems.push({ variantId: tshirtVariantId, quantity: item.quantity, productType: 'tshirt' });
           }
@@ -722,14 +574,14 @@ export default function ProductSelector({
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {AUDIO_PRODUCTS.map((product) => (
+          {shopProfile.audioProducts.map((product) => (
             <AudioProductCard
               key={product.id}
               productId={product.id}
               name={product.name}
               description={product.description}
               price={product.price}
-              imageSrc={audioImages[product.id as keyof typeof audioImages] || undefined}
+              imageSrc={audioImages[product.id] || undefined}
               imageEmoji={product.imageEmoji}
               isSelected={isAudioSelected(product.id)}
               quantity={getAudioQuantity(product.id)}
@@ -801,7 +653,7 @@ export default function ProductSelector({
             <p className="text-sm font-medium text-gray-700 mb-3">{t('addedItems')}</p>
             <div className="space-y-2">
               {selection.clothing.map((item) => {
-                const product = getClothingProduct(item.productId);
+                const product = getClothingProduct(activeClothingProducts, item.productId);
                 if (!product) return null;
                 return (
                   <div key={item.id} className="flex items-center justify-between bg-sage-50 p-3 rounded-lg">
@@ -857,6 +709,8 @@ export default function ProductSelector({
       <OrderSummary
         selection={selection}
         totals={totals}
+        audioProducts={shopProfile.audioProducts}
+        clothingProducts={activeClothingProducts}
         onCheckout={handleCheckout}
         isProcessing={isProcessing}
       />
