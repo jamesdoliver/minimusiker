@@ -18,6 +18,7 @@ const WEBHOOK_TOPICS = [
   { topic: 'ORDERS_PAID', path: '/api/webhooks/shopify/orders-paid' },
   { topic: 'ORDERS_FULFILLED', path: '/api/webhooks/shopify/orders-fulfilled' },
   { topic: 'ORDERS_CANCELLED', path: '/api/webhooks/shopify/orders-cancelled' },
+  { topic: 'ORDERS_UPDATED', path: '/api/webhooks/shopify/orders-updated' },
 ];
 
 async function getAccessToken() {

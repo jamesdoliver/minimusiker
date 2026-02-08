@@ -655,6 +655,8 @@ export const ORDERS_FIELD_IDS = {
   digital_delivered: 'fldj92CkKEXZutMsS',  // Has digital content been delivered?
   created_at: 'fldfmBl2c5pJ6zxL4',         // Record creation timestamp
   updated_at: 'fldXyxRPkMSztS8Ff',         // Last update timestamp
+  refund_amount: 'flddqjKgaydkFL5HG',      // Amount refunded (EUR)
+  cancel_reason: 'fld768qHuCqNujx8c',      // Shopify cancel reason
 } as const;
 
 // ======================================================================
@@ -794,8 +796,10 @@ export interface ShopifyOrder {
   shipping_amount?: number;                      // Shipping charged
   line_items: ShopifyOrderLineItem[];            // Parsed JSON array
   fulfillment_status: 'pending' | 'fulfilled' | 'partial' | 'restocked';
-  payment_status: 'pending' | 'paid' | 'refunded' | 'voided';
+  payment_status: 'pending' | 'paid' | 'partially_refunded' | 'refunded' | 'voided';
   digital_delivered: boolean;                    // Has digital content been delivered?
+  refund_amount?: number;                        // Amount refunded (EUR)
+  cancel_reason?: string;                        // Shopify cancel reason
   created_at: string;                            // Record creation timestamp
   updated_at: string;                            // Last update timestamp
 }
@@ -817,8 +821,10 @@ export interface CreateShopifyOrderInput {
   shipping_amount?: number;
   line_items: ShopifyOrderLineItem[];
   fulfillment_status: 'pending' | 'fulfilled' | 'partial' | 'restocked';
-  payment_status: 'pending' | 'paid' | 'refunded' | 'voided';
+  payment_status: 'pending' | 'paid' | 'partially_refunded' | 'refunded' | 'voided';
   digital_delivered?: boolean;
+  refund_amount?: number;
+  cancel_reason?: string;
 }
 
 // ======================================================================
