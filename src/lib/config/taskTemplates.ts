@@ -80,6 +80,23 @@ export const CLOTHING_ORDER_TEMPLATES: TaskTemplate[] = [
 ];
 
 /**
+ * Standard Clothing Order Task Templates
+ * Created weekly by cron job for batched standard Minimusiker-branded clothing
+ */
+export const STANDARD_CLOTHING_ORDER_TEMPLATES: TaskTemplate[] = [
+  {
+    id: 'order_standard_shirts',
+    type: 'standard_clothing_order',
+    name: 'Order Standard T-Shirts & Hoodies (Weekly Batch)',
+    description: 'Weekly supplier order for standard Minimusiker-branded clothing',
+    timeline_offset: 0,
+    completion_type: 'monetary',
+    creates_go_id: true,
+    creates_shipping: true,
+  },
+];
+
+/**
  * Shipping Task Template (created dynamically when paper order is completed)
  */
 export const SHIPPING_TEMPLATE: Omit<TaskTemplate, 'id' | 'timeline_offset'> = {
@@ -100,6 +117,8 @@ export function getTemplatesByType(type: TaskType): TaskTemplate[] {
       return PAPER_ORDER_TEMPLATES;
     case 'clothing_order':
       return CLOTHING_ORDER_TEMPLATES;
+    case 'standard_clothing_order':
+      return STANDARD_CLOTHING_ORDER_TEMPLATES;
     case 'cd_master':
       return []; // TODO: Add CD master templates
     case 'cd_production':
@@ -118,6 +137,7 @@ export function getAllTemplates(): TaskTemplate[] {
   return [
     ...PAPER_ORDER_TEMPLATES,
     ...CLOTHING_ORDER_TEMPLATES,
+    ...STANDARD_CLOTHING_ORDER_TEMPLATES,
   ];
 }
 

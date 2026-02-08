@@ -103,7 +103,7 @@ class TaskService {
 
     const record = await table.create({
       [TASKS_FIELD_IDS.template_id]: input.template_id,
-      [TASKS_FIELD_IDS.event_id]: [input.event_id], // Linked record
+      [TASKS_FIELD_IDS.event_id]: input.event_ids ?? [input.event_id], // Linked record(s)
       [TASKS_FIELD_IDS.task_type]: input.task_type,
       [TASKS_FIELD_IDS.task_name]: input.task_name,
       [TASKS_FIELD_IDS.description]: input.description,
@@ -166,6 +166,7 @@ class TaskService {
       all: allRecords.length,
       paper_order: 0,
       clothing_order: 0,
+      standard_clothing_order: 0,
       cd_master: 0,
       cd_production: 0,
       shipping: 0,
@@ -239,6 +240,7 @@ class TaskService {
     if (template?.creates_go_id) {
       const goOrder = await this.createGuesstimateOrder({
         event_id: task.event_id,
+        event_ids: task.event_ids,
         order_date: new Date().toISOString().split('T')[0],
         order_amount: completionData.amount,
         order_ids: goEnrichment?.order_ids,
@@ -271,6 +273,7 @@ class TaskService {
       if (event) {
         const shippingTask = await this.createTask({
           event_id: task.event_id,
+          event_ids: task.event_ids,
           template_id: `shipping_${task.template_id}`,
           task_type: 'shipping',
           task_name: SHIPPING_TEMPLATE.name,
@@ -307,7 +310,7 @@ class TaskService {
     const table = base(GUESSTIMATE_ORDERS_TABLE_ID);
 
     const fields: Record<string, string | number | string[]> = {
-      [GUESSTIMATE_ORDERS_FIELD_IDS.event_id]: [input.event_id],
+      [GUESSTIMATE_ORDERS_FIELD_IDS.event_id]: input.event_ids ?? [input.event_id],
       [GUESSTIMATE_ORDERS_FIELD_IDS.order_ids]: input.order_ids || '',
       [GUESSTIMATE_ORDERS_FIELD_IDS.order_amount]: input.order_amount || 0,
       [GUESSTIMATE_ORDERS_FIELD_IDS.contains]: input.contains
@@ -443,6 +446,7 @@ class TaskService {
       task_id: (get(TASKS_FIELD_IDS.task_id) as string) || record.id,
       template_id: (get(TASKS_FIELD_IDS.template_id) as string) || '',
       event_id: eventIds?.[0] || '',
+      event_ids: eventIds,
       task_type: (get(TASKS_FIELD_IDS.task_type) as TaskType) || 'paper_order',
       task_name: (get(TASKS_FIELD_IDS.task_name) as string) || '',
       description: (get(TASKS_FIELD_IDS.description) as string) || '',
@@ -475,6 +479,11 @@ class TaskService {
         eventDate = event.event_date;
         eventType = event.event_type;
       }
+    }
+
+    // For standard_clothing_order tasks with multiple events, show batch summary
+    if (task.task_type === 'standard_clothing_order' && task.event_ids && task.event_ids.length > 1) {
+      schoolName = `${task.event_ids.length} schools`;
     }
 
     // Get go_id display value and stock arrival status
