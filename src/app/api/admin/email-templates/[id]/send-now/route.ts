@@ -125,9 +125,7 @@ export async function POST(
         if (!eventMatchesTemplate(thresholdMatch, template)) {
           // Determine skip reason based on template filters
           let skipReason = 'Event passt nicht zu Template-Filter';
-          if (template.is_kita && !event.is_kita) {
-            skipReason = 'Template erfordert KiTa';
-          } else if (template.is_minimusikertag && !event.is_minimusikertag) {
+          if (template.is_minimusikertag && !event.is_minimusikertag) {
             skipReason = 'Template erfordert Minimusikertag';
           } else if (template.is_plus && !event.is_plus) {
             skipReason = 'Template erfordert Plus-Event';

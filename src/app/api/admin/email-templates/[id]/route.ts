@@ -99,7 +99,6 @@ export async function PUT(
     if (body.bodyHtml !== undefined) updateInput.bodyHtml = body.bodyHtml;
     if (body.active !== undefined) updateInput.active = body.active;
     if (body.is_minimusikertag !== undefined) updateInput.is_minimusikertag = body.is_minimusikertag;
-    if (body.is_kita !== undefined) updateInput.is_kita = body.is_kita;
     if (body.is_plus !== undefined) updateInput.is_plus = body.is_plus;
     if (body.is_schulsong !== undefined) updateInput.is_schulsong = body.is_schulsong;
 

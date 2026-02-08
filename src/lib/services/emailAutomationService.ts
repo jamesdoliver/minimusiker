@@ -33,7 +33,6 @@ const RATE_LIMIT_DELAY_MS = 500; // 500ms delay between emails to respect Resend
  */
 export function eventMatchesTemplate(event: EventThresholdMatch, template: EmailTemplate): boolean {
   if (template.is_minimusikertag && !event.isMinimusikertag) return false;
-  if (template.is_kita && !event.isKita) return false;
   if (template.is_plus && !event.isPlus) return false;
   if (template.is_schulsong && !event.isSchulsong) return false;
   return true;
