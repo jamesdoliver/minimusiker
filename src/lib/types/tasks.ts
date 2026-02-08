@@ -47,6 +47,7 @@ export interface TaskWithEventDetails extends Task {
   is_overdue: boolean;
   r2_file_path?: string; // Path to downloadable file
   r2_download_url?: string; // Signed URL for download
+  stock_arrived?: boolean; // For shipping tasks: whether linked GO-ID stock has arrived
 }
 
 // Completion data stored as JSON
@@ -74,6 +75,13 @@ export interface GuesstimateOrderItem {
   sku: string;
   name: string;
   quantity: number;
+}
+
+// GuesstimateOrder enriched with event details (for incoming orders view)
+export interface GuesstimateOrderWithEventDetails extends GuesstimateOrder {
+  school_name: string;
+  event_date: string;
+  parsed_contains: GuesstimateOrderItem[];
 }
 
 // Task Template definition (hardcoded in config)

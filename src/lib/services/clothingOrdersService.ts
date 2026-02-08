@@ -15,6 +15,7 @@ import {
   AggregatedClothingItems,
   ClothingItem,
 } from '@/lib/types/clothingOrders';
+import { calculateDeadline } from '@/lib/config/taskTemplates';
 import {
   ORDERS_TABLE_ID,
   ORDERS_FIELD_IDS,
@@ -308,7 +309,9 @@ class ClothingOrdersService {
   }
 
   /**
-   * Complete a clothing order (create task + GO-ID)
+   * Complete a clothing order via the standard task cascade
+   * Finds (or creates) the pending clothing task, then completes it through taskService
+   * which creates GO-ID + shipping task
    */
   async completeClothingOrder(
     eventRecordId: string,
@@ -316,30 +319,62 @@ class ClothingOrdersService {
     notes: string | undefined,
     orderIds: string[],
     adminEmail: string
-  ): Promise<{ taskId: string; goId: string }> {
+  ): Promise<{ taskId: string; goId: string; shippingTaskId?: string }> {
     const taskService = getTaskService();
     const base = this.airtable.getBase();
     const tasksTable = base(TASKS_TABLE_ID);
     const eventsTable = base(EVENTS_TABLE_ID);
 
-    // Get event details using .select() with RECORD_ID() to support returnFieldsByFieldId
-    const eventRecords = await eventsTable
+    // Find the pending order_schul_shirts task for this event
+    const pendingTasks = await tasksTable
       .select({
-        filterByFormula: `RECORD_ID() = '${eventRecordId}'`,
-        returnFieldsByFieldId: true,
-        maxRecords: 1,
+        filterByFormula: `AND(
+          {${TASKS_FIELD_IDS.template_id}} = 'order_schul_shirts',
+          {${TASKS_FIELD_IDS.status}} = 'pending',
+          SEARCH('${eventRecordId}', ARRAYJOIN({${TASKS_FIELD_IDS.event_id}}))
+        )`,
       })
       .all();
 
-    if (eventRecords.length === 0) {
-      throw new Error(`Event not found: ${eventRecordId}`);
+    let taskId: string;
+
+    if (pendingTasks.length > 0) {
+      // Use the existing pending task
+      taskId = pendingTasks[0].id;
+    } else {
+      // Legacy event without pre-generated task — create one as pending first
+      const eventRecords = await eventsTable
+        .select({
+          filterByFormula: `RECORD_ID() = '${eventRecordId}'`,
+          returnFieldsByFieldId: true,
+          maxRecords: 1,
+        })
+        .all();
+
+      if (eventRecords.length === 0) {
+        throw new Error(`Event not found: ${eventRecordId}`);
+      }
+
+      const event = eventRecords[0];
+      const eventDate = event.get(EVENTS_FIELD_IDS.event_date) as string;
+
+      const deadline = calculateDeadline(new Date(eventDate), -ORDER_DAY_OFFSET);
+
+      const pendingTask = await taskService.createTask({
+        event_id: eventRecordId,
+        template_id: 'order_schul_shirts',
+        task_type: 'clothing_order',
+        task_name: 'Order School T-Shirts & Hoodies',
+        description: 'Place supplier order for school-branded clothing items',
+        completion_type: 'monetary',
+        timeline_offset: -ORDER_DAY_OFFSET,
+        deadline: deadline.toISOString(),
+        status: 'pending',
+      });
+      taskId = pendingTask.id;
     }
 
-    const event = eventRecords[0];
-    const _eventId = event.get(EVENTS_FIELD_IDS.event_id) as string;
-    const schoolName = event.get(EVENTS_FIELD_IDS.school_name) as string;
-
-    // Get aggregated items for GO-ID contains field
+    // Build aggregated items for GO enrichment
     const orderDetails = await this.getOrdersForEvent(eventRecordId);
     const aggregatedItems: { sku: string; name: string; quantity: number }[] = [];
 
@@ -360,42 +395,18 @@ class ClothingOrdersService {
       });
     }
 
-    // Create GuesstimateOrder
-    const goOrder = await taskService.createGuesstimateOrder({
-      event_id: eventRecordId,
-      order_ids: orderIds.join(','),
-      order_date: new Date().toISOString().split('T')[0],
-      order_amount: amount,
-      contains: aggregatedItems,
-    });
-
-    // Create completed task
-    const completionData = JSON.stringify({
-      amount,
-      notes: notes || undefined,
-    });
-
-    const taskRecord = await tasksTable.create({
-      [TASKS_FIELD_IDS.template_id]: 'clothing_order',
-      [TASKS_FIELD_IDS.event_id]: [eventRecordId],
-      [TASKS_FIELD_IDS.task_type]: 'clothing_order',
-      [TASKS_FIELD_IDS.task_name]: `Clothing Order - ${schoolName}`,
-      [TASKS_FIELD_IDS.description]: `Clothing order for ${schoolName}`,
-      [TASKS_FIELD_IDS.completion_type]: 'monetary',
-      [TASKS_FIELD_IDS.timeline_offset]: -ORDER_DAY_OFFSET,
-      [TASKS_FIELD_IDS.deadline]: new Date().toISOString().split('T')[0],
-      [TASKS_FIELD_IDS.status]: 'completed',
-      [TASKS_FIELD_IDS.completed_at]: new Date().toISOString(),
-      [TASKS_FIELD_IDS.completed_by]: adminEmail,
-      [TASKS_FIELD_IDS.completion_data]: completionData,
-      [TASKS_FIELD_IDS.go_id]: [goOrder.id],
-      [TASKS_FIELD_IDS.order_ids]: orderIds.join(','),
-      [TASKS_FIELD_IDS.created_at]: new Date().toISOString(),
-    });
+    // Complete through the standard task cascade (creates GO-ID + shipping task)
+    const result = await taskService.completeTask(
+      taskId,
+      { amount, notes: notes || undefined },
+      adminEmail,
+      { order_ids: orderIds.join(','), contains: aggregatedItems }
+    );
 
     return {
-      taskId: taskRecord.id,
-      goId: goOrder.id,
+      taskId: result.task.id,
+      goId: result.goId || '',
+      shippingTaskId: result.shippingTaskId,
     };
   }
 }

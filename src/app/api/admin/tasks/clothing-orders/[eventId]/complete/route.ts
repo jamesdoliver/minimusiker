@@ -57,6 +57,7 @@ export async function POST(
       data: {
         task_id: result.taskId,
         go_id: result.goId,
+        shipping_task_id: result.shippingTaskId,
       },
     });
   } catch (error) {

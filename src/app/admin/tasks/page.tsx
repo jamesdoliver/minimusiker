@@ -8,13 +8,14 @@ import TaskCompletionModal from '@/components/admin/tasks/TaskCompletionModal';
 import CompletedTasksView from '@/components/admin/tasks/CompletedTasksView';
 import TaskSearchBar from '@/components/admin/tasks/TaskSearchBar';
 import ClothingOrdersView from '@/components/admin/tasks/ClothingOrdersView';
+import IncomingOrdersView from '@/components/admin/tasks/IncomingOrdersView';
 import {
   TaskWithEventDetails,
   TaskFilterTab,
   TaskCompletionData,
 } from '@/lib/types/tasks';
 
-type ViewMode = 'pending' | 'completed';
+type ViewMode = 'pending' | 'incoming' | 'completed';
 
 interface TasksStats {
   total: number;
@@ -246,6 +247,16 @@ export default function AdminTasks() {
           </span>
         </button>
         <button
+          onClick={() => setViewMode('incoming')}
+          className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            viewMode === 'incoming'
+              ? 'bg-[#94B8B3] text-white'
+              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          Incoming Orders
+        </button>
+        <button
           onClick={() => setViewMode('completed')}
           className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${
             viewMode === 'completed'
@@ -287,6 +298,11 @@ export default function AdminTasks() {
             />
           )}
         </>
+      )}
+
+      {/* Incoming Orders View */}
+      {viewMode === 'incoming' && (
+        <IncomingOrdersView onStockArrived={fetchPendingTasks} />
       )}
 
       {/* Completed Tasks View */}

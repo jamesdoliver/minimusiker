@@ -9,11 +9,14 @@ import {
   TaskCompletionData,
   CreateTaskInput,
   GuesstimateOrder,
+  GuesstimateOrderWithEventDetails,
+  GuesstimateOrderItem,
   CreateGuesstimateOrderInput,
   TaskFilterTab,
 } from '@/lib/types/tasks';
 import {
   PAPER_ORDER_TEMPLATES,
+  CLOTHING_ORDER_TEMPLATES,
   SHIPPING_TEMPLATE,
   getTemplateById,
   calculateUrgencyScore,
@@ -50,6 +53,26 @@ class TaskService {
 
     // Generate Paper Order tasks from templates
     for (const template of PAPER_ORDER_TEMPLATES) {
+      const deadline = calculateDeadline(eventDate, template.timeline_offset);
+
+      const taskInput: CreateTaskInput = {
+        event_id: eventId,
+        template_id: template.id,
+        task_type: template.type,
+        task_name: template.name,
+        description: template.description,
+        completion_type: template.completion_type,
+        timeline_offset: template.timeline_offset,
+        deadline: deadline.toISOString(),
+        status: 'pending',
+      };
+
+      const task = await this.createTask(taskInput);
+      createdTasks.push(task);
+    }
+
+    // Generate Clothing Order tasks from templates
+    for (const template of CLOTHING_ORDER_TEMPLATES) {
       const deadline = calculateDeadline(eventDate, template.timeline_offset);
 
       const taskInput: CreateTaskInput = {
@@ -193,11 +216,13 @@ class TaskService {
 
   /**
    * Complete a task
+   * @param goEnrichment - Optional enrichment data for GO-ID (used by clothing orders)
    */
   async completeTask(
     taskId: string,
     completionData: TaskCompletionData,
-    adminEmail: string
+    adminEmail: string,
+    goEnrichment?: { order_ids?: string; contains?: GuesstimateOrderItem[] }
   ): Promise<{ task: Task; goId?: string; shippingTaskId?: string }> {
     const base = this.airtable.getBase();
     const table = base(TASKS_TABLE_ID);
@@ -216,6 +241,8 @@ class TaskService {
         event_id: task.event_id,
         order_date: new Date().toISOString().split('T')[0],
         order_amount: completionData.amount,
+        order_ids: goEnrichment?.order_ids,
+        contains: goEnrichment?.contains,
       });
       goId = goOrder.id;
     }
@@ -230,6 +257,10 @@ class TaskService {
 
     if (goId) {
       updateFields[TASKS_FIELD_IDS.go_id] = [goId];
+    }
+
+    if (goEnrichment?.order_ids) {
+      updateFields[TASKS_FIELD_IDS.order_ids] = goEnrichment.order_ids;
     }
 
     await table.update(taskId, updateFields as Partial<Airtable.FieldSet>);
@@ -295,20 +326,86 @@ class TaskService {
   }
 
   /**
-   * Get GuesstimateOrders, optionally filtered by event
+   * Get GuesstimateOrders, optionally filtered by event or pending status
    */
-  async getGuesstimateOrders(eventId?: string): Promise<GuesstimateOrder[]> {
+  async getGuesstimateOrders(eventId?: string, pendingOnly?: boolean): Promise<GuesstimateOrder[]> {
     const base = this.airtable.getBase();
     const table = base(GUESSTIMATE_ORDERS_TABLE_ID);
 
-    const selectOptions: { filterByFormula?: string } = {};
+    const filters: string[] = [];
 
     if (eventId) {
-      selectOptions.filterByFormula = `SEARCH('${eventId}', ARRAYJOIN({${GUESSTIMATE_ORDERS_FIELD_IDS.event_id}}))`;
+      filters.push(`SEARCH('${eventId}', ARRAYJOIN({${GUESSTIMATE_ORDERS_FIELD_IDS.event_id}}))`);
+    }
+
+    if (pendingOnly) {
+      filters.push(`{${GUESSTIMATE_ORDERS_FIELD_IDS.date_completed}} = BLANK()`);
+    }
+
+    const selectOptions: { filterByFormula?: string } = {};
+    if (filters.length > 0) {
+      selectOptions.filterByFormula = filters.length === 1
+        ? filters[0]
+        : `AND(${filters.join(', ')})`;
     }
 
     const records = await table.select(selectOptions).all();
     return records.map((record) => this.transformGuesstimateOrderRecord(record));
+  }
+
+  /**
+   * Get GuesstimateOrders enriched with event details (for incoming orders view)
+   */
+  async getGuesstimateOrdersEnriched(options?: { pendingOnly?: boolean }): Promise<GuesstimateOrderWithEventDetails[]> {
+    const orders = await this.getGuesstimateOrders(undefined, options?.pendingOnly);
+
+    const enriched: GuesstimateOrderWithEventDetails[] = [];
+
+    for (const order of orders) {
+      let schoolName = 'Unknown School';
+      let eventDate = '';
+
+      if (order.event_id) {
+        const event = await this.airtable.getEventById(order.event_id);
+        if (event) {
+          schoolName = event.school_name;
+          eventDate = event.event_date;
+        }
+      }
+
+      let parsedContains: GuesstimateOrderItem[] = [];
+      if (order.contains) {
+        try {
+          parsedContains = JSON.parse(order.contains);
+        } catch {
+          // Ignore parse errors
+        }
+      }
+
+      enriched.push({
+        ...order,
+        school_name: schoolName,
+        event_date: eventDate,
+        parsed_contains: parsedContains,
+      });
+    }
+
+    return enriched;
+  }
+
+  /**
+   * Mark a GuesstimateOrder as arrived (sets date_completed to today)
+   */
+  async markGuesstimateOrderArrived(goId: string): Promise<GuesstimateOrder> {
+    const base = this.airtable.getBase();
+    const table = base(GUESSTIMATE_ORDERS_TABLE_ID);
+
+    await table.update(goId, {
+      [GUESSTIMATE_ORDERS_FIELD_IDS.date_completed]: new Date().toISOString().split('T')[0],
+    });
+
+    const updatedRecord = await table.find(goId);
+    return this.transformGuesstimateOrderRecord(updatedRecord);
   }
 
   /**
@@ -380,14 +477,21 @@ class TaskService {
       }
     }
 
-    // Get go_id display value
+    // Get go_id display value and stock arrival status
     let goDisplayId: string | undefined;
+    let stockArrived: boolean | undefined;
     if (task.go_id) {
       try {
         const base = this.airtable.getBase();
         const goTable = base(GUESSTIMATE_ORDERS_TABLE_ID);
         const goRecord = await goTable.find(task.go_id);
         goDisplayId = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.go_id) as string;
+
+        // For shipping tasks, check if linked GO-ID stock has arrived
+        if (task.task_type === 'shipping') {
+          const dateCompleted = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.date_completed) as string | undefined;
+          stockArrived = !!dateCompleted;
+        }
       } catch {
         // Ignore if go_id record not found
       }
@@ -411,6 +515,7 @@ class TaskService {
       days_until_due: daysUntilDue,
       is_overdue: isOverdue,
       r2_file_path: r2FilePath,
+      stock_arrived: stockArrived,
     };
   }
 
