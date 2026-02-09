@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendTestEmail, getPreviewTemplateData, substituteTemplateVariables } from '@/lib/services/emailAutomationService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
-import { getCampaignEmailTemplate } from '@/lib/services/resendService';
+import { getCampaignEmailTemplate } from '@/lib/services/emailTemplateWrapper';
 
 export const dynamic = 'force-dynamic';
 

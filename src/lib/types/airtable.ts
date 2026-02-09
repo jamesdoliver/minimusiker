@@ -712,6 +712,14 @@ export interface Event {
  */
 export type ClassType = 'regular' | 'choir' | 'teacher_song';
 
+export const PARENT_REGISTRABLE_CLASS_TYPES: ClassType[] = ['regular'];
+
+export function isRegistrableClassType(classType?: ClassType | string, isDefault?: boolean): boolean {
+  if (isDefault) return true;
+  if (!classType) return true; // Missing class_type = legacy 'regular'
+  return PARENT_REGISTRABLE_CLASS_TYPES.includes(classType as ClassType);
+}
+
 /**
  * Class record - One row per class within an event
  */

@@ -37,6 +37,9 @@ export async function GET(request: NextRequest) {
       ? await airtable.getActiveEmailTemplates()
       : await airtable.getAllEmailTemplates();
 
+    // Exclude trigger templates — those are served by /api/admin/trigger-templates
+    templates = templates.filter((t) => t.templateType !== 'trigger');
+
     // Filter by audience if specified
     if (audienceFilter) {
       templates = templates.filter((t) => t.audience.includes(audienceFilter));
