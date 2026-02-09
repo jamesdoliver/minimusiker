@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { processEmailAutomation } from '@/lib/services/emailAutomationService';
+import { processEmailAutomation, processSchulsongReleaseEmails, getCurrentBerlinHour } from '@/lib/services/emailAutomationService';
 import { CronAutomationResponse } from '@/lib/types/email-automation';
 
 export const dynamic = 'force-dynamic';
@@ -77,11 +77,28 @@ export async function POST(request: NextRequest): Promise<NextResponse<CronAutom
     // Process email automation
     const result = await processEmailAutomation(isDryRun);
 
+    // Process schulsong release emails in the 6-8am Berlin window
+    // (covers cron drift; dedup makes multiple runs safe)
+    let schulsongResult: { sent: number; skipped: number; failed: number; errors: string[] } | undefined;
+    const berlinHour = getCurrentBerlinHour();
+    if (berlinHour >= 6 && berlinHour <= 8) {
+      console.log(`[Email Automation Cron] Processing schulsong releases (Berlin hour: ${berlinHour})`);
+      schulsongResult = await processSchulsongReleaseEmails(isDryRun);
+      if (schulsongResult.errors.length > 0) {
+        console.error('[Email Automation Cron] Schulsong errors:', schulsongResult.errors);
+      }
+    }
+
     const duration = Date.now() - startTime;
     console.log(`[Email Automation Cron] Completed in ${duration}ms`);
     console.log(
       `[Email Automation Cron] Results: ${result.emailsSent} sent, ${result.emailsFailed} failed, ${result.emailsSkipped} skipped`
     );
+    if (schulsongResult) {
+      console.log(
+        `[Email Automation Cron] Schulsong: ${schulsongResult.sent} sent, ${schulsongResult.skipped} skipped, ${schulsongResult.failed} failed`
+      );
+    }
 
     if (result.errors.length > 0) {
       console.error('[Email Automation Cron] Errors:', result.errors);
@@ -91,6 +108,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CronAutom
       success: true,
       mode: isDryRun ? 'dry-run' : 'live',
       result,
+      schulsongResult,
     });
   } catch (error) {
     const duration = Date.now() - startTime;

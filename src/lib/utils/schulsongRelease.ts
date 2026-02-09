@@ -1,10 +1,10 @@
 /**
- * Compute the schulsong release date: next workday at 8am CET/CEST
+ * Compute the schulsong release date: next workday at 7am CET/CEST
  *
  * Rules:
  * - Always advance to at least the next day (never same-day release)
  * - Skip weekends: if next day is Saturday → Monday; Sunday → Monday
- * - Set time to 08:00:00 in Europe/Berlin timezone
+ * - Set time to 07:00:00 in Europe/Berlin timezone
  * - Return as UTC Date
  */
 export function computeSchulsongReleaseDate(now: Date = new Date()): Date {
@@ -36,8 +36,8 @@ export function computeSchulsongReleaseDate(now: Date = new Date()): Date {
     candidate.setUTCDate(candidate.getUTCDate() + 1); // Sunday → Monday
   }
 
-  // Now set the time to 08:00 Berlin time by computing the UTC offset
-  // Create a date string in Berlin timezone at 08:00
+  // Now set the time to 07:00 Berlin time by computing the UTC offset
+  // Create a date string in Berlin timezone at 07:00
   const releaseDateStr = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Berlin',
     year: 'numeric',
@@ -45,7 +45,7 @@ export function computeSchulsongReleaseDate(now: Date = new Date()): Date {
     day: '2-digit',
   }).format(candidate);
 
-  // Parse the Berlin date and create a Date at 08:00 Berlin time
+  // Parse the Berlin date and create a Date at 07:00 Berlin time
   // We use a trick: create a date string with time and parse it using the timezone
   const [rYear, rMonth, rDay] = releaseDateStr.split('-').map(Number);
 
@@ -63,8 +63,8 @@ export function computeSchulsongReleaseDate(now: Date = new Date()): Date {
   );
 
   // The offset in hours: if Berlin shows 1 at UTC midnight, offset is +1
-  // So to get 08:00 Berlin = 08:00 - offset in UTC
-  const utcHour = 8 - berlinHourAtMidnight;
+  // So to get 07:00 Berlin = 07:00 - offset in UTC
+  const utcHour = 7 - berlinHourAtMidnight;
 
   return new Date(Date.UTC(rYear, rMonth - 1, rDay, utcHour, 0, 0));
 }

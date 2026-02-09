@@ -3897,9 +3897,13 @@ class AirtableService {
 
       // Airtable SDK doesn't accept null — use undefined to clear a field
       const fieldValue = releasedAt ?? undefined;
-      await this.base(EVENTS_TABLE_ID).update(events[0].id, {
+      const updates: Record<string, string | undefined> = {
         [EVENTS_FIELD_IDS.schulsong_released_at]: fieldValue,
-      } as Record<string, string | undefined>);
+      };
+      if (releasedAt) {
+        updates[EVENTS_FIELD_IDS.admin_approval_status] = 'approved';
+      }
+      await this.base(EVENTS_TABLE_ID).update(events[0].id, updates);
 
       console.log(`[setSchulsongReleasedAt] Updated event ${eventId}: schulsong_released_at=${releasedAt}`);
     } catch (error) {

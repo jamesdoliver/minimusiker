@@ -3,15 +3,21 @@ import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { computeSchulsongReleaseDate } from '@/lib/utils/schulsongRelease';
+import { sendSchulsongReleaseEmailForEvent } from '@/lib/services/schulsongEmailService';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/admin/events/[eventId]/approve-schulsong
- * Admin approves the schulsong (after teacher has approved)
+ * Admin approves/overrides the schulsong release.
  *
- * Sets approval_status='approved' on the schulsong AudioFile,
- * computes schulsong_released_at (next workday 8am CET), and writes it to Events.
+ * Body (JSON, optional):
+ *   mode: 'scheduled' (default) | 'instant'
+ *
+ * - 'scheduled': release next workday 7am Berlin, cron auto-fires email
+ * - 'instant': release now + fire email immediately
+ *
+ * No teacher approval required (admin can override).
  */
 export async function POST(
   request: NextRequest,
@@ -21,6 +27,15 @@ export async function POST(
     const session = verifyAdminSession(request);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Parse optional mode from body
+    let mode: 'scheduled' | 'instant' = 'scheduled';
+    try {
+      const body = await request.json();
+      if (body.mode === 'instant') mode = 'instant';
+    } catch {
+      // No body is fine — default to scheduled
     }
 
     const eventId = decodeURIComponent(params.eventId);
@@ -40,25 +55,33 @@ export async function POST(
       );
     }
 
-    // Verify teacher has approved first
-    if (!schulsongFile.teacherApprovedAt) {
-      return NextResponse.json(
-        { error: 'Teacher must approve the schulsong first' },
-        { status: 400 }
-      );
-    }
+    const isOverride = !schulsongFile.teacherApprovedAt;
 
     // Set approval_status = 'approved' on the audio file
     await teacherService.updateAudioFileApprovalStatus(schulsongFile.id, 'approved');
 
-    // Compute release date and write to Events table
-    const releaseDate = computeSchulsongReleaseDate();
-    const releasedAt = releaseDate.toISOString();
+    // Compute release date based on mode
+    const releasedAt = mode === 'instant'
+      ? new Date().toISOString()
+      : computeSchulsongReleaseDate().toISOString();
+
+    // Write to Events table (also sets admin_approval_status = 'approved')
     await airtableService.setSchulsongReleasedAt(resolvedEventId, releasedAt);
+
+    // For instant mode, fire email immediately (don't fail approval if email fails)
+    if (mode === 'instant') {
+      try {
+        await sendSchulsongReleaseEmailForEvent(resolvedEventId);
+      } catch (err) {
+        console.error('[approve-schulsong] Instant email failed (approval still succeeded):', err);
+      }
+    }
 
     return NextResponse.json({
       success: true,
       releasedAt,
+      mode,
+      isOverride,
     });
   } catch (error) {
     console.error('Error approving schulsong:', error);

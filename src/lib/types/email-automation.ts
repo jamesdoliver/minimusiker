@@ -292,6 +292,7 @@ export interface CronAutomationResponse {
   success: boolean;
   mode?: 'live' | 'dry-run';
   result?: AutomationResult;
+  schulsongResult?: { sent: number; skipped: number; failed: number; errors: string[] };
   error?: string;
 }
 

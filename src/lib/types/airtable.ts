@@ -556,7 +556,7 @@ export const EVENTS_FIELD_IDS = {
   // Admin notes
   admin_notes: 'fldmzzlsrI5lKKx16', // Multiline text - free-text admin notes
   // Schulsong release date (set when admin approves schulsong after teacher approval)
-  schulsong_released_at: 'fldIQeyEpW9lpmg5K', // DateTime - next workday 8am CET
+  schulsong_released_at: 'fldIQeyEpW9lpmg5K', // DateTime - next workday 7am CET
 } as const;
 
 // Classes Table - 1 row per class

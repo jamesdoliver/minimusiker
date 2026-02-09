@@ -95,18 +95,30 @@ export default function AudioApprovalModal({
     }
   };
 
-  const handleSchulsongApprove = async () => {
+  const handleSchulsongApprove = async (mode: 'scheduled' | 'instant' = 'scheduled') => {
     try {
       setSchulsongSaving(true);
       const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/approve-schulsong`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
       });
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to approve schulsong');
       }
       const result = await response.json();
-      toast.success('Schulsong approved!');
+      if (mode === 'instant') {
+        toast.success('Schulsong sofort freigegeben! E-Mail wird versendet.');
+      } else {
+        const releaseDate = new Date(result.releasedAt);
+        const formatted = releaseDate.toLocaleDateString('de-DE', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        });
+        toast.success(`Schulsong freigegeben! Veröffentlichung: ${formatted} um 07:00`);
+      }
       await fetchSchulsongStatus();
       if (onApprovalComplete) onApprovalComplete();
     } catch (error) {
@@ -313,16 +325,55 @@ export default function AudioApprovalModal({
                 </div>
               )}
 
-              {/* Action buttons — only if teacher has approved and admin hasn't yet approved */}
+              {/* Already released — show release info + option to undo */}
+              {schulsongFile.approvalStatus === 'approved' && schulsongStatus.releasedAt && (
+                <div className="space-y-3">
+                  <div className="p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+                    {new Date(schulsongStatus.releasedAt) <= new Date()
+                      ? 'Sofort freigegeben'
+                      : `Veröffentlichung: ${formatDate(schulsongStatus.releasedAt)}`}
+                  </div>
+                  <button
+                    onClick={() => setShowSchulsongRejectInput(!showSchulsongRejectInput)}
+                    disabled={schulsongSaving}
+                    className="px-3 py-1.5 rounded text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors disabled:opacity-50"
+                  >
+                    Ablehnen
+                  </button>
+                  {showSchulsongRejectInput && (
+                    <div>
+                      <textarea
+                        value={schulsongRejectComment}
+                        onChange={(e) => setSchulsongRejectComment(e.target.value)}
+                        placeholder="Grund für Ablehnung..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        rows={2}
+                      />
+                      <button
+                        onClick={handleSchulsongReject}
+                        disabled={schulsongSaving}
+                        className="mt-2 px-3 py-1.5 rounded text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                      >
+                        {schulsongSaving ? 'Saving...' : 'Ablehnung bestätigen'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Teacher approved, release already scheduled — show info + override options */}
               {schulsongFile.teacherApprovedAt && schulsongFile.approvalStatus !== 'approved' && (
                 <div className="space-y-3">
+                  <div className="p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+                    Lehrer hat freigegeben — Release bereits geplant
+                  </div>
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={handleSchulsongApprove}
+                      onClick={() => handleSchulsongApprove('instant')}
                       disabled={schulsongSaving}
-                      className="px-3 py-1.5 rounded text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                      className="px-3 py-1.5 rounded text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
                     >
-                      {schulsongSaving ? 'Saving...' : 'Freigeben'}
+                      {schulsongSaving ? 'Saving...' : 'Sofort freigeben'}
                     </button>
                     <button
                       onClick={() => setShowSchulsongRejectInput(!showSchulsongRejectInput)}
@@ -354,11 +405,55 @@ export default function AudioApprovalModal({
                 </div>
               )}
 
-              {/* Info: teacher hasn't approved yet */}
+              {/* Teacher hasn't approved — admin override possible */}
               {!schulsongFile.teacherApprovedAt && schulsongFile.approvalStatus !== 'approved' && (
-                <p className="text-xs text-gray-500">
-                  Der Lehrer muss den Schulsong zuerst freigeben, bevor Sie ihn prüfen können.
-                </p>
+                <div className="space-y-3">
+                  <div className="p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-700">
+                    Lehrer hat noch nicht freigegeben — Admin-Override möglich
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleSchulsongApprove('scheduled')}
+                      disabled={schulsongSaving}
+                      className="px-3 py-1.5 rounded text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                    >
+                      {schulsongSaving ? 'Saving...' : 'Override: Freigeben (7 Uhr)'}
+                    </button>
+                    <button
+                      onClick={() => handleSchulsongApprove('instant')}
+                      disabled={schulsongSaving}
+                      className="px-3 py-1.5 rounded text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                      {schulsongSaving ? 'Saving...' : 'Override: Sofort freigeben'}
+                    </button>
+                    <button
+                      onClick={() => setShowSchulsongRejectInput(!showSchulsongRejectInput)}
+                      disabled={schulsongSaving}
+                      className="px-3 py-1.5 rounded text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition-colors disabled:opacity-50"
+                    >
+                      Ablehnen
+                    </button>
+                  </div>
+
+                  {showSchulsongRejectInput && (
+                    <div>
+                      <textarea
+                        value={schulsongRejectComment}
+                        onChange={(e) => setSchulsongRejectComment(e.target.value)}
+                        placeholder="Grund für Ablehnung..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                        rows={2}
+                      />
+                      <button
+                        onClick={handleSchulsongReject}
+                        disabled={schulsongSaving}
+                        className="mt-2 px-3 py-1.5 rounded text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                      >
+                        {schulsongSaving ? 'Saving...' : 'Ablehnung bestätigen'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

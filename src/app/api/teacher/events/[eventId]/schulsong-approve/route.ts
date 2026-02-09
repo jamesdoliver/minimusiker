@@ -3,6 +3,7 @@ import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { triggerSchulsongTeacherApprovedNotification } from '@/lib/services/notificationService';
+import { computeSchulsongReleaseDate } from '@/lib/utils/schulsongRelease';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,9 +40,14 @@ export async function POST(
     // Approve the schulsong
     const result = await teacherService.approveSchulsongAsTeacher(eventId);
 
-    // Send notification email to admins (fire-and-forget)
+    // Auto-schedule release for next working day 7am Berlin
+    // (skip if already released — don't override an admin instant release)
     const airtableService = getAirtableService();
     const event = await airtableService.getEventByEventId(eventId);
+    if (event && !event.schulsong_released_at) {
+      const releaseDate = computeSchulsongReleaseDate();
+      await airtableService.setSchulsongReleasedAt(eventId, releaseDate.toISOString());
+    }
     if (event) {
       triggerSchulsongTeacherApprovedNotification({
         schoolName: event.school_name,

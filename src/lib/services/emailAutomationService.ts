@@ -559,7 +559,7 @@ export async function sendAutomatedEmail(
 /**
  * Get the current hour in Europe/Berlin timezone
  */
-function getCurrentBerlinHour(): number {
+export function getCurrentBerlinHour(): number {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Berlin',
     hour: 'numeric',
@@ -705,6 +705,61 @@ export async function processEmailAutomation(
   }
 
   return result;
+}
+
+// =============================================================================
+// Schulsong Release Email Processing (called by cron)
+// =============================================================================
+
+/**
+ * Find all events with a schulsong release time in the past and send release
+ * emails. Dedup via EMAIL_LOGS prevents double-sends, so multiple runs are safe.
+ */
+export async function processSchulsongReleaseEmails(
+  dryRun: boolean = false
+): Promise<{ sent: number; skipped: number; failed: number; errors: string[] }> {
+  // Lazy import to avoid circular dependency
+  const { sendSchulsongReleaseEmailForEvent } = await import('@/lib/services/schulsongEmailService');
+
+  const airtable = getAirtableService();
+  const allEvents = await airtable.getAllEvents();
+  const now = new Date();
+
+  // Filter: schulsong + approved + released_at in the past
+  const eligible = allEvents.filter(
+    (e) =>
+      e.is_schulsong &&
+      e.admin_approval_status === 'approved' &&
+      e.schulsong_released_at &&
+      new Date(e.schulsong_released_at) <= now
+  );
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const event of eligible) {
+    try {
+      if (dryRun) {
+        console.log(`[SchulsongCron] (dry-run) Would send for ${event.event_id} (${event.school_name})`);
+        skipped++;
+        continue;
+      }
+
+      const result = await sendSchulsongReleaseEmailForEvent(event.event_id);
+      sent += result.sent;
+      skipped += result.skipped;
+      failed += result.failed;
+    } catch (err) {
+      const msg = `Failed to process ${event.event_id}: ${err instanceof Error ? err.message : String(err)}`;
+      console.error(`[SchulsongCron] ${msg}`);
+      errors.push(msg);
+    }
+  }
+
+  console.log(`[SchulsongCron] Processed ${eligible.length} events: ${sent} sent, ${skipped} skipped, ${failed} failed`);
+  return { sent, skipped, failed, errors };
 }
 
 // =============================================================================
