@@ -3,6 +3,7 @@ import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { notifyEngineerOfFirstUpload } from '@/lib/services/notificationService';
 import { autoMatchFiles, getMatchSummary } from '@/lib/utils/autoMatch';
 import AdmZip from 'adm-zip';
 
@@ -233,6 +234,7 @@ export async function PUT(
       } catch (error) {
         console.error('Error auto-assigning engineer:', error);
       }
+      notifyEngineerOfFirstUpload(eventId).catch(err => console.error('Engineer notification error:', err));
       try {
         await getAirtableService().updateEventAudioPipelineStage(eventId, 'in_progress');
       } catch (error) {

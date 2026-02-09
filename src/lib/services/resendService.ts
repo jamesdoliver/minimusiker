@@ -276,6 +276,14 @@ export interface StaffBookingAlertData {
   region?: string;
 }
 
+export interface EngineerAudioUploadedData {
+  engineerName: string;
+  schoolName: string;
+  eventDate: string;
+  eventId: string;
+  engineerPortalUrl: string;
+}
+
 export interface StaffReassignmentData {
   staffName: string;
   schoolName: string;
@@ -338,4 +346,24 @@ export async function sendStaffReassignmentEmail(
     contactPhone: data.contactPhone || '',
     staffPortalUrl: data.staffPortalUrl,
   }, 'Staff reassignment');
+}
+
+// ============================================================================
+// ENGINEER AUDIO UPLOADED NOTIFICATION
+// ============================================================================
+
+/**
+ * Send engineer audio uploaded notification
+ */
+export async function sendEngineerAudioUploadedEmail(
+  email: string,
+  data: EngineerAudioUploadedData
+): Promise<SendEmailResult> {
+  return sendTriggerEmail(email, 'engineer_audio_uploaded', {
+    engineerName: data.engineerName,
+    schoolName: data.schoolName,
+    eventDate: data.eventDate,
+    eventId: data.eventId,
+    engineerPortalUrl: data.engineerPortalUrl,
+  }, 'Engineer audio uploaded');
 }

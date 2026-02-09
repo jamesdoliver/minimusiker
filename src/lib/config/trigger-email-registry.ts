@@ -10,14 +10,14 @@ export interface TriggerEmailDefinition {
   slug: string;
   name: string;
   description: string;
-  recipientType: 'admin' | 'teacher' | 'parent' | 'staff';
+  recipientType: 'admin' | 'teacher' | 'parent' | 'staff' | 'engineer';
   defaultSubject: string;
   defaultBodyHtml: string;
   availableVariables: string[];
 }
 
 /**
- * All 8 trigger emails in the system
+ * All 9 trigger emails in the system
  */
 export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   // ─── 1. Teacher Magic Link ──────────────────────────────────────────
@@ -443,6 +443,40 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   </tr>
 </table>`,
     availableVariables: ['staffName', 'schoolName', 'eventDate', 'schoolAddress', 'contactPerson', 'contactEmail', 'contactPhone', 'staffPortalUrl'],
+  },
+
+  // ─── 9. Engineer Audio Uploaded ─────────────────────────────────────
+  {
+    slug: 'engineer_audio_uploaded',
+    name: 'Audio hochgeladen (Engineer)',
+    description: 'Wird an den zugewiesenen Engineer gesendet, wenn zum ersten Mal Audiodateien für ein Event hochgeladen werden.',
+    recipientType: 'engineer',
+    defaultSubject: 'Neue Aufnahmen bereit: {{schoolName}} – {{eventDate}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{engineerName}},
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Für das Event an der <strong>{{schoolName}}</strong> am <strong>{{eventDate}}</strong> wurden Aufnahmen hochgeladen.
+  Du kannst jetzt mit dem Mixing beginnen.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td align="center" style="padding: 8px 0 32px 0;">
+      <a href="{{engineerPortalUrl}}"
+         style="display: inline-block; background-color: #d85a6a; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 2px 4px rgba(216, 90, 106, 0.3);">
+        Zum Engineer-Portal
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Falls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:<br>
+  <a href="{{engineerPortalUrl}}" style="color: #d85a6a; word-break: break-all;">{{engineerPortalUrl}}</a>
+</p>`,
+    availableVariables: ['engineerName', 'schoolName', 'eventDate', 'eventId', 'engineerPortalUrl'],
   },
 ];
 

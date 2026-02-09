@@ -10,6 +10,7 @@ const RECIPIENT_LABELS: Record<string, { label: string; color: string }> = {
   teacher: { label: 'Lehrer', color: 'bg-purple-100 text-purple-700' },
   parent: { label: 'Eltern', color: 'bg-orange-100 text-orange-700' },
   staff: { label: 'Staff', color: 'bg-teal-100 text-teal-700' },
+  engineer: { label: 'Engineer', color: 'bg-indigo-100 text-indigo-700' },
 };
 
 const RECIPIENT_GROUP_ORDER: Array<{ key: string; label: string }> = [
@@ -17,6 +18,7 @@ const RECIPIENT_GROUP_ORDER: Array<{ key: string; label: string }> = [
   { key: 'teacher', label: 'Lehrer-E-Mails' },
   { key: 'parent', label: 'Eltern-E-Mails' },
   { key: 'staff', label: 'Staff-E-Mails' },
+  { key: 'engineer', label: 'Engineer-E-Mails' },
 ];
 
 export default function TriggerEmailsTab() {

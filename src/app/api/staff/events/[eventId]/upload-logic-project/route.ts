@@ -3,6 +3,7 @@ import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { notifyEngineerOfFirstUpload } from '@/lib/services/notificationService';
 import { AudioFileType } from '@/lib/types/teacher';
 
 export const dynamic = 'force-dynamic';
@@ -150,6 +151,7 @@ export async function PUT(
     const bothUploaded = hasSchulsong && hasMinimusiker;
 
     if (bothUploaded) {
+      notifyEngineerOfFirstUpload(eventId).catch(err => console.error('Engineer notification error:', err));
       await getAirtableService().updateEventAudioPipelineStage(eventId, 'in_progress');
     }
 

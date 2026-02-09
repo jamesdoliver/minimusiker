@@ -88,7 +88,7 @@ export interface TriggerEmailTemplate {
   triggerSlug: string;                           // Unique identifier e.g. 'teacher_magic_link'
   name: string;                                  // Human-readable name
   description: string;                           // When this trigger fires
-  recipientType: 'admin' | 'teacher' | 'parent' | 'staff';
+  recipientType: 'admin' | 'teacher' | 'parent' | 'staff' | 'engineer';
   subject: string;                               // Email subject with {{variables}}
   bodyHtml: string;                              // HTML body with {{variables}}
   active: boolean;                               // Whether template is active
