@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTaskService } from '@/lib/services/taskService';
 import { getActivityService, ActivityService } from '@/lib/services/activityService';
-import { getEmailService } from '@/lib/services/emailService';
+import { sendStaffReassignmentEmail } from '@/lib/services/resendService';
 import { SchoolEventDetail, EVENTS_TABLE_ID, EVENTS_FIELD_IDS, PERSONEN_TABLE_ID, PERSONEN_FIELD_IDS } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
@@ -11,6 +11,8 @@ import {
   triggerDateChangeNotification,
   triggerCancellationNotification,
 } from '@/lib/services/notificationService';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
@@ -411,7 +413,7 @@ export async function PATCH(
 
                 // Send email notification
                 try {
-                  const emailResult = await getEmailService().sendStaffReassignment(
+                  const emailResult = await sendStaffReassignmentEmail(
                     staffEmail,
                     staffName,
                     {

@@ -6,6 +6,8 @@ import { getActivityService, ActivityService } from '@/lib/services/activityServ
 import { CLASSES_TABLE_ID, CLASSES_FIELD_IDS } from '@/lib/types/airtable';
 import Airtable from 'airtable';
 
+export const dynamic = 'force-dynamic';
+
 // Helper to get class info including eventRecordId
 async function getClassInfo(classId: string): Promise<{ className: string; eventRecordId: string | null } | null> {
   try {

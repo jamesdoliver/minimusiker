@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import shopifyService from '@/lib/services/shopifyService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/shopify/products/[handle]
  * Fetches a single product by its handle (URL-friendly identifier)

@@ -4,6 +4,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/classes/[classId]/songs
  * Add a new song to a class or group (admin only)

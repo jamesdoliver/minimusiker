@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/engineer/events/[eventId]/publish
  * Get the current publish status for an event

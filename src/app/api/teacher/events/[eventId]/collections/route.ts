@@ -4,6 +4,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/teacher/events/[eventId]/collections
  * Get all collections (Choir and Teacher Song) for an event

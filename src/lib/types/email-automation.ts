@@ -28,6 +28,9 @@ export const EMAIL_TEMPLATES_FIELD_IDS = {
   is_kita: 'fldBCfeWCeVNErpQW',                 // Checkbox
   is_plus: 'fldHIcAFxGOHLMZD9',                 // Checkbox
   is_schulsong: 'fldbYsFdCwHoTvhmh',            // Checkbox
+  template_type: 'fld1FaqKGyWwWwOp6',            // Single Select: timeline, trigger
+  trigger_slug: 'fldBJsRxe1PxvTXoL',              // Single line text
+  trigger_description: 'fldibypBMULVBtcIH',        // Long text
 } as const;
 
 // =============================================================================
@@ -72,6 +75,25 @@ export interface EmailTemplate {
   is_kita: boolean;                              // Event type filter
   is_plus: boolean;                              // Event type filter
   is_schulsong: boolean;                         // Event type filter
+  templateType?: 'timeline' | 'trigger';         // Template category
+  triggerSlug?: string;                          // Unique slug for trigger templates
+  triggerDescription?: string;                   // Description of when trigger fires
+}
+
+/**
+ * Trigger email template — event-driven email with Airtable-stored overrides
+ */
+export interface TriggerEmailTemplate {
+  id?: string;                                   // Airtable record ID (undefined if not yet seeded)
+  triggerSlug: string;                           // Unique identifier e.g. 'teacher_magic_link'
+  name: string;                                  // Human-readable name
+  description: string;                           // When this trigger fires
+  recipientType: 'admin' | 'teacher' | 'parent' | 'staff';
+  subject: string;                               // Email subject with {{variables}}
+  bodyHtml: string;                              // HTML body with {{variables}}
+  active: boolean;                               // Whether template is active
+  availableVariables: string[];                  // Variables available for substitution
+  isCustomized: boolean;                         // true if Airtable template differs from default
 }
 
 /**
@@ -108,6 +130,9 @@ export interface CreateEmailTemplateInput {
   is_kita?: boolean;
   is_plus?: boolean;
   is_schulsong?: boolean;
+  templateType?: 'timeline' | 'trigger';
+  triggerSlug?: string;
+  triggerDescription?: string;
 }
 
 /**
@@ -125,6 +150,9 @@ export interface UpdateEmailTemplateInput {
   is_kita?: boolean;
   is_plus?: boolean;
   is_schulsong?: boolean;
+  templateType?: 'timeline' | 'trigger';
+  triggerSlug?: string;
+  triggerDescription?: string;
 }
 
 /**

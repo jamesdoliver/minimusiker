@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getEarlyBirdTargets, CampaignRecipient } from '@/lib/services/campaignService';
 import { sendCampaignEmail } from '@/lib/services/resendService';
 
+export const dynamic = 'force-dynamic';
+
 // Target schools for this campaign (access_codes, used for short URLs like minimusiker.app/24)
 // - Grundschule am Römerbad (Zunzweier): 24
 // - Schule an der Ruhr: 16

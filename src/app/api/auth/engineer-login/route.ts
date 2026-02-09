@@ -3,6 +3,8 @@ import { createEngineerSessionToken } from '@/lib/auth/verifyEngineerSession';
 import { EngineerSession, ENGINEER_SESSION_COOKIE } from '@/lib/types/engineer';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Engineer login via Airtable Personen table
  * - Email: E-Mail field from Personen table

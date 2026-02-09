@@ -3,6 +3,8 @@ import { createStaffSessionToken } from '@/lib/auth/verifyStaffSession';
 import { StaffSession } from '@/lib/types/airtable';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Staff login via Airtable Personen table
  * - Email: E-Mail field from Personen table

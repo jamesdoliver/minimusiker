@@ -7,6 +7,8 @@ import {
   ShopifyWebhookOrder,
 } from '@/lib/utils/shopifyWebhook';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/webhooks/shopify/orders-create
  *

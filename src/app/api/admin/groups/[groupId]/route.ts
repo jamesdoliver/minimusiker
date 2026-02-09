@@ -4,6 +4,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
+export const dynamic = 'force-dynamic';
+
 // Helper to resolve eventRecordId from eventId (booking_id or simplybookId)
 async function resolveEventRecordId(eventId: string): Promise<string | null> {
   const airtableService = getAirtableService();

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService, AlbumTrackUpdate } from '@/lib/services/teacherService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/teacher/events/[eventId]/album-order
  * Get all tracks for the album layout modal

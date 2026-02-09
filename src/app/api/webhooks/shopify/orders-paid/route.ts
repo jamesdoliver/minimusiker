@@ -21,6 +21,8 @@ import {
   ShopifyOrderLineItem,
 } from '@/lib/types/airtable';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/webhooks/shopify/orders-paid
  *

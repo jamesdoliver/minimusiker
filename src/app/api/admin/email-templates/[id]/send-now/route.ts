@@ -8,27 +8,19 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import {
   getRecipientsForEvent,
   sendAutomatedEmail,
   eventMatchesTemplate,
+  daysBetween,
+  sleep,
 } from '@/lib/services/emailAutomationService';
 import { EventThresholdMatch } from '@/lib/types/email-automation';
 
 export const dynamic = 'force-dynamic';
 
 const RATE_LIMIT_DELAY_MS = 500;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function daysBetween(date1: Date, date2: Date): number {
-  const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate());
-  const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate());
-  const diffTime = d2.getTime() - d1.getTime();
-  return Math.round(diffTime / (1000 * 60 * 60 * 24));
-}
 
 // Preview response types
 interface PreviewEventRecipients {
@@ -59,6 +51,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { eventIds, preview, forceResend } = body as { eventIds: string[]; preview?: boolean; forceResend?: boolean };
@@ -80,8 +77,14 @@ export async function POST(
       );
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Use Berlin timezone for date computation (consistent with cron automation)
+    const berlinFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Berlin',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    });
+    const todayBerlinStr = berlinFormatter.format(new Date());
+    const [y, m, d] = todayBerlinStr.split('-').map(Number);
+    const today = new Date(Date.UTC(y, m - 1, d));
 
     // Preview mode: gather recipients without sending
     if (preview) {

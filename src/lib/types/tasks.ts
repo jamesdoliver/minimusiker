@@ -4,6 +4,7 @@
 export type TaskType =
   | 'paper_order'
   | 'clothing_order'
+  | 'standard_clothing_order'
   | 'cd_master'
   | 'cd_production'
   | 'shipping';
@@ -19,7 +20,8 @@ export interface Task {
   id: string; // Airtable record ID
   task_id: string; // TSK-0001 (autonumber display)
   template_id: string; // Reference to hardcoded template
-  event_id: string; // Linked event record ID
+  event_id: string; // Linked event record ID (first entry)
+  event_ids?: string[]; // All linked event record IDs (multi-event support)
   task_type: TaskType;
   task_name: string;
   description: string;
@@ -47,6 +49,7 @@ export interface TaskWithEventDetails extends Task {
   is_overdue: boolean;
   r2_file_path?: string; // Path to downloadable file
   r2_download_url?: string; // Signed URL for download
+  stock_arrived?: boolean; // For shipping tasks: whether linked GO-ID stock has arrived
 }
 
 // Completion data stored as JSON
@@ -74,6 +77,13 @@ export interface GuesstimateOrderItem {
   sku: string;
   name: string;
   quantity: number;
+}
+
+// GuesstimateOrder enriched with event details (for incoming orders view)
+export interface GuesstimateOrderWithEventDetails extends GuesstimateOrder {
+  school_name: string;
+  event_date: string;
+  parsed_contains: GuesstimateOrderItem[];
 }
 
 // Task Template definition (hardcoded in config)
@@ -110,6 +120,12 @@ export const TASK_TYPE_CONFIG: Record<TaskType, TaskTypeConfig> = {
     color: 'text-purple-800',
     bgColor: 'bg-purple-100 border-purple-200',
   },
+  standard_clothing_order: {
+    label: 'Standard Clothing',
+    icon: '🏷️',
+    color: 'text-indigo-800',
+    bgColor: 'bg-indigo-100 border-indigo-200',
+  },
   cd_master: {
     label: 'CD Master',
     icon: '💿',
@@ -137,6 +153,7 @@ export const TASK_FILTER_TABS: { id: TaskFilterTab; label: string }[] = [
   { id: 'all', label: 'All Tasks' },
   { id: 'paper_order', label: 'Paper Orders' },
   { id: 'clothing_order', label: 'Clothing Orders' },
+  { id: 'standard_clothing_order', label: 'Standard Clothing' },
   { id: 'cd_master', label: 'CD Master' },
   { id: 'cd_production', label: 'CD Production' },
   { id: 'shipping', label: 'Shipping' },
@@ -150,6 +167,7 @@ export interface TasksResponse {
 
 export interface CreateTaskInput {
   event_id: string;
+  event_ids?: string[]; // Multi-event support (overrides event_id for linked records)
   template_id: string;
   task_type: TaskType;
   task_name: string;
@@ -167,6 +185,7 @@ export interface CompleteTaskInput {
 
 export interface CreateGuesstimateOrderInput {
   event_id: string;
+  event_ids?: string[]; // Multi-event support
   order_ids?: string;
   order_date?: string;
   order_amount?: number;

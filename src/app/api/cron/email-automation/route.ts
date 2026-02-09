@@ -13,6 +13,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { processEmailAutomation } from '@/lib/services/emailAutomationService';
 import { CronAutomationResponse } from '@/lib/types/email-automation';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Verify the request is from Vercel Cron
  * Vercel sends the CRON_SECRET in the Authorization header as a Bearer token

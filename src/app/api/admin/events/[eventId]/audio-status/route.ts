@@ -5,6 +5,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { AudioStatusData, TrackApprovalInfo, AdminApprovalStatus } from '@/lib/types/audio-status';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/events/[eventId]/audio-status
  * Get audio status data for an event, including track approval info

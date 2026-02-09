@@ -3,6 +3,8 @@ import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/engineer/events/[eventId]/songs/[songId]/download-raw
  * Get signed download URLs for all raw audio files for a specific song

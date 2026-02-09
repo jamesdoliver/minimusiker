@@ -3,6 +3,8 @@ import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/teacher/invite/create
  * Create an invite link for another teacher to access a specific event

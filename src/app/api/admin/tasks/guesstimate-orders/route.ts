@@ -15,8 +15,19 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const eventId = searchParams.get('eventId') || undefined;
+    const status = searchParams.get('status') || undefined;
 
     const taskService = getTaskService();
+
+    // If status=pending, return enriched GO-IDs for incoming orders view
+    if (status === 'pending') {
+      const enrichedOrders = await taskService.getGuesstimateOrdersEnriched({ pendingOnly: true });
+      return NextResponse.json({
+        success: true,
+        data: enrichedOrders,
+      });
+    }
+
     const orders = await taskService.getGuesstimateOrders(eventId);
 
     return NextResponse.json({

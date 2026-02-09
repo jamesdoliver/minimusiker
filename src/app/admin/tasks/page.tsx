@@ -8,19 +8,22 @@ import TaskCompletionModal from '@/components/admin/tasks/TaskCompletionModal';
 import CompletedTasksView from '@/components/admin/tasks/CompletedTasksView';
 import TaskSearchBar from '@/components/admin/tasks/TaskSearchBar';
 import ClothingOrdersView from '@/components/admin/tasks/ClothingOrdersView';
+import StandardClothingBatchView from '@/components/admin/tasks/StandardClothingBatchView';
+import IncomingOrdersView from '@/components/admin/tasks/IncomingOrdersView';
 import {
   TaskWithEventDetails,
   TaskFilterTab,
   TaskCompletionData,
 } from '@/lib/types/tasks';
 
-type ViewMode = 'pending' | 'completed';
+type ViewMode = 'pending' | 'incoming' | 'completed';
 
 interface TasksStats {
   total: number;
   all: number;
   paper_order: number;
   clothing_order: number;
+  standard_clothing_order: number;
   cd_master: number;
   cd_production: number;
   shipping: number;
@@ -36,6 +39,7 @@ export default function AdminTasks() {
     all: 0,
     paper_order: 0,
     clothing_order: 0,
+    standard_clothing_order: 0,
     cd_master: 0,
     cd_production: 0,
     shipping: 0,
@@ -74,6 +78,7 @@ export default function AdminTasks() {
           all: data.data.stats?.all || 0,
           paper_order: data.data.stats?.paper_order || 0,
           clothing_order: data.data.stats?.clothing_order || 0,
+          standard_clothing_order: data.data.stats?.standard_clothing_order || 0,
           cd_master: data.data.stats?.cd_master || 0,
           cd_production: data.data.stats?.cd_production || 0,
           shipping: data.data.stats?.shipping || 0,
@@ -246,6 +251,16 @@ export default function AdminTasks() {
           </span>
         </button>
         <button
+          onClick={() => setViewMode('incoming')}
+          className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+            viewMode === 'incoming'
+              ? 'bg-[#94B8B3] text-white'
+              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          Incoming Orders
+        </button>
+        <button
           onClick={() => setViewMode('completed')}
           className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${
             viewMode === 'completed'
@@ -269,6 +284,7 @@ export default function AdminTasks() {
                 all: stats.all,
                 paper_order: stats.paper_order,
                 clothing_order: stats.clothing_order,
+                standard_clothing_order: stats.standard_clothing_order,
                 cd_master: stats.cd_master,
                 cd_production: stats.cd_production,
                 shipping: stats.shipping,
@@ -276,9 +292,11 @@ export default function AdminTasks() {
             />
           </div>
 
-          {/* Show ClothingOrdersView for clothing tab, TaskQueue for others */}
+          {/* Show specialized views for clothing tabs, TaskQueue for others */}
           {activeTab === 'clothing_order' ? (
             <ClothingOrdersView isActive={activeTab === 'clothing_order'} />
+          ) : activeTab === 'standard_clothing_order' ? (
+            <StandardClothingBatchView isActive={activeTab === 'standard_clothing_order'} />
           ) : (
             <TaskQueue
               tasks={filteredTasks}
@@ -287,6 +305,11 @@ export default function AdminTasks() {
             />
           )}
         </>
+      )}
+
+      {/* Incoming Orders View */}
+      {viewMode === 'incoming' && (
+        <IncomingOrdersView onStockArrived={fetchPendingTasks} />
       )}
 
       {/* Completed Tasks View */}

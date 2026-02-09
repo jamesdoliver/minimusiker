@@ -19,6 +19,8 @@ import {
   getOrdersByEventRecordId,
 } from '@/lib/services/ordersHelper';
 
+export const dynamic = 'force-dynamic';
+
 interface LineItem {
   variant_id: string;
   product_title: string;

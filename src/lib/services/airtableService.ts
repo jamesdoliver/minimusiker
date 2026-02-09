@@ -39,6 +39,7 @@ import {
   REGISTRATIONS_FIELD_IDS,
   EVENT_MANUAL_COSTS_TABLE_ID,
   EVENT_MANUAL_COSTS_FIELD_IDS,
+  isRegistrableClassType,
 } from '@/lib/types/airtable';
 import { ManualCost } from '@/lib/types/analytics';
 import {
@@ -2678,6 +2679,14 @@ class AirtableService {
           return null;
         }
 
+        // Reject non-registrable class types (choir, teacher_song)
+        const classType = classFields['class_type'] || classFields[CLASSES_FIELD_IDS.class_type];
+        const isDefault = Boolean(classFields['is_default'] || classFields[CLASSES_FIELD_IDS.is_default]);
+        if (!isRegistrableClassType(classType, isDefault)) {
+          console.warn(`[getEventAndClassDetails] Class ${classId} is type "${classType}" - not registrable`);
+          return null;
+        }
+
         // Transform to EventClassDetails format
         // Note: Airtable returns field names, not field IDs
         return {
@@ -3091,9 +3100,17 @@ class AirtableService {
           filterByFormula: filterFormula,
         }).all();
 
+        // Filter out non-registrable class types (choir, teacher_song)
+        const registrableRecords = classRecords.filter(classRecord => {
+          const f = classRecord.fields as Record<string, any>;
+          const classType = f['class_type'] || f[CLASSES_FIELD_IDS.class_type];
+          const isDefault = Boolean(f['is_default'] || f[CLASSES_FIELD_IDS.is_default]);
+          return isRegistrableClassType(classType, isDefault);
+        });
+
         // For each class, count registered children
         const classesWithCounts = await Promise.all(
-          classRecords.map(async (classRecord) => {
+          registrableRecords.map(async (classRecord) => {
             const classFields = classRecord.fields as Record<string, any>;
             // Note: Airtable returns human-readable field names, not field IDs
             const classId = classFields['class_id'] || classFields[CLASSES_FIELD_IDS.class_id];
@@ -5860,6 +5877,9 @@ class AirtableService {
       is_kita: (record.get(EMAIL_TEMPLATES_FIELD_IDS.is_kita) as boolean) || false,
       is_plus: (record.get(EMAIL_TEMPLATES_FIELD_IDS.is_plus) as boolean) || false,
       is_schulsong: (record.get(EMAIL_TEMPLATES_FIELD_IDS.is_schulsong) as boolean) || false,
+      templateType: (record.get(EMAIL_TEMPLATES_FIELD_IDS.template_type) as 'timeline' | 'trigger') || undefined,
+      triggerSlug: (record.get(EMAIL_TEMPLATES_FIELD_IDS.trigger_slug) as string) || undefined,
+      triggerDescription: (record.get(EMAIL_TEMPLATES_FIELD_IDS.trigger_description) as string) || undefined,
     };
   }
 
@@ -5948,7 +5968,8 @@ class AirtableService {
     if (!this.ensureEmailTablesInitialized()) return null;
 
     try {
-      const record = await this.emailTemplatesTable!.create({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fields: Record<string, any> = {
         [EMAIL_TEMPLATES_FIELD_IDS.name]: data.name,
         [EMAIL_TEMPLATES_FIELD_IDS.audience]: data.audience,
         [EMAIL_TEMPLATES_FIELD_IDS.trigger_days]: data.triggerDays,
@@ -5960,7 +5981,12 @@ class AirtableService {
         [EMAIL_TEMPLATES_FIELD_IDS.is_kita]: data.is_kita ?? false,
         [EMAIL_TEMPLATES_FIELD_IDS.is_plus]: data.is_plus ?? false,
         [EMAIL_TEMPLATES_FIELD_IDS.is_schulsong]: data.is_schulsong ?? false,
-      });
+      };
+      if (data.templateType) fields[EMAIL_TEMPLATES_FIELD_IDS.template_type] = data.templateType;
+      if (data.triggerSlug) fields[EMAIL_TEMPLATES_FIELD_IDS.trigger_slug] = data.triggerSlug;
+      if (data.triggerDescription) fields[EMAIL_TEMPLATES_FIELD_IDS.trigger_description] = data.triggerDescription;
+
+      const record = await this.emailTemplatesTable!.create(fields);
 
       return this.transformEmailTemplateRecord(record);
     } catch (error) {
@@ -5990,6 +6016,9 @@ class AirtableService {
       if (data.is_kita !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.is_kita] = data.is_kita;
       if (data.is_plus !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.is_plus] = data.is_plus;
       if (data.is_schulsong !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.is_schulsong] = data.is_schulsong;
+      if (data.templateType !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.template_type] = data.templateType;
+      if (data.triggerSlug !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.trigger_slug] = data.triggerSlug;
+      if (data.triggerDescription !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.trigger_description] = data.triggerDescription;
 
       const record = await this.emailTemplatesTable!.update(id, fields);
       return this.transformEmailTemplateRecord(record);
@@ -6083,7 +6112,7 @@ class AirtableService {
       return records.length > 0;
     } catch (error) {
       console.error('Error checking if email has been sent:', error);
-      return false; // Return false to allow email attempt if check fails
+      return true; // Fail closed: skip email rather than risk duplicate sends during Airtable outages
     }
   }
 

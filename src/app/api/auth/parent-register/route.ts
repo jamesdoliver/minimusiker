@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { getEmailService } from '@/lib/services/emailService';
+import { sendParentWelcomeEmail } from '@/lib/services/resendService';
 import { ParentSession } from '@/lib/types/airtable';
 import {
   RegistrationRequest,
@@ -14,6 +14,8 @@ import {
   sanitizeRegistrationData,
 } from '@/lib/validators/registrationValidators';
 import { generateSchoolId } from '@/lib/utils/eventIdentifiers';
+
+export const dynamic = 'force-dynamic';
 
 const PARENT_JWT_SECRET =
   process.env.PARENT_JWT_SECRET || process.env.JWT_SECRET || 'parent-secret-key';
@@ -255,7 +257,7 @@ export async function POST(request: NextRequest) {
     // Only send if there are new children being registered
     if (newChildren.length > 0) {
       try {
-        await getEmailService().sendParentWelcome(sanitizedData.parentEmail, {
+        await sendParentWelcomeEmail(sanitizedData.parentEmail, {
           parentName: sanitizedData.parentFirstName,
           childName: newChildren.map((c) => c.childName).join(', '),
           schoolName: eventDetails.schoolName,

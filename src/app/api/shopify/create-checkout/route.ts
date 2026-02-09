@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import shopifyService from '@/lib/services/shopifyService';
 import { CheckoutLineItem, CheckoutCustomAttributes } from '@/lib/types/shop';
 import { getAirtableService } from '@/lib/services/airtableService';
+
+export const dynamic = 'force-dynamic';
 // Note: EARLY_BIRD_DEADLINE_DAYS was previously used here but is no longer needed
 // Early-bird discount now applies before event day (daysUntilEvent > 0)
 

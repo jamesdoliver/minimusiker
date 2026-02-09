@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ENGINEER_SESSION_COOKIE } from '@/lib/types/engineer';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Engineer logout - clears the engineer session cookie
  */

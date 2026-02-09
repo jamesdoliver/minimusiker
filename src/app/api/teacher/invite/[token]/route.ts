@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTeacherService } from '@/lib/services/teacherService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/teacher/invite/[token]
  * Validate an invite token and return event info for display

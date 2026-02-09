@@ -124,6 +124,27 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
           </div>
         )}
 
+        {/* Stock Readiness Badge (shipping tasks only) */}
+        {task.task_type === 'shipping' && task.stock_arrived !== undefined && (
+          <div className="flex items-center">
+            {task.stock_arrived ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Ready to Ship
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Awaiting Stock
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Completion Hint */}
         <p className="text-xs text-gray-500">
           <span className="font-medium">Completed by:</span>{' '}

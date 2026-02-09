@@ -195,7 +195,7 @@ export default function ClothingOrderCompletionModal({
               <p className="font-medium mb-1">This will create:</p>
               <ul className="list-disc list-inside space-y-1 text-blue-700">
                 <li>GO-ID for supplier order tracking</li>
-                <li>Task record in Completed Tasks</li>
+                <li>Shipping task for delivery to school</li>
               </ul>
             </div>
 

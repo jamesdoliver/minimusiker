@@ -11,6 +11,8 @@ import {
   CLASSES_FIELD_IDS,
 } from '@/lib/types/airtable';
 
+export const dynamic = 'force-dynamic';
+
 interface ClassInput {
   className: string;
   totalChildren?: number;

@@ -5,13 +5,15 @@ import {
   SCHOOL_BOOKINGS_TABLE_ID,
   SCHOOL_BOOKINGS_FIELD_IDS,
 } from '@/lib/types/airtable';
-import { getEmailService } from '@/lib/services/emailService';
+import { sendStaffBookingAlertEmail } from '@/lib/services/resendService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { triggerNewBookingNotification } from '@/lib/services/notificationService';
 import Airtable from 'airtable';
+
+export const dynamic = 'force-dynamic';
 
 // Initialize Airtable
 const airtableApiKey = process.env.AIRTABLE_API_KEY || '';
@@ -245,11 +247,11 @@ export async function POST(request: Request) {
         const staffName = staffRecord.get('Name') as string;
 
         if (staffEmail) {
-          const emailService = getEmailService();
-          const result = await emailService.sendNewBookingAlert(
+          const result = await sendStaffBookingAlertEmail(
             staffEmail,
             staffName || 'Team Member',
             {
+              staffName: staffName || 'Team Member',
               schoolName: mappedData.schoolName,
               contactName: mappedData.contactPerson,
               contactEmail: mappedData.contactEmail,

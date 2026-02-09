@@ -4,6 +4,8 @@ import { ApiResponse } from '@/lib/types';
 import { verifyAdminSession, AdminSession } from '@/lib/auth/verifyAdminSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 const ADMIN_SESSION_COOKIE = 'admin_token';
 const ADMIN_SESSION_EXPIRY = 60 * 60 * 8; // 8 hours in seconds
 

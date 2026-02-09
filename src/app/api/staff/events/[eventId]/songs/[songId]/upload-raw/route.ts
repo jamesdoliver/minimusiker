@@ -4,6 +4,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/staff/events/[eventId]/songs/[songId]/upload-raw
  * Generate presigned URL for uploading raw audio file for a specific song

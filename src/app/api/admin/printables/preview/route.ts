@@ -22,6 +22,8 @@ import {
   hexToRgb,
 } from '@/lib/config/printableTextConfig';
 
+export const dynamic = 'force-dynamic';
+
 // Request body type for preview generation
 interface PreviewRequest {
   eventId: string;        // Could be SimplyBook ID or actual event_id

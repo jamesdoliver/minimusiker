@@ -4,6 +4,8 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { computeSchulsongReleaseDate } from '@/lib/utils/schulsongRelease';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/events/[eventId]/approve-schulsong
  * Admin approves the schulsong (after teacher has approved)

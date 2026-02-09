@@ -3,6 +3,35 @@
 import { ClothingType } from '@/lib/config/clothingVariants';
 
 /**
+ * Standard clothing batch (weekly cross-event batch)
+ */
+export interface StandardClothingBatch {
+  task_id: string;              // Airtable task record ID
+  batch_id: string;             // "STD-2026-W06"
+  week_start: string;           // Monday ISO date
+  week_end: string;             // Sunday ISO date
+  event_record_ids: string[];
+  event_names: string[];        // School names for display
+  total_orders: number;
+  total_revenue: number;
+  aggregated_items: AggregatedClothingItems;
+  order_ids: string[];
+}
+
+/**
+ * Standard clothing order detail (individual order within a batch)
+ */
+export interface StandardClothingOrderDetail {
+  order_id: string;
+  order_number: string;
+  order_date: string;
+  total_amount: number;
+  parent_name: string;
+  school_name: string;          // School/event name (since orders span multiple events)
+  clothing_items: ClothingItem[];
+}
+
+/**
  * Aggregated clothing items by size
  */
 export interface AggregatedClothingItems {

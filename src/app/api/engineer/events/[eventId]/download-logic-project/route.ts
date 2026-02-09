@@ -4,6 +4,8 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/engineer/events/[eventId]/download-logic-project?projectType=schulsong|minimusiker
  * Generate signed download URL for a Logic Pro project ZIP

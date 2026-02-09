@@ -4,6 +4,8 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/parent/schulsong-status?eventId={eventId}
  * Check if event has a schulsong and return signed URLs for playback/download

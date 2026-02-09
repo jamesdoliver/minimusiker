@@ -5,6 +5,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { AudioFileType } from '@/lib/types/teacher';
 
+export const dynamic = 'force-dynamic';
+
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
 
 type LogicProjectType = 'schulsong' | 'minimusiker';
@@ -132,7 +134,6 @@ export async function PUT(
     // Create audio file record
     const teacherService = getTeacherService();
     const audioFile = await teacherService.createAudioFile({
-      classId: '', // event-level, no class
       eventId,
       type: audioFileTypeFromProjectType(projectType),
       r2Key,

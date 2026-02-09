@@ -3,6 +3,8 @@ import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/engineer/events/[eventId]/toggle-schulsong
  * Toggle is_schulsong on an AudioFile record

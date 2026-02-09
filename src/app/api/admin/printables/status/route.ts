@@ -18,6 +18,8 @@ import { getR2Service, PrintableType } from '@/lib/services/r2Service';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { PrintableItemType } from '@/lib/config/printableTextConfig';
 
+export const dynamic = 'force-dynamic';
+
 // Map from R2 PrintableType to UI PrintableItemType
 const r2TypeToItemType: Partial<Record<PrintableType, PrintableItemType>> = {
   'tshirt-print': 'tshirt',
