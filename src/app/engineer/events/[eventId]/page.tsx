@@ -442,47 +442,43 @@ export default function EngineerEventDetailPage() {
             </div>
           </div>
 
-          {/* Logic Pro Project Downloads */}
-          {event.logicProjects && event.logicProjects.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">Logic Pro Projects</h4>
-              <div className="flex flex-wrap gap-3">
-                {event.logicProjects.map((project) => (
-                  <button
-                    key={project.projectType}
-                    onClick={() => handleDownloadLogicProject(project.projectType)}
-                    disabled={downloadingProject === project.projectType}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {downloadingProject === project.projectType ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Preparing...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Download {project.projectType === 'schulsong' ? 'Schulsong' : 'MiniMusiker'} Project
-                        {project.fileSizeBytes && (
-                          <span className="text-purple-200 text-xs">
-                            ({formatFileSize(project.fileSizeBytes)})
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Download all raw files button (only when raw files exist) + Batch Upload */}
+          {/* Action toolbar: Logic Pro downloads + Raw ZIP + Batch Upload */}
           <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-3">
+            {/* Logic Pro Project Downloads */}
+            {event.logicProjects && event.logicProjects.length > 0 &&
+              event.logicProjects.map((project) => (
+                <button
+                  key={project.projectType}
+                  onClick={() => handleDownloadLogicProject(project.projectType)}
+                  disabled={downloadingProject === project.projectType}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+                >
+                  {downloadingProject === project.projectType ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Preparing...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download {project.projectType === 'schulsong' ? 'Schulsong' : 'MiniMusiker'} Project
+                      {project.fileSizeBytes && (
+                        <span className="text-purple-200 text-xs">
+                          ({formatFileSize(project.fileSizeBytes)})
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
+              ))
+            }
+
+            {/* Download All Raw Files (only when raw files exist) */}
             {(event.classes.some(c => c.rawFiles.length > 0) ||
               (event.schulsongClass?.rawFiles.length ?? 0) > 0) && (
               <button
@@ -508,6 +504,8 @@ export default function EngineerEventDetailPage() {
                 )}
               </button>
             )}
+
+            {/* Batch Upload Final WAVs */}
             <button
               onClick={() => setShowBatchUpload(true)}
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
