@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { EngineerEventDetail, EngineerClassView, AudioFileWithUrl } from '@/lib/types/engineer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EngineerBatchUploadModal from '@/components/engineer/EngineerBatchUploadModal';
+import { useClientZipDownload, ZipDownloadFile } from '@/lib/hooks/useClientZipDownload';
+import ZipDownloadModal from '@/components/engineer/ZipDownloadModal';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'No date';
@@ -42,7 +44,8 @@ export default function EngineerEventDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploadStates, setUploadStates] = useState<Record<string, ClassUploadState>>({});
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const zipDownload = useClientZipDownload();
+  const isDownloadingZip = zipDownload.state.status === 'downloading';
   const [downloadingProject, setDownloadingProject] = useState<string | null>(null);
   const [togglingSchulsong, setTogglingSchulsong] = useState<string | null>(null);
   const [showBatchUpload, setShowBatchUpload] = useState(false);
@@ -123,35 +126,34 @@ export default function EngineerEventDetailPage() {
   };
 
   const handleDownloadAllZip = async (classId?: string) => {
-    setIsDownloadingZip(true);
     try {
-      const url = classId
-        ? `/api/engineer/events/${encodeURIComponent(eventId)}/download-zip?classId=${encodeURIComponent(classId)}`
-        : `/api/engineer/events/${encodeURIComponent(eventId)}/download-zip`;
+      const apiUrl = classId
+        ? `/api/engineer/events/${encodeURIComponent(eventId)}/download-urls?classId=${encodeURIComponent(classId)}`
+        : `/api/engineer/events/${encodeURIComponent(eventId)}/download-urls`;
 
-      const response = await fetch(url);
+      const response = await fetch(apiUrl);
 
       if (!response.ok) {
-        throw new Error('Failed to generate ZIP file');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Failed to get download URLs');
       }
 
-      // Get the blob and create download
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = classId
-        ? `${event?.schoolName}_${classId}_raw_audio.zip`
-        : `${event?.schoolName}_all_raw_audio.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(downloadUrl);
+      const data = await response.json();
+      const files: ZipDownloadFile[] = data.files;
+
+      // Warn if total size is very large (> 2 GB)
+      const TWO_GB = 2 * 1024 * 1024 * 1024;
+      if (data.totalSizeBytes > TWO_GB) {
+        const sizeGB = (data.totalSizeBytes / (1024 * 1024 * 1024)).toFixed(1);
+        if (!confirm(`Total download size is ${sizeGB} GB. This may take a while. Continue?`)) {
+          return;
+        }
+      }
+
+      await zipDownload.startDownload(files, data.zipFilename);
     } catch (err) {
       console.error('Download error:', err);
-      alert('Failed to download ZIP file');
-    } finally {
-      setIsDownloadingZip(false);
+      alert(err instanceof Error ? err.message : 'Failed to download ZIP file');
     }
   };
 
@@ -492,7 +494,7 @@ export default function EngineerEventDetailPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Generating ZIP...
+                  Preparing...
                 </>
               ) : (
                 <>
@@ -721,6 +723,13 @@ export default function EngineerEventDetailPage() {
           onClose={() => setShowBatchUpload(false)}
           eventId={eventId}
           onUploadComplete={fetchEventDetail}
+        />
+
+        {/* ZIP Download Progress Modal */}
+        <ZipDownloadModal
+          state={zipDownload.state}
+          onCancel={zipDownload.cancel}
+          onClose={zipDownload.reset}
         />
 
         {/* Delete Confirmation Dialog */}
