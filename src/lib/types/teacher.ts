@@ -57,8 +57,8 @@ export const AUDIO_FILES_FIELD_IDS = {
   status: 'fldCAcEMu0IF1bWgz', // pending | processing | ready | error
   is_schulsong: 'fldaPVT59Gdf8hqPL', // Checkbox - marks audio file as the schulsong
   // Admin approval fields
-  approval_status: 'fldTODO_APPROVAL_STATUS', // Single Select - pending | approved | rejected
-  rejection_comment: 'fldTODO_REJECTION_COMMENT', // Long Text - Admin's rejection reason
+  approval_status: 'fldeZZiMYePsAt35e', // Single Select - pending | approved | rejected
+  rejection_comment: 'fldEbSmoN7NPeMktj', // Long Text - Admin's rejection reason
   // Teacher approval for schulsong
   teacher_approved_at: 'fldSyA8lWMV72xCuq', // Date/time - when teacher approved schulsong
 } as const;
