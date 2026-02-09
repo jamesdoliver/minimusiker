@@ -14,6 +14,10 @@ export interface TriggerEmailDefinition {
   defaultSubject: string;
   defaultBodyHtml: string;
   availableVariables: string[];
+  sendNow?: {
+    eventFilter: 'schulsong_approved' | 'all_events' | 'schulsong_events';
+    recipientResolver: 'event_teacher' | 'parents_by_registration';
+  };
 }
 
 /**
@@ -477,6 +481,57 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   <a href="{{engineerPortalUrl}}" style="color: #d85a6a; word-break: break-all;">{{engineerPortalUrl}}</a>
 </p>`,
     availableVariables: ['engineerName', 'schoolName', 'eventDate', 'eventId', 'engineerPortalUrl'],
+  },
+
+  // ─── 10. Schulsong Audio Release (Teacher) ──────────────────────────
+  {
+    slug: 'schulsong_audio_release',
+    name: 'Schulsong: Audio freigegeben',
+    description: 'Wird an Lehrer gesendet, wenn der Schulsong vom Admin freigegeben wird. Enthält eine Vorlage zum Weiterleiten an Eltern.',
+    recipientType: 'teacher',
+    defaultSubject: 'Dreht die Boxen auf! Euer Schulsong ist fertig.',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo liebe {{schoolName}},
+</h2>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Das Warten hat sich gelohnt, denn heute ist ein ganz besonderer Tag. Euer Schulsong ist fertig und bereit von euch gehört zu werden. Wir Musiker nennen das \u201eRelease day\u201c und das wollen wir mit euch feiern.
+</p>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Im Login-Bereich könnt ihr jetzt jederzeit auf euren Schulsong zugreifen und ihn abspielen. Aber damit nicht nur ihr als Lehrkräfte in den Genuss kommt, stellen wir den Song natürlich auch allen Eltern zur Verfügung. Nach einer ganz einfachen Registrierung, haben sie in ihrem eigenen Online-Bereich ebenfalls Zugriff auf den Song und können von nun an auch Zuhause kräftig mitsingen.
+</p>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Wir wünschen euch ganz viel Freude mit dem Ergebnis.<br>
+  Eure Minimusiker (Lars &amp; Till)
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px; background-color: #f0f9ff; border-radius: 8px;">
+  <tr>
+    <td style="padding: 16px;">
+      <p style="margin: 0 0 12px 0; color: #1e40af; font-size: 14px; font-weight: 600;">Hier ist eine passende E-Mail Vorlage für eure Eltern:</p>
+      <hr style="border: none; border-top: 1px solid #bfdbfe; margin: 0 0 12px 0;">
+      <p style="margin: 0 0 8px 0; color: #4a5568; font-size: 14px; line-height: 1.6;">
+        Liebe Eltern!
+      </p>
+      <p style="margin: 0 0 8px 0; color: #4a5568; font-size: 14px; line-height: 1.6;">
+        Es ist soweit! Unsere Schule hat seit heute ihren eigenen Schulsong. Geschrieben und produziert wurde er von den Minimusikern, wobei wir inhaltlich viele Ideen zur Textgestaltung und den besonderen Eigenschaften unserer Schule mitgeliefert haben. Und das allerbeste: Unsere Schülerinnen und Schüler haben aktiv mitgemacht und sind auf der Aufnahme zu hören.
+      </p>
+      <p style="margin: 0 0 8px 0; color: #4a5568; font-size: 14px; line-height: 1.6;">
+        Um den Song jetzt abzurufen, registrieren Sie sich einfach über <a href="{{eventLink}}" style="color: #d85a6a;">diesen Link</a>, oder scannen den QR-Code auf dem Flyer, den Ihr Kind mit nach Hause gebracht hat. Ist das bereits geschehen, können Sie sich hier direkt <a href="{{parentPortalLink}}" style="color: #d85a6a;">einloggen</a>.
+      </p>
+      <p style="margin: 0; color: #4a5568; font-size: 14px; line-height: 1.6;">
+        Wir wünschen ganz viel Spaß beim Anhören und Mitsingen!
+      </p>
+    </td>
+  </tr>
+</table>`,
+    availableVariables: ['schoolName', 'eventLink', 'parentPortalLink'],
+    sendNow: {
+      eventFilter: 'schulsong_approved',
+      recipientResolver: 'event_teacher',
+    },
   },
 ];
 

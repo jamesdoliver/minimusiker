@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import TriggerEmailEditor from './TriggerEmailEditor';
+import TriggerSendNowModal from './TriggerSendNowModal';
 import { TriggerEmailTemplate } from '@/lib/types/email-automation';
 
 const RECIPIENT_LABELS: Record<string, { label: string; color: string }> = {
@@ -26,6 +27,7 @@ export default function TriggerEmailsTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
+  const [sendNowSlug, setSendNowSlug] = useState<string | null>(null);
   const [togglingSlug, setTogglingSlug] = useState<string | null>(null);
 
   const fetchTemplates = useCallback(async () => {
@@ -223,6 +225,14 @@ export default function TriggerEmailsTab() {
                       >
                         Vorschau
                       </button>
+                      {template.hasSendNow && (
+                        <button
+                          onClick={() => setSendNowSlug(template.triggerSlug)}
+                          className="text-xs text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Jetzt senden
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -237,6 +247,15 @@ export default function TriggerEmailsTab() {
         <TriggerEmailEditor
           slug={editingSlug}
           onClose={handleEditorClose}
+        />
+      )}
+
+      {/* Send Now Modal */}
+      {sendNowSlug && (
+        <TriggerSendNowModal
+          slug={sendNowSlug}
+          triggerName={templates.find((t) => t.triggerSlug === sendNowSlug)?.name || ''}
+          onClose={() => setSendNowSlug(null)}
         />
       )}
     </>

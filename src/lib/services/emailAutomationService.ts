@@ -209,7 +209,7 @@ export async function getEventsHittingThreshold(
  * Priority 2: Events.simplybook_booking → SchoolBookings.school_contact_name (booking contact)
  * Priority 3: Events.assigned_staff → Personen (staff names as last resort)
  */
-async function getTeacherRecipientsForEvent(
+export async function getTeacherRecipientsForEvent(
   eventId: string,
   eventRecordId: string,
   eventData: EventThresholdMatch
@@ -310,7 +310,7 @@ async function getTeacherRecipientsForEvent(
 /**
  * Get parent recipients for an event
  */
-async function getParentRecipientsForEvent(
+export async function getParentRecipientsForEvent(
   eventId: string,
   eventRecordId: string,
   eventData: EventThresholdMatch

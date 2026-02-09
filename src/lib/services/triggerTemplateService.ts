@@ -263,6 +263,7 @@ export async function getAllTriggerTemplates(): Promise<TriggerEmailTemplate[]> 
         active: record?.active ?? true,
         availableVariables: entry.availableVariables,
         isCustomized,
+        hasSendNow: !!entry.sendNow,
       };
     });
   } catch (error) {
@@ -278,6 +279,7 @@ export async function getAllTriggerTemplates(): Promise<TriggerEmailTemplate[]> 
       active: true,
       availableVariables: entry.availableVariables,
       isCustomized: false,
+      hasSendNow: !!entry.sendNow,
     }));
   }
 }
@@ -311,6 +313,7 @@ export async function getTriggerTemplateBySlug(slug: string): Promise<TriggerEma
       active: record?.active ?? true,
       availableVariables: entry.availableVariables,
       isCustomized,
+      hasSendNow: !!entry.sendNow,
     };
   } catch (error) {
     console.error(`[TriggerTemplate] Error fetching template ${slug}:`, error);
@@ -324,6 +327,7 @@ export async function getTriggerTemplateBySlug(slug: string): Promise<TriggerEma
       active: true,
       availableVariables: entry.availableVariables,
       isCustomized: false,
+      hasSendNow: !!entry.sendNow,
     };
   }
 }
@@ -442,6 +446,18 @@ export function getSampleVariables(slug: string): Record<string, string> {
       contactEmail: 'schmidt@schule.de',
       contactPhone: '0171 1234567',
       staffPortalUrl: 'https://app.minimusiker.de/staff',
+    },
+    engineer_audio_uploaded: {
+      engineerName: 'Max',
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      eventId: 'evt_example_123',
+      engineerPortalUrl: 'https://app.minimusiker.de/engineer',
+    },
+    schulsong_audio_release: {
+      schoolName: 'Grundschule Sonnenschein',
+      eventLink: 'https://minimusiker.app/e/1234',
+      parentPortalLink: 'https://minimusiker.app/familie',
     },
   };
 

@@ -94,6 +94,7 @@ export interface TriggerEmailTemplate {
   active: boolean;                               // Whether template is active
   availableVariables: string[];                  // Variables available for substitution
   isCustomized: boolean;                         // true if Airtable template differs from default
+  hasSendNow?: boolean;                          // true if this trigger supports manual "Send Now"
 }
 
 /**
