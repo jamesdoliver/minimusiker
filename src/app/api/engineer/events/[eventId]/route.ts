@@ -53,6 +53,12 @@ export async function GET(
     const teacherService = getTeacherService();
     const allAudioFiles = await teacherService.getAudioFilesByEventId(eventId);
 
+    // Temporary diagnostic logging for Logic Pro project visibility debugging
+    const logicProjectFiles = allAudioFiles.filter(
+      f => f.type === 'logic-project-schulsong' || f.type === 'logic-project-minimusiker'
+    );
+    console.log(`[Engineer Event ${eventId}] AudioFiles: total=${allAudioFiles.length}, logic-project=${logicProjectFiles.length}, types=[${logicProjectFiles.map(f => f.type).join(', ')}]`);
+
     // Separate logic project files (event-level, visible to all engineers)
     // before applying role-based filtering to regular audio files
     let audioFiles = allAudioFiles.filter(
