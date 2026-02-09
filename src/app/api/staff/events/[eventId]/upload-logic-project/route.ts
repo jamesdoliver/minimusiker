@@ -134,7 +134,6 @@ export async function PUT(
     // Create audio file record
     const teacherService = getTeacherService();
     const audioFile = await teacherService.createAudioFile({
-      classId: '', // event-level, no class
       eventId,
       type: audioFileTypeFromProjectType(projectType),
       r2Key,

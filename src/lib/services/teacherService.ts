@@ -566,6 +566,7 @@ class TeacherService {
     }
 
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // Use text field (class_id) for querying - linked record queries don't work
       // reliably in Airtable formulas. The text class_id is always set and indexed.
       try {
@@ -604,6 +605,7 @@ class TeacherService {
    */
   async getSongsByEventId(eventId: string): Promise<Song[]> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // Use text field (event_id) for querying - linked record queries don't work
       // reliably in Airtable formulas. The text event_id is always set and indexed.
       try {
@@ -797,6 +799,7 @@ class TeacherService {
    */
   async getAudioFilesByClassId(classId: string): Promise<AudioFile[]> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Use linked record field (class_link)
       try {
         // First, find the Classes record by class_id field
@@ -845,6 +848,7 @@ class TeacherService {
    */
   async getAudioFilesByEventId(eventId: string): Promise<AudioFile[]> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Use linked record field (event_link)
       try {
         // First, find the Events record by event_id field
@@ -904,6 +908,7 @@ class TeacherService {
    */
   async getAudioFilesByType(classId: string, type: AudioFileType): Promise<AudioFile[]> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Use linked record field (class_link) + type filter
       try {
         // First, find the Classes record by class_id field
@@ -951,7 +956,7 @@ class TeacherService {
    * Create audio file record
    */
   async createAudioFile(data: {
-    classId: string;
+    classId?: string;
     eventId: string;
     songId?: string;
     type: AudioFileType;
@@ -963,32 +968,37 @@ class TeacherService {
     status?: AudioFileStatus;
     isSchulsong?: boolean;
   }): Promise<AudioFile> {
+    // Declared outside try so it's accessible in catch for error logging
+    const fields: any = {};
     try {
-      const fields: any = {
-        class_id: data.classId,
-        event_id: data.eventId,
-        song_id: data.songId,
-        type: data.type,
-        r2_key: data.r2Key,
-        filename: data.filename,
-        uploaded_by: data.uploadedBy,
-        uploaded_at: new Date().toISOString(),
-        duration_seconds: data.durationSeconds,
-        file_size_bytes: data.fileSizeBytes,
-        status: data.status || 'pending',
-        is_schulsong: data.isSchulsong || false,
-      };
+      // Only set fields that have actual values — Airtable may reject undefined/empty fields
+      if (data.classId) fields.class_id = data.classId;
+      fields.event_id = data.eventId;
+      if (data.songId) fields.song_id = data.songId;
+      fields.type = data.type;
+      fields.r2_key = data.r2Key;
+      fields.filename = data.filename;
+      fields.uploaded_by = data.uploadedBy;
+      fields.uploaded_at = new Date().toISOString();
+      if (data.durationSeconds != null) fields.duration_seconds = data.durationSeconds;
+      if (data.fileSizeBytes != null) fields.file_size_bytes = data.fileSizeBytes;
+      fields.status = data.status ?? 'pending';
+      fields.is_schulsong = data.isSchulsong ?? false;
 
       // If using normalized tables, also populate linked record fields
       if (this.useNormalizedTables()) {
-        // Find Classes record by class_id
-        const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'`,
-          maxRecords: 1,
-        }).firstPage();
+        this.ensureNormalizedTablesInitialized();
 
-        if (classRecords.length > 0) {
-          fields[AUDIO_FILES_LINKED_FIELD_IDS.class_link] = [classRecords[0].id];
+        // Only look up Classes record if classId is provided (event-level records won't have one)
+        if (data.classId) {
+          const classRecords = await this.classesTable!.select({
+            filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'`,
+            maxRecords: 1,
+          }).firstPage();
+
+          if (classRecords.length > 0) {
+            fields[AUDIO_FILES_LINKED_FIELD_IDS.class_link] = [classRecords[0].id];
+          }
         }
 
         // Find Events record by event_id
@@ -1013,6 +1023,7 @@ class TeacherService {
       return this.transformAudioFileRecord(record);
     } catch (error) {
       console.error('Error creating audio file record:', error);
+      console.error('Fields attempted:', JSON.stringify(fields));
       throw new Error(`Failed to create audio file record: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -1177,6 +1188,7 @@ class TeacherService {
    */
   async getSongsWithAudioStatus(eventId: string): Promise<SongWithAudio[]> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Use linked record field (event_link) for audio files
       try {
         // Get all songs for this event (already uses dual-read)
@@ -1295,6 +1307,7 @@ class TeacherService {
 
       // If using normalized tables, also populate linked record fields
       if (this.useNormalizedTables()) {
+        this.ensureNormalizedTablesInitialized();
         // Find Classes record by class_id
         const classRecords = await this.classesTable!.select({
           filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'`,
@@ -3034,6 +3047,7 @@ class TeacherService {
 
     // Check normalized Registrations table using linked record
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       try {
         const normalizedRecords = await this.base('Registrations')
           .select({
@@ -3092,6 +3106,7 @@ class TeacherService {
 
         // If using normalized tables, also update linked record
         if (this.useNormalizedTables()) {
+          this.ensureNormalizedTablesInitialized();
           updateFields[SONGS_LINKED_FIELD_IDS.class_link] = [targetClassRecordId];
         }
 
