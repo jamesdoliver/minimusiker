@@ -58,7 +58,12 @@ export async function POST(
     const isOverride = !schulsongFile.teacherApprovedAt;
 
     // Set approval_status = 'approved' on the audio file
-    await teacherService.updateAudioFileApprovalStatus(schulsongFile.id, 'approved');
+    // Non-fatal: AudioFile approval_status field IDs may not be configured yet
+    try {
+      await teacherService.updateAudioFileApprovalStatus(schulsongFile.id, 'approved');
+    } catch (err) {
+      console.warn('[approve-schulsong] Could not update AudioFile approval_status (non-fatal):', err);
+    }
 
     // Compute release date based on mode
     const releasedAt = mode === 'instant'
