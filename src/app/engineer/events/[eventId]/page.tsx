@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { EngineerEventDetail, EngineerClassView, AudioFileWithUrl, LogicProjectInfo } from '@/lib/types/engineer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import EngineerBatchUploadModal from '@/components/engineer/EngineerBatchUploadModal';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'No date';
@@ -44,6 +45,7 @@ export default function EngineerEventDetailPage() {
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [downloadingProject, setDownloadingProject] = useState<string | null>(null);
   const [togglingSchulsong, setTogglingSchulsong] = useState<string | null>(null);
+  const [showBatchUpload, setShowBatchUpload] = useState(false);
 
   const handleToggleSchulsong = async (audioFileId: string, currentValue: boolean) => {
     setTogglingSchulsong(audioFileId);
@@ -421,8 +423,8 @@ export default function EngineerEventDetailPage() {
             </div>
           )}
 
-          {/* Download all raw files button (legacy fallback) */}
-          <div className="mt-4 pt-4 border-t border-gray-100">
+          {/* Download all raw files button (legacy fallback) + Batch Upload */}
+          <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-3">
             <button
               onClick={() => handleDownloadAllZip()}
               disabled={isDownloadingZip}
@@ -444,6 +446,15 @@ export default function EngineerEventDetailPage() {
                   Download All Raw Files (ZIP)
                 </>
               )}
+            </button>
+            <button
+              onClick={() => setShowBatchUpload(true)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              Batch Upload Final WAVs
             </button>
           </div>
         </div>
@@ -624,6 +635,13 @@ export default function EngineerEventDetailPage() {
             </div>
           </>
         )}
+        {/* Batch Upload Modal */}
+        <EngineerBatchUploadModal
+          isOpen={showBatchUpload}
+          onClose={() => setShowBatchUpload(false)}
+          eventId={eventId}
+          onUploadComplete={fetchEventDetail}
+        />
       </main>
     </div>
   );
