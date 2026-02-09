@@ -249,7 +249,8 @@
     "download": "Schulsong herunterladen",
     "play": "Abspielen",
     "pause": "Pause",
-    "loading": "Wird geladen..."
+    "loading": "Wird geladen...",
+    "downloading": "Wird heruntergeladen..."
   },
   "parentPortal": {
     "manageChildren": {

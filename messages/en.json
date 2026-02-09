@@ -249,7 +249,8 @@
     "download": "Download School Song",
     "play": "Play",
     "pause": "Pause",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "downloading": "Downloading..."
   },
   "parentPortal": {
     "manageChildren": {

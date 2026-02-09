@@ -17,6 +17,7 @@ export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl, filenam
   const [isReady, setIsReady] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const formatTime = useCallback((seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -36,9 +37,9 @@ export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl, filenam
 
       ws = WaveSurfer.create({
         container: waveformRef.current,
-        waveColor: 'rgba(255, 255, 255, 0.5)',
-        progressColor: '#5B8A72',
-        cursorColor: '#ffffff',
+        waveColor: '#C4DBD5',
+        progressColor: '#6B8B84',
+        cursorColor: '#3D504C',
         cursorWidth: 2,
         barWidth: 3,
         barGap: 2,
@@ -83,41 +84,51 @@ export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl, filenam
     }
   };
 
-  const handleDownload = () => {
-    if (downloadUrl) {
+  const handleDownload = async () => {
+    if (!downloadUrl || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      const response = await fetch(downloadUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = downloadUrl;
+      a.href = blobUrl;
       a.download = filename || 'schulsong.mp3';
-      a.target = '_blank';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Download error:', err);
+      window.open(downloadUrl, '_blank');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-6 sm:p-8">
       {/* Player controls */}
       <div className="flex items-center gap-4 mb-3">
         <button
           onClick={togglePlayPause}
           disabled={!isReady}
-          className="flex-shrink-0 w-12 h-12 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-shrink-0 w-12 h-12 rounded-full bg-sage-600 hover:bg-sage-700 flex items-center justify-center shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label={isPlaying ? t('pause') : t('play')}
         >
           {isPlaying ? (
-            <svg className="w-5 h-5 text-gray-800" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
               <rect x="6" y="4" width="4" height="16" rx="1" />
               <rect x="14" y="4" width="4" height="16" rx="1" />
             </svg>
           ) : (
-            <svg className="w-5 h-5 text-gray-800 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
           )}
         </button>
 
-        <div className="text-sm text-white/90 font-medium tabular-nums min-w-[80px]">
+        <div className="text-sm text-sage-800 font-medium tabular-nums min-w-[80px]">
           {formatTime(currentTime)} / {formatTime(duration)}
         </div>
       </div>
@@ -128,8 +139,8 @@ export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl, filenam
       {/* Loading state */}
       {!isReady && (
         <div className="flex items-center justify-center py-4">
-          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          <span className="ml-2 text-sm text-white/70">{t('loading')}</span>
+          <div className="w-5 h-5 border-2 border-sage-200 border-t-sage-600 rounded-full animate-spin" />
+          <span className="ml-2 text-sm text-sage-700">{t('loading')}</span>
         </div>
       )}
 
@@ -137,12 +148,22 @@ export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl, filenam
       {downloadUrl && (
         <button
           onClick={handleDownload}
-          className="mt-6 w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#E91E63] text-white rounded-lg hover:bg-[#C2185B] transition-colors font-medium shadow-md"
+          disabled={isDownloading}
+          className="mt-6 w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-sage-500 to-sage-700 hover:from-sage-600 hover:to-sage-800 text-white rounded-lg transition-colors font-button font-bold uppercase tracking-wide shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          {t('download')}
+          {isDownloading ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              {t('downloading')}
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {t('download')}
+            </>
+          )}
         </button>
       )}
     </div>
