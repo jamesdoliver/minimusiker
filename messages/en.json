@@ -156,6 +156,7 @@
   "productSelector": {
     "title": "How to get the recordings",
     "subtitle": "Choose the right medium for all the songs from the Minimusiker day. For the right look, you can also order a T-Shirt or Hoodie.",
+    "titleSchulsongOnly": "Get the limited edition school shirts and school hoodies from {schoolName} now!",
     "chooseAudio": "Choose Your Audio",
     "required": "(Required)",
     "addClothing": "Add Clothing",

@@ -75,6 +75,7 @@ function ParentPortalContent() {
   const [groups, setGroups] = useState<ParentGroup[]>([]);
   const [groupAudioStatuses, setGroupAudioStatuses] = useState<Record<string, AudioStatus>>({});
   const [shopProfile, setShopProfile] = useState<ShopProfile>(MINIMUSIKERTAG_PROFILE);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [collections, setCollections] = useState<ParentCollection[]>([]);
   const [collectionAudioStatuses, setCollectionAudioStatuses] = useState<Record<string, AudioStatus>>({});
   const [activeTab, setActiveTab] = useState<ContentTab>('class');
@@ -168,9 +169,13 @@ function ParentPortalContent() {
 
   // Fetch schulsong status to determine if this is a schulsong-only event
   useEffect(() => {
-    if (!session || !eventId) return;
+    if (!session || !eventId) {
+      setIsProfileLoading(false);
+      return;
+    }
 
     const fetchSchulsongStatus = async () => {
+      setIsProfileLoading(true);
       try {
         const response = await fetch(
           `/api/parent/schulsong-status?eventId=${encodeURIComponent(eventId)}`,
@@ -186,6 +191,8 @@ function ParentPortalContent() {
         }
       } catch (err) {
         console.error('Error fetching schulsong status:', err);
+      } finally {
+        setIsProfileLoading(false);
       }
     };
 
@@ -362,7 +369,7 @@ function ParentPortalContent() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isProfileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <LoadingSpinner size="lg" />
@@ -418,26 +425,28 @@ function ParentPortalContent() {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Shop Link */}
-              <Link
-                href="/familie/shop"
-                className="flex items-center gap-1 text-sm text-sage-600 hover:text-sage-700 font-medium"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+              {/* Shop Link (hidden for Schulsong-only — inline ProductSelector is their shop) */}
+              {!isSchulsongOnly && (
+                <Link
+                  href="/familie/shop"
+                  className="flex items-center gap-1 text-sm text-sage-600 hover:text-sage-700 font-medium"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                  />
-                </svg>
-                {tCommon('shop')}
-              </Link>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                    />
+                  </svg>
+                  {tCommon('shop')}
+                </Link>
+              )}
               {/* Language Selector */}
               <LanguageSelector />
               <span className="text-sm text-gray-700">
@@ -527,11 +536,11 @@ function ParentPortalContent() {
         </div>
       </div>
 
-      {/* Hero Intro Section - Video and Introduction */}
-      <HeroIntroSection />
+      {/* Hero Intro Section - Video and Introduction (hidden for Schulsong-only) */}
+      {!isSchulsongOnly && <HeroIntroSection />}
 
-      {/* Preparation Section - Yellow PDF Download */}
-      <PreparationSection />
+      {/* Preparation Section - Yellow PDF Download (hidden for Schulsong-only) */}
+      {!isSchulsongOnly && <PreparationSection />}
 
       {/* Schulsong Section - Free school song with waveform player */}
       {eventId && <SchulsongSection eventId={eventId} />}

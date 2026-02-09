@@ -352,13 +352,13 @@ export default function ProductSelector({
     const tshirtNumericId = tshirtVariantGid ? extractVariantNumericId(tshirtVariantGid) : null;
     const hoodieNumericId = hoodieVariantGid ? extractVariantNumericId(hoodieVariantGid) : null;
 
-    // Find bundle product by searching for a product with "bundle" or "set" in title
-    const bundleImage = shopifyProducts.find(p =>
-      p.title.toLowerCase().includes('bundle') ||
-      p.title.toLowerCase().includes('set') ||
-      p.title.toLowerCase().includes('t-shirt & hoodie') ||
-      p.title.toLowerCase().includes('t-shirt + hoodie')
-    )?.images?.[0]?.url;
+    // Find bundle product by requiring clothing-specific terms and excluding audio products
+    const bundleImage = shopifyProducts.find(p => {
+      const title = p.title.toLowerCase();
+      return (title.includes('t-shirt') || title.includes('tshirt')) &&
+             title.includes('hoodie') &&
+             !title.includes('minicard') && !title.includes('cd') && !title.includes('tonie');
+    })?.images?.[0]?.url;
 
     return {
       tshirt: (tshirtNumericId && findProductImageByVariantId(shopifyProducts, tshirtNumericId)) || '/images/familie_portal/T-Shirt Fallback Picture.png',
@@ -554,13 +554,21 @@ export default function ProductSelector({
     <div className="bg-gradient-to-br from-sage-50 to-cream-100 rounded-xl shadow-xl p-6 md:p-8 border-2 border-sage-200">
       {/* Header */}
       <div className="mb-8">
-        <h2 className="text-2xl font-heading font-bold text-gray-900 flex items-center gap-2">
-          <span className="text-2xl">🎵</span>
-          {t('title')}
-        </h2>
-        <p className="text-gray-600 mt-1">
-          {isSchulsongOnly ? t('subtitleSchulsongOnly') : t('subtitle', { schoolName })}
-        </p>
+        {isSchulsongOnly ? (
+          <h2 className="text-2xl font-heading font-bold text-gray-900">
+            {t('titleSchulsongOnly', { schoolName })}
+          </h2>
+        ) : (
+          <>
+            <h2 className="text-2xl font-heading font-bold text-gray-900 flex items-center gap-2">
+              <span className="text-2xl">🎵</span>
+              {t('title')}
+            </h2>
+            <p className="text-gray-600 mt-1">
+              {t('subtitle', { schoolName })}
+            </p>
+          </>
+        )}
       </div>
 
       {/* Audio Section - Multi-select (hidden for schulsong-only events) */}
