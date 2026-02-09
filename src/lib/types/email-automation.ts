@@ -97,6 +97,7 @@ export interface TriggerEmailTemplate {
   triggerEventKey?: string;                      // Key from TRIGGER_EVENT_CATALOG
   triggerEventName?: string;                     // Resolved display name from catalog
   triggerEventDescription?: string;              // Resolved description from catalog
+  hasSendNow?: boolean;                          // true if this trigger supports manual "Send Now"
 }
 
 /**

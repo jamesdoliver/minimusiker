@@ -367,3 +367,27 @@ export async function sendEngineerAudioUploadedEmail(
     engineerPortalUrl: data.engineerPortalUrl,
   }, 'Engineer audio uploaded');
 }
+
+// ============================================================================
+// SCHULSONG AUDIO RELEASE NOTIFICATION (Teacher)
+// ============================================================================
+
+export interface SchulsongAudioReleaseData {
+  schoolName: string;
+  eventLink: string;
+  parentPortalLink: string;
+}
+
+/**
+ * Send schulsong audio release notification to teacher
+ */
+export async function sendSchulsongAudioReleaseEmail(
+  email: string,
+  data: SchulsongAudioReleaseData
+): Promise<SendEmailResult> {
+  return sendTriggerEmail(email, 'schulsong_audio_release', {
+    schoolName: data.schoolName,
+    eventLink: data.eventLink,
+    parentPortalLink: data.parentPortalLink,
+  }, 'Schulsong audio release');
+}
