@@ -75,12 +75,28 @@ function buildTriggerVariables(
     case 'schulsong_audio_release':
       return {
         schoolName: event.school_name,
+      };
+    case 'schulsong_parent_release':
+      return {
+        schoolName: event.school_name,
         eventLink,
         parentPortalLink: `${baseUrl}/familie`,
+        parentName: '',
+        merchandiseDeadline: computeMerchandiseDeadline(event.event_date),
       };
     default:
       return { schoolName: event.school_name };
   }
+}
+
+function computeMerchandiseDeadline(eventDate: string): string {
+  const date = new Date(eventDate);
+  date.setDate(date.getDate() + 7);
+  return date.toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
 function formatDateGerman(dateStr: string): string {

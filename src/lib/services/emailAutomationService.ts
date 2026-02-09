@@ -719,7 +719,7 @@ export async function processSchulsongReleaseEmails(
   dryRun: boolean = false
 ): Promise<{ sent: number; skipped: number; failed: number; errors: string[] }> {
   // Lazy import to avoid circular dependency
-  const { sendSchulsongReleaseEmailForEvent } = await import('@/lib/services/schulsongEmailService');
+  const { sendSchulsongReleaseEmailForEvent, sendSchulsongParentReleaseEmailForEvent } = await import('@/lib/services/schulsongEmailService');
 
   const airtable = getAirtableService();
   const allEvents = await airtable.getAllEvents();
@@ -747,10 +747,11 @@ export async function processSchulsongReleaseEmails(
         continue;
       }
 
-      const result = await sendSchulsongReleaseEmailForEvent(event.event_id);
-      sent += result.sent;
-      skipped += result.skipped;
-      failed += result.failed;
+      const teacherResult = await sendSchulsongReleaseEmailForEvent(event.event_id);
+      const parentResult = await sendSchulsongParentReleaseEmailForEvent(event.event_id);
+      sent += teacherResult.sent + parentResult.sent;
+      skipped += teacherResult.skipped + parentResult.skipped;
+      failed += teacherResult.failed + parentResult.failed;
     } catch (err) {
       const msg = `Failed to process ${event.event_id}: ${err instanceof Error ? err.message : String(err)}`;
       console.error(`[SchulsongCron] ${msg}`);

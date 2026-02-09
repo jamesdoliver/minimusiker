@@ -3,7 +3,7 @@ import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { computeSchulsongReleaseDate } from '@/lib/utils/schulsongRelease';
-import { sendSchulsongReleaseEmailForEvent } from '@/lib/services/schulsongEmailService';
+import { sendSchulsongReleaseEmailForEvent, sendSchulsongParentReleaseEmailForEvent } from '@/lib/services/schulsongEmailService';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,7 +78,12 @@ export async function POST(
       try {
         await sendSchulsongReleaseEmailForEvent(resolvedEventId);
       } catch (err) {
-        console.error('[approve-schulsong] Instant email failed (approval still succeeded):', err);
+        console.error('[approve-schulsong] Teacher email failed (non-fatal):', err);
+      }
+      try {
+        await sendSchulsongParentReleaseEmailForEvent(resolvedEventId);
+      } catch (err) {
+        console.error('[approve-schulsong] Parent email failed (non-fatal):', err);
       }
     }
 
