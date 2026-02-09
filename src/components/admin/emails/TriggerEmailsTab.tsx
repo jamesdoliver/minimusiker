@@ -164,6 +164,11 @@ export default function TriggerEmailsTab() {
                               Standard
                             </span>
                           )}
+                          {template.triggerEventName && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-50 text-cyan-700">
+                              ⚡ {template.triggerEventName}
+                            </span>
+                          )}
                         </div>
                         <p className="mt-1 text-xs text-gray-500">
                           {template.description}

@@ -8,6 +8,7 @@
 import { getAirtableService } from './airtableService';
 import { getCampaignEmailTemplate } from './emailTemplateWrapper';
 import { TRIGGER_EMAIL_REGISTRY, getRegistryEntry } from '@/lib/config/trigger-email-registry';
+import { getTriggerEvent } from '@/lib/config/trigger-event-catalog';
 import { TriggerEmailTemplate } from '@/lib/types/email-automation';
 
 // ─── In-memory cache (60s TTL) ────────────────────────────────────────
@@ -251,6 +252,9 @@ export async function getAllTriggerTemplates(): Promise<TriggerEmailTemplate[]> 
       const isCustomized = record
         ? record.subject !== entry.defaultSubject || record.bodyHtml !== entry.defaultBodyHtml
         : false;
+      const triggerEvent = entry.triggerEventKey
+        ? getTriggerEvent(entry.triggerEventKey)
+        : undefined;
 
       return {
         id: record?.id,
@@ -263,22 +267,33 @@ export async function getAllTriggerTemplates(): Promise<TriggerEmailTemplate[]> 
         active: record?.active ?? true,
         availableVariables: entry.availableVariables,
         isCustomized,
+        triggerEventKey: entry.triggerEventKey,
+        triggerEventName: triggerEvent?.name,
+        triggerEventDescription: triggerEvent?.description,
       };
     });
   } catch (error) {
     console.error('[TriggerTemplate] Error fetching all templates:', error);
     // Fall back to registry defaults
-    return TRIGGER_EMAIL_REGISTRY.map((entry) => ({
-      triggerSlug: entry.slug,
-      name: entry.name,
-      description: entry.description,
-      recipientType: entry.recipientType,
-      subject: entry.defaultSubject,
-      bodyHtml: entry.defaultBodyHtml,
-      active: true,
-      availableVariables: entry.availableVariables,
-      isCustomized: false,
-    }));
+    return TRIGGER_EMAIL_REGISTRY.map((entry) => {
+      const triggerEvent = entry.triggerEventKey
+        ? getTriggerEvent(entry.triggerEventKey)
+        : undefined;
+      return {
+        triggerSlug: entry.slug,
+        name: entry.name,
+        description: entry.description,
+        recipientType: entry.recipientType,
+        subject: entry.defaultSubject,
+        bodyHtml: entry.defaultBodyHtml,
+        active: true,
+        availableVariables: entry.availableVariables,
+        isCustomized: false,
+        triggerEventKey: entry.triggerEventKey,
+        triggerEventName: triggerEvent?.name,
+        triggerEventDescription: triggerEvent?.description,
+      };
+    });
   }
 }
 
@@ -299,6 +314,9 @@ export async function getTriggerTemplateBySlug(slug: string): Promise<TriggerEma
     const isCustomized = record
       ? record.subject !== entry.defaultSubject || record.bodyHtml !== entry.defaultBodyHtml
       : false;
+    const triggerEvent = entry.triggerEventKey
+      ? getTriggerEvent(entry.triggerEventKey)
+      : undefined;
 
     return {
       id: record?.id,
@@ -311,9 +329,15 @@ export async function getTriggerTemplateBySlug(slug: string): Promise<TriggerEma
       active: record?.active ?? true,
       availableVariables: entry.availableVariables,
       isCustomized,
+      triggerEventKey: entry.triggerEventKey,
+      triggerEventName: triggerEvent?.name,
+      triggerEventDescription: triggerEvent?.description,
     };
   } catch (error) {
     console.error(`[TriggerTemplate] Error fetching template ${slug}:`, error);
+    const triggerEvent = entry.triggerEventKey
+      ? getTriggerEvent(entry.triggerEventKey)
+      : undefined;
     return {
       triggerSlug: entry.slug,
       name: entry.name,
@@ -324,6 +348,9 @@ export async function getTriggerTemplateBySlug(slug: string): Promise<TriggerEma
       active: true,
       availableVariables: entry.availableVariables,
       isCustomized: false,
+      triggerEventKey: entry.triggerEventKey,
+      triggerEventName: triggerEvent?.name,
+      triggerEventDescription: triggerEvent?.description,
     };
   }
 }

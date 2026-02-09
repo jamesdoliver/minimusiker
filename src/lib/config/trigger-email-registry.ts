@@ -14,6 +14,7 @@ export interface TriggerEmailDefinition {
   defaultSubject: string;
   defaultBodyHtml: string;
   availableVariables: string[];
+  triggerEventKey?: string;  // Key from TRIGGER_EVENT_CATALOG
 }
 
 /**
@@ -26,6 +27,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     name: 'Lehrer Login-Link',
     description: 'Wird gesendet, wenn ein Lehrer einen Login-Link für das Pädagogen-Portal anfordert.',
     recipientType: 'teacher',
+    triggerEventKey: 'user:teacher_magic_link',
     defaultSubject: 'Dein Login-Link für das Minimusiker Pädagogen-Portal',
     defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
   Hallo {{teacherName}},
@@ -64,6 +66,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     name: 'Neue Buchung (Admin)',
     description: 'Wird an Admins gesendet, wenn ein SimplyBook-Webhook eine neue Buchung erstellt.',
     recipientType: 'admin',
+    triggerEventKey: 'webhook:new_booking',
     defaultSubject: 'Neue Buchung: {{schoolName}} - {{eventDate}}',
     defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
   Neue Buchung eingegangen
@@ -132,6 +135,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     name: 'Terminänderung',
     description: 'Wird an Admins gesendet, wenn ein Admin das Datum eines Events ändert.',
     recipientType: 'admin',
+    triggerEventKey: 'admin:date_change',
     defaultSubject: 'Terminänderung: {{schoolName}} - {{oldDate}} → {{newDate}}',
     defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
   Terminänderung
@@ -189,6 +193,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     name: 'Stornierung',
     description: 'Wird an Admins gesendet, wenn ein Event storniert oder gelöscht wird.',
     recipientType: 'admin',
+    triggerEventKey: 'admin:cancellation',
     defaultSubject: 'Buchung {{reasonText}}: {{schoolName}} - {{eventDate}}',
     defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #dc3545; font-size: 22px; font-weight: 600;">
   {{title}}
@@ -245,6 +250,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     name: 'Schulsong Freigabe',
     description: 'Wird an Admins gesendet, wenn ein Lehrer den Schulsong im Portal freigibt.',
     recipientType: 'admin',
+    triggerEventKey: 'teacher:schulsong_approved',
     defaultSubject: 'Schulsong freigegeben: {{schoolName}} - {{eventDate}}',
     defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
   Schulsong vom Lehrer freigegeben
@@ -287,6 +293,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     name: 'Eltern Willkommen',
     description: 'Wird an Eltern gesendet, wenn sie ihre Kinder für ein Event registrieren.',
     recipientType: 'parent',
+    triggerEventKey: 'user:parent_registration',
     defaultSubject: 'Willkommen bei Minimusiker, {{parentName}}!',
     defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
   Hallo {{parentName}},
@@ -325,6 +332,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     name: 'Neue Buchung (Staff)',
     description: 'Wird an den zugewiesenen Mitarbeiter gesendet, wenn eine neue Buchung über SimplyBook eingeht.',
     recipientType: 'staff',
+    triggerEventKey: 'webhook:staff_assigned',
     defaultSubject: 'Neue Buchung zugewiesen: {{schoolName}}',
     defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
   Hallo {{staffName}},
@@ -385,6 +393,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     name: 'Staff Neuzuweisung',
     description: 'Wird an einen Mitarbeiter gesendet, wenn ein Event ihm neu zugewiesen wird.',
     recipientType: 'staff',
+    triggerEventKey: 'admin:staff_reassigned',
     defaultSubject: 'Event-Neuzuweisung: {{schoolName}} - {{eventDate}}',
     defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
   Hallo {{staffName}},
@@ -451,6 +460,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     name: 'Audio hochgeladen (Engineer)',
     description: 'Wird an den zugewiesenen Engineer gesendet, wenn zum ersten Mal Audiodateien für ein Event hochgeladen werden.',
     recipientType: 'engineer',
+    triggerEventKey: 'staff:first_audio_upload',
     defaultSubject: 'Neue Aufnahmen bereit: {{schoolName}} – {{eventDate}}',
     defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
   Hallo {{engineerName}},

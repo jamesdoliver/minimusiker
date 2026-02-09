@@ -203,6 +203,20 @@ export default function TriggerEmailEditor({ slug, onClose }: Props) {
                   </div>
                 )}
 
+                {/* Trigger Event Info */}
+                {template?.triggerEventName && (
+                  <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-3">
+                    <p className="text-xs font-medium text-cyan-700">
+                      Trigger: {template.triggerEventName}
+                    </p>
+                    {template.triggerEventDescription && (
+                      <p className="text-xs text-cyan-600 mt-0.5">
+                        {template.triggerEventDescription}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Available Variables */}
                 {template && (
                   <div className="bg-gray-50 rounded-lg p-3">

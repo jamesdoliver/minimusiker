@@ -94,6 +94,9 @@ export interface TriggerEmailTemplate {
   active: boolean;                               // Whether template is active
   availableVariables: string[];                  // Variables available for substitution
   isCustomized: boolean;                         // true if Airtable template differs from default
+  triggerEventKey?: string;                      // Key from TRIGGER_EVENT_CATALOG
+  triggerEventName?: string;                     // Resolved display name from catalog
+  triggerEventDescription?: string;              // Resolved description from catalog
 }
 
 /**
