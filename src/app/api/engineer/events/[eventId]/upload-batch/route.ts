@@ -264,28 +264,6 @@ export async function PUT(
       audioFiles.push(audioFile);
     }
 
-    // Check pipeline stage transition: all songs have finals → ready_for_review
-    if (audioFiles.length > 0) {
-      try {
-        const allSongs = await teacherService.getSongsByEventId(eventId);
-        const allAudioFiles = await teacherService.getAudioFilesByEventId(eventId);
-        const finalFiles = allAudioFiles.filter(f => f.type === 'final');
-        const classIdsWithSongs = new Set(allSongs.map(s => s.classId));
-        const classIdsWithFinal = new Set(finalFiles.map(f => f.classId));
-        const allClassesHaveFinal = classIdsWithSongs.size > 0 &&
-          [...classIdsWithSongs].every(cid => classIdsWithFinal.has(cid));
-
-        const hasSchulsongOnly = classIdsWithSongs.size === 0 &&
-          finalFiles.some(f => f.isSchulsong);
-
-        if (allClassesHaveFinal || hasSchulsongOnly) {
-          await getAirtableService().updateEventAudioPipelineStage(eventId, 'ready_for_review');
-        }
-      } catch (e) {
-        console.error('Error checking/updating audio pipeline stage:', e);
-      }
-    }
-
     return NextResponse.json({
       success: true,
       audioFiles,

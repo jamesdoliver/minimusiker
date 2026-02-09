@@ -1120,6 +1120,22 @@ class TeacherService {
   }
 
   /**
+   * Get a single audio file by its Airtable record ID
+   */
+  async getAudioFileById(audioFileId: string): Promise<AudioFile | null> {
+    try {
+      const record = await this.base(AUDIO_FILES_TABLE).find(audioFileId);
+      return this.transformAudioFileRecord(record);
+    } catch (error: any) {
+      if (error?.statusCode === 404 || error?.message?.includes('NOT_FOUND')) {
+        return null;
+      }
+      console.error('Error fetching audio file by ID:', error);
+      throw new Error(`Failed to fetch audio file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Delete audio file record
    */
   async deleteAudioFile(audioFileId: string): Promise<void> {

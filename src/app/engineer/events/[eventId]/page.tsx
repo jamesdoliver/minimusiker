@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { EngineerEventDetail, EngineerClassView, AudioFileWithUrl, LogicProjectInfo } from '@/lib/types/engineer';
+import { EngineerEventDetail, EngineerClassView, AudioFileWithUrl } from '@/lib/types/engineer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EngineerBatchUploadModal from '@/components/engineer/EngineerBatchUploadModal';
 
@@ -46,6 +46,9 @@ export default function EngineerEventDetailPage() {
   const [downloadingProject, setDownloadingProject] = useState<string | null>(null);
   const [togglingSchulsong, setTogglingSchulsong] = useState<string | null>(null);
   const [showBatchUpload, setShowBatchUpload] = useState(false);
+  const [deletingFile, setDeletingFile] = useState<AudioFileWithUrl | null>(null);
+  const [isDeletingFile, setIsDeletingFile] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleToggleSchulsong = async (audioFileId: string, currentValue: boolean) => {
     setTogglingSchulsong(audioFileId);
@@ -289,6 +292,59 @@ export default function EngineerEventDetailPage() {
     e.target.value = '';
   };
 
+  const handleDeleteFile = async () => {
+    if (!deletingFile) return;
+    setIsDeletingFile(true);
+    try {
+      const response = await fetch(
+        `/api/engineer/events/${encodeURIComponent(eventId)}/audio-files/${encodeURIComponent(deletingFile.id)}`,
+        { method: 'DELETE' }
+      );
+      if (!response.ok) {
+        const data = await response.json();
+        alert(data.error || 'Failed to delete file');
+        return;
+      }
+      setDeletingFile(null);
+      await fetchEventDetail();
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('Failed to delete file');
+    } finally {
+      setIsDeletingFile(false);
+    }
+  };
+
+  const handleSubmitForReview = async () => {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(
+        `/api/engineer/events/${encodeURIComponent(eventId)}/submit-for-review`,
+        { method: 'POST' }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.error || 'Failed to submit for review');
+        return;
+      }
+      await fetchEventDetail();
+    } catch (err) {
+      console.error('Submit error:', err);
+      alert('Failed to submit for review');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Compute progress for sticky footer
+  const totalClasses = event ? event.classes.length + (event.schulsongClass ? 1 : 0) : 0;
+  const classesWithFinals = event
+    ? event.classes.filter(c => c.finalMp3File || c.finalWavFile).length +
+      (event.schulsongClass && (event.schulsongClass.finalMp3File || event.schulsongClass.finalWavFile) ? 1 : 0)
+    : 0;
+  const showFooter = event && event.audioPipelineStage !== 'approved' && event.audioPipelineStage !== 'ready_for_review';
+  const canSubmit = classesWithFinals > 0;
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gray-50">
@@ -345,7 +401,7 @@ export default function EngineerEventDetailPage() {
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 ${showFooter ? 'pb-28' : ''}`}>
         {/* Event overview */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <div className="flex flex-wrap gap-6">
@@ -571,6 +627,17 @@ export default function EngineerEventDetailPage() {
                         <p className="text-xs text-gray-500 mt-1">Click to upload</p>
                       )}
                     </label>
+                    {event.schulsongClass.finalMp3File && event.audioPipelineStage !== 'approved' && (
+                      <button
+                        onClick={() => setDeletingFile(event.schulsongClass!.finalMp3File!)}
+                        className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                      </button>
+                    )}
                   </div>
 
                   {/* Final WAV */}
@@ -606,6 +673,17 @@ export default function EngineerEventDetailPage() {
                         <p className="text-xs text-gray-500 mt-1">Click to upload</p>
                       )}
                     </label>
+                    {event.schulsongClass.finalWavFile && event.audioPipelineStage !== 'approved' && (
+                      <button
+                        onClick={() => setDeletingFile(event.schulsongClass!.finalWavFile!)}
+                        className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -630,6 +708,8 @@ export default function EngineerEventDetailPage() {
                   eventIsSchulsong={event.isSchulsong}
                   onToggleSchulsong={handleToggleSchulsong}
                   togglingSchulsongId={togglingSchulsong}
+                  onDeleteFile={setDeletingFile}
+                  audioPipelineStage={event.audioPipelineStage}
                 />
               ))}
             </div>
@@ -642,7 +722,91 @@ export default function EngineerEventDetailPage() {
           eventId={eventId}
           onUploadComplete={fetchEventDetail}
         />
+
+        {/* Delete Confirmation Dialog */}
+        {deletingFile && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete File</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">
+                Are you sure you want to delete <span className="font-medium">{deletingFile.filename}</span>?
+              </p>
+              <p className="text-sm text-red-600 mb-6">
+                This will permanently delete this file. This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setDeletingFile(null)}
+                  disabled={isDeletingFile}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteFile}
+                  disabled={isDeletingFile}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isDeletingFile ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Sticky Submit Footer */}
+      {showFooter && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-700">
+                {classesWithFinals} of {totalClasses} {totalClasses === 1 ? 'class has' : 'classes have'} final files
+              </p>
+              <div className="mt-2 w-full bg-gray-200 rounded-full h-2 max-w-xs">
+                <div
+                  className="bg-purple-600 h-2 rounded-full transition-all"
+                  style={{ width: totalClasses > 0 ? `${(classesWithFinals / totalClasses) * 100}%` : '0%' }}
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleSubmitForReview}
+              disabled={!canSubmit || isSubmitting}
+              className="px-6 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
+            >
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Review'
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -657,6 +821,8 @@ interface ClassCardProps {
   eventIsSchulsong?: boolean;
   onToggleSchulsong: (audioFileId: string, currentValue: boolean) => void;
   togglingSchulsongId: string | null;
+  onDeleteFile: (file: AudioFileWithUrl) => void;
+  audioPipelineStage?: string;
 }
 
 function ClassCard({
@@ -669,6 +835,8 @@ function ClassCard({
   eventIsSchulsong,
   onToggleSchulsong,
   togglingSchulsongId,
+  onDeleteFile,
+  audioPipelineStage,
 }: ClassCardProps) {
   const anyFinalFile = classView.finalMp3File || classView.finalWavFile;
 
@@ -892,6 +1060,17 @@ function ClassCard({
                 <p className="text-xs text-gray-500 mt-1">Click to upload</p>
               )}
             </label>
+            {classView.finalMp3File && audioPipelineStage !== 'approved' && (
+              <button
+                onClick={() => onDeleteFile(classView.finalMp3File!)}
+                className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </button>
+            )}
           </div>
 
           {/* Final WAV upload */}
@@ -931,6 +1110,17 @@ function ClassCard({
                 <p className="text-xs text-gray-500 mt-1">Click to upload</p>
               )}
             </label>
+            {classView.finalWavFile && audioPipelineStage !== 'approved' && (
+              <button
+                onClick={() => onDeleteFile(classView.finalWavFile!)}
+                className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </button>
+            )}
           </div>
         </div>
 
