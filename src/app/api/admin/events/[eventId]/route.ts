@@ -12,6 +12,8 @@ import {
   triggerCancellationNotification,
 } from '@/lib/services/notificationService';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { eventId: string } }

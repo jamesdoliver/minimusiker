@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/staff/team
  * Fetch all staff members with "Team" role from Personen table

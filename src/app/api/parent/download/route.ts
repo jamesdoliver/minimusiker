@@ -20,6 +20,8 @@ import {
 } from '@/lib/types/airtable';
 import { resolveEventRecordId } from '@/lib/services/ordersHelper';
 
+export const dynamic = 'force-dynamic';
+
 interface DownloadRequest {
   eventId: string;
   classId?: string;

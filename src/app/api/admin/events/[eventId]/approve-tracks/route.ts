@@ -9,6 +9,8 @@ import {
 } from '@/lib/types/audio-status';
 import { AUDIO_FILES_FIELD_IDS } from '@/lib/types/teacher';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/events/[eventId]/approve-tracks
  * Approve or reject tracks for an event

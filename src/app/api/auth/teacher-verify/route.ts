@@ -3,6 +3,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { createTeacherSessionToken } from '@/lib/auth/verifyTeacherSession';
 import { TeacherSession, TEACHER_SESSION_COOKIE, TEACHER_SESSION_EXPIRY_SECONDS } from '@/lib/types/teacher';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/auth/teacher-verify
  * Verify magic link token and create session

@@ -12,6 +12,8 @@ import {
   LogicProjectInfo,
 } from '@/lib/types/engineer';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/engineer/events/[eventId]
  * Get event detail with classes and audio files for engineer

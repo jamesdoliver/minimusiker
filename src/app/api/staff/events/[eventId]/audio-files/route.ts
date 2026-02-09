@@ -4,6 +4,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/staff/events/[eventId]/audio-files
  * Get all audio files for an event with signed URLs

@@ -3,6 +3,8 @@ import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getActivityService } from '@/lib/services/activityService';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/admin/events/[eventId]/activity
  * Fetch activity timeline for an event

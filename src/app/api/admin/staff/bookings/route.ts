@@ -3,6 +3,8 @@ import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { EVENTS_TABLE_ID, EVENTS_FIELD_IDS } from '@/lib/types/airtable';
 
+export const dynamic = 'force-dynamic';
+
 interface StaffBooking {
   date: string;
   schoolName: string;

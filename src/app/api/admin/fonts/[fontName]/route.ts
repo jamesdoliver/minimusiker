@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getR2Service } from '@/lib/services/r2Service';
 import { FontName, FONT_FILENAMES } from '@/lib/services/r2Service';
 
+export const dynamic = 'force-dynamic';
+
 // Map URL-friendly names to FontName type
 const FONT_NAME_MAP: Record<string, FontName> = {
   'fredoka': 'fredoka',

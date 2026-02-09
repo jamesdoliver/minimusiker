@@ -6,6 +6,8 @@ import {
   updateSchoolBookingById,
 } from '@/lib/services/teacherService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * PUT /api/teacher/school/info
  * Update school contact information for the authenticated teacher

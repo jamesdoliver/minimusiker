@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/teacher/classes/[classId]/songs
  * Get all songs for a class

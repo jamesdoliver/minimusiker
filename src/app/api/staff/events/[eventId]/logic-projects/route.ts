@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/staff/events/[eventId]/logic-projects
  * Get upload status for both Logic Pro project types

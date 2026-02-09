@@ -7,6 +7,8 @@ import {
 } from '@/lib/types/airtable';
 import Airtable from 'airtable';
 
+export const dynamic = 'force-dynamic';
+
 // Initialize Airtable
 const airtableApiKey = process.env.AIRTABLE_API_KEY || '';
 const airtableBaseId = process.env.AIRTABLE_BASE_ID || '';

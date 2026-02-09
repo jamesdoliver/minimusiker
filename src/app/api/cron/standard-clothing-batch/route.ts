@@ -12,6 +12,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStandardClothingBatchService } from '@/lib/services/standardClothingBatchService';
 
+export const dynamic = 'force-dynamic';
+
 function verifyCronRequest(request: NextRequest): boolean {
   const authHeader = request.headers.get('Authorization');
   const cronSecret = process.env.CRON_SECRET;

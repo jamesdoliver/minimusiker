@@ -3,6 +3,8 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/events/[eventId]/assign-staff
  * Assign a staff member to all records with the given booking_id

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/events/[eventId]/refresh-teacher
  * Syncs the booking's contact person to the first class's main_teacher field

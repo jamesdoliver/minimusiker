@@ -26,6 +26,8 @@ import {
   FontFamily,
 } from '@/lib/config/printableTextConfig';
 
+export const dynamic = 'force-dynamic';
+
 // Item status type
 type ItemStatus = 'pending' | 'confirmed' | 'skipped';
 

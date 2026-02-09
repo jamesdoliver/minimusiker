@@ -4,6 +4,8 @@ import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/engineer/events/[eventId]/upload-mixed
  * Generate presigned URL for mixed audio upload (preview or final)

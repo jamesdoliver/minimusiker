@@ -3,6 +3,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { createTeacherSessionToken } from '@/lib/auth/verifyTeacherSession';
 import { TEACHER_SESSION_COOKIE, TEACHER_SESSION_EXPIRY_SECONDS } from '@/lib/types/teacher';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/teacher/invite/accept
  * Accept an invite and create a session for the teacher

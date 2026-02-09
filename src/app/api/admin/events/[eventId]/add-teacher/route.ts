@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/events/[eventId]/add-teacher
  * Admin endpoint to directly add a teacher to an event by email

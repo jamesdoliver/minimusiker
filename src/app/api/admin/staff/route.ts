@@ -9,6 +9,8 @@ import {
   ROLLEN_IDS,
 } from '@/lib/types/airtable';
 
+export const dynamic = 'force-dynamic';
+
 interface StaffMemberWithRegions {
   id: string;
   name: string;

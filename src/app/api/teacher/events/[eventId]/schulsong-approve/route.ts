@@ -4,6 +4,8 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { triggerSchulsongTeacherApprovedNotification } from '@/lib/services/notificationService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/teacher/events/[eventId]/schulsong-approve
  * Teacher approves the schulsong

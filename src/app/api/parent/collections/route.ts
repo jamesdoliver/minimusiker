@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyParentSession } from '@/lib/auth/verifyParentSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/parent/collections
  * Get collections (Choir and Teacher Song) for a parent's event

@@ -6,6 +6,8 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { autoMatchFiles, getMatchSummary } from '@/lib/utils/autoMatch';
 import AdmZip from 'adm-zip';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/staff/events/[eventId]/classes/[classId]/upload-batch
  * Upload ZIP file or multiple files, extract, and run auto-matching

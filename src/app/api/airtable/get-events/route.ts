@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const events = await getAirtableService().getSchoolEventSummaries();

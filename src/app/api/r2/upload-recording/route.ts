@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getR2Service } from '@/lib/services/r2Service';
 
+export const dynamic = 'force-dynamic';
+
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for large file uploads
 

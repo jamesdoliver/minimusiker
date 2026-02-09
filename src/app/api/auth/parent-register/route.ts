@@ -15,6 +15,8 @@ import {
 } from '@/lib/validators/registrationValidators';
 import { generateSchoolId } from '@/lib/utils/eventIdentifiers';
 
+export const dynamic = 'force-dynamic';
+
 const PARENT_JWT_SECRET =
   process.env.PARENT_JWT_SECRET || process.env.JWT_SECRET || 'parent-secret-key';
 const PARENT_SESSION_DURATION = parseInt(

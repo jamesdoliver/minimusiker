@@ -5,6 +5,8 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/engineer/events/[eventId]/download-zip
  * Download all raw audio files as a ZIP

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { ApiResponse } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Email Check API
  *

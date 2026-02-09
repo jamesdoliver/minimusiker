@@ -4,6 +4,8 @@ import { createTeacherSessionToken } from '@/lib/auth/verifyTeacherSession';
 import { TeacherSession, TEACHER_SESSION_COOKIE, TEACHER_SESSION_EXPIRY_SECONDS } from '@/lib/types/teacher';
 import { sendTeacherMagicLinkEmail } from '@/lib/services/resendService';
 
+export const dynamic = 'force-dynamic';
+
 // Admin bypass email - creates session directly without magic link
 const ADMIN_BYPASS_EMAIL = 'admin@minimusiker.de';
 

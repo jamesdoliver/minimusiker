@@ -4,6 +4,8 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { ApiResponse, ParentSession } from '@/lib/types';
 import { generateEventId, generateSchoolId, generateClassId } from '@/lib/utils/eventIdentifiers';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Parent Login Route
  *

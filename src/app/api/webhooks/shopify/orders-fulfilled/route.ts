@@ -11,6 +11,8 @@ import {
   ORDERS_FIELD_IDS,
 } from '@/lib/types/airtable';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/webhooks/shopify/orders-fulfilled
  *

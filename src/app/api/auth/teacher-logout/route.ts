@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TEACHER_SESSION_COOKIE } from '@/lib/types/teacher';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/auth/teacher-logout
  * Clear teacher session cookie
