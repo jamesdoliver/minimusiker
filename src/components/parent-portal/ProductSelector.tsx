@@ -444,11 +444,17 @@ export default function ProductSelector({
       // Build line items for Shopify cart (with productType for discount code logic)
       const lineItems: Array<{ variantId: string; quantity: number; productType?: 'tshirt' | 'hoodie' | 'audio' }> = [];
 
+      // Track any missing variant mappings to prevent silent checkout failures
+      const missingVariants: string[] = [];
+
       // Add audio products
       selection.audioProducts.forEach((item) => {
         const variantId = shopProfile.shopifyVariantMap[item.productId];
         if (variantId) {
           lineItems.push({ variantId, quantity: item.quantity, productType: 'audio' });
+        } else {
+          console.error(`[Checkout] Missing variant mapping for audio key: ${item.productId}`);
+          missingVariants.push(item.productId);
         }
       });
 
@@ -458,27 +464,50 @@ export default function ProductSelector({
 
       selection.clothing.forEach((item) => {
         if (item.productId === 'tshirt' && item.tshirtSize) {
-          const variantId = shopProfile.shopifyVariantMap[`tshirt-${variantPrefix}-${item.tshirtSize}`];
+          const variantKey = `tshirt-${variantPrefix}-${item.tshirtSize}`;
+          const variantId = shopProfile.shopifyVariantMap[variantKey];
           if (variantId) {
             lineItems.push({ variantId, quantity: item.quantity, productType: 'tshirt' });
+          } else {
+            console.error(`[Checkout] Missing variant mapping for key: ${variantKey}`);
+            missingVariants.push(variantKey);
           }
         } else if (item.productId === 'hoodie' && item.hoodieSize) {
-          const variantId = shopProfile.shopifyVariantMap[`hoodie-${variantPrefix}-${item.hoodieSize}`];
+          const variantKey = `hoodie-${variantPrefix}-${item.hoodieSize}`;
+          const variantId = shopProfile.shopifyVariantMap[variantKey];
           if (variantId) {
             lineItems.push({ variantId, quantity: item.quantity, productType: 'hoodie' });
+          } else {
+            console.error(`[Checkout] Missing variant mapping for key: ${variantKey}`);
+            missingVariants.push(variantKey);
           }
         } else if (item.productId === 'tshirt-hoodie' && item.tshirtSize && item.hoodieSize) {
           // Bundle: add both t-shirt and hoodie as separate line items with their types
-          const tshirtVariantId = shopProfile.shopifyVariantMap[`tshirt-${variantPrefix}-${item.tshirtSize}`];
-          const hoodieVariantId = shopProfile.shopifyVariantMap[`hoodie-${variantPrefix}-${item.hoodieSize}`];
+          const tshirtKey = `tshirt-${variantPrefix}-${item.tshirtSize}`;
+          const hoodieKey = `hoodie-${variantPrefix}-${item.hoodieSize}`;
+          const tshirtVariantId = shopProfile.shopifyVariantMap[tshirtKey];
+          const hoodieVariantId = shopProfile.shopifyVariantMap[hoodieKey];
           if (tshirtVariantId) {
             lineItems.push({ variantId: tshirtVariantId, quantity: item.quantity, productType: 'tshirt' });
+          } else {
+            console.error(`[Checkout] Missing variant mapping for key: ${tshirtKey}`);
+            missingVariants.push(tshirtKey);
           }
           if (hoodieVariantId) {
             lineItems.push({ variantId: hoodieVariantId, quantity: item.quantity, productType: 'hoodie' });
+          } else {
+            console.error(`[Checkout] Missing variant mapping for key: ${hoodieKey}`);
+            missingVariants.push(hoodieKey);
           }
         }
       });
+
+      // Block checkout if any variant mappings are missing — prevent silent partial orders
+      if (missingVariants.length > 0) {
+        console.error('[Checkout] Missing variant mappings:', missingVariants);
+        alert('Some items could not be added to your cart. Please try again or contact support.');
+        return;
+      }
 
       if (lineItems.length === 0) {
         alert('Could not add items to cart. Please try again.');

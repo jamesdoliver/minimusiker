@@ -176,6 +176,7 @@ function ParentPortalContent() {
 
     const fetchSchulsongStatus = async () => {
       setIsProfileLoading(true);
+      setShopProfile(MINIMUSIKERTAG_PROFILE); // Reset to default while loading to prevent stale profile flash
       try {
         const response = await fetch(
           `/api/parent/schulsong-status?eventId=${encodeURIComponent(eventId)}`,
@@ -191,6 +192,7 @@ function ParentPortalContent() {
         }
       } catch (err) {
         console.error('Error fetching schulsong status:', err);
+        // shopProfile stays as MINIMUSIKERTAG_PROFILE (safe default — shows more products, not fewer)
       } finally {
         setIsProfileLoading(false);
       }
@@ -403,7 +405,7 @@ function ParentPortalContent() {
   const schoolName = selectedChild?.schoolName || session?.schoolName || 'Springfield Elementary School';
   const schoolColor = '#94B8B3'; // Default sage color
   const eventType = selectedChild?.eventType || session?.eventType || 'Minimusiker';
-  const eventDate = selectedChild?.bookingDate || session?.bookingDate || '2024-12-15';
+  const eventDate = selectedChild?.bookingDate || session?.bookingDate;
   const className = selectedChild?.class || '';
 
   return (
@@ -520,13 +522,15 @@ function ParentPortalContent() {
               </p>
             )}
             <p className="text-xl md:text-2xl opacity-95 mt-2">{eventType}</p>
-            <p className="text-base md:text-lg mt-2 opacity-90">
-              {new Date(eventDate).toLocaleDateString('de-DE', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-              })}
-            </p>
+            {eventDate && (
+              <p className="text-base md:text-lg mt-2 opacity-90">
+                {new Date(eventDate).toLocaleDateString('de-DE', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                })}
+              </p>
+            )}
             {hasMultipleChildren && selectedChild && (
               <p className="text-sm mt-1 opacity-90">
                 {tBanner('recordingFor', { childName: selectedChild.childName })}
