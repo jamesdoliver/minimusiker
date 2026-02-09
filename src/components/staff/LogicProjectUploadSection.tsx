@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useMultipartUpload } from '@/lib/hooks/useMultipartUpload';
 
 type ProjectType = 'schulsong' | 'minimusiker';
 
@@ -52,6 +53,14 @@ export default function LogicProjectUploadSection({ eventId }: { eventId: string
     schulsong: { uploadState: 'pending', progress: 0 },
     minimusiker: { uploadState: 'pending', progress: 0 },
   });
+
+  const { upload: ssUpload, abort: ssAbort } = useMultipartUpload();
+  const { upload: mmUpload, abort: mmAbort } = useMultipartUpload();
+
+  const uploaders: Record<ProjectType, { upload: typeof ssUpload; abort: typeof ssAbort }> = {
+    schulsong: { upload: ssUpload, abort: ssAbort },
+    minimusiker: { upload: mmUpload, abort: mmAbort },
+  };
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -115,75 +124,32 @@ export default function LogicProjectUploadSection({ eventId }: { eventId: string
       [projectType]: { uploadState: 'uploading', progress: 0, filename: file.name },
     }));
 
+    const { upload: doUpload } = uploaders[projectType];
+    const baseUrl = `/api/staff/events/${encodeURIComponent(eventId)}/upload-logic-project/multipart`;
+
     try {
-      // Step 1: Get presigned URL
-      const urlResponse = await fetch(
-        `/api/staff/events/${encodeURIComponent(eventId)}/upload-logic-project`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            projectType,
-            filename: file.name,
-            fileSizeBytes: file.size,
-          }),
-        }
-      );
-
-      if (!urlResponse.ok) {
-        const errData = await urlResponse.json();
-        throw new Error(errData.error || 'Failed to get upload URL');
-      }
-
-      const { uploadUrl, r2Key } = await urlResponse.json();
-
-      // Step 2: Upload to R2 via XHR for progress tracking
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', uploadUrl);
-        xhr.setRequestHeader('Content-Type', 'application/zip');
-
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const pct = Math.round((e.loaded / e.total) * 100);
-            setCards((prev) => ({
-              ...prev,
-              [projectType]: { ...prev[projectType], progress: pct },
-            }));
-          }
-        };
-
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
-          }
-        };
-
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.send(file);
+      await doUpload({
+        file,
+        initiateUrl: baseUrl,
+        completeUrl: baseUrl,
+        abortUrl: baseUrl,
+        initiateBody: {
+          projectType,
+          filename: file.name,
+          fileSizeBytes: file.size,
+        },
+        completeBodyExtra: {
+          projectType,
+          filename: file.name,
+          fileSizeBytes: file.size,
+        },
+        onProgress: (pct) => {
+          setCards((prev) => ({
+            ...prev,
+            [projectType]: { ...prev[projectType], progress: pct },
+          }));
+        },
       });
-
-      // Step 3: Confirm upload
-      const confirmResponse = await fetch(
-        `/api/staff/events/${encodeURIComponent(eventId)}/upload-logic-project`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            projectType,
-            r2Key,
-            filename: file.name,
-            fileSizeBytes: file.size,
-          }),
-        }
-      );
-
-      if (!confirmResponse.ok) {
-        const errData = await confirmResponse.json();
-        throw new Error(errData.error || 'Failed to confirm upload');
-      }
 
       setCards((prev) => ({
         ...prev,
@@ -199,6 +165,15 @@ export default function LogicProjectUploadSection({ eventId }: { eventId: string
       // Refresh to pick up bothUploaded state
       fetchStatus();
     } catch (err) {
+      // Don't show error if user cancelled
+      if (err instanceof Error && err.message === 'Upload aborted') {
+        setCards((prev) => ({
+          ...prev,
+          [projectType]: { uploadState: 'pending', progress: 0 },
+        }));
+        return;
+      }
+
       console.error(`Upload error (${projectType}):`, err);
       setCards((prev) => ({
         ...prev,
@@ -209,6 +184,10 @@ export default function LogicProjectUploadSection({ eventId }: { eventId: string
         },
       }));
     }
+  };
+
+  const handleCancel = (projectType: ProjectType) => {
+    uploaders[projectType].abort();
   };
 
   const handleDelete = async (projectType: ProjectType) => {
@@ -297,12 +276,12 @@ export default function LogicProjectUploadSection({ eventId }: { eventId: string
             </label>
           )}
 
-          {/* Uploading state — progress bar */}
+          {/* Uploading state — progress bar + cancel */}
           {card.uploadState === 'uploading' && (
             <div>
               <div className="flex items-center gap-3 mb-3">
                 <svg
-                  className="animate-spin h-5 w-5 text-[#5a8a82]"
+                  className="animate-spin h-5 w-5 text-[#5a8a82] flex-shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                 >
@@ -320,12 +299,18 @@ export default function LogicProjectUploadSection({ eventId }: { eventId: string
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
                     Uploading {card.filename}...
                   </p>
                   <p className="text-xs text-gray-500">{card.progress}%</p>
                 </div>
+                <button
+                  onClick={() => handleCancel(projectType)}
+                  className="text-xs text-gray-500 hover:text-red-600 transition-colors flex-shrink-0"
+                >
+                  Cancel
+                </button>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div

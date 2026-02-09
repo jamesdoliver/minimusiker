@@ -6,6 +6,10 @@ import {
   HeadObjectCommand,
   CopyObjectCommand,
   PutBucketCorsCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -2086,6 +2090,116 @@ class R2Service {
       uploadUrl,
       key,
     };
+  }
+
+  // ========================================
+  // Multipart Upload Methods
+  // ========================================
+
+  /**
+   * Initiate a multipart upload — returns the R2-assigned UploadId
+   */
+  async initiateMultipartUpload(
+    key: string,
+    contentType: string
+  ): Promise<{ uploadId: string; key: string }> {
+    const command = new CreateMultipartUploadCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const response = await this.client.send(command);
+
+    if (!response.UploadId) {
+      throw new Error('R2 did not return an UploadId');
+    }
+
+    return { uploadId: response.UploadId, key };
+  }
+
+  /**
+   * Generate presigned URLs for each upload part
+   */
+  async generateUploadPartUrls(
+    key: string,
+    uploadId: string,
+    totalParts: number
+  ): Promise<Record<number, string>> {
+    const urls: Record<number, string> = {};
+
+    for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
+      const command = new UploadPartCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        UploadId: uploadId,
+        PartNumber: partNumber,
+      });
+
+      urls[partNumber] = await getSignedUrl(this.client, command, {
+        expiresIn: 10800, // 3 hours — matches Logic Pro upload expiry
+      });
+    }
+
+    return urls;
+  }
+
+  /**
+   * Complete a multipart upload — R2 validates all parts and ETags
+   */
+  async completeMultipartUpload(
+    key: string,
+    uploadId: string,
+    parts: { PartNumber: number; ETag: string }[]
+  ): Promise<{ etag: string }> {
+    const sortedParts = [...parts].sort((a, b) => a.PartNumber - b.PartNumber);
+
+    const command = new CompleteMultipartUploadCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: {
+        Parts: sortedParts,
+      },
+    });
+
+    const response = await this.client.send(command);
+
+    return { etag: response.ETag || '' };
+  }
+
+  /**
+   * Abort a multipart upload — R2 cleans up all uploaded parts.
+   * Best-effort: catches and logs errors, does not rethrow.
+   */
+  async abortMultipartUpload(key: string, uploadId: string): Promise<void> {
+    try {
+      const command = new AbortMultipartUploadCommand({
+        Bucket: this.bucketName,
+        Key: key,
+        UploadId: uploadId,
+      });
+
+      await this.client.send(command);
+    } catch (error) {
+      console.error('[R2Service] Error aborting multipart upload:', error);
+    }
+  }
+
+  /**
+   * Domain wrapper: initiate a multipart upload for a Logic Pro project.
+   * Generates the R2 key using the same pattern as generateLogicProjectUploadUrl.
+   */
+  async initiateLogicProjectMultipartUpload(
+    eventId: string,
+    projectType: 'schulsong' | 'minimusiker',
+    filename: string
+  ): Promise<{ uploadId: string; key: string }> {
+    const timestamp = Date.now();
+    const projectLabel = projectType === 'schulsong' ? 'schulsong_project' : 'minimusiker_project';
+    const key = `recordings/${eventId}/logic-projects/${projectType}/${timestamp}_${projectLabel}.zip`;
+
+    return this.initiateMultipartUpload(key, 'application/zip');
   }
 
   // ========================================
