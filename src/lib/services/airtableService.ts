@@ -6083,7 +6083,7 @@ class AirtableService {
       return records.length > 0;
     } catch (error) {
       console.error('Error checking if email has been sent:', error);
-      return false; // Return false to allow email attempt if check fails
+      return true; // Fail closed: skip email rather than risk duplicate sends during Airtable outages
     }
   }
 

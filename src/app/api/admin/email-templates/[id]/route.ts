@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { UpdateEmailTemplateInput } from '@/lib/types/email-automation';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const airtable = getAirtableService();
     const template = await airtable.getEmailTemplateById(id);
@@ -62,6 +68,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -86,6 +97,14 @@ export async function PUT(
     if (body.triggerDays !== undefined && typeof body.triggerDays !== 'number') {
       return NextResponse.json(
         { success: false, error: 'triggerDays must be a number' },
+        { status: 400 }
+      );
+    }
+
+    // Validate triggerHour if provided (must be 0-23)
+    if (body.triggerHour !== undefined && (typeof body.triggerHour !== 'number' || body.triggerHour < 0 || body.triggerHour > 23)) {
+      return NextResponse.json(
+        { success: false, error: 'triggerHour must be a number between 0 and 23' },
         { status: 400 }
       );
     }
@@ -135,6 +154,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const airtable = getAirtableService();
 

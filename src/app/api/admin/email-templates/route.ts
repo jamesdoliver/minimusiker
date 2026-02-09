@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { CreateEmailTemplateInput, AudienceValue } from '@/lib/types/email-automation';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,11 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   try {
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const activeOnly = searchParams.get('activeOnly') === 'true';
     const audienceFilter = searchParams.get('audience') as AudienceValue | null;
@@ -77,6 +83,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     // Validate required fields
@@ -109,6 +120,14 @@ export async function POST(request: NextRequest) {
     if (typeof body.triggerDays !== 'number') {
       return NextResponse.json(
         { success: false, error: 'triggerDays must be a number' },
+        { status: 400 }
+      );
+    }
+
+    // Validate triggerHour if provided (must be 0-23)
+    if (body.triggerHour !== undefined && (typeof body.triggerHour !== 'number' || body.triggerHour < 0 || body.triggerHour > 23)) {
+      return NextResponse.json(
+        { success: false, error: 'triggerHour must be a number between 0 and 23' },
         { status: 400 }
       );
     }

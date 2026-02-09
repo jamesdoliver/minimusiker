@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendTestEmail, getPreviewTemplateData, substituteTemplateVariables } from '@/lib/services/emailAutomationService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getCampaignEmailTemplate } from '@/lib/services/resendService';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -83,6 +89,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const airtable = getAirtableService();
     const template = await airtable.getEmailTemplateById(id);

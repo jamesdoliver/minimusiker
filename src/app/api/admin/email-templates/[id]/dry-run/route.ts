@@ -9,9 +9,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import {
   getEventsHittingThreshold,
   getRecipientsForEvent,
+  eventMatchesTemplate,
 } from '@/lib/services/emailAutomationService';
 import { EmailRecipient, Audience } from '@/lib/types/email-automation';
 
@@ -79,6 +81,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<DryRunResponse>> {
   try {
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const airtable = getAirtableService();
 
@@ -92,7 +99,8 @@ export async function GET(
     }
 
     // Get events matching this template's trigger threshold
-    const events = await getEventsHittingThreshold(template.triggerDays);
+    const allEvents = await getEventsHittingThreshold(template.triggerDays);
+    const events = allEvents.filter(e => eventMatchesTemplate(e, template));
 
     // Transform events to response format
     const matchingEvents: DryRunEventMatch[] = events.map((event) => ({

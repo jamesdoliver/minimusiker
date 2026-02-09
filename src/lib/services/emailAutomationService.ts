@@ -41,7 +41,7 @@ export function eventMatchesTemplate(event: EventThresholdMatch, template: Email
 /**
  * Calculate the difference in days between two dates (ignoring time)
  */
-function daysBetween(date1: Date, date2: Date): number {
+export function daysBetween(date1: Date, date2: Date): number {
   const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate());
   const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate());
   const diffTime = d2.getTime() - d1.getTime();
@@ -84,7 +84,7 @@ function formatDateWithDayGerman(dateStr: string): string {
 /**
  * Sleep for a specified number of milliseconds
  */
-function sleep(ms: number): Promise<void> {
+export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -138,24 +138,31 @@ export function substituteTemplateVariables(
  * @returns Events where (event_date - today) equals triggerDays
  */
 export async function getEventsHittingThreshold(
-  triggerDays: number
+  triggerDays: number,
+  prefetchedEvents?: Event[]
 ): Promise<EventThresholdMatch[]> {
   const airtable = getAirtableService();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+
+  // Get today's date in Berlin timezone using Intl.DateTimeFormat('en-CA') which
+  // produces YYYY-MM-DD directly — no ambiguous locale string re-parsing.
+  const berlinFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Berlin',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+  const todayBerlinStr = berlinFormatter.format(new Date()); // "2026-02-08"
+  const [y, m, d] = todayBerlinStr.split('-').map(Number);
+  const todayUtcMidnight = new Date(Date.UTC(y, m - 1, d));
 
   // Calculate the target date based on trigger days
   // If triggerDays = -56, we want events that are 56 days in the future
   // If triggerDays = +7, we want events that were 7 days ago
-  const targetDate = new Date(today);
-  targetDate.setDate(targetDate.getDate() - triggerDays);
+  const targetDate = new Date(todayUtcMidnight);
+  targetDate.setUTCDate(targetDate.getUTCDate() - triggerDays);
 
   const targetDateStr = targetDate.toISOString().split('T')[0];
 
   try {
-    // Query events with the matching date
-    // Note: This uses the normalized Events table
-    const events = await airtable.getAllEvents();
+    const events = prefetchedEvents ?? await airtable.getAllEvents();
 
     const matchingEvents: EventThresholdMatch[] = [];
 
@@ -167,7 +174,7 @@ export async function getEventsHittingThreshold(
 
       if (eventDateStr === targetDateStr) {
         const eventDate = new Date(event.event_date);
-        const daysUntil = daysBetween(today, eventDate);
+        const daysUntil = daysBetween(todayUtcMidnight, eventDate);
 
         matchingEvents.push({
           eventId: event.event_id,
@@ -603,6 +610,9 @@ export async function processEmailAutomation(
       return result;
     }
 
+    // Fetch all events once and share across templates to avoid repeated Airtable calls
+    const allEvents = await airtable.getAllEvents();
+
     for (const template of templates) {
       try {
         result.templatesProcessed++;
@@ -611,7 +621,7 @@ export async function processEmailAutomation(
         );
 
         // Get events matching this template's trigger threshold
-        const events = await getEventsHittingThreshold(template.triggerDays);
+        const events = await getEventsHittingThreshold(template.triggerDays, allEvents);
 
         // Filter events by template's event type filters
         const filteredEvents = events.filter(event => eventMatchesTemplate(event, template));
