@@ -21,10 +21,10 @@ export const EARLY_BIRD_DEADLINE_DAYS = 19;
 export const PERSONALIZED_CLOTHING_CUTOFF_DAYS = -4;
 
 /**
- * Schulsong-only clothing cutoff: available up to 7 days after event.
+ * Schulsong-only clothing cutoff: available up to 14 days after event.
  * Extended window since schulsong-only events don't have audio products.
  */
-export const SCHULSONG_CLOTHING_CUTOFF_DAYS = -7;
+export const SCHULSONG_CLOTHING_CUTOFF_DAYS = -14;
 
 /**
  * Event milestones with their timeline offsets (days relative to event)
