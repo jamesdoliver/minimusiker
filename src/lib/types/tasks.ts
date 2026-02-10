@@ -13,7 +13,7 @@ export type TaskType =
 export type TaskCompletionType = 'monetary' | 'checkbox' | 'submit_only';
 
 // Task status
-export type TaskStatus = 'pending' | 'completed';
+export type TaskStatus = 'pending' | 'completed' | 'cancelled';
 
 // Base Task interface (Airtable record)
 export interface Task {

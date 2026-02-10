@@ -8,11 +8,13 @@ import { MinicardOrderEvent } from '@/lib/types/minicardOrders';
 interface MinicardOrderCardProps {
   event: MinicardOrderEvent;
   onMarkComplete: (event: MinicardOrderEvent) => void;
+  onCancel: (event: MinicardOrderEvent) => void;
 }
 
 export default function MinicardOrderCard({
   event,
   onMarkComplete,
+  onCancel,
 }: MinicardOrderCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -153,6 +155,15 @@ export default function MinicardOrderCard({
                 Download Printable
               </div>
             )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel(event);
+              }}
+              className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+            >
+              Cancel Task
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();

@@ -60,13 +60,25 @@ export async function PATCH(
   try {
     const { taskId } = await params;
     const body = await request.json();
-    const completionData: TaskCompletionData = body.completion_data || {};
 
     // Get admin email from session/auth (for now, use a placeholder)
     // TODO: Get actual admin email from session
     const adminEmail = 'admin@minimusiker.de';
 
     const taskService = getTaskService();
+
+    // Handle cancellation
+    if (body.status === 'cancelled') {
+      const task = await taskService.cancelTask(taskId, adminEmail);
+      return NextResponse.json({
+        success: true,
+        data: { task },
+        message: 'Task cancelled successfully.',
+      });
+    }
+
+    // Handle completion
+    const completionData: TaskCompletionData = body.completion_data || {};
     const result = await taskService.completeTask(taskId, completionData, adminEmail);
 
     return NextResponse.json({
@@ -81,9 +93,9 @@ export async function PATCH(
         : 'Task completed successfully.',
     });
   } catch (error) {
-    console.error('Error completing task:', error);
+    console.error('Error updating task:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to complete task' },
+      { success: false, error: 'Failed to update task' },
       { status: 500 }
     );
   }

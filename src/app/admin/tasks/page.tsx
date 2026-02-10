@@ -75,14 +75,14 @@ export default function AdminTasks() {
       if (data.success) {
         setPendingTasks(data.data.tasks || []);
         setStats({
-          total: data.data.stats?.total || 0,
-          all: data.data.stats?.all || 0,
-          paper_order: data.data.stats?.paper_order || 0,
-          clothing_order: data.data.stats?.clothing_order || 0,
-          standard_clothing_order: data.data.stats?.standard_clothing_order || 0,
-          cd_master: data.data.stats?.cd_master || 0,
-          cd_production: data.data.stats?.cd_production || 0,
-          shipping: data.data.stats?.shipping || 0,
+          total: data.data.counts?.total || 0,
+          all: data.data.counts?.all || 0,
+          paper_order: data.data.counts?.paper_order || 0,
+          clothing_order: data.data.counts?.clothing_order || 0,
+          standard_clothing_order: data.data.counts?.standard_clothing_order || 0,
+          cd_master: data.data.counts?.cd_master || 0,
+          cd_production: data.data.counts?.cd_production || 0,
+          shipping: data.data.counts?.shipping || 0,
         });
       } else {
         throw new Error(data.error || 'Failed to load tasks');

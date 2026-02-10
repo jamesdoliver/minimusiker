@@ -41,6 +41,32 @@ export default function MinicardOrdersView({ isActive, onCompleteTask }: Minicar
     }
   }, [isActive, fetchMinicardOrders]);
 
+  const handleCancelTask = async (event: MinicardOrderEvent) => {
+    const confirmed = window.confirm(
+      `Cancel minicard task for ${event.school_name}? This will remove it from the task list.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/admin/tasks/${event.task_record_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to cancel task');
+      }
+
+      // Remove the event from local state
+      setEvents((prev) => prev.filter((e) => e.event_record_id !== event.event_record_id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to cancel task');
+    }
+  };
+
   const handleMarkComplete = (event: MinicardOrderEvent) => {
     // Build a synthetic TaskWithEventDetails for the completion modal
     const syntheticTask: TaskWithEventDetails = {
@@ -147,6 +173,7 @@ export default function MinicardOrdersView({ isActive, onCompleteTask }: Minicar
               key={event.event_record_id}
               event={event}
               onMarkComplete={handleMarkComplete}
+              onCancel={handleCancelTask}
             />
           ))}
         </div>

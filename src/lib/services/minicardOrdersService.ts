@@ -52,9 +52,9 @@ class MinicardOrdersService {
     const futureThreshold = new Date(today);
     futureThreshold.setDate(today.getDate() + 30 + 1);
 
-    // Events up to 7 days in the past for overdue orders
+    // Events up to 30 days in the past for overdue orders
     const pastCutoff = new Date(today);
-    pastCutoff.setDate(today.getDate() - 7 - 1);
+    pastCutoff.setDate(today.getDate() - 30 - 1);
 
     // Step 1: Get pending minicard tasks
     const pendingTasks = await tasksTable

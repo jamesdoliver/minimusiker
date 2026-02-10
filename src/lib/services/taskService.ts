@@ -303,6 +303,23 @@ class TaskService {
   }
 
   /**
+   * Cancel a task
+   */
+  async cancelTask(taskId: string, adminEmail: string): Promise<Task> {
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+
+    await table.update(taskId, {
+      [TASKS_FIELD_IDS.status]: 'cancelled',
+      [TASKS_FIELD_IDS.completed_by]: adminEmail,
+      [TASKS_FIELD_IDS.completed_at]: new Date().toISOString(),
+    } as Partial<Airtable.FieldSet>);
+
+    const updatedRecord = await table.find(taskId);
+    return this.transformTaskRecord(updatedRecord);
+  }
+
+  /**
    * Create a GuesstimateOrder (go_id)
    */
   async createGuesstimateOrder(input: CreateGuesstimateOrderInput): Promise<GuesstimateOrder> {
