@@ -121,8 +121,9 @@ async function getParentsByRecordIds(parentRecordIds: string[]): Promise<Map<str
     if (parentRecordIds.includes(record.id)) {
       const email = record.fields[PARENTS_FIELD_IDS.parent_email] as string;
       const firstName = record.fields[PARENTS_FIELD_IDS.parent_first_name] as string;
+      const emailCampaigns = record.fields[PARENTS_FIELD_IDS.email_campaigns] as string | undefined;
 
-      if (email) {
+      if (email && emailCampaigns !== 'no') {
         parentMap.set(record.id, {
           email: email.toLowerCase().trim(),
           firstName: firstName || '',
