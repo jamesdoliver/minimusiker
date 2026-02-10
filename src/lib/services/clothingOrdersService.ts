@@ -27,10 +27,9 @@ import {
   REGISTRATIONS_FIELD_IDS,
   PARENTS_TABLE_ID,
   PARENTS_FIELD_IDS,
-  CLASSES_TABLE_ID,
-  CLASSES_FIELD_IDS,
 } from '@/lib/types/airtable';
 import { ShopifyOrderLineItem } from '@/lib/types/airtable';
+import { buildClassToEventMap, resolveOrderEventId } from '@/lib/utils/orderEventResolver';
 
 // Order Day is 18 days before event
 const ORDER_DAY_OFFSET = 18;
@@ -39,45 +38,6 @@ const VISIBILITY_WINDOW_DAYS = 21;
 
 class ClothingOrdersService {
   private airtable = getAirtableService();
-
-  /**
-   * Build a map from class record ID → event record ID.
-   * Fetched once per method call to avoid N+1 queries.
-   */
-  private async buildClassToEventMap(): Promise<Map<string, string>> {
-    const base = this.airtable.getBase();
-    const classesTable = base(CLASSES_TABLE_ID);
-    const records = await classesTable.select({ returnFieldsByFieldId: true }).all();
-    const map = new Map<string, string>();
-    for (const record of records) {
-      const eventIds = record.get(CLASSES_FIELD_IDS.event_id) as string[] | undefined;
-      if (eventIds?.[0]) {
-        map.set(record.id, eventIds[0]);
-      }
-    }
-    return map;
-  }
-
-  /**
-   * Resolve an order's event record ID using direct event_id first,
-   * falling back to class_id → event_id lookup.
-   */
-  private resolveOrderEventId(
-    order: Airtable.Record<Airtable.FieldSet>,
-    classToEvent: Map<string, string>
-  ): string | undefined {
-    // Path 1: Direct event_id linked field
-    const eventIds = order.get(ORDERS_FIELD_IDS.event_id) as string[] | undefined;
-    if (eventIds?.[0]) return eventIds[0];
-
-    // Path 2: Fallback via class_id → event_id
-    const classIds = order.get(ORDERS_FIELD_IDS.class_id) as string[] | undefined;
-    if (classIds?.[0]) {
-      return classToEvent.get(classIds[0]);
-    }
-
-    return undefined;
-  }
 
   /**
    * Get all pending clothing order events within the visibility window
@@ -134,7 +94,7 @@ class ClothingOrdersService {
     // Get all orders and class→event lookup for fallback resolution
     const [allOrders, classToEvent] = await Promise.all([
       ordersTable.select({ returnFieldsByFieldId: true }).all(),
-      this.buildClassToEventMap(),
+      buildClassToEventMap(base),
     ]);
 
     // Group orders by event
@@ -158,7 +118,7 @@ class ClothingOrdersService {
       const hasClothing = lineItems.some((item) => isClothingVariant(item.variant_id));
       if (!hasClothing) continue;
 
-      const eventRecordId = this.resolveOrderEventId(order, classToEvent);
+      const eventRecordId = resolveOrderEventId(order, classToEvent);
       if (!eventRecordId) continue;
 
       // Skip if this event already has a completed clothing task
@@ -261,7 +221,7 @@ class ClothingOrdersService {
       ordersTable.select({ returnFieldsByFieldId: true }).all(),
       parentsTable.select({ returnFieldsByFieldId: true }).all(),
       registrationsTable.select({ returnFieldsByFieldId: true }).all(),
-      this.buildClassToEventMap(),
+      buildClassToEventMap(base),
     ]);
 
     // Create lookup maps for efficient access
@@ -271,7 +231,7 @@ class ClothingOrdersService {
 
     // Filter to orders linked to this event (with class_id → event_id fallback)
     const orders = allOrders.filter((order) => {
-      return this.resolveOrderEventId(order, classToEvent) === eventRecordId;
+      return resolveOrderEventId(order, classToEvent) === eventRecordId;
     });
 
     const orderDetails: ClothingOrderDetail[] = [];

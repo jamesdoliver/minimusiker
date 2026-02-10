@@ -24,10 +24,9 @@ import {
   TASKS_FIELD_IDS,
   PARENTS_TABLE_ID,
   PARENTS_FIELD_IDS,
-  CLASSES_TABLE_ID,
-  CLASSES_FIELD_IDS,
 } from '@/lib/types/airtable';
 import { ShopifyOrderLineItem } from '@/lib/types/airtable';
+import { buildClassToEventMap, resolveOrderEventId } from '@/lib/utils/orderEventResolver';
 
 class StandardClothingBatchService {
   private airtable = getAirtableService();
@@ -72,42 +71,6 @@ class StandardClothingBatchService {
     const yearStart = new Date(Date.UTC(tempDate.getUTCFullYear(), 0, 1));
     const weekNum = Math.ceil((((tempDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
     return `STD-${year}-W${String(weekNum).padStart(2, '0')}`;
-  }
-
-  /**
-   * Build a map from class record ID to event record ID
-   */
-  private async buildClassToEventMap(): Promise<Map<string, string>> {
-    const base = this.airtable.getBase();
-    const classesTable = base(CLASSES_TABLE_ID);
-    const records = await classesTable.select({ returnFieldsByFieldId: true }).all();
-    const map = new Map<string, string>();
-    for (const record of records) {
-      const eventIds = record.get(CLASSES_FIELD_IDS.event_id) as string[] | undefined;
-      if (eventIds?.[0]) {
-        map.set(record.id, eventIds[0]);
-      }
-    }
-    return map;
-  }
-
-  /**
-   * Resolve an order's event record ID using direct event_id first,
-   * falling back to class_id -> event_id lookup.
-   */
-  private resolveOrderEventId(
-    order: Airtable.Record<Airtable.FieldSet>,
-    classToEvent: Map<string, string>
-  ): string | undefined {
-    const eventIds = order.get(ORDERS_FIELD_IDS.event_id) as string[] | undefined;
-    if (eventIds?.[0]) return eventIds[0];
-
-    const classIds = order.get(ORDERS_FIELD_IDS.class_id) as string[] | undefined;
-    if (classIds?.[0]) {
-      return classToEvent.get(classIds[0]);
-    }
-
-    return undefined;
   }
 
   /**
@@ -174,7 +137,7 @@ class StandardClothingBatchService {
     const alreadyBatched = await this.getAlreadyBatchedOrderIds();
 
     // Build class-to-event map for event resolution
-    const classToEvent = await this.buildClassToEventMap();
+    const classToEvent = await buildClassToEventMap(this.airtable.getBase());
 
     // Filter to orders with standard clothing items, excluding already-batched
     const matchingOrders: {
@@ -216,7 +179,7 @@ class StandardClothingBatchService {
 
       if (clothingItems.length === 0) continue;
 
-      const eventRecordId = this.resolveOrderEventId(order, classToEvent);
+      const eventRecordId = resolveOrderEventId(order, classToEvent);
 
       matchingOrders.push({
         order,
@@ -355,7 +318,7 @@ class StandardClothingBatchService {
     );
 
     // Build class-to-event map
-    const classToEvent = await this.buildClassToEventMap();
+    const classToEvent = await buildClassToEventMap(this.airtable.getBase());
 
     const batches: StandardClothingBatch[] = [];
 
@@ -411,7 +374,7 @@ class StandardClothingBatchService {
 
         if (hasStandard) {
           totalOrders++;
-          const eventRecordId = this.resolveOrderEventId(order, classToEvent);
+          const eventRecordId = resolveOrderEventId(order, classToEvent);
           if (eventRecordId) eventRecordIds.add(eventRecordId);
         }
       }
@@ -467,7 +430,7 @@ class StandardClothingBatchService {
     const [allOrders, allParents, classToEvent] = await Promise.all([
       ordersTable.select({ returnFieldsByFieldId: true }).all(),
       parentsTable.select({ returnFieldsByFieldId: true }).all(),
-      this.buildClassToEventMap(),
+      buildClassToEventMap(this.airtable.getBase()),
     ]);
 
     const parentsById = new Map(
@@ -516,7 +479,7 @@ class StandardClothingBatchService {
       const parentName = parentIds?.[0] ? (parentsById.get(parentIds[0]) || 'Unknown') : 'Unknown';
 
       // Get school name from event
-      const eventRecordId = this.resolveOrderEventId(order, classToEvent);
+      const eventRecordId = resolveOrderEventId(order, classToEvent);
       let schoolName = 'Unknown School';
       if (eventRecordId) {
         if (eventNameCache.has(eventRecordId)) {

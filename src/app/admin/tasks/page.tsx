@@ -10,6 +10,7 @@ import TaskSearchBar from '@/components/admin/tasks/TaskSearchBar';
 import ClothingOrdersView from '@/components/admin/tasks/ClothingOrdersView';
 import StandardClothingBatchView from '@/components/admin/tasks/StandardClothingBatchView';
 import IncomingOrdersView from '@/components/admin/tasks/IncomingOrdersView';
+import MinicardOrdersView from '@/components/admin/tasks/MinicardOrdersView';
 import {
   TaskWithEventDetails,
   TaskFilterTab,
@@ -297,6 +298,19 @@ export default function AdminTasks() {
             <ClothingOrdersView isActive={activeTab === 'clothing_order'} />
           ) : activeTab === 'standard_clothing_order' ? (
             <StandardClothingBatchView isActive={activeTab === 'standard_clothing_order'} />
+          ) : activeTab === 'paper_order' ? (
+            <>
+              <MinicardOrdersView isActive={true} onCompleteTask={handleCompleteClick} />
+              <div className="mt-8 mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Flyers & Posters</h2>
+                <p className="text-sm text-gray-500">Individual print order tasks</p>
+              </div>
+              <TaskQueue
+                tasks={filteredTasks.filter(t => t.template_id !== 'minicard')}
+                isLoading={isLoading}
+                onComplete={handleCompleteClick}
+              />
+            </>
           ) : (
             <TaskQueue
               tasks={filteredTasks}
