@@ -320,3 +320,29 @@ export function getPersonalizedProductCountdown(
 
   return { days, hours };
 }
+
+/**
+ * Get countdown to schulsong clothing order deadline
+ * Returns null if deadline has passed
+ */
+export function getSchulsongClothingCountdown(
+  eventDate: string | Date
+): { days: number; hours: number; minutes: number; seconds: number } | null {
+  const event = new Date(eventDate);
+  const deadline = new Date(event);
+  deadline.setDate(deadline.getDate() + Math.abs(SCHULSONG_CLOTHING_CUTOFF_DAYS));
+  // Set deadline to end of day (23:59:59)
+  deadline.setHours(23, 59, 59, 999);
+
+  const now = new Date();
+  const diff = deadline.getTime() - now.getTime();
+
+  if (diff <= 0) return null;
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+  return { days, hours, minutes, seconds };
+}

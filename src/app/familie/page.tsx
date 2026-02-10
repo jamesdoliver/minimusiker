@@ -9,6 +9,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import LanguageSelector from '@/components/shared/LanguageSelector';
 import PreviewPlayer from '@/components/landing/PreviewPlayer';
 import ProductSelector from '@/components/parent-portal/ProductSelector';
+import OrderDeadlineCountdown from '@/components/parent-portal/OrderDeadlineCountdown';
 import HeroIntroSection from '@/components/parent-portal/HeroIntroSection';
 import PreparationSection from '@/components/parent-portal/PreparationSection';
 import SchulsongSection from '@/components/parent-portal/SchulsongSection';
@@ -901,6 +902,9 @@ function ParentPortalContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Shopping Section */}
         <section className="mb-12">
+          {isSchulsongOnly && eventDate && (
+            <OrderDeadlineCountdown eventDate={eventDate} eventType={eventType} />
+          )}
           <ProductSelector
             eventId={eventId}
             eventDate={eventDate}

@@ -252,6 +252,9 @@
     "loading": "Wird geladen...",
     "downloading": "Wird heruntergeladen..."
   },
+  "orderDeadline": {
+    "clothingMessage": "Schul-Shirts und Schul-Hoodies nur noch bestellbar für"
+  },
   "parentPortal": {
     "manageChildren": {
       "title": "Registrierte Kinder",

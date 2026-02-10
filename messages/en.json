@@ -252,6 +252,9 @@
     "loading": "Loading...",
     "downloading": "Downloading..."
   },
+  "orderDeadline": {
+    "clothingMessage": "School shirts and school hoodies only available for"
+  },
   "parentPortal": {
     "manageChildren": {
       "title": "Registered Children",
