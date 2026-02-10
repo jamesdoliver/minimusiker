@@ -49,6 +49,8 @@ export interface BookingWithDetails {
   audioPipelineStage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved';
   // Admin notes
   adminNotes?: string;
+  // Discount code (simplybookHash)
+  discountCode?: string;
 }
 
 // Staff member for dropdown
@@ -92,6 +94,7 @@ function transformToBookingWithDetails(
     eventName: 'MiniMusiker Day',
     // Parse secondaryContacts from JSON field
     secondaryContacts: booking.secondaryContacts ? parseSecondaryContacts(booking.secondaryContacts) : undefined,
+    discountCode: booking.simplybookHash,
   };
 }
 

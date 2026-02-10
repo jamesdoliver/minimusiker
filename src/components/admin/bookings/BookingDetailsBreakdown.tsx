@@ -24,6 +24,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
   const [showOrdersModal, setShowOrdersModal] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [discountCopied, setDiscountCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showRefreshModal, setShowRefreshModal] = useState(false);
   const [refreshData, setRefreshData] = useState<{
@@ -133,6 +134,14 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
     navigator.clipboard.writeText(`https://${booking.shortUrl}`);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  // Copy discount code to clipboard
+  const handleCopyDiscount = () => {
+    if (!booking.discountCode) return;
+    navigator.clipboard.writeText(booking.discountCode);
+    setDiscountCopied(true);
+    setTimeout(() => setDiscountCopied(false), 2000);
   };
 
   // Refresh booking data from SimplyBook
@@ -366,6 +375,29 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
               <label className="text-xs text-gray-500 uppercase tracking-wide">Booking Code</label>
               <p className="text-sm font-mono text-gray-900">{booking.code}</p>
             </div>
+            {booking.discountCode && (
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">Discount Code</label>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-mono text-gray-900">{booking.discountCode}</p>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleCopyDiscount(); }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Copy discount code"
+                  >
+                    {discountCopied ? (
+                      <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
             <div>
               <label className="text-xs text-gray-500 uppercase tracking-wide">Event Type</label>
               <p className="text-sm text-gray-900">{booking.eventName || 'MiniMusiker Day'}</p>
