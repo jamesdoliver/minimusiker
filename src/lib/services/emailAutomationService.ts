@@ -6,7 +6,8 @@
  */
 
 import { getAirtableService } from './airtableService';
-import { sendCampaignEmail } from './resendService';
+import { sendCampaignEmail, CampaignEmailOptions } from './resendService';
+import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
 import { getTeacherService } from './teacherService';
 import {
   EmailTemplate,
@@ -331,7 +332,9 @@ export async function getParentRecipientsForEvent(
         const parentRecordId = registration.parent_id[0];
         const parent = await airtable.getParentByRecordId(parentRecordId);
 
-        if (parent?.parent_email && !seenEmails.has(parent.parent_email.toLowerCase())) {
+        if (parent?.parent_email
+            && !seenEmails.has(parent.parent_email.toLowerCase())
+            && parent.email_campaigns !== 'no') {
           seenEmails.add(parent.parent_email.toLowerCase());
 
           // Get class details if available
@@ -525,8 +528,20 @@ export async function sendAutomatedEmail(
     }
   }
 
-  // Send the email
-  const result = await sendCampaignEmail(recipient.email, subject, bodyHtml);
+  // Send the email (with unsubscribe for parent recipients)
+  const isParent = recipient.type === 'parent' || recipient.type === 'non-buyer';
+  const unsubscribeUrl = isParent ? generateUnsubscribeUrl(recipient.email) : undefined;
+  const campaignOptions: CampaignEmailOptions | undefined = isParent && unsubscribeUrl
+    ? {
+        showUnsubscribe: true,
+        unsubscribeUrl,
+        headers: {
+          'List-Unsubscribe': `<${unsubscribeUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+      }
+    : undefined;
+  const result = await sendCampaignEmail(recipient.email, subject, bodyHtml, campaignOptions);
 
   // Log the result
   const logInput: CreateEmailLogInput = {

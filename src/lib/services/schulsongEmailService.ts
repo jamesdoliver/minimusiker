@@ -15,6 +15,7 @@ import {
   renderFullTriggerEmail,
 } from '@/lib/services/triggerTemplateService';
 import { getRegistryEntry } from '@/lib/config/trigger-email-registry';
+import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
 import { EventThresholdMatch, CreateEmailLogInput } from '@/lib/types/email-automation';
 
 const SLUG = 'schulsong_audio_release';
@@ -236,9 +237,13 @@ export async function sendSchulsongParentReleaseEmailForEvent(
       merchandiseDeadline: computeMerchandiseDeadline(event.event_date),
     };
 
-    // Render template
+    // Render template (with unsubscribe for parent recipients)
+    const unsubscribeUrl = generateUnsubscribeUrl(recipient.email);
     const subject = renderTriggerTemplate(trigger.subject, variables);
-    const html = renderFullTriggerEmail(trigger.bodyHtml, variables);
+    const html = renderFullTriggerEmail(trigger.bodyHtml, variables, {
+      showUnsubscribe: true,
+      unsubscribeUrl,
+    });
 
     // Send
     let sendStatus: 'sent' | 'failed' = 'sent';
@@ -256,6 +261,10 @@ export async function sendSchulsongParentReleaseEmailForEvent(
           to: recipient.email,
           subject,
           html,
+          headers: {
+            'List-Unsubscribe': `<${unsubscribeUrl}>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          },
         });
 
         if (error) {

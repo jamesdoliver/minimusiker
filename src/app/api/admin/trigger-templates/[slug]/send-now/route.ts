@@ -22,6 +22,7 @@ import {
 import { Event } from '@/lib/types/airtable';
 import { EventThresholdMatch, CreateEmailLogInput } from '@/lib/types/email-automation';
 import { Resend } from 'resend';
+import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
 
 export const dynamic = 'force-dynamic';
 
@@ -272,9 +273,13 @@ export async function POST(
           }
         }
 
-        // Render template
+        // Render template (with unsubscribe for parent recipients)
+        const isParent = recipient.type === 'parent' || recipient.type === 'non-buyer';
+        const unsubscribeUrl = isParent ? generateUnsubscribeUrl(recipient.email) : undefined;
         const subject = renderTriggerTemplate(trigger.subject, variables);
-        const html = renderFullTriggerEmail(trigger.bodyHtml, variables);
+        const html = renderFullTriggerEmail(trigger.bodyHtml, variables,
+          isParent && unsubscribeUrl ? { showUnsubscribe: true, unsubscribeUrl } : undefined
+        );
 
         // Send
         let sendStatus: 'sent' | 'failed' = 'sent';
@@ -292,6 +297,10 @@ export async function POST(
               to: recipient.email,
               subject,
               html,
+              headers: isParent && unsubscribeUrl ? {
+                'List-Unsubscribe': `<${unsubscribeUrl}>`,
+                'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+              } : undefined,
             });
 
             if (error) {

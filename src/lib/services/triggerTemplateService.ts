@@ -6,7 +6,7 @@
  */
 
 import { getAirtableService } from './airtableService';
-import { getCampaignEmailTemplate } from './emailTemplateWrapper';
+import { getCampaignEmailTemplate, EmailTemplateOptions } from './emailTemplateWrapper';
 import { TRIGGER_EMAIL_REGISTRY, getRegistryEntry } from '@/lib/config/trigger-email-registry';
 import { getTriggerEvent } from '@/lib/config/trigger-event-catalog';
 import { TriggerEmailTemplate } from '@/lib/types/email-automation';
@@ -173,10 +173,11 @@ export function renderTriggerTemplate(
  */
 export function renderFullTriggerEmail(
   bodyHtml: string,
-  variables: Record<string, string>
+  variables: Record<string, string>,
+  templateOptions?: EmailTemplateOptions
 ): string {
   const substituted = renderTriggerTemplate(bodyHtml, variables);
-  return getCampaignEmailTemplate(substituted);
+  return getCampaignEmailTemplate(substituted, templateOptions);
 }
 
 /**

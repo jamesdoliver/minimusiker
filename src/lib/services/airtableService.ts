@@ -1932,6 +1932,22 @@ class AirtableService {
     }
   }
 
+  /**
+   * Unsubscribe a parent by email: look up parent record and set email_campaigns to 'no'.
+   * Returns true if successful, false if parent not found.
+   */
+  async unsubscribeParentByEmail(email: string): Promise<boolean> {
+    try {
+      const parent = await this.queryParentByEmail(email);
+      if (!parent) return false;
+      await this.updateEmailCampaignPreferences([parent.id], 'no');
+      return true;
+    } catch (error) {
+      console.error('[AirtableService] Error unsubscribing parent:', error);
+      return false;
+    }
+  }
+
   // ==================== Event Management ====================
 
   // Get unique class sessions from parent journey records

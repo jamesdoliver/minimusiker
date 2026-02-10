@@ -6,11 +6,26 @@
  * resendService and triggerTemplateService.
  */
 
+export interface EmailTemplateOptions {
+  showUnsubscribe?: boolean;
+  unsubscribeUrl?: string;
+}
+
 /**
  * Generate the HTML email wrapper for campaign emails.
  * Provides consistent Minimusiker branding (header, footer, styling).
  */
-export function getCampaignEmailTemplate(bodyHtml: string): string {
+export function getCampaignEmailTemplate(
+  bodyHtml: string,
+  options?: EmailTemplateOptions
+): string {
+  const year = new Date().getFullYear();
+  const unsubscribeHtml = options?.showUnsubscribe && options?.unsubscribeUrl
+    ? `<p style="margin: 6px 0 0 0;">
+              <a href="${options.unsubscribeUrl}" style="color: #cbd5e0; font-size: 9px; text-decoration: none;">E-Mail-Einstellungen</a>
+            </p>`
+    : '';
+
   return `
 <!DOCTYPE html>
 <html lang="de">
@@ -50,8 +65,14 @@ export function getCampaignEmailTemplate(bodyHtml: string): string {
           <tr>
             <td style="padding: 24px 40px 32px 40px; text-align: center;">
               <p style="margin: 0; color: #cbd5e0; font-size: 12px;">
-                &copy; ${new Date().getFullYear()} Minimusiker
+                &copy; ${year} Minimusiker
               </p>
+              <p style="margin: 8px 0 0 0; color: #a0aec0; font-size: 10px; line-height: 1.5;">
+                Minimusiker &middot; powered by Guesstimate Nexus &middot; Polytope Management Group<br>
+                Guesstimate Loftyard Studios &middot; Willdenowstra&szlig;e 4, 13353 Berlin<br>
+                <a href="mailto:support@minimusiker.de" style="color: #a0aec0; text-decoration: none;">support@minimusiker.de</a>
+              </p>
+              ${unsubscribeHtml}
             </td>
           </tr>
 

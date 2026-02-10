@@ -14,12 +14,17 @@ import {
   renderTriggerTemplate,
   renderFullTriggerEmail,
 } from './triggerTemplateService';
-import { getCampaignEmailTemplate } from './emailTemplateWrapper';
+import { getCampaignEmailTemplate, EmailTemplateOptions } from './emailTemplateWrapper';
+import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
 
 interface SendEmailResult {
   success: boolean;
   messageId?: string;
   error?: string;
+}
+
+export interface CampaignEmailOptions extends EmailTemplateOptions {
+  headers?: Record<string, string>;
 }
 
 // Lazy-initialize Resend client to avoid build-time errors
@@ -41,10 +46,11 @@ const FROM_NAME = 'Minimusiker';
 export async function sendCampaignEmail(
   to: string,
   subject: string,
-  html: string
+  html: string,
+  options?: CampaignEmailOptions
 ): Promise<SendEmailResult> {
   // Wrap the HTML in the branded template
-  const wrappedHtml = getCampaignEmailTemplate(html);
+  const wrappedHtml = getCampaignEmailTemplate(html, options);
 
   // Development fallback - log instead of sending
   if (!process.env.RESEND_API_KEY) {
@@ -64,6 +70,7 @@ export async function sendCampaignEmail(
       to,
       subject,
       html: wrappedHtml,
+      headers: options?.headers,
     });
 
     if (error) {
@@ -110,12 +117,27 @@ async function sendTriggerEmail(
   slug: string,
   variables: Record<string, string>,
   logLabel: string,
+  options?: { parentEmail?: string },
 ): Promise<SendEmailResult> {
   const trigger = await getTriggerTemplate(slug);
   if (!trigger.active) return { success: true, messageId: 'disabled' };
 
+  // Build unsubscribe options for parent emails
+  const isParent = !!options?.parentEmail;
+  const unsubscribeUrl = isParent ? generateUnsubscribeUrl(options!.parentEmail!) : undefined;
+  const templateOptions = isParent && unsubscribeUrl
+    ? { showUnsubscribe: true, unsubscribeUrl }
+    : undefined;
+
   const subject = renderTriggerTemplate(trigger.subject, variables);
-  const html = renderFullTriggerEmail(trigger.bodyHtml, variables);
+  const html = renderFullTriggerEmail(trigger.bodyHtml, variables, templateOptions);
+
+  const headers = isParent && unsubscribeUrl
+    ? {
+        'List-Unsubscribe': `<${unsubscribeUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      }
+    : undefined;
 
   if (!process.env.RESEND_API_KEY) {
     console.log(`[${logLabel}] (dev) To: ${Array.isArray(to) ? to.join(', ') : to}, Subject: ${subject}`);
@@ -129,6 +151,7 @@ async function sendTriggerEmail(
       to,
       subject,
       html,
+      headers,
     });
 
     if (error) {
@@ -306,7 +329,7 @@ export async function sendParentWelcomeEmail(
     parentName: data.parentName,
     childName: data.childName,
     schoolName: data.schoolName,
-  }, 'Parent welcome');
+  }, 'Parent welcome', { parentEmail: email });
 }
 
 /**

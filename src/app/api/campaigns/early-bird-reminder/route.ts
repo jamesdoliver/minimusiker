@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEarlyBirdTargets, CampaignRecipient } from '@/lib/services/campaignService';
 import { sendCampaignEmail } from '@/lib/services/resendService';
+import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
 
 export const dynamic = 'force-dynamic';
 
@@ -192,8 +193,16 @@ export async function POST(request: NextRequest) {
     for (const recipient of recipients) {
       const subject = getEmailSubject(recipient.schoolName);
       const html = getEmailHtml(recipient);
+      const unsubscribeUrl = generateUnsubscribeUrl(recipient.email);
 
-      const result = await sendCampaignEmail(recipient.email, subject, html);
+      const result = await sendCampaignEmail(recipient.email, subject, html, {
+        showUnsubscribe: true,
+        unsubscribeUrl,
+        headers: {
+          'List-Unsubscribe': `<${unsubscribeUrl}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+      });
 
       if (result.success) {
         results.sent++;
