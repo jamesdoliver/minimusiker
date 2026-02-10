@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
+import { unzip } from 'fflate';
 
 interface SongInfo {
   id: string;
@@ -32,20 +33,35 @@ interface EngineerBatchUploadModalProps {
   onUploadComplete?: () => void;
 }
 
+type Step = 'upload' | 'extracting' | 'uploading-files' | 'review' | 'confirming';
+
+function unzipAsync(data: Uint8Array): Promise<Record<string, Uint8Array>> {
+  return new Promise((resolve, reject) => {
+    unzip(data, (err, result) => {
+      if (err) reject(err);
+      else resolve(result);
+    });
+  });
+}
+
 export default function EngineerBatchUploadModal({
   isOpen,
   onClose,
   eventId,
   onUploadComplete,
 }: EngineerBatchUploadModalProps) {
-  const [step, setStep] = useState<'upload' | 'review' | 'confirming'>('upload');
-  const [uploading, setUploading] = useState(false);
+  const [step, setStep] = useState<Step>('upload');
   const [uploadId, setUploadId] = useState<string | null>(null);
   const [matches, setMatches] = useState<EnrichedMatch[]>([]);
   const [editedMatches, setEditedMatches] = useState<Map<string, string>>(new Map());
   const [allSongs, setAllSongs] = useState<SongInfo[]>([]);
   const [allClasses, setAllClasses] = useState<ClassInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; filename: string }>({ current: 0, total: 0, filename: '' });
+
+  const extractedFilesRef = useRef<Map<string, Uint8Array>>(new Map());
+  const uploadUrlsRef = useRef<Record<string, string>>({});
+  const abortRef = useRef(false);
 
   // Build effective assignments: edited overrides or original match
   const effectiveAssignments = useMemo(() => {
@@ -112,28 +128,55 @@ export default function EngineerBatchUploadModal({
     return grouped;
   }, [allSongs, allClasses]);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      setUploading(true);
       setError(null);
+      abortRef.current = false;
 
-      const formData = new FormData();
-      formData.append('file', file);
+      // Phase 1: Extract ZIP client-side
+      setStep('extracting');
+      const arrayBuffer = await file.arrayBuffer();
+      const zipData = new Uint8Array(arrayBuffer);
+      const entries = await unzipAsync(zipData);
 
+      const extracted = new Map<string, Uint8Array>();
+      for (const [path, data] of Object.entries(entries)) {
+        // Skip directories (empty data), __MACOSX, dotfiles, non-WAV
+        if (data.length === 0) continue;
+        if (path.includes('__MACOSX')) continue;
+        if (path.startsWith('.')) continue;
+
+        const filename = path.split('/').pop() || path;
+        if (filename.startsWith('.')) continue;
+        if (!filename.toLowerCase().endsWith('.wav')) continue;
+
+        extracted.set(filename, data);
+      }
+
+      if (extracted.size === 0) {
+        throw new Error('No WAV files found in ZIP. This feature only supports .wav files.');
+      }
+
+      extractedFilesRef.current = extracted;
+      const filenames = Array.from(extracted.keys());
+
+      // Phase 2: Get matches + presigned URLs from server
       const response = await fetch(
         `/api/engineer/events/${encodeURIComponent(eventId)}/upload-batch`,
         {
           method: 'POST',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filenames }),
         }
       );
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Upload failed');
+        let message = `Upload failed (${response.status})`;
+        try { const d = await response.json(); message = d.error || message; } catch {}
+        throw new Error(message);
       }
 
       const result = await response.json();
@@ -141,16 +184,70 @@ export default function EngineerBatchUploadModal({
       setMatches(result.matches);
       setAllSongs(result.allSongs || []);
       setAllClasses(result.allClasses || []);
-      setStep('review');
+      uploadUrlsRef.current = result.uploadUrls || {};
 
-      toast.success(`Extracted ${result.matches.length} WAV file(s). Review matches below.`);
+      // Phase 3: Upload WAVs to R2 via presigned URLs
+      setStep('uploading-files');
+      const fileList = Array.from(extracted.entries());
+      setUploadProgress({ current: 0, total: fileList.length, filename: '' });
+
+      for (let i = 0; i < fileList.length; i++) {
+        if (abortRef.current) {
+          throw new Error('Upload cancelled');
+        }
+
+        const [filename, data] = fileList[i];
+        const url = uploadUrlsRef.current[filename];
+        if (!url) {
+          throw new Error(`No upload URL for ${filename}`);
+        }
+
+        setUploadProgress({ current: i + 1, total: fileList.length, filename });
+
+        let uploaded = false;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const res = await fetch(url, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'audio/wav' },
+              body: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
+            });
+            if (!res.ok) {
+              throw new Error(`R2 upload failed (${res.status})`);
+            }
+            uploaded = true;
+            break;
+          } catch (err) {
+            if (attempt === 0) {
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+              throw new Error(`Failed to upload ${filename}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            }
+          }
+        }
+
+        if (!uploaded) {
+          throw new Error(`Failed to upload ${filename} after retries`);
+        }
+
+        // Free memory for this file
+        extracted.delete(filename);
+      }
+
+      // Clear all extracted data
+      extractedFilesRef.current = new Map();
+
+      setStep('review');
+      toast.success(`Extracted and uploaded ${result.matches.length} WAV file(s). Review matches below.`);
     } catch (err) {
       console.error('Upload error:', err);
-      toast.error(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
-      setUploading(false);
+      const message = err instanceof Error ? err.message : 'Upload failed';
+      setError(message);
+      toast.error(message);
+      extractedFilesRef.current = new Map();
+      setStep('upload');
     }
-  };
+  }, [eventId]);
 
   const handleMatchChange = (filename: string, songId: string) => {
     const next = new Map(editedMatches);
@@ -182,8 +279,9 @@ export default function EngineerBatchUploadModal({
       );
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || 'Confirmation failed');
+        let message = `Confirmation failed (${response.status})`;
+        try { const d = await response.json(); message = d.error || message; } catch {}
+        throw new Error(message);
       }
 
       const result = await response.json();
@@ -199,13 +297,17 @@ export default function EngineerBatchUploadModal({
       handleClose();
     } catch (err) {
       console.error('Confirmation error:', err);
-      setError(err instanceof Error ? err.message : 'Confirmation failed');
-      toast.error(err instanceof Error ? err.message : 'Confirmation failed');
+      const message = err instanceof Error ? err.message : 'Confirmation failed';
+      setError(message);
+      toast.error(message);
       setStep('review');
     }
   };
 
   const handleClose = () => {
+    abortRef.current = true;
+    extractedFilesRef.current = new Map();
+    uploadUrlsRef.current = {};
     setStep('upload');
     setUploadId(null);
     setMatches([]);
@@ -213,6 +315,7 @@ export default function EngineerBatchUploadModal({
     setAllSongs([]);
     setAllClasses([]);
     setError(null);
+    setUploadProgress({ current: 0, total: 0, filename: '' });
     onClose();
   };
 
@@ -233,6 +336,14 @@ export default function EngineerBatchUploadModal({
     return '\u2717';
   };
 
+  const stepTitle = {
+    'upload': 'Upload ZIP',
+    'extracting': 'Extracting...',
+    'uploading-files': 'Uploading Files...',
+    'review': 'Review Matches',
+    'confirming': 'Confirming...',
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -241,8 +352,7 @@ export default function EngineerBatchUploadModal({
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">
-            Batch Upload Final WAVs —{' '}
-            {step === 'upload' ? 'Upload ZIP' : step === 'review' ? 'Review Matches' : 'Uploading...'}
+            Batch Upload Final WAVs — {stepTitle[step]}
           </h2>
           <button
             onClick={handleClose}
@@ -262,6 +372,12 @@ export default function EngineerBatchUploadModal({
               <p className="text-gray-600">
                 Upload a ZIP containing your final WAV mixes. Files will be automatically matched to songs based on filename similarity.
               </p>
+
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
 
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-500 transition-colors">
                 <label className="cursor-pointer">
@@ -294,17 +410,40 @@ export default function EngineerBatchUploadModal({
                     className="hidden"
                     accept=".zip,application/zip"
                     onChange={handleFileSelect}
-                    disabled={uploading}
                   />
                 </label>
               </div>
+            </div>
+          )}
 
-              {uploading && (
-                <div className="text-center">
-                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-purple-600 border-r-transparent"></div>
-                  <p className="mt-2 text-sm text-gray-600">Extracting and matching WAV files...</p>
-                </div>
+          {step === 'extracting' && (
+            <div className="text-center py-12">
+              <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-purple-600 border-r-transparent"></div>
+              <p className="mt-4 text-gray-600">Extracting WAV files from ZIP...</p>
+            </div>
+          )}
+
+          {step === 'uploading-files' && (
+            <div className="text-center py-12">
+              <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-purple-600 border-r-transparent"></div>
+              <p className="mt-4 text-gray-600">
+                Uploading file {uploadProgress.current} of {uploadProgress.total}...
+              </p>
+              {uploadProgress.filename && (
+                <p className="mt-1 text-xs text-gray-500 truncate max-w-md mx-auto">{uploadProgress.filename}</p>
               )}
+              <div className="mt-4 w-64 mx-auto bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+              <button
+                onClick={() => { abortRef.current = true; }}
+                className="mt-4 px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           )}
 
@@ -443,7 +582,7 @@ export default function EngineerBatchUploadModal({
           {step === 'confirming' && (
             <div className="text-center py-12">
               <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-purple-600 border-r-transparent"></div>
-              <p className="mt-4 text-gray-600">Uploading {summary.total} file(s)...</p>
+              <p className="mt-4 text-gray-600">Confirming {summary.total} file(s)...</p>
             </div>
           )}
         </div>

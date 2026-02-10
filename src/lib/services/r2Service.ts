@@ -973,6 +973,32 @@ class R2Service {
   }
 
   /**
+   * Generate a presigned URL for uploading to temporary location (batch uploads)
+   * This allows direct browser-to-R2 uploads for batch WAV files.
+   * Path: temp/{uploadId}/{filename}
+   */
+  async generateTempUploadUrl(
+    uploadId: string,
+    filename: string,
+    contentType: string = 'audio/wav'
+  ): Promise<{ uploadUrl: string; key: string }> {
+    const key = `temp/${uploadId}/${filename}`;
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: 3600 });
+
+    return {
+      uploadUrl,
+      key,
+    };
+  }
+
+  /**
    * Upload file to temporary location (for batch uploads before confirmation)
    * Path: temp/{uploadId}/{filename}
    */

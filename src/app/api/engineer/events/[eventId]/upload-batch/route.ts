@@ -5,14 +5,13 @@ import { getR2Service } from '@/lib/services/r2Service';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { ENGINEER_IDS } from '@/lib/config/engineers';
 import { autoMatchFiles, getMatchSummary } from '@/lib/utils/autoMatch';
-import AdmZip from 'adm-zip';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/engineer/events/[eventId]/upload-batch
- * Upload ZIP file containing final WAV mixes, extract, and run auto-matching against event songs.
- * Returns match results for engineer to review and correct before confirming.
+ * Accept filenames extracted client-side from a ZIP, run auto-matching against event songs,
+ * and return presigned upload URLs for direct browser-to-R2 uploads.
  */
 export async function POST(
   request: NextRequest,
@@ -26,57 +25,27 @@ export async function POST(
 
     const eventId = decodeURIComponent(params.eventId);
 
-    const formData = await request.formData();
-    const uploadedFile = formData.get('file') as File | null;
+    const body = await request.json();
+    const { filenames } = body as { filenames?: string[] };
 
-    if (!uploadedFile) {
+    if (!Array.isArray(filenames) || filenames.length === 0) {
       return NextResponse.json(
-        { error: 'No file uploaded' },
+        { error: 'filenames array is required and must not be empty' },
         { status: 400 }
       );
     }
 
-    if (!uploadedFile.name.endsWith('.zip') && uploadedFile.type !== 'application/zip') {
-      return NextResponse.json(
-        { error: 'Only ZIP files are accepted' },
-        { status: 400 }
-      );
-    }
-
-    // Extract WAV files from ZIP
-    const zipBuffer = Buffer.from(await uploadedFile.arrayBuffer());
-    const zip = new AdmZip(zipBuffer);
-    const zipEntries = zip.getEntries();
-
-    const filenames: string[] = [];
-    const fileBuffers = new Map<string, Buffer>();
-
-    for (const entry of zipEntries) {
-      if (entry.isDirectory || entry.entryName.startsWith('.') || entry.entryName.includes('__MACOSX')) {
-        continue;
+    // Sanitize filenames: strip path components, reject path traversal
+    const sanitized: string[] = [];
+    for (const raw of filenames) {
+      const name = raw.split('/').pop()?.split('\\').pop() || '';
+      if (!name || name.includes('..') || !name.toLowerCase().endsWith('.wav')) {
+        return NextResponse.json(
+          { error: `Invalid filename: ${raw}` },
+          { status: 400 }
+        );
       }
-
-      const filename = entry.entryName.split('/').pop() || entry.entryName;
-
-      // Skip hidden files (dot-files extracted from base name)
-      if (filename.startsWith('.')) {
-        continue;
-      }
-
-      const ext = filename.toLowerCase().split('.').pop();
-      if (ext !== 'wav') {
-        continue;
-      }
-
-      filenames.push(filename);
-      fileBuffers.set(filename, entry.getData());
-    }
-
-    if (filenames.length === 0) {
-      return NextResponse.json(
-        { error: 'No WAV files found. This feature only supports .wav files.' },
-        { status: 400 }
-      );
+      sanitized.push(name);
     }
 
     // Get all songs for the event
@@ -91,7 +60,7 @@ export async function POST(
     }
 
     // Run auto-matching against all event songs
-    const matchResults = autoMatchFiles(filenames, allSongs);
+    const matchResults = autoMatchFiles(sanitized, allSongs);
     const matchSummary = getMatchSummary(matchResults);
 
     // Get class names from event detail
@@ -126,22 +95,13 @@ export async function POST(
     }
     const allClasses = Array.from(classMap.values());
 
-    // Upload WAVs to temp R2 location
+    // Generate presigned upload URLs for each filename
     const uploadId = `${session.engineerId}_${Date.now()}`;
     const r2 = getR2Service();
-    const uploadPromises = Array.from(fileBuffers.entries()).map(async ([filename, buffer]) => {
-      return r2.uploadToTemp(uploadId, filename, buffer, 'audio/wav');
-    });
-
-    const uploadResults = await Promise.all(uploadPromises);
-    const failedUploads = uploadResults.filter((r) => !r.success);
-
-    if (failedUploads.length > 0) {
-      console.error('Some temp uploads failed:', failedUploads);
-      return NextResponse.json(
-        { error: `Failed to upload ${failedUploads.length} file(s) to temporary storage` },
-        { status: 500 }
-      );
+    const uploadUrls: Record<string, string> = {};
+    for (const filename of sanitized) {
+      const { uploadUrl } = await r2.generateTempUploadUrl(uploadId, filename);
+      uploadUrls[filename] = uploadUrl;
     }
 
     return NextResponse.json({
@@ -156,7 +116,8 @@ export async function POST(
         classId: s.classId,
       })),
       allClasses,
-      message: 'Files uploaded to temporary storage. Review matches and confirm.',
+      uploadUrls,
+      message: 'Review matches and upload files directly.',
     });
   } catch (error) {
     console.error('Error processing engineer batch upload:', error);
