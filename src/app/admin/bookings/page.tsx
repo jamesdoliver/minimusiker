@@ -3,10 +3,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import BookingsTable from '@/components/admin/bookings/BookingsTable';
+import CreateBookingModal from '@/components/admin/bookings/CreateBookingModal';
 import { BookingWithDetails, StaffOption, RegionOption } from '@/app/api/admin/bookings/route';
 
 // Tier 1: Computed status (mutually exclusive)
-type ComputedStatus = 'confirmed' | 'completed' | 'onHold';
+type ComputedStatus = 'confirmed' | 'completed' | 'onHold' | 'pending';
 
 // Tier 2: Event types for toggle buttons
 type EventType = 'minimusikertag' | 'plus' | 'schulsong' | 'kita';
@@ -16,6 +17,7 @@ interface BookingsStats {
   confirmed: number;
   completed: number;
   onHold: number;
+  pending: number;
 }
 
 /**
@@ -25,6 +27,11 @@ interface BookingsStats {
  * - Completed: event_date is >15 days past
  */
 function getComputedStatus(booking: BookingWithDetails): ComputedStatus {
+  // Pending status overrides all other logic
+  if (booking.eventStatus === 'Pending') {
+    return 'pending';
+  }
+
   // On Hold status overrides date-based logic
   if (booking.eventStatus === 'On Hold') {
     return 'onHold';
@@ -59,6 +66,9 @@ export default function AdminBookings() {
 
   // Text search (existing functionality)
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Create booking modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     fetchBookings();
@@ -144,6 +154,7 @@ export default function AdminBookings() {
       confirmed: bookings.filter(b => getComputedStatus(b) === 'confirmed').length,
       completed: bookings.filter(b => getComputedStatus(b) === 'completed').length,
       onHold: bookings.filter(b => getComputedStatus(b) === 'onHold').length,
+      pending: bookings.filter(b => getComputedStatus(b) === 'pending').length,
     };
   }, [bookings]);
 
@@ -246,25 +257,36 @@ export default function AdminBookings() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Bookings Overview</h1>
-        <button
-          onClick={fetchBookings}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <svg
-            className="w-4 h-4 mr-2"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-          Refresh
-        </button>
+            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create Booking
+          </button>
+          <button
+            onClick={fetchBookings}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <svg
+              className="w-4 h-4 mr-2"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Filter Panel */}
@@ -272,16 +294,18 @@ export default function AdminBookings() {
 
         {/* TIER 1: Status Toggles (multi-select) */}
         <div className="flex flex-wrap gap-2">
-          {(['confirmed', 'completed', 'onHold'] as ComputedStatus[]).map((status) => {
+          {(['confirmed', 'completed', 'onHold', 'pending'] as ComputedStatus[]).map((status) => {
             const labels: Record<ComputedStatus, string> = {
               confirmed: 'Confirmed',
               completed: 'Completed',
               onHold: 'On Hold',
+              pending: 'Pending',
             };
             const counts: Record<ComputedStatus, number> = {
               confirmed: stats.confirmed,
               completed: stats.completed,
               onHold: stats.onHold,
+              pending: stats.pending,
             };
             const isActive = activeStatuses.has(status);
 
@@ -446,6 +470,14 @@ export default function AdminBookings() {
         bookings={filteredBookings}
         onEventDeleted={handleEventDeleted}
         getComputedStatus={getComputedStatus}
+      />
+
+      {/* Create Booking Modal */}
+      <CreateBookingModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => { setShowCreateModal(false); fetchBookings(); }}
+        regions={regionList}
       />
     </div>
   );

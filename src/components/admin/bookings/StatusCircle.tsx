@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted';
+type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted' | 'Pending';
 
 interface StatusCircleProps {
   status?: EventStatus;
@@ -29,6 +29,11 @@ const statusConfig: Record<EventStatus, { color: string; bgColor: string; label:
     color: '#6b7280', // gray-500
     bgColor: '#e5e7eb', // gray-200
     label: 'Deleted',
+  },
+  Pending: {
+    color: '#eab308', // yellow-500
+    bgColor: '#fef9c3', // yellow-100
+    label: 'Pending',
   },
 };
 

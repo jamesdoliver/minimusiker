@@ -4738,7 +4738,8 @@ class AirtableService {
     staffId?: string,
     eventType?: string,
     schoolAddress?: string,
-    schoolPhone?: string
+    schoolPhone?: string,
+    eventStatus?: string
   ): Promise<Event> {
     this.ensureNormalizedTablesInitialized();
 
@@ -4770,6 +4771,11 @@ class AirtableService {
       // Add staff assignment if provided
       if (staffId) {
         eventFields[EVENTS_FIELD_IDS.assigned_staff] = [staffId];
+      }
+
+      // Add event status if provided (e.g., 'Pending' for manual bookings)
+      if (eventStatus) {
+        eventFields[EVENTS_FIELD_IDS.status] = eventStatus;
       }
 
       // Add school contact info if provided

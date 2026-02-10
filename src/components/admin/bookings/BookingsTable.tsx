@@ -8,7 +8,7 @@ import EventTypeCircles from './EventTypeCircles';
 import { RegistrationProgress } from './RegistrationProgress';
 
 // Computed status type for styling
-type ComputedStatus = 'confirmed' | 'completed' | 'onHold';
+type ComputedStatus = 'confirmed' | 'completed' | 'onHold' | 'pending';
 
 function AudioPipelineIndicator({ stage, eventDate }: { stage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved'; eventDate?: string }) {
   let isFuture = false;
@@ -134,7 +134,7 @@ export default function BookingsTable({ bookings, onEventDeleted, getComputedSta
                   <tr
                     className={`cursor-pointer hover:bg-gray-100 transition-colors ${
                       isEven ? 'bg-white' : 'bg-gray-50'
-                    } ${isExpanded ? 'bg-blue-50 hover:bg-blue-50' : ''} ${isCompleted ? 'opacity-60' : ''}`}
+                    } ${isExpanded ? 'bg-blue-50 hover:bg-blue-50' : ''} ${isCompleted ? 'opacity-60' : ''} ${booking.eventStatus === 'Pending' ? 'bg-yellow-50 border-l-4 border-l-yellow-400' : ''}`}
                     onClick={() => toggleRow(booking.id)}
                   >
                     <td className="px-4 py-4">
