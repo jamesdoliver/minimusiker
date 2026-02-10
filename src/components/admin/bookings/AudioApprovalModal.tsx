@@ -48,6 +48,14 @@ export default function AudioApprovalModal({
   const [schulsongRejectComment, setSchulsongRejectComment] = useState('');
   const [showSchulsongRejectInput, setShowSchulsongRejectInput] = useState(false);
 
+  // Release confirmation state
+  const [confirmRelease, setConfirmRelease] = useState<{
+    mode: 'scheduled' | 'instant';
+    teacherCount: number;
+    parentCount: number;
+  } | null>(null);
+  const [fetchingCounts, setFetchingCounts] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       fetchAudioStatus();
@@ -152,6 +160,37 @@ export default function AudioApprovalModal({
     } finally {
       setSchulsongSaving(false);
     }
+  };
+
+  const handleReleaseClick = async (mode: 'scheduled' | 'instant') => {
+    try {
+      setFetchingCounts(true);
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/schulsong-recipients`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch recipient counts');
+      }
+      const result = await response.json();
+      setConfirmRelease({
+        mode,
+        teacherCount: result.data.teacherCount,
+        parentCount: result.data.parentCount,
+      });
+    } catch (error) {
+      console.error('Error fetching recipient counts:', error);
+      toast.error('Empfänger konnten nicht geladen werden');
+    } finally {
+      setFetchingCounts(false);
+    }
+  };
+
+  const handleConfirmRelease = () => {
+    if (!confirmRelease) return;
+    handleSchulsongApprove(confirmRelease.mode);
+    setConfirmRelease(null);
+  };
+
+  const handleCancelRelease = () => {
+    setConfirmRelease(null);
   };
 
   const handleApprovalChange = (audioFileId: string, status: ApprovalStatus) => {
@@ -361,15 +400,62 @@ export default function AudioApprovalModal({
                 </div>
               )}
 
+              {/* Release confirmation panel */}
+              {confirmRelease && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-blue-800">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    E-Mail-Empfänger
+                  </div>
+                  <p className="text-sm text-blue-900">
+                    <span className="font-bold">{confirmRelease.teacherCount} Lehrer</span>
+                    {' + '}
+                    <span className="font-bold">{confirmRelease.parentCount} Eltern</span>
+                    {' werden benachrichtigt'}
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    {confirmRelease.mode === 'instant'
+                      ? 'Modus: Sofort freigeben'
+                      : `Modus: Geplant um 07:00`}
+                  </p>
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      onClick={handleConfirmRelease}
+                      disabled={schulsongSaving}
+                      className="px-4 py-1.5 rounded text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
+                    >
+                      {schulsongSaving ? 'Saving...' : 'Bestätigen'}
+                    </button>
+                    <button
+                      onClick={handleCancelRelease}
+                      disabled={schulsongSaving}
+                      className="px-3 py-1.5 rounded text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading spinner while fetching recipient counts */}
+              {fetchingCounts && !confirmRelease && (
+                <div className="flex items-center gap-2 p-3 text-sm text-gray-600">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-solid border-blue-600 border-r-transparent" />
+                  Empfänger werden geladen...
+                </div>
+              )}
+
               {/* Teacher approved, release already scheduled — show info + override options */}
-              {schulsongFile.teacherApprovedAt && schulsongFile.approvalStatus !== 'approved' && (
+              {schulsongFile.teacherApprovedAt && schulsongFile.approvalStatus !== 'approved' && !confirmRelease && !fetchingCounts && (
                 <div className="space-y-3">
                   <div className="p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
                     Lehrer hat freigegeben — Release bereits geplant
                   </div>
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => handleSchulsongApprove('instant')}
+                      onClick={() => handleReleaseClick('instant')}
                       disabled={schulsongSaving}
                       className="px-3 py-1.5 rounded text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
                     >
@@ -406,21 +492,21 @@ export default function AudioApprovalModal({
               )}
 
               {/* Teacher hasn't approved — admin override possible */}
-              {!schulsongFile.teacherApprovedAt && schulsongFile.approvalStatus !== 'approved' && (
+              {!schulsongFile.teacherApprovedAt && schulsongFile.approvalStatus !== 'approved' && !confirmRelease && !fetchingCounts && (
                 <div className="space-y-3">
                   <div className="p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-700">
                     Lehrer hat noch nicht freigegeben — Admin-Override möglich
                   </div>
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => handleSchulsongApprove('scheduled')}
+                      onClick={() => handleReleaseClick('scheduled')}
                       disabled={schulsongSaving}
                       className="px-3 py-1.5 rounded text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
                     >
                       {schulsongSaving ? 'Saving...' : 'Override: Freigeben (7 Uhr)'}
                     </button>
                     <button
-                      onClick={() => handleSchulsongApprove('instant')}
+                      onClick={() => handleReleaseClick('instant')}
                       disabled={schulsongSaving}
                       className="px-3 py-1.5 rounded text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors disabled:opacity-50"
                     >
