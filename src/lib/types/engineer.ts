@@ -51,13 +51,28 @@ export interface AudioFileWithUrl extends AudioFile {
 }
 
 /**
+ * Per-song audio files for engineer view
+ */
+export interface EngineerSongView {
+  songId: string;
+  songTitle: string;
+  artist?: string;
+  order: number;
+  previewFile?: AudioFileWithUrl;
+  finalMp3File?: AudioFileWithUrl;
+  finalWavFile?: AudioFileWithUrl;
+}
+
+/**
  * Class view for engineer event detail page
- * Includes all audio files (raw, preview, final) with URLs
+ * Songs nested under each class, each with its own upload slots
  */
 export interface EngineerClassView {
   classId: string;
   className: string;
-  rawFiles: AudioFileWithUrl[];
+  songs: EngineerSongView[];
+  rawFiles: AudioFileWithUrl[];  // Legacy files without songId
+  // Class-level fields used only by schulsong dedicated section
   previewFile?: AudioFileWithUrl;
   finalMp3File?: AudioFileWithUrl;
   finalWavFile?: AudioFileWithUrl;
@@ -103,6 +118,7 @@ export interface EngineerLoginRequest {
  */
 export interface UploadMixedRequest {
   classId: string;
+  songId?: string;
   filename: string;
   type: 'preview' | 'final';
   contentType?: string;
@@ -122,6 +138,7 @@ export interface UploadMixedUrlResponse {
  */
 export interface ConfirmMixedUploadRequest {
   classId: string;
+  songId?: string;
   r2Key: string;
   filename: string;
   type: 'preview' | 'final';

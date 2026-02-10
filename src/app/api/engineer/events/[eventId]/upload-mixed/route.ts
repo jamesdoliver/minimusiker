@@ -24,7 +24,7 @@ export async function POST(
     }
 
     const eventId = decodeURIComponent(params.eventId);
-    const { classId, filename, type, contentType, format } = await request.json();
+    const { classId, songId, filename, type, contentType, format } = await request.json();
 
     // Validate required fields
     if (!classId || typeof classId !== 'string') {
@@ -79,7 +79,8 @@ export async function POST(
       classId,
       type,
       resolvedContentType,
-      resolvedFormat
+      resolvedFormat,
+      songId
     );
 
     return NextResponse.json({
@@ -118,7 +119,7 @@ export async function PUT(
     }
 
     const eventId = decodeURIComponent(params.eventId);
-    const { classId, r2Key, filename, type, fileSizeBytes, durationSeconds, isSchulsong } =
+    const { classId, songId, r2Key, filename, type, fileSizeBytes, durationSeconds, isSchulsong } =
       await request.json();
 
     // Validate required fields
@@ -182,6 +183,7 @@ export async function PUT(
       audioFile = await teacherService.createAudioFile({
         classId,
         eventId,
+        songId: songId || undefined,
         type,
         r2Key,
         filename,

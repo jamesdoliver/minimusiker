@@ -822,11 +822,13 @@ class R2Service {
     classId: string,
     type: 'preview' | 'final',
     contentType: string = 'audio/mpeg',
-    format: 'mp3' | 'wav' = 'mp3'
+    format: 'mp3' | 'wav' = 'mp3',
+    songId?: string
   ): Promise<{ uploadUrl: string; key: string }> {
-    // Mixed audio goes to recordings/{eventId}/{classId}/{type}.{ext}
     const extension = type === 'preview' ? 'mp3' : format;
-    const key = `recordings/${eventId}/${classId}/${type}.${extension}`;
+    const key = songId
+      ? `recordings/${eventId}/${classId}/${songId}/${type}.${extension}`
+      : `recordings/${eventId}/${classId}/${type}.${extension}`;
 
     const command = new PutObjectCommand({
       Bucket: this.bucketName,

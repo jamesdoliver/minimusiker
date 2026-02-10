@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { EngineerEventDetail, EngineerClassView, AudioFileWithUrl } from '@/lib/types/engineer';
+import { EngineerEventDetail, EngineerClassView, EngineerSongView, AudioFileWithUrl } from '@/lib/types/engineer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EngineerBatchUploadModal from '@/components/engineer/EngineerBatchUploadModal';
 import { useClientZipDownload, ZipDownloadFile } from '@/lib/hooks/useClientZipDownload';
@@ -28,7 +28,7 @@ function formatFileSize(bytes: number | undefined): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-interface ClassUploadState {
+interface SongUploadState {
   isUploading: boolean;
   uploadType: 'preview' | 'final-mp3' | 'final-wav' | null;
   progress: number;
@@ -43,7 +43,7 @@ export default function EngineerEventDetailPage() {
   const [event, setEvent] = useState<EngineerEventDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [uploadStates, setUploadStates] = useState<Record<string, ClassUploadState>>({});
+  const [uploadStates, setUploadStates] = useState<Record<string, SongUploadState>>({});
   const zipDownload = useClientZipDownload();
   const isDownloadingZip = zipDownload.state.status === 'downloading';
   const [downloadingProject, setDownloadingProject] = useState<string | null>(null);
@@ -181,12 +181,15 @@ export default function EngineerEventDetailPage() {
     type: 'preview' | 'final',
     file: File,
     format: 'mp3' | 'wav' = 'mp3',
-    isSchulsong?: boolean
+    isSchulsong?: boolean,
+    songId?: string
   ) => {
+    // Key by songId when available, fall back to classId (schulsong)
+    const stateKey = songId || classId;
     const uploadType = type === 'preview' ? 'preview' : (`final-${format}` as 'final-mp3' | 'final-wav');
     setUploadStates((prev) => ({
       ...prev,
-      [classId]: { isUploading: true, uploadType, progress: 0, error: null },
+      [stateKey]: { isUploading: true, uploadType, progress: 0, error: null },
     }));
 
     const contentType = format === 'wav' ? 'audio/wav' : 'audio/mpeg';
@@ -200,6 +203,7 @@ export default function EngineerEventDetailPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             classId,
+            songId: songId || undefined,
             filename: file.name,
             type,
             contentType: type === 'preview' ? (file.type || 'audio/mpeg') : contentType,
@@ -217,7 +221,7 @@ export default function EngineerEventDetailPage() {
       // Step 2: Upload to R2
       setUploadStates((prev) => ({
         ...prev,
-        [classId]: { ...prev[classId], progress: 30 },
+        [stateKey]: { ...prev[stateKey], progress: 30 },
       }));
 
       const uploadResponse = await fetch(uploadUrl, {
@@ -234,7 +238,7 @@ export default function EngineerEventDetailPage() {
 
       setUploadStates((prev) => ({
         ...prev,
-        [classId]: { ...prev[classId], progress: 70 },
+        [stateKey]: { ...prev[stateKey], progress: 70 },
       }));
 
       // Step 3: Confirm upload
@@ -245,6 +249,7 @@ export default function EngineerEventDetailPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             classId,
+            songId: songId || undefined,
             r2Key,
             filename: file.name,
             type,
@@ -260,7 +265,7 @@ export default function EngineerEventDetailPage() {
 
       setUploadStates((prev) => ({
         ...prev,
-        [classId]: { isUploading: false, uploadType: null, progress: 100, error: null },
+        [stateKey]: { isUploading: false, uploadType: null, progress: 100, error: null },
       }));
 
       // Refresh event data
@@ -269,7 +274,7 @@ export default function EngineerEventDetailPage() {
       console.error('Upload error:', err);
       setUploadStates((prev) => ({
         ...prev,
-        [classId]: {
+        [stateKey]: {
           isUploading: false,
           uploadType: null,
           progress: 0,
@@ -284,11 +289,12 @@ export default function EngineerEventDetailPage() {
     type: 'preview' | 'final',
     format: 'mp3' | 'wav',
     e: React.ChangeEvent<HTMLInputElement>,
-    isSchulsong?: boolean
+    isSchulsong?: boolean,
+    songId?: string
   ) => {
     const file = e.target.files?.[0];
     if (file) {
-      handleUploadMixed(classId, type, file, format, isSchulsong);
+      handleUploadMixed(classId, type, file, format, isSchulsong, songId);
     }
     // Reset input so same file can be selected again
     e.target.value = '';
@@ -338,14 +344,15 @@ export default function EngineerEventDetailPage() {
     }
   };
 
-  // Compute progress for sticky footer
-  const totalClasses = event ? event.classes.length + (event.schulsongClass ? 1 : 0) : 0;
-  const classesWithFinals = event
-    ? event.classes.filter(c => c.finalMp3File || c.finalWavFile).length +
+  // Compute progress for sticky footer (song-based)
+  const allEventSongs = event ? event.classes.flatMap(c => c.songs) : [];
+  const totalSongs = allEventSongs.length + (event?.schulsongClass ? 1 : 0);
+  const songsWithFinals = event
+    ? allEventSongs.filter(s => s.finalMp3File || s.finalWavFile).length +
       (event.schulsongClass && (event.schulsongClass.finalMp3File || event.schulsongClass.finalWavFile) ? 1 : 0)
     : 0;
   const showFooter = event && event.audioPipelineStage !== 'approved' && event.audioPipelineStage !== 'ready_for_review';
-  const canSubmit = classesWithFinals > 0;
+  const canSubmit = songsWithFinals > 0;
 
   if (isLoading) {
     return (
@@ -703,14 +710,8 @@ export default function EngineerEventDetailPage() {
                 <ClassCard
                   key={classView.classId}
                   classView={classView}
-                  uploadState={uploadStates[classView.classId]}
-                  onDownloadFile={handleDownloadFile}
-                  onDownloadZip={() => handleDownloadAllZip(classView.classId)}
-                  onFileSelect={(type, format, e) => handleFileSelect(classView.classId, type, format, e)}
-                  isDownloadingZip={isDownloadingZip}
-                  eventIsSchulsong={event.isSchulsong}
-                  onToggleSchulsong={handleToggleSchulsong}
-                  togglingSchulsongId={togglingSchulsong}
+                  uploadStates={uploadStates}
+                  onFileSelect={(songId, type, format, e) => handleFileSelect(classView.classId, type, format, e, undefined, songId)}
                   onDeleteFile={setDeletingFile}
                   audioPipelineStage={event.audioPipelineStage}
                 />
@@ -788,12 +789,12 @@ export default function EngineerEventDetailPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-700">
-                {classesWithFinals} of {totalClasses} {totalClasses === 1 ? 'class has' : 'classes have'} final files
+                {songsWithFinals} of {totalSongs} {totalSongs === 1 ? 'song has' : 'songs have'} final files
               </p>
               <div className="mt-2 w-full bg-gray-200 rounded-full h-2 max-w-xs">
                 <div
                   className="bg-purple-600 h-2 rounded-full transition-all"
-                  style={{ width: totalClasses > 0 ? `${(classesWithFinals / totalClasses) * 100}%` : '0%' }}
+                  style={{ width: totalSongs > 0 ? `${(songsWithFinals / totalSongs) * 100}%` : '0%' }}
                 />
               </div>
             </div>
@@ -823,348 +824,255 @@ export default function EngineerEventDetailPage() {
 
 interface ClassCardProps {
   classView: EngineerClassView;
-  uploadState?: ClassUploadState;
-  onDownloadFile: (file: AudioFileWithUrl) => void;
-  onDownloadZip: () => void;
-  onFileSelect: (type: 'preview' | 'final', format: 'mp3' | 'wav', e: React.ChangeEvent<HTMLInputElement>) => void;
-  isDownloadingZip: boolean;
-  eventIsSchulsong?: boolean;
-  onToggleSchulsong: (audioFileId: string, currentValue: boolean) => void;
-  togglingSchulsongId: string | null;
+  uploadStates: Record<string, SongUploadState>;
+  onFileSelect: (songId: string, type: 'preview' | 'final', format: 'mp3' | 'wav', e: React.ChangeEvent<HTMLInputElement>) => void;
   onDeleteFile: (file: AudioFileWithUrl) => void;
   audioPipelineStage?: string;
 }
 
 function ClassCard({
   classView,
-  uploadState,
-  onDownloadFile,
-  onDownloadZip,
+  uploadStates,
   onFileSelect,
-  isDownloadingZip,
-  eventIsSchulsong,
-  onToggleSchulsong,
-  togglingSchulsongId,
   onDeleteFile,
   audioPipelineStage,
 }: ClassCardProps) {
-  const anyFinalFile = classView.finalMp3File || classView.finalWavFile;
-
-  const uploadTypeLabel =
-    uploadState?.uploadType === 'final-mp3' ? 'Final MP3' :
-    uploadState?.uploadType === 'final-wav' ? 'Final WAV' :
-    uploadState?.uploadType === 'preview' ? 'Preview' : '';
+  const songsWithFinal = classView.songs.filter(s => s.finalMp3File || s.finalWavFile).length;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Class header */}
       <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
         <h3 className="font-semibold text-gray-900">{classView.className}</h3>
-        <div className="flex gap-2">
-          <span
-            className={`px-2 py-1 text-xs rounded-full ${
-              classView.previewFile
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-500'
-            }`}
-          >
-            Preview {classView.previewFile ? '✓' : ''}
-          </span>
-          <span
-            className={`px-2 py-1 text-xs rounded-full ${
-              classView.finalMp3File
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-500'
-            }`}
-          >
-            MP3 {classView.finalMp3File ? '✓' : ''}
-          </span>
-          <span
-            className={`px-2 py-1 text-xs rounded-full ${
-              classView.finalWavFile
-                ? 'bg-green-100 text-green-700'
-                : 'bg-gray-100 text-gray-500'
-            }`}
-          >
-            WAV {classView.finalWavFile ? '✓' : ''}
-          </span>
-          {(classView.finalMp3File?.isSchulsong || classView.finalWavFile?.isSchulsong) && (
-            <span className="px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-700 font-bold">
-              S
-            </span>
-          )}
-        </div>
+        <span className="text-xs text-gray-500">
+          {songsWithFinal} / {classView.songs.length} songs with finals
+        </span>
       </div>
 
-      {/* Raw files section */}
-      <div className="px-6 py-4 border-b border-gray-100">
-        <div className="flex justify-between items-center mb-3">
-          <h4 className="text-sm font-medium text-gray-700">
-            Raw Files ({classView.rawFiles.length})
-          </h4>
-          {classView.rawFiles.length > 0 && (
-            <button
-              onClick={onDownloadZip}
-              disabled={isDownloadingZip}
-              className="text-sm text-purple-600 hover:text-purple-700 disabled:opacity-50"
-            >
-              Download All (ZIP)
-            </button>
-          )}
+      {/* Songs */}
+      {classView.songs.length === 0 ? (
+        <div className="px-6 py-8 text-center">
+          <p className="text-sm text-gray-500">No songs added yet. Teachers must add songs first.</p>
         </div>
-
-        {classView.rawFiles.length === 0 ? (
-          <p className="text-sm text-gray-500">No raw files uploaded yet</p>
-        ) : (
-          <div className="space-y-2">
-            {classView.rawFiles.map((file) => (
-              <div
-                key={file.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <svg
-                    className="w-5 h-5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
-                    />
-                  </svg>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{file.filename}</p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(file.fileSizeBytes)}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => onDownloadFile(file)}
-                  disabled={!file.signedUrl}
-                  className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
-                  </svg>
-                </button>
-              </div>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {classView.songs
+            .sort((a, b) => a.order - b.order)
+            .map((song) => (
+              <SongRow
+                key={song.songId}
+                song={song}
+                uploadState={uploadStates[song.songId]}
+                onFileSelect={(type, format, e) => onFileSelect(song.songId, type, format, e)}
+                onDeleteFile={onDeleteFile}
+                audioPipelineStage={audioPipelineStage}
+              />
             ))}
-          </div>
-        )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface SongRowProps {
+  song: EngineerSongView;
+  uploadState?: SongUploadState;
+  onFileSelect: (type: 'preview' | 'final', format: 'mp3' | 'wav', e: React.ChangeEvent<HTMLInputElement>) => void;
+  onDeleteFile: (file: AudioFileWithUrl) => void;
+  audioPipelineStage?: string;
+}
+
+function SongRow({
+  song,
+  uploadState,
+  onFileSelect,
+  onDeleteFile,
+  audioPipelineStage,
+}: SongRowProps) {
+  const uploadTypeLabel =
+    uploadState?.uploadType === 'final-mp3' ? 'Final MP3' :
+    uploadState?.uploadType === 'final-wav' ? 'Final WAV' :
+    uploadState?.uploadType === 'preview' ? 'Preview' : '';
+
+  return (
+    <div className="px-6 py-4">
+      {/* Song title */}
+      <div className="flex items-center gap-2 mb-3">
+        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+        </svg>
+        <div>
+          <p className="text-sm font-medium text-gray-900">{song.songTitle}</p>
+          {song.artist && <p className="text-xs text-gray-500">{song.artist}</p>}
+        </div>
+        <div className="ml-auto flex gap-1.5">
+          <span className={`px-1.5 py-0.5 text-xs rounded ${song.previewFile ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+            Preview{song.previewFile ? ' ✓' : ''}
+          </span>
+          <span className={`px-1.5 py-0.5 text-xs rounded ${song.finalMp3File ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+            MP3{song.finalMp3File ? ' ✓' : ''}
+          </span>
+          <span className={`px-1.5 py-0.5 text-xs rounded ${song.finalWavFile ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+            WAV{song.finalWavFile ? ' ✓' : ''}
+          </span>
+        </div>
       </div>
 
-      {/* Upload section */}
-      <div className="px-6 py-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Upload Mixed Audio</h4>
+      {/* Upload state indicators */}
+      {uploadState?.error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-600">{uploadState.error}</p>
+        </div>
+      )}
 
-        {uploadState?.error && (
-          <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">{uploadState.error}</p>
+      {uploadState?.isUploading && (
+        <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="animate-spin h-4 w-4 text-purple-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <p className="text-sm text-purple-700">
+              Uploading {uploadTypeLabel}...
+            </p>
           </div>
-        )}
-
-        {uploadState?.isUploading && (
-          <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <svg className="animate-spin h-4 w-4 text-purple-600" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <p className="text-sm text-purple-700">
-                Uploading {uploadTypeLabel}...
-              </p>
-            </div>
-            <div className="w-full bg-purple-200 rounded-full h-2">
-              <div
-                className="bg-purple-600 h-2 rounded-full transition-all"
-                style={{ width: `${uploadState.progress}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-3 gap-4">
-          {/* Preview upload */}
-          <div>
-            <label
-              className={`block p-4 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
-                classView.previewFile
-                  ? 'border-green-300 bg-green-50'
-                  : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-              }`}
-            >
-              <input
-                type="file"
-                accept="audio/*"
-                className="hidden"
-                onChange={(e) => onFileSelect('preview', 'mp3', e)}
-                disabled={uploadState?.isUploading}
-              />
-              <svg
-                className={`w-6 h-6 mx-auto mb-2 ${
-                  classView.previewFile ? 'text-green-500' : 'text-gray-400'
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                {classView.previewFile ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                )}
-              </svg>
-              <p className="text-sm font-medium text-gray-900">Preview</p>
-              {classView.previewFile ? (
-                <p className="text-xs text-green-600 mt-1">Uploaded - Click to replace</p>
-              ) : (
-                <p className="text-xs text-gray-500 mt-1">Click to upload</p>
-              )}
-            </label>
-          </div>
-
-          {/* Final MP3 upload */}
-          <div>
-            <label
-              className={`block p-4 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
-                classView.finalMp3File
-                  ? 'border-green-300 bg-green-50'
-                  : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-              }`}
-            >
-              <input
-                type="file"
-                accept="audio/mpeg,.mp3"
-                className="hidden"
-                onChange={(e) => onFileSelect('final', 'mp3', e)}
-                disabled={uploadState?.isUploading}
-              />
-              <svg
-                className={`w-6 h-6 mx-auto mb-2 ${
-                  classView.finalMp3File ? 'text-green-500' : 'text-gray-400'
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                {classView.finalMp3File ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                )}
-              </svg>
-              <p className="text-sm font-medium text-gray-900">Final MP3</p>
-              {classView.finalMp3File ? (
-                <p className="text-xs text-green-600 mt-1">Uploaded - Click to replace</p>
-              ) : (
-                <p className="text-xs text-gray-500 mt-1">Click to upload</p>
-              )}
-            </label>
-            {classView.finalMp3File && audioPipelineStage !== 'approved' && (
-              <button
-                onClick={() => onDeleteFile(classView.finalMp3File!)}
-                className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete
-              </button>
-            )}
-          </div>
-
-          {/* Final WAV upload */}
-          <div>
-            <label
-              className={`block p-4 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
-                classView.finalWavFile
-                  ? 'border-green-300 bg-green-50'
-                  : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-              }`}
-            >
-              <input
-                type="file"
-                accept="audio/wav,.wav"
-                className="hidden"
-                onChange={(e) => onFileSelect('final', 'wav', e)}
-                disabled={uploadState?.isUploading}
-              />
-              <svg
-                className={`w-6 h-6 mx-auto mb-2 ${
-                  classView.finalWavFile ? 'text-green-500' : 'text-gray-400'
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                {classView.finalWavFile ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                )}
-              </svg>
-              <p className="text-sm font-medium text-gray-900">Final WAV</p>
-              {classView.finalWavFile ? (
-                <p className="text-xs text-green-600 mt-1">Uploaded - Click to replace</p>
-              ) : (
-                <p className="text-xs text-gray-500 mt-1">Click to upload</p>
-              )}
-            </label>
-            {classView.finalWavFile && audioPipelineStage !== 'approved' && (
-              <button
-                onClick={() => onDeleteFile(classView.finalWavFile!)}
-                className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete
-              </button>
-            )}
+          <div className="w-full bg-purple-200 rounded-full h-2">
+            <div
+              className="bg-purple-600 h-2 rounded-full transition-all"
+              style={{ width: `${uploadState.progress}%` }}
+            />
           </div>
         </div>
+      )}
 
-        {/* Schulsong toggle - only shown when event has schulsong enabled and any final file exists */}
-        {eventIsSchulsong && anyFinalFile && (
-          <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
-                S
-              </span>
-              <div>
-                <p className="text-sm font-medium text-gray-700">Mark as Schulsong</p>
-                <p className="text-xs text-gray-500">
-                  {anyFinalFile.isSchulsong
-                    ? 'This audio is the school song'
-                    : 'Tag this final audio as the school song'}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => onToggleSchulsong(anyFinalFile.id, !!anyFinalFile.isSchulsong)}
-              disabled={togglingSchulsongId === anyFinalFile.id}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                anyFinalFile.isSchulsong ? 'bg-amber-500' : 'bg-gray-300'
-              }`}
+      {/* 3-column upload grid */}
+      <div className="grid grid-cols-3 gap-3">
+        {/* Preview */}
+        <div>
+          <label
+            className={`block p-3 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
+              song.previewFile
+                ? 'border-green-300 bg-green-50'
+                : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+            }`}
+          >
+            <input
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={(e) => onFileSelect('preview', 'mp3', e)}
+              disabled={uploadState?.isUploading}
+            />
+            <svg
+              className={`w-5 h-5 mx-auto mb-1 ${song.previewFile ? 'text-green-500' : 'text-gray-400'}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  anyFinalFile.isSchulsong ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
+              {song.previewFile ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              )}
+            </svg>
+            <p className="text-xs font-medium text-gray-900">Preview</p>
+            {song.previewFile ? (
+              <p className="text-xs text-green-600">Replace</p>
+            ) : (
+              <p className="text-xs text-gray-500">Upload</p>
+            )}
+          </label>
+        </div>
+
+        {/* Final MP3 */}
+        <div>
+          <label
+            className={`block p-3 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
+              song.finalMp3File
+                ? 'border-green-300 bg-green-50'
+                : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+            }`}
+          >
+            <input
+              type="file"
+              accept="audio/mpeg,.mp3"
+              className="hidden"
+              onChange={(e) => onFileSelect('final', 'mp3', e)}
+              disabled={uploadState?.isUploading}
+            />
+            <svg
+              className={`w-5 h-5 mx-auto mb-1 ${song.finalMp3File ? 'text-green-500' : 'text-gray-400'}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              {song.finalMp3File ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              )}
+            </svg>
+            <p className="text-xs font-medium text-gray-900">Final MP3</p>
+            {song.finalMp3File ? (
+              <p className="text-xs text-green-600">Replace</p>
+            ) : (
+              <p className="text-xs text-gray-500">Upload</p>
+            )}
+          </label>
+          {song.finalMp3File && audioPipelineStage !== 'approved' && (
+            <button
+              onClick={() => onDeleteFile(song.finalMp3File!)}
+              className="mt-1.5 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
             </button>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Final WAV */}
+        <div>
+          <label
+            className={`block p-3 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${
+              song.finalWavFile
+                ? 'border-green-300 bg-green-50'
+                : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+            }`}
+          >
+            <input
+              type="file"
+              accept="audio/wav,.wav"
+              className="hidden"
+              onChange={(e) => onFileSelect('final', 'wav', e)}
+              disabled={uploadState?.isUploading}
+            />
+            <svg
+              className={`w-5 h-5 mx-auto mb-1 ${song.finalWavFile ? 'text-green-500' : 'text-gray-400'}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              {song.finalWavFile ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              )}
+            </svg>
+            <p className="text-xs font-medium text-gray-900">Final WAV</p>
+            {song.finalWavFile ? (
+              <p className="text-xs text-green-600">Replace</p>
+            ) : (
+              <p className="text-xs text-gray-500">Upload</p>
+            )}
+          </label>
+          {song.finalWavFile && audioPipelineStage !== 'approved' && (
+            <button
+              onClick={() => onDeleteFile(song.finalWavFile!)}
+              className="mt-1.5 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

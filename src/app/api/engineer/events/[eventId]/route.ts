@@ -7,6 +7,7 @@ import { ENGINEER_IDS } from '@/lib/config/engineers';
 import {
   EngineerEventDetail,
   EngineerClassView,
+  EngineerSongView,
   AudioFileWithUrl,
   EngineerMixingStatus,
   LogicProjectInfo,
@@ -109,6 +110,7 @@ export async function GET(
         schulsongClassView = {
           classId: schulsongClass.classId,
           className: 'Schulsong',
+          songs: [],  // Schulsong has its own dedicated rendering block
           rawFiles: schulsongAudioFiles.filter((f) => f.type === 'raw'),
           previewFile: schulsongAudioFiles.find((f) => f.type === 'preview'),
           finalMp3File: schulsongAudioFiles.find(
@@ -121,6 +123,9 @@ export async function GET(
       }
     }
 
+    // Fetch songs for this event
+    const allSongs = await teacherService.getSongsByEventId(eventId);
+
     // Group audio files by class (excluding schulsong class from regular classes)
     // Micha only handles schulsong — skip regular classes entirely for him
     const isMichaEngineer = ENGINEER_IDS.MICHA && session.engineerId === ENGINEER_IDS.MICHA;
@@ -130,36 +135,40 @@ export async function GET(
         const classAudioFiles = audioFilesWithUrls.filter(
           (f) => f.classId === classDetail.classId
         );
+        const classSongs = allSongs.filter(s => s.classId === classDetail.classId);
 
-        const rawFiles = classAudioFiles.filter((f) => f.type === 'raw');
-        const previewFile = classAudioFiles.find((f) => f.type === 'preview');
-        const finalMp3File = classAudioFiles.find(
-          (f) => f.type === 'final' && f.r2Key.endsWith('.mp3')
-        );
-        const finalWavFile = classAudioFiles.find(
-          (f) => f.type === 'final' && f.r2Key.endsWith('.wav')
-        );
+        const songs: EngineerSongView[] = classSongs.map(song => {
+          const songFiles = classAudioFiles.filter(f => f.songId === song.id);
+          return {
+            songId: song.id,
+            songTitle: song.title,
+            artist: song.artist,
+            order: song.order,
+            previewFile: songFiles.find(f => f.type === 'preview'),
+            finalMp3File: songFiles.find(f => f.type === 'final' && f.r2Key.endsWith('.mp3')),
+            finalWavFile: songFiles.find(f => f.type === 'final' && f.r2Key.endsWith('.wav')),
+          };
+        });
+
+        // Legacy files without songId
+        const rawFiles = classAudioFiles.filter(f => !f.songId && f.type === 'raw');
 
         return {
           classId: classDetail.classId,
           className: classDetail.className,
+          songs,
           rawFiles,
-          previewFile,
-          finalMp3File,
-          finalWavFile,
         };
       });
 
-    // Determine overall mixing status
-    const hasAnyRaw = classesWithAudio.some((c) => c.rawFiles.length > 0);
-    const allHavePreview = classesWithAudio.every((c) => c.previewFile);
-    const allHaveFinal = classesWithAudio.every((c) => c.finalMp3File || c.finalWavFile);
-    const someHavePreview = classesWithAudio.some((c) => c.previewFile);
+    // Determine overall mixing status (song-based)
+    const allSongViews = classesWithAudio.flatMap(c => c.songs);
+    const songsWithFinal = allSongViews.filter(s => s.finalMp3File || s.finalWavFile).length;
 
     let mixingStatus: EngineerMixingStatus = 'pending';
-    if (allHavePreview && allHaveFinal && classesWithAudio.length > 0) {
+    if (allSongViews.length > 0 && songsWithFinal === allSongViews.length) {
       mixingStatus = 'completed';
-    } else if (someHavePreview || (hasAnyRaw && classesWithAudio.some((c) => c.finalMp3File || c.finalWavFile))) {
+    } else if (songsWithFinal > 0) {
       mixingStatus = 'in-progress';
     }
 
