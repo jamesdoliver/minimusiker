@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Product } from '@/lib/types/airtable';
 import ProductCard from './ProductCard';
@@ -10,9 +10,10 @@ interface ProductCatalogProps {
   products: Product[];
   isLoading?: boolean;
   error?: string | null;
+  excludedVariantIds?: Set<string>;
 }
 
-export default function ProductCatalog({ products, isLoading, error }: ProductCatalogProps) {
+export default function ProductCatalog({ products, isLoading, error, excludedVariantIds }: ProductCatalogProps) {
   const t = useTranslations('shop.catalog');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
@@ -24,11 +25,27 @@ export default function ProductCatalog({ products, isLoading, error }: ProductCa
     { id: 'digital', label: t('categoryDigital'), types: ['PDF', 'Digital'] },
   ];
 
+  // Filter out excluded variants from products, removing products with no remaining variants
+  const visibleProducts = useMemo(() => {
+    if (!excludedVariantIds || excludedVariantIds.size === 0) return products;
+
+    return products
+      .map((product) => {
+        const allowedVariants = product.variants.filter(
+          (v) => !excludedVariantIds.has(v.id)
+        );
+        if (allowedVariants.length === 0) return null;
+        if (allowedVariants.length === product.variants.length) return product;
+        return { ...product, variants: allowedVariants };
+      })
+      .filter((p): p is Product => p !== null);
+  }, [products, excludedVariantIds]);
+
   // Filter products by category
   const filteredProducts =
     selectedCategory === 'all'
-      ? products
-      : products.filter((product) => {
+      ? visibleProducts
+      : visibleProducts.filter((product) => {
           const category = CATEGORIES.find((c) => c.id === selectedCategory);
           if (!category || !category.types) return true;
           return category.types.some(
@@ -55,7 +72,7 @@ export default function ProductCatalog({ products, isLoading, error }: ProductCa
     );
   }
 
-  if (products.length === 0) {
+  if (visibleProducts.length === 0) {
     return (
       <div className="bg-cream-100 rounded-lg p-12 text-center">
         <svg
@@ -117,7 +134,7 @@ export default function ProductCatalog({ products, isLoading, error }: ProductCa
       {/* Product Count */}
       <div className="mt-8 text-center">
         <p className="text-sm text-gray-500">
-          {t('showingCount', { count: filteredProducts.length, total: products.length })}
+          {t('showingCount', { count: filteredProducts.length, total: visibleProducts.length })}
         </p>
       </div>
     </div>

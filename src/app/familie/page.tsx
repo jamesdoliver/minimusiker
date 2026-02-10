@@ -428,28 +428,6 @@ function ParentPortalContent() {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Shop Link (hidden for Schulsong-only — inline ProductSelector is their shop) */}
-              {!isSchulsongOnly && (
-                <Link
-                  href="/familie/shop"
-                  className="flex items-center gap-1 text-sm text-sage-600 hover:text-sage-700 font-medium"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                    />
-                  </svg>
-                  {tCommon('shop')}
-                </Link>
-              )}
               {/* Language Selector */}
               <LanguageSelector />
               <span className="text-sm text-gray-700">

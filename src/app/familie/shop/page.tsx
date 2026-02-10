@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { CartProvider } from '@/lib/contexts/CartContext';
 import { useProducts } from '@/lib/hooks/useProducts';
@@ -9,6 +9,8 @@ import ProductCatalog from '@/components/shop/ProductCatalog';
 import CartSummary from '@/components/shop/CartSummary';
 import CartDrawer from '@/components/shop/CartDrawer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import { resolveShopProfile } from '@/lib/config/shopProfiles';
+import { canOrderPersonalizedClothing } from '@/lib/utils/eventTimeline';
 
 // Child type from session
 interface SessionChild {
@@ -20,6 +22,27 @@ interface SessionChild {
   schoolName?: string;
 }
 
+/**
+ * Build a set of Shopify variant GIDs that should be excluded based on cutoff.
+ * If personalized clothing is available, exclude standard clothing variants.
+ * If personalized clothing is NOT available, exclude personalized clothing variants.
+ */
+function buildExcludedVariantIds(
+  variantMap: Record<string, string>,
+  showPersonalized: boolean
+): Set<string> {
+  const excluded = new Set<string>();
+  const excludePrefix = showPersonalized ? '-standard-' : '-personalized-';
+
+  for (const [key, gid] of Object.entries(variantMap)) {
+    if (key.includes(excludePrefix)) {
+      excluded.add(gid);
+    }
+  }
+
+  return excluded;
+}
+
 // Inner component that uses hooks
 function ShopContent() {
   const router = useRouter();
@@ -28,6 +51,9 @@ function ShopContent() {
   const [children, setChildren] = useState<SessionChild[]>([]);
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
   const [isVerifying, setIsVerifying] = useState(true);
+  const [eventDate, setEventDate] = useState<string | null>(null);
+  const [shopProfile, setShopProfile] = useState<ReturnType<typeof resolveShopProfile> | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
   const { products, isLoading, error } = useProducts({
     tagFilter: 'minimusiker-shop',
@@ -56,17 +82,6 @@ function ShopContent() {
           // Store all children for selection
           if (data.data.children?.length > 0) {
             setChildren(data.data.children);
-            // Log session data for debugging
-            console.log('[shop] Session loaded:', {
-              parentId: data.data.parentId,
-              childrenCount: data.data.children.length,
-              children: data.data.children.map((c: SessionChild) => ({
-                childName: c.childName,
-                eventId: c.eventId,
-                bookingId: c.bookingId,
-                classId: c.classId,
-              })),
-            });
           }
         }
       } catch (error) {
@@ -80,7 +95,51 @@ function ShopContent() {
     verifySession();
   }, [router]);
 
-  if (isVerifying) {
+  // Fetch event profile and date for cutoff filtering
+  useEffect(() => {
+    if (isVerifying || !eventId) {
+      // Don't resolve profile loading until we have an eventId from the session
+      if (!isVerifying && !eventId) {
+        setIsProfileLoading(false);
+      }
+      return;
+    }
+
+    const fetchEventProfile = async () => {
+      setIsProfileLoading(true);
+      try {
+        const response = await fetch(
+          `/api/parent/schulsong-status?eventId=${encodeURIComponent(eventId)}`,
+          { credentials: 'include' }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setShopProfile(resolveShopProfile({
+            isMinimusikertag: data.isMinimusikertag,
+            isPlus: data.isPlus,
+            isSchulsong: data.isSchulsong,
+          }));
+          setEventDate(data.eventDate || null);
+        }
+      } catch (err) {
+        console.error('Error fetching event profile:', err);
+      } finally {
+        setIsProfileLoading(false);
+      }
+    };
+
+    fetchEventProfile();
+  }, [isVerifying, eventId]);
+
+  // Compute excluded variant IDs based on cutoff
+  const excludedVariantIds = useMemo(() => {
+    if (!shopProfile || !eventDate) return new Set<string>();
+
+    const showPersonalized = canOrderPersonalizedClothing(eventDate);
+    return buildExcludedVariantIds(shopProfile.shopifyVariantMap, showPersonalized);
+  }, [shopProfile, eventDate]);
+
+  if (isVerifying || isProfileLoading) {
     return (
       <div className="min-h-screen bg-cream-50 flex items-center justify-center">
         <LoadingSpinner size="lg" />
@@ -126,6 +185,7 @@ function ShopContent() {
           products={products}
           isLoading={isLoading}
           error={error}
+          excludedVariantIds={excludedVariantIds}
         />
       </main>
 

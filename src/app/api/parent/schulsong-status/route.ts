@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
     const isSchulsong = event?.is_schulsong === true;
     const isMinimusikertag = event?.is_minimusikertag === true;
     const isPlus = event?.is_plus === true;
+    const eventDate = event?.event_date || null;
 
     // Schulsong visibility is controlled by schulsong_released_at (set when admin approves)
     const releasedAt = event?.schulsong_released_at ? new Date(event.schulsong_released_at) : null;
@@ -62,6 +63,7 @@ export async function GET(request: NextRequest) {
         isSchulsong: false,
         isMinimusikertag,
         isPlus,
+        eventDate,
       });
     }
 
@@ -74,6 +76,7 @@ export async function GET(request: NextRequest) {
         isSchulsong: true,
         isMinimusikertag,
         isPlus,
+        eventDate,
         hasAudio: false,
       });
     }
@@ -100,6 +103,7 @@ export async function GET(request: NextRequest) {
         isSchulsong: true,
         isMinimusikertag,
         isPlus,
+        eventDate,
         hasAudio: false,
       });
     }
@@ -111,6 +115,7 @@ export async function GET(request: NextRequest) {
         isSchulsong: true,
         isMinimusikertag,
         isPlus,
+        eventDate,
         hasAudio: false,
         notYetVisible: true,
         // If releasedAt is set (admin approved, waiting for timer), show date
@@ -126,6 +131,7 @@ export async function GET(request: NextRequest) {
       isSchulsong: true,
       isMinimusikertag,
       isPlus,
+      eventDate,
       hasAudio: true,
       audioUrl,
       downloadUrl,

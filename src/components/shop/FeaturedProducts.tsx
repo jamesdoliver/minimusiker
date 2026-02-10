@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { Product } from '@/lib/types/airtable';
@@ -28,25 +27,6 @@ export default function FeaturedProducts({ products, maxItems = 3 }: FeaturedPro
         <h2 className="font-heading text-2xl text-minimusik-heading">
           {t('title')}
         </h2>
-        <Link
-          href="/familie/shop"
-          className="text-sage-600 hover:text-sage-700 font-medium text-sm flex items-center gap-1"
-        >
-          {t('viewAll')}
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </Link>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -117,20 +97,13 @@ export default function FeaturedProducts({ products, maxItems = 3 }: FeaturedPro
                 </div>
 
                 {/* Quick Add Button */}
-                {product.variants.length === 1 && variant.availableForSale ? (
+                {product.variants.length === 1 && variant.availableForSale && (
                   <button
                     onClick={() => addItem(product, variant, 1)}
                     className="mt-3 w-full py-2 bg-sage-500 text-white text-sm font-medium rounded hover:bg-sage-600 transition-colors"
                   >
                     {tCard('addToCart')}
                   </button>
-                ) : (
-                  <Link
-                    href="/familie/shop"
-                    className="mt-3 block w-full py-2 border border-sage-500 text-sage-600 text-sm font-medium rounded text-center hover:bg-sage-50 transition-colors"
-                  >
-                    {t('viewOptions')}
-                  </Link>
                 )}
               </div>
             </div>
