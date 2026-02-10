@@ -44,7 +44,7 @@ export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl, filenam
         barWidth: 3,
         barGap: 2,
         barRadius: 2,
-        height: 80,
+        height: 64,
         normalize: true,
       });
 
@@ -107,7 +107,7 @@ export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl, filenam
   };
 
   return (
-    <div className="w-full bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-6 sm:p-8">
+    <div className="w-full bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-4 sm:p-6">
       {/* Player controls */}
       <div className="flex items-center gap-4 mb-3">
         <button
@@ -149,7 +149,7 @@ export default function SchulsongWaveformPlayer({ audioUrl, downloadUrl, filenam
         <button
           onClick={handleDownload}
           disabled={isDownloading}
-          className="mt-6 w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-sage-500 to-sage-700 hover:from-sage-600 hover:to-sage-800 text-white rounded-lg transition-colors font-button font-bold uppercase tracking-wide shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+          className="mt-4 w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-sage-500 to-sage-700 hover:from-sage-600 hover:to-sage-800 text-white rounded-lg transition-colors font-button font-bold uppercase tracking-wide shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
         >
           {isDownloading ? (
             <>

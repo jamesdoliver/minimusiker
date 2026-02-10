@@ -62,7 +62,7 @@ export default function SchulsongSection({ eventId }: SchulsongSectionProps) {
 
   return (
     <section
-      className="relative pt-64 md:pt-80 pb-12 md:pb-16 bg-cover bg-center"
+      className="relative pt-80 md:pt-96 pb-4 md:pb-6 bg-cover bg-center"
       style={{
         backgroundImage: `url('/images/schulesong/Wallpaper UnserSchulsong.png')`,
       }}
