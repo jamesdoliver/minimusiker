@@ -253,7 +253,8 @@
     "downloading": "Downloading..."
   },
   "orderDeadline": {
-    "clothingMessage": "School shirts and school hoodies only available for"
+    "clothingMessage": "School shirts and school hoodies only available for",
+    "earlyBirdMessage": "10% discount available for only"
   },
   "parentPortal": {
     "manageChildren": {

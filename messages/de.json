@@ -253,7 +253,8 @@
     "downloading": "Wird heruntergeladen..."
   },
   "orderDeadline": {
-    "clothingMessage": "Schul-Shirts und Schul-Hoodies nur noch bestellbar für"
+    "clothingMessage": "Schul-Shirts und Schul-Hoodies nur noch bestellbar für",
+    "earlyBirdMessage": "10% Rabatt nur noch für"
   },
   "parentPortal": {
     "manageChildren": {

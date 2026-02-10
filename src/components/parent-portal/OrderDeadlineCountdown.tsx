@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { getSchulsongClothingCountdown } from '@/lib/utils/eventTimeline';
+import { getSchulsongClothingCountdown, getEarlyBirdCountdown } from '@/lib/utils/eventTimeline';
 
 interface OrderDeadlineCountdownProps {
   eventDate: string;
-  eventType: string;
+  profileType: string;
 }
 
 export default function OrderDeadlineCountdown({
   eventDate,
-  eventType,
+  profileType,
 }: OrderDeadlineCountdownProps) {
   const t = useTranslations('orderDeadline');
   const locale = useLocale();
@@ -23,6 +23,9 @@ export default function OrderDeadlineCountdown({
     seconds: number;
   } | null>(null);
 
+  const isSchulsong = profileType === 'schulsong-only';
+  const isEarlyBird = profileType === 'minimusikertag' || profileType === 'plus';
+
   useEffect(() => {
     setHasMounted(true);
   }, []);
@@ -31,16 +34,20 @@ export default function OrderDeadlineCountdown({
     if (!eventDate) return;
 
     const update = () => {
-      setCountdown(getSchulsongClothingCountdown(eventDate));
+      if (isSchulsong) {
+        setCountdown(getSchulsongClothingCountdown(eventDate));
+      } else if (isEarlyBird) {
+        setCountdown(getEarlyBirdCountdown(eventDate));
+      }
     };
 
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [eventDate]);
+  }, [eventDate, isSchulsong, isEarlyBird]);
 
-  // Guard: only for schulsong events
-  if (!eventType.toLowerCase().includes('schulsong')) return null;
+  // Guard: only for supported profile types
+  if (!isSchulsong && !isEarlyBird) return null;
 
   // Guard: SSR hydration
   if (!hasMounted) return null;
@@ -58,6 +65,8 @@ export default function OrderDeadlineCountdown({
       : countdown.days === 1
         ? 'day'
         : 'days';
+
+  const message = isSchulsong ? t('clothingMessage') : t('earlyBirdMessage');
 
   return (
     <div className="bg-gradient-to-r from-sage-500 to-sage-700 rounded-xl py-3 px-4 mb-6">
@@ -77,7 +86,7 @@ export default function OrderDeadlineCountdown({
           />
         </svg>
         <span>
-          {t('clothingMessage')}{' '}
+          {message}{' '}
           <span className="font-bold tabular-nums">
             {countdown.days} {dayLabel} {pad(countdown.hours)}:{pad(countdown.minutes)}:{pad(countdown.seconds)}
           </span>
