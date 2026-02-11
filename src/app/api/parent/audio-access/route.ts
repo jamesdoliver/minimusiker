@@ -390,9 +390,14 @@ async function buildAllAudio(
     }
 
     // Group audio files by classId (only final + ready, not schulsong)
+    // Deduplicate by songId within each class, keeping only the newest record
+    // (allAudioFiles is sorted by uploaded_at desc, so first seen per songId wins)
     const audioFilesByClass = new Map<string, AudioFile[]>();
+    const seenSongIds = new Set<string>();
     for (const af of allAudioFiles) {
       if (af.type !== 'final' || af.status !== 'ready' || af.isSchulsong) continue;
+      if (af.songId && seenSongIds.has(af.songId)) continue;
+      if (af.songId) seenSongIds.add(af.songId);
       const existing = audioFilesByClass.get(af.classId) || [];
       existing.push(af);
       audioFilesByClass.set(af.classId, existing);
