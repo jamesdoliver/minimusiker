@@ -3,6 +3,7 @@ import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { generateAudioDisplayName } from '@/lib/utils/audioFilename';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +71,18 @@ export async function POST(
       );
     }
 
+    // Generate meaningful filename if songId is provided
+    let displayName: string | undefined;
+    if (songId) {
+      const teacherService = getTeacherService();
+      const song = await teacherService.getSongById(songId);
+      if (song) {
+        const classInfo = eventDetail.classes.find((c: { classId: string }) => c.classId === classId);
+        const className = classInfo?.className || classId;
+        displayName = generateAudioDisplayName(song.title, className);
+      }
+    }
+
     // Generate presigned URL for upload
     const r2Service = getR2Service();
     const resolvedFormat = (format === 'wav' ? 'wav' : 'mp3') as 'mp3' | 'wav';
@@ -80,7 +93,8 @@ export async function POST(
       type,
       resolvedContentType,
       resolvedFormat,
-      songId
+      songId,
+      displayName
     );
 
     return NextResponse.json({
@@ -160,6 +174,9 @@ export async function PUT(
       );
     }
 
+    // Use meaningful filename from R2 key if available, fall back to original filename
+    const meaningfulFilename = r2Key.split('/').pop() || filename;
+
     // Check if an existing audio file record exists for this class, type, and exact R2 key
     // Match by r2Key to allow separate MP3 and WAV final files
     const teacherService = getTeacherService();
@@ -171,7 +188,7 @@ export async function PUT(
       // Update existing record
       audioFile = await teacherService.updateAudioFile(existingFile.id, {
         r2Key,
-        filename,
+        filename: meaningfulFilename,
         uploadedBy: session.engineerId,
         fileSizeBytes,
         durationSeconds,
@@ -186,7 +203,7 @@ export async function PUT(
         songId: songId || undefined,
         type,
         r2Key,
-        filename,
+        filename: meaningfulFilename,
         uploadedBy: session.engineerId,
         fileSizeBytes,
         durationSeconds,

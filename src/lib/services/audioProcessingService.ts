@@ -25,7 +25,8 @@ export async function processAudioFile(
   r2Key: string,
   eventId: string,
   classId: string,
-  songId: string
+  songId: string,
+  displayName?: string
 ): Promise<{
   mp3Key: string;
   previewKey: string;
@@ -81,7 +82,8 @@ export async function processAudioFile(
     ], { timeout: 30000 });
 
     // 5. Upload MP3 to R2
-    const mp3Key = `recordings/${eventId}/${classId}/${songId}/final/final.mp3`;
+    const mp3Filename = displayName ? `${displayName}.mp3` : 'final.mp3';
+    const mp3Key = `recordings/${eventId}/${classId}/${songId}/final/${mp3Filename}`;
     const mp3Buffer = isWav
       ? await readFileAsBuffer(mp3Path)
       : buffer; // If already MP3, use original buffer
@@ -96,7 +98,8 @@ export async function processAudioFile(
     }
 
     // 6. Upload preview to R2
-    const previewKey = `recordings/${eventId}/${classId}/${songId}/preview/preview.mp3`;
+    const previewFilename = displayName ? `${displayName}.mp3` : 'preview.mp3';
+    const previewKey = `recordings/${eventId}/${classId}/${songId}/preview/${previewFilename}`;
     await uploadBuffer(r2, previewKey, await readFileAsBuffer(previewPath), 'audio/mpeg');
 
     // 7. Update AudioFile record in Airtable

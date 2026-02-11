@@ -313,6 +313,7 @@ export default function EngineerBatchUploadModal({
                 classId: file.classId,
                 songId: file.songId,
                 r2Key: file.r2Key,
+                displayName: file.displayName,
               }),
             });
 

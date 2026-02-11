@@ -529,10 +529,13 @@ class R2Service {
   /**
    * Generate a signed URL for accessing a file
    */
-  async generateSignedUrl(key: string, expiresIn: number = 1800): Promise<string> {
+  async generateSignedUrl(key: string, expiresIn: number = 1800, downloadFilename?: string): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucketName,
       Key: key,
+      ...(downloadFilename && {
+        ResponseContentDisposition: `attachment; filename="${encodeURIComponent(downloadFilename)}"`,
+      }),
     });
 
     const signedUrl = await getSignedUrl(this.client, command, { expiresIn });
@@ -823,12 +826,18 @@ class R2Service {
     type: 'preview' | 'final',
     contentType: string = 'audio/mpeg',
     format: 'mp3' | 'wav' = 'mp3',
-    songId?: string
+    songId?: string,
+    displayName?: string
   ): Promise<{ uploadUrl: string; key: string }> {
     const extension = type === 'preview' ? 'mp3' : format;
-    const key = songId
-      ? `recordings/${eventId}/${classId}/${songId}/${type}.${extension}`
-      : `recordings/${eventId}/${classId}/${type}.${extension}`;
+    let key: string;
+    if (songId && displayName) {
+      key = `recordings/${eventId}/${classId}/${songId}/${type}/${displayName}.${extension}`;
+    } else if (songId) {
+      key = `recordings/${eventId}/${classId}/${songId}/${type}.${extension}`;
+    } else {
+      key = `recordings/${eventId}/${classId}/${type}.${extension}`;
+    }
 
     const command = new PutObjectCommand({
       Bucket: this.bucketName,

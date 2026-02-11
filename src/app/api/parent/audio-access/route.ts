@@ -205,8 +205,9 @@ async function buildClassFull(
   for (const af of finalFiles) {
     const mp3Key = af.mp3R2Key;
     if (mp3Key && await r2.fileExists(mp3Key)) {
-      const audioUrl = await r2.generateSignedUrl(mp3Key, 3600); // 1 hour
-      const downloadUrl = await r2.generateSignedUrl(mp3Key, 86400); // 24 hours
+      const downloadFilename = mp3Key.split('/').pop() || 'audio.mp3';
+      const audioUrl = await r2.generateSignedUrl(mp3Key, 3600); // 1 hour, streaming
+      const downloadUrl = await r2.generateSignedUrl(mp3Key, 86400, downloadFilename); // 24 hours, download
       return { audioUrl, downloadUrl };
     }
 
@@ -215,15 +216,16 @@ async function buildClassFull(
       const canonicalKey = `recordings/${eventId}/${classId}/${af.songId}/final/final.mp3`;
       if (await r2.fileExists(canonicalKey)) {
         const audioUrl = await r2.generateSignedUrl(canonicalKey, 3600);
-        const downloadUrl = await r2.generateSignedUrl(canonicalKey, 86400);
+        const downloadUrl = await r2.generateSignedUrl(canonicalKey, 86400, 'final.mp3');
         return { audioUrl, downloadUrl };
       }
     }
 
     // Fall back to original r2Key
     if (af.r2Key && await r2.fileExists(af.r2Key)) {
+      const downloadFilename = af.r2Key.split('/').pop() || 'audio.mp3';
       const audioUrl = await r2.generateSignedUrl(af.r2Key, 3600);
-      const downloadUrl = await r2.generateSignedUrl(af.r2Key, 86400);
+      const downloadUrl = await r2.generateSignedUrl(af.r2Key, 86400, downloadFilename);
       return { audioUrl, downloadUrl };
     }
   }
@@ -234,14 +236,14 @@ async function buildClassFull(
     const recordingsKey = `recordings/${eventId}/${classId}/final.mp3`;
     if (await r2.fileExists(recordingsKey)) {
       const audioUrl = await r2.generateSignedUrl(recordingsKey, 3600);
-      const downloadUrl = await r2.generateSignedUrl(recordingsKey, 86400);
+      const downloadUrl = await r2.generateSignedUrl(recordingsKey, 86400, 'final.mp3');
       return { audioUrl, downloadUrl };
     }
 
     const legacyKey = `events/${eventId}/${classId}/full.mp3`;
     if (await r2.fileExists(legacyKey)) {
       const audioUrl = await r2.generateSignedUrl(legacyKey, 3600);
-      const downloadUrl = await r2.generateSignedUrl(legacyKey, 86400);
+      const downloadUrl = await r2.generateSignedUrl(legacyKey, 86400, 'full.mp3');
       return { audioUrl, downloadUrl };
     }
   }
@@ -281,8 +283,9 @@ async function buildGroupAudio(
 
   for (const key of paths) {
     if (await r2.fileExists(key)) {
+      const downloadFilename = key.split('/').pop() || 'audio.mp3';
       const audioUrl = await r2.generateSignedUrl(key, 3600);
-      const downloadUrl = await r2.generateSignedUrl(key, 86400);
+      const downloadUrl = await r2.generateSignedUrl(key, 86400, downloadFilename);
       return { audioUrl, downloadUrl };
     }
   }

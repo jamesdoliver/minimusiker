@@ -5,6 +5,7 @@ import { getR2Service } from '@/lib/services/r2Service';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { ENGINEER_IDS } from '@/lib/config/engineers';
 import { autoMatchFiles, getMatchSummary } from '@/lib/utils/autoMatch';
+import { generateAudioDisplayName } from '@/lib/utils/audioFilename';
 
 export const dynamic = 'force-dynamic';
 
@@ -186,6 +187,16 @@ export async function PUT(
     const audioFiles = [];
     const warnings: string[] = [];
 
+    // Fetch class names for meaningful filenames
+    const airtableService = getAirtableService();
+    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const classNameMap = new Map<string, string>();
+    if (eventDetail) {
+      for (const cls of eventDetail.classes) {
+        classNameMap.set(cls.classId, cls.className);
+      }
+    }
+
     for (const match of confirmedMatches) {
       const { filename, songId } = match;
 
@@ -196,9 +207,10 @@ export async function PUT(
         continue;
       }
 
-      // Generate final R2 key matching existing pattern
-      const timestamp = Date.now();
-      const finalKey = `recordings/${eventId}/${song.classId}/${songId}/final/final_${timestamp}.wav`;
+      // Generate meaningful R2 key: "{SongTitle} - {ClassName}.wav"
+      const className = classNameMap.get(song.classId) || song.classId;
+      const displayName = generateAudioDisplayName(song.title, className);
+      const finalKey = `recordings/${eventId}/${song.classId}/${songId}/final/${displayName}.wav`;
 
       // Move file from temp to final location
       const tempKey = `temp/${uploadId}/${filename}`;
@@ -209,14 +221,14 @@ export async function PUT(
         continue;
       }
 
-      // Create AudioFile record
+      // Create AudioFile record with meaningful filename
       const audioFile = await teacherService.createSongAudioFile({
         songId,
         classId: song.classId,
         eventId,
         type: 'final',
         r2Key: finalKey,
-        filename,
+        filename: `${displayName}.wav`,
         uploadedBy: session.engineerId,
         status: 'ready',
         isSchulsong: isMicha || false,
@@ -232,6 +244,7 @@ export async function PUT(
       eventId: af.eventId,
       classId: af.classId,
       songId: af.songId,
+      displayName: af.filename.replace(/\.\w+$/, ''),
     }));
 
     return NextResponse.json({

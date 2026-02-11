@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { eventId, classId, songId, r2Key } = await request.json();
+    const { eventId, classId, songId, r2Key, displayName } = await request.json();
 
     if (!eventId || !classId || !songId || !r2Key) {
       return NextResponse.json(
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await processAudioFile(r2Key, eventId, classId, songId);
+    const result = await processAudioFile(r2Key, eventId, classId, songId, displayName);
 
     return NextResponse.json({
       success: true,
