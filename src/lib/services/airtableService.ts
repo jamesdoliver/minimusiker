@@ -2419,9 +2419,12 @@ class AirtableService {
           const linkedRegistrationIds = classRecord.fields[CLASSES_FIELD_IDS.registrations] as string[] || [];
           const registeredParents = linkedRegistrationIds.length;
 
+          const classType = (classRecord.fields[CLASSES_FIELD_IDS.class_type] as string) || 'regular';
+
           classes.push({
             classId,
             className,
+            classType,
             mainTeacher: classMainTeacher,
             totalChildren,
             registeredParents,
@@ -2530,6 +2533,7 @@ class AirtableService {
 
         const classes: EventClassDetail[] = Array.from(classesMap.values()).map(cls => ({
           ...cls,
+          classType: 'regular' as const,
           registrationRate: cls.totalChildren > 0
             ? Math.round((cls.registeredParents / cls.totalChildren) * 100)
             : 0,

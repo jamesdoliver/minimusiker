@@ -4,8 +4,37 @@ import { hasMinicardForEvent } from '@/lib/utils/minicardAccess';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
+import type { Song, AudioFile } from '@/lib/types/teacher';
 
 export const dynamic = 'force-dynamic';
+
+// Types for the allAudio response
+interface AllAudioResponse {
+  parentClassId: string;
+  sections: AudioSection[];
+  totalTracks: number;
+  totalSizeBytes: number;
+}
+
+interface AudioSection {
+  sectionId: string;
+  sectionName: string;
+  sectionType: 'class' | 'choir' | 'teacher_song' | 'group';
+  memberClasses?: Array<{ classId: string; className: string }>;
+  tracks: TrackEntry[];
+}
+
+interface TrackEntry {
+  songId?: string;
+  title: string;
+  artist?: string;
+  order: number;
+  durationSeconds?: number;
+  fileSizeBytes?: number;
+  audioUrl: string;
+  downloadUrl: string;
+  filename: string;
+}
 
 /**
  * GET /api/parent/audio-access
@@ -79,7 +108,13 @@ export async function GET(request: NextRequest) {
 
     // Only include full content when minicard buyer AND released
     if (hasMinicard && isReleased) {
-      // Full class audio
+      // All audio tracklist (new unified approach)
+      const allAudio = await buildAllAudio(r2, teacherService, airtableService, eventId, classId);
+      if (allAudio) {
+        response.allAudio = allAudio;
+      }
+
+      // Full class audio (kept for backward compatibility)
       const classFull = await buildClassFull(r2, teacherService, eventId, classId);
       if (classFull) {
         response.classFull = classFull;
@@ -291,4 +326,263 @@ async function buildGroupAudio(
   }
 
   return {};
+}
+
+/**
+ * Resolve the best available R2 key for an audio file.
+ * Checks in order: mp3R2Key → canonical final path → r2Key
+ */
+async function resolveAudioFileUrl(
+  r2: ReturnType<typeof getR2Service>,
+  af: AudioFile,
+  eventId: string,
+  classId: string
+): Promise<string | null> {
+  // 1. Processed MP3
+  if (af.mp3R2Key && await r2.fileExists(af.mp3R2Key)) {
+    return af.mp3R2Key;
+  }
+
+  // 2. Canonical path
+  if (af.songId) {
+    const canonicalKey = `recordings/${eventId}/${classId}/${af.songId}/final/final.mp3`;
+    if (await r2.fileExists(canonicalKey)) {
+      return canonicalKey;
+    }
+  }
+
+  // 3. Original upload
+  if (af.r2Key && await r2.fileExists(af.r2Key)) {
+    return af.r2Key;
+  }
+
+  return null;
+}
+
+/**
+ * Build the full all-audio tracklist for an event.
+ * Returns every class, collection, and group with per-song streaming/download URLs.
+ */
+async function buildAllAudio(
+  r2: ReturnType<typeof getR2Service>,
+  teacherService: ReturnType<typeof getTeacherService>,
+  airtableService: ReturnType<typeof getAirtableService>,
+  eventId: string,
+  parentClassId: string
+): Promise<AllAudioResponse | null> {
+  try {
+    // 1. Bulk fetch songs + audio files for the event (2 Airtable calls)
+    const [allSongs, allAudioFiles, eventDetail] = await Promise.all([
+      teacherService.getSongsByEventId(eventId),
+      teacherService.getAudioFilesByEventId(eventId),
+      airtableService.getSchoolEventDetail(eventId),
+    ]);
+
+    if (!eventDetail) {
+      console.warn('[buildAllAudio] No event detail found for', eventId);
+      return null;
+    }
+
+    // 2. Build lookup maps
+    const songMap = new Map<string, Song>();
+    for (const song of allSongs) {
+      songMap.set(song.id, song);
+    }
+
+    // Group audio files by classId (only final + ready, not schulsong)
+    const audioFilesByClass = new Map<string, AudioFile[]>();
+    for (const af of allAudioFiles) {
+      if (af.type !== 'final' || af.status !== 'ready' || af.isSchulsong) continue;
+      const existing = audioFilesByClass.get(af.classId) || [];
+      existing.push(af);
+      audioFilesByClass.set(af.classId, existing);
+    }
+
+    // 3. Build sections from all classes
+    const sections: AudioSection[] = [];
+
+    for (const cls of eventDetail.classes) {
+      const classAudioFiles = audioFilesByClass.get(cls.classId) || [];
+      const tracks: TrackEntry[] = [];
+
+      // Process each audio file for this class
+      const trackPromises = classAudioFiles.map(async (af) => {
+        const r2Key = await resolveAudioFileUrl(r2, af, eventId, cls.classId);
+        if (!r2Key) {
+          console.warn(`[buildAllAudio] No R2 key found for audio file ${af.id} in class ${cls.classId}`);
+          return null;
+        }
+
+        // Match to song for metadata
+        const song = af.songId ? songMap.get(af.songId) : undefined;
+        const title = song?.title || cls.className;
+        const artist = song?.artist;
+        const order = song?.order || 0;
+        const downloadFilename = song
+          ? `${String(order).padStart(2, '0')} - ${title}.mp3`
+          : `${cls.className}.mp3`;
+
+        const [audioUrl, downloadUrl] = await Promise.all([
+          r2.generateSignedUrl(r2Key, 3600),
+          r2.generateSignedUrl(r2Key, 86400, downloadFilename),
+        ]);
+
+        return {
+          songId: af.songId,
+          title,
+          artist,
+          order,
+          durationSeconds: af.durationSeconds,
+          fileSizeBytes: af.fileSizeBytes,
+          audioUrl,
+          downloadUrl,
+          filename: downloadFilename,
+        } as TrackEntry;
+      });
+
+      const resolvedTracks = await Promise.all(trackPromises);
+      for (const track of resolvedTracks) {
+        if (track) tracks.push(track);
+      }
+
+      // Sort tracks by order
+      tracks.sort((a, b) => a.order - b.order);
+
+      const sectionType = (cls.classType === 'choir' || cls.classType === 'teacher_song')
+        ? cls.classType as 'choir' | 'teacher_song'
+        : 'class';
+
+      sections.push({
+        sectionId: cls.classId,
+        sectionName: cls.className,
+        sectionType,
+        tracks,
+      });
+    }
+
+    // 4. Get groups for parent's class
+    try {
+      const groups = await teacherService.getGroupsForClass(parentClassId);
+      for (const group of groups) {
+        const groupTracks: TrackEntry[] = [];
+
+        // Check for song-level audio files first (preferred, has metadata)
+        const groupAudioFiles = audioFilesByClass.get(group.groupId) || [];
+
+        for (const af of groupAudioFiles) {
+          const r2Key = await resolveAudioFileUrl(r2, af, eventId, group.groupId);
+          if (!r2Key) continue;
+
+          const song = af.songId ? songMap.get(af.songId) : undefined;
+          const title = song?.title || group.groupName;
+          const downloadFilename = song
+            ? `${String(song.order).padStart(2, '0')} - ${title}.mp3`
+            : `${group.groupName}.mp3`;
+
+          const [audioUrl, downloadUrl] = await Promise.all([
+            r2.generateSignedUrl(r2Key, 3600),
+            r2.generateSignedUrl(r2Key, 86400, downloadFilename),
+          ]);
+
+          groupTracks.push({
+            songId: af.songId,
+            title,
+            artist: song?.artist,
+            order: song?.order || 0,
+            durationSeconds: af.durationSeconds,
+            fileSizeBytes: af.fileSizeBytes,
+            audioUrl,
+            downloadUrl,
+            filename: downloadFilename,
+          });
+        }
+
+        // Fallback: check legacy R2 paths only if no song-level files found
+        if (groupTracks.length === 0) {
+          const groupPaths = [
+            `recordings/${eventId}/${group.groupId}/final.mp3`,
+            `events/${eventId}/${group.groupId}/full.mp3`,
+          ];
+
+          for (const key of groupPaths) {
+            if (await r2.fileExists(key)) {
+              const downloadFilename = `${group.groupName}.mp3`;
+              const [audioUrl, downloadUrl] = await Promise.all([
+                r2.generateSignedUrl(key, 3600),
+                r2.generateSignedUrl(key, 86400, downloadFilename),
+              ]);
+
+              groupTracks.push({
+                title: group.groupName,
+                order: 1,
+                audioUrl,
+                downloadUrl,
+                filename: downloadFilename,
+              });
+              break;
+            }
+          }
+        }
+
+        groupTracks.sort((a, b) => a.order - b.order);
+
+        const memberClasses = group.memberClasses?.map(c => ({
+          classId: c.classId,
+          className: c.className,
+        })) || [];
+
+        sections.push({
+          sectionId: group.groupId,
+          sectionName: group.groupName,
+          sectionType: 'group',
+          memberClasses,
+          tracks: groupTracks,
+        });
+      }
+    } catch {
+      // Groups are optional
+    }
+
+    // 5. Sort sections: parent's class first, then regular classes (alphabetical),
+    //    then choir, teacher songs, groups
+    const sectionOrder: Record<string, number> = {
+      class: 1,
+      choir: 2,
+      teacher_song: 3,
+      group: 4,
+    };
+    sections.sort((a, b) => {
+      // Parent's class always first
+      if (a.sectionId === parentClassId) return -1;
+      if (b.sectionId === parentClassId) return 1;
+
+      // Then by type
+      const typeA = sectionOrder[a.sectionType] || 99;
+      const typeB = sectionOrder[b.sectionType] || 99;
+      if (typeA !== typeB) return typeA - typeB;
+
+      // Then alphabetical within same type
+      return a.sectionName.localeCompare(b.sectionName);
+    });
+
+    // 6. Calculate totals
+    let totalTracks = 0;
+    let totalSizeBytes = 0;
+    for (const section of sections) {
+      totalTracks += section.tracks.length;
+      for (const track of section.tracks) {
+        totalSizeBytes += track.fileSizeBytes || 0;
+      }
+    }
+
+    return {
+      parentClassId,
+      sections,
+      totalTracks,
+      totalSizeBytes,
+    };
+  } catch (error) {
+    console.error('[buildAllAudio] Error:', error);
+    return null;
+  }
 }

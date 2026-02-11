@@ -427,6 +427,7 @@ export interface MinimusikanRepresentative {
 export interface EventClassDetail {
   classId: string;
   className: string;
+  classType?: string;  // 'regular' | 'choir' | 'teacher_song'
   mainTeacher?: string;
   totalChildren: number;
   registeredParents: number;
