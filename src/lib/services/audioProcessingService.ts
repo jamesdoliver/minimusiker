@@ -1,6 +1,6 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { writeFile, unlink, access } from 'fs/promises';
+import { writeFile, unlink, access, copyFile, chmod } from 'fs/promises';
 import { constants as fsConstants } from 'fs';
 import path from 'path';
 import { getR2Service } from './r2Service';
@@ -12,16 +12,39 @@ const execFileAsync = promisify(execFile);
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ffmpegPath: string | null = require('ffmpeg-static');
 
+// Cache the usable ffmpeg path across invocations within the same function instance
+let resolvedFfmpegPath: string | null = null;
+
 async function getFfmpegPath(): Promise<string> {
+  // Return cached path if already resolved and still executable
+  if (resolvedFfmpegPath) {
+    try {
+      await access(resolvedFfmpegPath, fsConstants.X_OK);
+      return resolvedFfmpegPath;
+    } catch {
+      resolvedFfmpegPath = null; // Stale, re-resolve
+    }
+  }
+
   if (!ffmpegPath) {
     throw new Error('ffmpeg-static returned null/undefined — binary not bundled in deployment');
   }
+
+  // Try the original path first (works locally)
   try {
     await access(ffmpegPath, fsConstants.X_OK);
+    resolvedFfmpegPath = ffmpegPath;
+    return ffmpegPath;
   } catch {
-    throw new Error(`ffmpeg binary not executable or missing at: ${ffmpegPath}`);
+    // Binary exists but isn't executable (Vercel strips permissions)
   }
-  return ffmpegPath;
+
+  // Copy to /tmp and make executable
+  const tmpFfmpeg = '/tmp/ffmpeg';
+  await copyFile(ffmpegPath, tmpFfmpeg);
+  await chmod(tmpFfmpeg, 0o755);
+  resolvedFfmpegPath = tmpFfmpeg;
+  return tmpFfmpeg;
 }
 
 /**
