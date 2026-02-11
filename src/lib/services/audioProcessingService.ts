@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { writeFile, unlink } from 'fs/promises';
+import { writeFile, unlink, access } from 'fs/promises';
+import { constants as fsConstants } from 'fs';
 import path from 'path';
 import { getR2Service } from './r2Service';
 import { getTeacherService } from './teacherService';
@@ -9,7 +10,19 @@ const execFileAsync = promisify(execFile);
 
 // ffmpeg-static provides the path to a pre-compiled ffmpeg binary
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const ffmpegPath: string = require('ffmpeg-static');
+const ffmpegPath: string | null = require('ffmpeg-static');
+
+async function getFfmpegPath(): Promise<string> {
+  if (!ffmpegPath) {
+    throw new Error('ffmpeg-static returned null/undefined — binary not bundled in deployment');
+  }
+  try {
+    await access(ffmpegPath, fsConstants.X_OK);
+  } catch {
+    throw new Error(`ffmpeg binary not executable or missing at: ${ffmpegPath}`);
+  }
+  return ffmpegPath;
+}
 
 /**
  * Process an uploaded audio file: encode WAV→MP3, generate 10-second preview snippet.
@@ -45,6 +58,9 @@ export async function processAudioFile(
   const filesToCleanup = [inputPath, mp3Path, previewPath];
 
   try {
+    // 0. Verify ffmpeg is available before downloading anything
+    const ffmpeg = await getFfmpegPath();
+
     // 1. Download source file from R2
     const buffer = await r2.getFileBuffer(r2Key);
     if (!buffer) {
@@ -58,7 +74,7 @@ export async function processAudioFile(
 
     if (isWav) {
       // Encode WAV → MP3 at 192kbps
-      await execFileAsync(ffmpegPath, [
+      await execFileAsync(ffmpeg, [
         '-i', inputPath,
         '-codec:a', 'libmp3lame',
         '-b:a', '192k',
@@ -69,10 +85,10 @@ export async function processAudioFile(
 
     // 3. Get duration from the MP3 (or source) using ffprobe-like approach
     //    We extract duration from ffmpeg stderr output
-    const durationSeconds = await getAudioDuration(sourceMp3Path);
+    const durationSeconds = await getAudioDuration(ffmpeg, sourceMp3Path);
 
     // 4. Generate 10-second preview with 1-second fade-out
-    await execFileAsync(ffmpegPath, [
+    await execFileAsync(ffmpeg, [
       '-i', sourceMp3Path,
       '-t', '10',
       '-af', 'afade=t=out:st=9:d=1',
@@ -135,10 +151,10 @@ export async function processAudioFile(
 /**
  * Get audio duration in seconds using ffmpeg
  */
-async function getAudioDuration(filePath: string): Promise<number> {
+async function getAudioDuration(ffmpeg: string, filePath: string): Promise<number> {
   try {
     // ffmpeg writes info to stderr; use -f null to avoid output
-    const { stderr } = await execFileAsync(ffmpegPath, [
+    const { stderr } = await execFileAsync(ffmpeg, [
       '-i', filePath,
       '-f', 'null',
       '-',

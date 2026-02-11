@@ -25,9 +25,13 @@ const nextConfig = {
       },
     ],
   },
+  serverExternalPackages: ['ffmpeg-static'],
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',
+    },
+    outputFileTracingIncludes: {
+      '/api/audio/process': ['./node_modules/ffmpeg-static/**/*'],
     },
   },
   async headers() {
