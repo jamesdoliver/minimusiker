@@ -31,6 +31,8 @@ interface EngineerBatchUploadModalProps {
   onClose: () => void;
   eventId: string;
   onUploadComplete?: () => void;
+  onSongProcessing?: (songId: string) => void;
+  onSongProcessed?: (songId: string) => void;
 }
 
 type Step = 'upload' | 'extracting' | 'uploading-files' | 'review' | 'confirming' | 'processing';
@@ -49,6 +51,8 @@ export default function EngineerBatchUploadModal({
   onClose,
   eventId,
   onUploadComplete,
+  onSongProcessing,
+  onSongProcessed,
 }: EngineerBatchUploadModalProps) {
   const [step, setStep] = useState<Step>('upload');
   const [uploadId, setUploadId] = useState<string | null>(null);
@@ -304,6 +308,8 @@ export default function EngineerBatchUploadModal({
           const file = filesToProcess[i];
           setProcessingProgress(prev => ({ ...prev, current: i + 1 }));
 
+          if (file.songId) onSongProcessing?.(file.songId);
+
           try {
             const processResponse = await fetch('/api/audio/process', {
               method: 'POST',
@@ -325,6 +331,8 @@ export default function EngineerBatchUploadModal({
           } catch (err) {
             processingErrors.push(`Error processing file ${i + 1}: ${err instanceof Error ? err.message : 'Unknown error'}`);
           }
+
+          if (file.songId) onSongProcessed?.(file.songId);
         }
 
         if (processingErrors.length > 0) {
