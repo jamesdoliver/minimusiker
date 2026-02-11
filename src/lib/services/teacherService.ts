@@ -791,6 +791,9 @@ class TeacherService {
       rejectionComment: record.fields[AUDIO_FILES_FIELD_IDS.rejection_comment],
       // Teacher approval for schulsong
       teacherApprovedAt: record.fields.teacher_approved_at || record.fields[AUDIO_FILES_FIELD_IDS.teacher_approved_at],
+      // Audio processing fields
+      previewR2Key: record.fields.preview_r2_key || record.fields[AUDIO_FILES_FIELD_IDS.preview_r2_key],
+      mp3R2Key: record.fields.mp3_r2_key || record.fields[AUDIO_FILES_FIELD_IDS.mp3_r2_key],
     };
   }
 
@@ -1059,6 +1062,8 @@ class TeacherService {
       fileSizeBytes?: number;
       status?: AudioFileStatus;
       isSchulsong?: boolean;
+      previewR2Key?: string;
+      mp3R2Key?: string;
     }
   ): Promise<AudioFile> {
     try {
@@ -1070,6 +1075,8 @@ class TeacherService {
       if (data.fileSizeBytes !== undefined) updateData.file_size_bytes = data.fileSizeBytes;
       if (data.status !== undefined) updateData.status = data.status;
       if (data.isSchulsong !== undefined) updateData.is_schulsong = data.isSchulsong;
+      if (data.previewR2Key !== undefined) updateData.preview_r2_key = data.previewR2Key;
+      if (data.mp3R2Key !== undefined) updateData.mp3_r2_key = data.mp3R2Key;
       // Update uploaded_at timestamp
       updateData.uploaded_at = new Date().toISOString();
 

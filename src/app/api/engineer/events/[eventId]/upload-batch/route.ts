@@ -225,10 +225,20 @@ export async function PUT(
       audioFiles.push(audioFile);
     }
 
+    // Build list of files that need audio processing (WAV→MP3 + preview generation)
+    const filesToProcess = audioFiles.map(af => ({
+      audioFileId: af.id,
+      r2Key: af.r2Key,
+      eventId: af.eventId,
+      classId: af.classId,
+      songId: af.songId,
+    }));
+
     return NextResponse.json({
       success: true,
       audioFiles,
       count: audioFiles.length,
+      filesToProcess,
       warnings: warnings.length > 0 ? warnings : undefined,
       message: `Successfully uploaded ${audioFiles.length} final WAV file(s)`,
     });

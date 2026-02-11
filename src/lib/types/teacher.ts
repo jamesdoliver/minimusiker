@@ -61,6 +61,9 @@ export const AUDIO_FILES_FIELD_IDS = {
   rejection_comment: 'fldEbSmoN7NPeMktj', // Long Text - Admin's rejection reason
   // Teacher approval for schulsong
   teacher_approved_at: 'fldSyA8lWMV72xCuq', // Date/time - when teacher approved schulsong
+  // Audio processing fields
+  preview_r2_key: 'fldPreviewR2Key', // R2 key for the 10-second preview snippet
+  mp3_r2_key: 'fldMp3R2Key', // R2 key for the encoded MP3 (when original is WAV)
 } as const;
 
 export const TEACHER_INVITES_FIELD_IDS = {
@@ -159,6 +162,9 @@ export interface AudioFile {
   rejectionComment?: string; // Admin's rejection reason
   // Teacher approval for schulsong
   teacherApprovedAt?: string; // ISO datetime when teacher approved schulsong
+  // Audio processing fields
+  previewR2Key?: string; // R2 key for the 10-second preview snippet
+  mp3R2Key?: string; // R2 key for the encoded MP3 (when original is WAV)
 }
 
 /**

@@ -33,6 +33,9 @@
     },
     "src/app/api/cron/standard-clothing-batch/route.ts": {
       "maxDuration": 120
+    },
+    "src/app/api/audio/process/route.ts": {
+      "maxDuration": 300
     }
   },
   "headers": [

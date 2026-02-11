@@ -266,6 +266,28 @@ export const SCHULSONG_ONLY_PROFILE: ShopProfile = {
 };
 
 // ============================================================================
+// MINICARD VARIANT IDs (for access detection)
+// ============================================================================
+
+/**
+ * All Shopify variant IDs that include a Minicard (grants full audio access).
+ * Includes standalone Minicard, Minicard+CD bundles, and Tonie products
+ * (Kreativ-Tonie ships with a Minicard).
+ *
+ * Variant IDs are the numeric portion after "gid://shopify/ProductVariant/"
+ */
+export const MINICARD_VARIANT_IDS = new Set([
+  // Minimusikertag variants
+  '53258099720538',   // Minicard (standalone)
+  '53327238824282',   // Minicard+CD bundle
+  '53271523557722',   // Tonie (Kreativ-Tonie mit Minicard)
+  // PLUS variants
+  '53440629375322',   // Minicard PLUS
+  '53525549089114',   // Minicard+CD bundle PLUS
+  '53525526217050',   // Tonie PLUS
+]);
+
+// ============================================================================
 // PROFILE RESOLUTION
 // ============================================================================
 

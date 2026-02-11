@@ -33,7 +33,7 @@ interface EngineerBatchUploadModalProps {
   onUploadComplete?: () => void;
 }
 
-type Step = 'upload' | 'extracting' | 'uploading-files' | 'review' | 'confirming';
+type Step = 'upload' | 'extracting' | 'uploading-files' | 'review' | 'confirming' | 'processing';
 
 function unzipAsync(data: Uint8Array): Promise<Record<string, Uint8Array>> {
   return new Promise((resolve, reject) => {
@@ -58,6 +58,7 @@ export default function EngineerBatchUploadModal({
   const [allClasses, setAllClasses] = useState<ClassInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; filename: string }>({ current: 0, total: 0, filename: '' });
+  const [processingProgress, setProcessingProgress] = useState<{ current: number; total: number; errors: string[] }>({ current: 0, total: 0, errors: [] });
 
   const extractedFilesRef = useRef<Map<string, Uint8Array>>(new Map());
   const uploadUrlsRef = useRef<Record<string, string>>({});
@@ -285,7 +286,6 @@ export default function EngineerBatchUploadModal({
       }
 
       const result = await response.json();
-      toast.success(`Successfully uploaded ${result.count} final WAV file(s)!`);
 
       if (result.warnings && result.warnings.length > 0) {
         for (const warning of result.warnings) {
@@ -293,6 +293,48 @@ export default function EngineerBatchUploadModal({
         }
       }
 
+      // Audio Processing Phase: encode WAV→MP3 + generate preview snippets
+      const filesToProcess = result.filesToProcess || [];
+      if (filesToProcess.length > 0) {
+        setStep('processing');
+        setProcessingProgress({ current: 0, total: filesToProcess.length, errors: [] });
+        const processingErrors: string[] = [];
+
+        for (let i = 0; i < filesToProcess.length; i++) {
+          const file = filesToProcess[i];
+          setProcessingProgress(prev => ({ ...prev, current: i + 1 }));
+
+          try {
+            const processResponse = await fetch('/api/audio/process', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                eventId: file.eventId,
+                classId: file.classId,
+                songId: file.songId,
+                r2Key: file.r2Key,
+              }),
+            });
+
+            if (!processResponse.ok) {
+              let message = `Processing failed for file ${i + 1}`;
+              try { const d = await processResponse.json(); message = d.error || message; } catch {}
+              processingErrors.push(message);
+            }
+          } catch (err) {
+            processingErrors.push(`Error processing file ${i + 1}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          }
+        }
+
+        if (processingErrors.length > 0) {
+          setProcessingProgress(prev => ({ ...prev, errors: processingErrors }));
+          for (const error of processingErrors) {
+            toast.error(error);
+          }
+        }
+      }
+
+      toast.success(`Successfully uploaded and processed ${result.count} file(s)!`);
       onUploadComplete?.();
       handleClose();
     } catch (err) {
@@ -316,6 +358,7 @@ export default function EngineerBatchUploadModal({
     setAllClasses([]);
     setError(null);
     setUploadProgress({ current: 0, total: 0, filename: '' });
+    setProcessingProgress({ current: 0, total: 0, errors: [] });
     onClose();
   };
 
@@ -342,6 +385,7 @@ export default function EngineerBatchUploadModal({
     'uploading-files': 'Uploading Files...',
     'review': 'Review Matches',
     'confirming': 'Confirming...',
+    'processing': 'Processing Audio...',
   };
 
   if (!isOpen) return null;
@@ -583,6 +627,29 @@ export default function EngineerBatchUploadModal({
             <div className="text-center py-12">
               <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-purple-600 border-r-transparent"></div>
               <p className="mt-4 text-gray-600">Confirming {summary.total} file(s)...</p>
+            </div>
+          )}
+
+          {step === 'processing' && (
+            <div className="text-center py-12">
+              <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+              <p className="mt-4 text-gray-600">
+                Processing audio {processingProgress.current} of {processingProgress.total}...
+              </p>
+              <p className="mt-1 text-xs text-gray-500">Encoding MP3 + generating preview snippets</p>
+              <div className="mt-4 w-64 mx-auto bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${processingProgress.total > 0 ? (processingProgress.current / processingProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+              {processingProgress.errors.length > 0 && (
+                <div className="mt-4 max-w-md mx-auto text-left">
+                  {processingProgress.errors.map((err, i) => (
+                    <p key={i} className="text-sm text-red-600">{err}</p>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
