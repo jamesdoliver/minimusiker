@@ -5,7 +5,11 @@
  * It runs every hour and only processes templates whose triggerHour matches
  * the current Europe/Berlin hour.
  *
- * @route POST /api/cron/email-automation
+ * Vercel Cron sends GET requests, so the GET handler processes emails.
+ * POST is also supported for manual testing / backwards compatibility.
+ *
+ * @route GET /api/cron/email-automation (Vercel Cron)
+ * @route POST /api/cron/email-automation (manual / legacy)
  * @security Protected by CRON_SECRET environment variable
  */
 
@@ -45,17 +49,10 @@ function verifyCronRequest(request: NextRequest): boolean {
 }
 
 /**
- * POST /api/cron/email-automation
- * Process automated email sending based on active templates
- *
- * Query params:
- * - dryRun=true: Returns what would be sent without actually sending emails
- *
- * Headers:
- * - Authorization: Bearer <CRON_SECRET> (set by Vercel Cron)
- * - X-Cron-Secret: <CRON_SECRET> (for manual testing)
+ * Shared handler for both GET (Vercel Cron) and POST (manual/legacy) requests.
+ * Processes automated email sending based on active templates.
  */
-export async function POST(request: NextRequest): Promise<NextResponse<CronAutomationResponse>> {
+async function handleCronRequest(request: NextRequest): Promise<NextResponse<CronAutomationResponse>> {
   const startTime = Date.now();
 
   try {
@@ -126,35 +123,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<CronAutom
 
 /**
  * GET /api/cron/email-automation
- * Returns information about the cron endpoint
+ * Primary handler — Vercel Cron sends GET requests.
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
-  // Verify authorization for status check as well
-  if (!verifyCronRequest(request)) {
-    return NextResponse.json(
-      { success: false, error: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
+export async function GET(request: NextRequest): Promise<NextResponse<CronAutomationResponse>> {
+  return handleCronRequest(request);
+}
 
-  return NextResponse.json({
-    endpoint: '/api/cron/email-automation',
-    method: 'POST',
-    description: 'Process automated email sending based on active templates',
-    schedule: '0 * * * * (every hour)',
-    queryParams: {
-      dryRun: 'Set to "true" to preview what would be sent without actually sending',
-    },
-    headers: {
-      Authorization: 'Bearer <CRON_SECRET> - Required for authentication',
-    },
-    features: [
-      'Fetches active email templates from Airtable',
-      'Finds events matching each template\'s trigger threshold',
-      'Sends emails to teachers and/or parents based on template audience',
-      'Logs all email sends to EMAIL_LOGS table for tracking',
-      'Prevents duplicate sends by checking log history',
-      'Rate limits at 500ms between sends to respect Resend limits',
-    ],
-  });
+/**
+ * POST /api/cron/email-automation
+ * Kept for manual testing and backwards compatibility.
+ */
+export async function POST(request: NextRequest): Promise<NextResponse<CronAutomationResponse>> {
+  return handleCronRequest(request);
 }
