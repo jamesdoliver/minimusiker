@@ -11,6 +11,7 @@ import CartDrawer from '@/components/shop/CartDrawer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { resolveShopProfile } from '@/lib/config/shopProfiles';
 import { canOrderPersonalizedClothing } from '@/lib/utils/eventTimeline';
+import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 
 // Child type from session
 interface SessionChild {
@@ -52,6 +53,7 @@ function ShopContent() {
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
   const [isVerifying, setIsVerifying] = useState(true);
   const [eventDate, setEventDate] = useState<string | null>(null);
+  const [timelineOverridesJson, setTimelineOverridesJson] = useState<string | null>(null);
   const [shopProfile, setShopProfile] = useState<ReturnType<typeof resolveShopProfile> | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
 
@@ -120,6 +122,9 @@ function ShopContent() {
             isSchulsong: data.isSchulsong,
           }));
           setEventDate(data.eventDate || null);
+          if (data.timelineOverrides) {
+            setTimelineOverridesJson(data.timelineOverrides);
+          }
         }
       } catch (err) {
         console.error('Error fetching event profile:', err);
@@ -131,13 +136,18 @@ function ShopContent() {
     fetchEventProfile();
   }, [isVerifying, eventId]);
 
-  // Compute excluded variant IDs based on cutoff
+  // Compute excluded variant IDs based on cutoff (with per-event overrides)
+  const overrides = useMemo(() => parseOverrides(timelineOverridesJson), [timelineOverridesJson]);
   const excludedVariantIds = useMemo(() => {
     if (!shopProfile || !eventDate) return new Set<string>();
 
-    const showPersonalized = canOrderPersonalizedClothing(eventDate);
+    const isSchulsongOnly = shopProfile.audioProducts.length === 0;
+    const cutoffDays = isSchulsongOnly
+      ? getThreshold('schulsong_clothing_cutoff_days', overrides)
+      : getThreshold('personalized_clothing_cutoff_days', overrides);
+    const showPersonalized = canOrderPersonalizedClothing(eventDate, cutoffDays);
     return buildExcludedVariantIds(shopProfile.shopifyVariantMap, showPersonalized);
-  }, [shopProfile, eventDate]);
+  }, [shopProfile, eventDate, overrides]);
 
   if (isVerifying || isProfileLoading) {
     return (

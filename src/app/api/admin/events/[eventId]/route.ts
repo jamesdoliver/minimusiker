@@ -197,12 +197,41 @@ export async function PATCH(
       body.is_schulsong !== undefined ||
       body.is_minimusikertag !== undefined;
     const hasNotesUpdate = body.admin_notes !== undefined;
+    const hasOverridesUpdate = body.timeline_overrides !== undefined;
 
-    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate) {
+    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate) {
       return NextResponse.json(
-        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides' },
         { status: 400 }
       );
+    }
+
+    // Validate timeline_overrides JSON if provided
+    if (hasOverridesUpdate && body.timeline_overrides !== '') {
+      try {
+        const parsed = JSON.parse(body.timeline_overrides);
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          return NextResponse.json(
+            { success: false, error: 'timeline_overrides must be a JSON object' },
+            { status: 400 }
+          );
+        }
+        // Validate all values are numbers within reasonable bounds
+        for (const [key, value] of Object.entries(parsed)) {
+          if (key === 'milestones' || key === 'task_offsets') continue; // Phase 2 nested objects
+          if (typeof value !== 'number' || !isFinite(value as number) || Math.abs(value as number) > 365) {
+            return NextResponse.json(
+              { success: false, error: `Invalid value for ${key}: must be a finite number between -365 and 365` },
+              { status: 400 }
+            );
+          }
+        }
+      } catch {
+        return NextResponse.json(
+          { success: false, error: 'timeline_overrides must be valid JSON' },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate date format if provided
@@ -542,6 +571,14 @@ export async function PATCH(
       const base = airtableService['base'];
       await base(EVENTS_TABLE_ID).update(eventRecordId, {
         [EVENTS_FIELD_IDS.admin_notes]: body.admin_notes,
+      });
+    }
+
+    // Handle timeline overrides update
+    if (hasOverridesUpdate) {
+      const base = airtableService['base'];
+      await base(EVENTS_TABLE_ID).update(eventRecordId, {
+        [EVENTS_FIELD_IDS.timeline_overrides]: body.timeline_overrides || '',
       });
     }
 

@@ -20,6 +20,7 @@ import {
   renderFullTriggerEmail,
 } from '@/lib/services/triggerTemplateService';
 import { Event } from '@/lib/types/airtable';
+import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 import { EventThresholdMatch, CreateEmailLogInput } from '@/lib/types/email-automation';
 import { Resend } from 'resend';
 import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
@@ -83,16 +84,18 @@ function buildTriggerVariables(
         eventLink,
         parentPortalLink: `${baseUrl}/familie`,
         parentName: '',
-        merchandiseDeadline: computeMerchandiseDeadline(event.event_date),
+        merchandiseDeadline: computeMerchandiseDeadline(event),
       };
     default:
       return { schoolName: event.school_name };
   }
 }
 
-function computeMerchandiseDeadline(eventDate: string): string {
-  const date = new Date(eventDate);
-  date.setDate(date.getDate() + 7);
+function computeMerchandiseDeadline(event: Event): string {
+  const date = new Date(event.event_date);
+  const overrides = parseOverrides(event.timeline_overrides);
+  const days = getThreshold('merchandise_deadline_days', overrides);
+  date.setDate(date.getDate() + days);
   return date.toLocaleDateString('de-DE', {
     day: '2-digit',
     month: '2-digit',

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ApiResponse } from '@/lib/types';
 import { getR2Service, R2_PATHS } from '@/lib/services/r2Service';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,14 +42,16 @@ export async function GET(request: NextRequest) {
 
     // Fetch event to check event date for time-based release
     const event = await airtableService.getEventByEventId(eventId);
+    const overrides = parseOverrides(event?.timeline_overrides);
+    const previewDays = getThreshold('preview_available_days', overrides);
 
-    // Check if 7 days have passed since the event date (purely time-based)
+    // Check if preview period has passed since the event date (purely time-based)
     const eventDate = event?.event_date ? new Date(event.event_date) : null;
-    const sevenDaysAfter = eventDate ? new Date(eventDate) : null;
-    if (sevenDaysAfter) {
-      sevenDaysAfter.setDate(sevenDaysAfter.getDate() + 7);
+    const previewDate = eventDate ? new Date(eventDate) : null;
+    if (previewDate) {
+      previewDate.setDate(previewDate.getDate() + previewDays);
     }
-    const hasWaitingPeriodPassed = sevenDaysAfter ? new Date() >= sevenDaysAfter : false;
+    const hasWaitingPeriodPassed = previewDate ? new Date() >= previewDate : false;
 
     // Audio is visible when 7 days have passed since the event (time-based, no admin approval needed)
     const isVisible = hasWaitingPeriodPassed;
@@ -123,8 +126,8 @@ export async function GET(request: NextRequest) {
       expiresAt: hasAudio ? new Date(Date.now() + 3600 * 1000).toISOString() : undefined,
       // If audio file exists but not visible yet, indicate when it will be visible
       notYetVisible: hasAudioFile && !isVisible,
-      visibleAfter: hasAudioFile && !isVisible && sevenDaysAfter
-        ? sevenDaysAfter.toISOString()
+      visibleAfter: hasAudioFile && !isVisible && previewDate
+        ? previewDate.toISOString()
         : undefined,
     };
 

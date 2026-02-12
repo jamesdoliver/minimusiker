@@ -558,6 +558,8 @@ export const EVENTS_FIELD_IDS = {
   admin_notes: 'fldmzzlsrI5lKKx16', // Multiline text - free-text admin notes
   // Schulsong release date (set when admin approves schulsong after teacher approval)
   schulsong_released_at: 'fldIQeyEpW9lpmg5K', // DateTime - next workday 7am CET
+  // Per-event timeline threshold overrides (JSON blob)
+  timeline_overrides: 'fldTODO_TIMELINE_OVERRIDES', // Multiline text - JSON with per-event timing overrides
 } as const;
 
 // Classes Table - 1 row per class
@@ -703,6 +705,8 @@ export interface Event {
   admin_notes?: string;
   // Schulsong release date (set when admin approves schulsong after teacher approval)
   schulsong_released_at?: string;
+  // Per-event timeline threshold overrides (JSON blob)
+  timeline_overrides?: string;
 }
 
 /**

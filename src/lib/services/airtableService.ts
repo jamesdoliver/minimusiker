@@ -5477,6 +5477,8 @@ class AirtableService {
       admin_notes: record.get('admin_notes') as string | undefined,
       // Schulsong release date
       schulsong_released_at: record.get('schulsong_released_at') as string | undefined,
+      // Per-event timeline threshold overrides
+      timeline_overrides: record.get('timeline_overrides') as string | undefined,
     };
   }
 

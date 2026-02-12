@@ -95,6 +95,7 @@ function ParentPortalContent() {
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [shopProfile, setShopProfile] = useState<ShopProfile>(MINIMUSIKERTAG_PROFILE);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [timelineOverrides, setTimelineOverrides] = useState<string | null>(null);
 
   useEffect(() => {
     verifySessionAndLoadData();
@@ -202,6 +203,9 @@ function ParentPortalContent() {
             isPlus: data.isPlus,
             isSchulsong: data.isSchulsong,
           }));
+          if (data.timelineOverrides) {
+            setTimelineOverrides(data.timelineOverrides);
+          }
         }
       } catch (err) {
         console.error('Error fetching schulsong status:', err);
@@ -491,7 +495,7 @@ function ParentPortalContent() {
         {/* Shopping Section */}
         <section className="mb-12">
           {eventDate && (
-            <OrderDeadlineCountdown eventDate={eventDate} profileType={shopProfile.profileType} />
+            <OrderDeadlineCountdown eventDate={eventDate} profileType={shopProfile.profileType} timelineOverrides={timelineOverrides} />
           )}
           <ProductSelector
             eventId={eventId}
@@ -502,6 +506,7 @@ function ParentPortalContent() {
             schoolName={schoolName}
             children={children}
             shopProfile={shopProfile}
+            timelineOverrides={timelineOverrides}
           />
         </section>
 

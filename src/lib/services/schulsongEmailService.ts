@@ -17,7 +17,7 @@ import {
 import { getRegistryEntry } from '@/lib/config/trigger-email-registry';
 import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
 import { EventThresholdMatch, CreateEmailLogInput } from '@/lib/types/email-automation';
-import { SCHULSONG_CLOTHING_CUTOFF_DAYS } from '@/lib/utils/eventTimeline';
+import { parseOverrides, getThreshold, EventTimelineOverrides } from '@/lib/utils/eventThresholds';
 
 const SLUG = 'schulsong_audio_release';
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@minimusiker.app';
@@ -153,9 +153,10 @@ export async function sendSchulsongReleaseEmailForEvent(
 
 const PARENT_SLUG = 'schulsong_parent_release';
 
-function computeMerchandiseDeadline(eventDate: string): string {
+function computeMerchandiseDeadline(eventDate: string, overrides?: EventTimelineOverrides | null): string {
   const date = new Date(eventDate);
-  date.setDate(date.getDate() + Math.abs(SCHULSONG_CLOTHING_CUTOFF_DAYS));
+  const days = getThreshold('merchandise_deadline_days', overrides);
+  date.setDate(date.getDate() + days);
   return date.toLocaleDateString('de-DE', {
     day: '2-digit',
     month: '2-digit',
@@ -235,7 +236,7 @@ export async function sendSchulsongParentReleaseEmailForEvent(
       eventLink,
       parentPortalLink: `${baseUrl}/familie`,
       parentName: recipient.name || '',
-      merchandiseDeadline: computeMerchandiseDeadline(event.event_date),
+      merchandiseDeadline: computeMerchandiseDeadline(event.event_date, parseOverrides(event.timeline_overrides)),
     };
 
     // Render template (with unsubscribe for parent recipients)

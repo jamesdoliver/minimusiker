@@ -4,6 +4,7 @@ import { hasMinicardForEvent } from '@/lib/utils/minicardAccess';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
+import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 import type { Song, AudioFile } from '@/lib/types/teacher';
 
 export const dynamic = 'force-dynamic';
@@ -80,19 +81,22 @@ export async function GET(request: NextRequest) {
     const teacherService = getTeacherService();
     const r2 = getR2Service();
 
-    // 1. Check release timing (purely time-based)
+    // 1. Check release timing (purely time-based, with per-event overrides)
     const event = await airtableService.getEventByEventId(eventId);
     const eventDate = event?.event_date ? new Date(event.event_date) : null;
+    const overrides = parseOverrides(event?.timeline_overrides);
+    const previewDays = getThreshold('preview_available_days', overrides);
+    const releaseDays = getThreshold('full_release_days', overrides);
 
-    const sevenDaysAfter = eventDate ? new Date(eventDate) : null;
-    if (sevenDaysAfter) sevenDaysAfter.setDate(sevenDaysAfter.getDate() + 7);
+    const previewDate = eventDate ? new Date(eventDate) : null;
+    if (previewDate) previewDate.setDate(previewDate.getDate() + previewDays);
 
-    const fourteenDaysAfter = eventDate ? new Date(eventDate) : null;
-    if (fourteenDaysAfter) fourteenDaysAfter.setDate(fourteenDaysAfter.getDate() + 14);
+    const releaseDate = eventDate ? new Date(eventDate) : null;
+    if (releaseDate) releaseDate.setDate(releaseDate.getDate() + releaseDays);
 
     const now = new Date();
-    const hasPreviewsAvailable = sevenDaysAfter ? now >= sevenDaysAfter : false;
-    const isReleased = fourteenDaysAfter ? now >= fourteenDaysAfter : false;
+    const hasPreviewsAvailable = previewDate ? now >= previewDate : false;
+    const isReleased = releaseDate ? now >= releaseDate : false;
 
     // 2. Check minicard purchase status
     const hasMinicard = await hasMinicardForEvent(session.parentId, eventId);
@@ -107,7 +111,7 @@ export async function GET(request: NextRequest) {
       isReleased,
       hasPreviewsAvailable,
       classPreview,
-      releaseDate: sevenDaysAfter ? sevenDaysAfter.toISOString() : undefined,
+      releaseDate: previewDate ? previewDate.toISOString() : undefined,
     };
 
     // Only include full content when minicard buyer AND released

@@ -1,17 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { getSchulsongClothingCountdown, getEarlyBirdCountdown } from '@/lib/utils/eventTimeline';
+import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 
 interface OrderDeadlineCountdownProps {
   eventDate: string;
   profileType: string;
+  timelineOverrides?: string | null;
 }
 
 export default function OrderDeadlineCountdown({
   eventDate,
   profileType,
+  timelineOverrides,
 }: OrderDeadlineCountdownProps) {
   const t = useTranslations('orderDeadline');
   const locale = useLocale();
@@ -26,6 +29,8 @@ export default function OrderDeadlineCountdown({
   const isSchulsong = profileType === 'schulsong-only';
   const isEarlyBird = profileType === 'minimusikertag' || profileType === 'plus';
 
+  const overrides = useMemo(() => parseOverrides(timelineOverrides), [timelineOverrides]);
+
   useEffect(() => {
     setHasMounted(true);
   }, []);
@@ -35,16 +40,18 @@ export default function OrderDeadlineCountdown({
 
     const update = () => {
       if (isSchulsong) {
-        setCountdown(getSchulsongClothingCountdown(eventDate));
+        const days = Math.abs(getThreshold('schulsong_clothing_cutoff_days', overrides));
+        setCountdown(getSchulsongClothingCountdown(eventDate, days));
       } else if (isEarlyBird) {
-        setCountdown(getEarlyBirdCountdown(eventDate));
+        const days = getThreshold('early_bird_deadline_days', overrides);
+        setCountdown(getEarlyBirdCountdown(eventDate, days));
       }
     };
 
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [eventDate, isSchulsong, isEarlyBird]);
+  }, [eventDate, isSchulsong, isEarlyBird, overrides]);
 
   // Guard: only for supported profile types
   if (!isSchulsong && !isEarlyBird) return null;

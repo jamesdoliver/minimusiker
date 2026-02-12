@@ -8,6 +8,7 @@ import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/
 import { useProducts } from '@/lib/hooks/useProducts';
 import { Product } from '@/lib/types/airtable';
 import { canOrderPersonalizedClothing, getDaysUntilEvent, SCHULSONG_CLOTHING_CUTOFF_DAYS } from '@/lib/utils/eventTimeline';
+import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 import { ShopProfile, AudioProductId, ClothingProductId, AudioProduct, ClothingProduct } from '@/lib/config/shopProfiles';
 import AudioProductCard from './AudioProductCard';
 import ClothingProductCard from './ClothingProductCard';
@@ -44,6 +45,7 @@ interface ProductSelectorProps {
   children?: ParentSessionChild[];
   shopProfile: ShopProfile;
   onCheckout?: (selection: ProductSelection, total: number) => void;
+  timelineOverrides?: string | null;
 }
 
 const COMBO_DISCOUNT_PERCENT = 10;
@@ -283,6 +285,7 @@ export default function ProductSelector({
   children = [],
   shopProfile,
   onCheckout,
+  timelineOverrides,
 }: ProductSelectorProps) {
   const t = useTranslations('productSelector');
   const [selection, setSelection] = useState<ProductSelection>({
@@ -295,11 +298,12 @@ export default function ProductSelector({
   const isSchulsongOnly = shopProfile.audioProducts.length === 0;
 
   // Determine if personalized products should be shown
-  // Schulsong-only events get an extended deadline (-7 days instead of -4)
-  const showPersonalized = canOrderPersonalizedClothing(
-    eventDate,
-    isSchulsongOnly ? SCHULSONG_CLOTHING_CUTOFF_DAYS : undefined
-  );
+  // Use per-event override if available, otherwise fall back to global defaults
+  const overrides = useMemo(() => parseOverrides(timelineOverrides), [timelineOverrides]);
+  const cutoffDays = isSchulsongOnly
+    ? getThreshold('schulsong_clothing_cutoff_days', overrides)
+    : getThreshold('personalized_clothing_cutoff_days', overrides);
+  const showPersonalized = canOrderPersonalizedClothing(eventDate, cutoffDays);
 
   // Select the appropriate clothing products based on time until event
   const activeClothingProducts = useMemo(

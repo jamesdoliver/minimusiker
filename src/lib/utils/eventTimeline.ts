@@ -324,13 +324,15 @@ export function getPersonalizedProductCountdown(
 /**
  * Get countdown to early-bird discount deadline (19 days before event)
  * Returns null if deadline has passed
+ * @param overrideDays - Optional per-event override for the deadline (days before event)
  */
 export function getEarlyBirdCountdown(
-  eventDate: string | Date
+  eventDate: string | Date,
+  overrideDays?: number
 ): { days: number; hours: number; minutes: number; seconds: number } | null {
   const event = new Date(eventDate);
   const deadline = new Date(event);
-  deadline.setDate(deadline.getDate() - EARLY_BIRD_DEADLINE_DAYS);
+  deadline.setDate(deadline.getDate() - (overrideDays ?? EARLY_BIRD_DEADLINE_DAYS));
   // Set deadline to end of day (23:59:59)
   deadline.setHours(23, 59, 59, 999);
 
@@ -350,13 +352,15 @@ export function getEarlyBirdCountdown(
 /**
  * Get countdown to schulsong clothing order deadline
  * Returns null if deadline has passed
+ * @param overrideDays - Optional per-event override for the cutoff (positive = days after event)
  */
 export function getSchulsongClothingCountdown(
-  eventDate: string | Date
+  eventDate: string | Date,
+  overrideDays?: number
 ): { days: number; hours: number; minutes: number; seconds: number } | null {
   const event = new Date(eventDate);
   const deadline = new Date(event);
-  deadline.setDate(deadline.getDate() + Math.abs(SCHULSONG_CLOTHING_CUTOFF_DAYS));
+  deadline.setDate(deadline.getDate() + (overrideDays ?? Math.abs(SCHULSONG_CLOTHING_CUTOFF_DAYS)));
   // Set deadline to end of day (23:59:59)
   deadline.setHours(23, 59, 59, 999);
 
