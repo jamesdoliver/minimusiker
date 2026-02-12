@@ -55,6 +55,8 @@ export const EMAIL_LOGS_FIELD_IDS = {
 export type AudienceValue = 'teacher' | 'parent' | 'non-buyers';
 export type Audience = AudienceValue[];
 
+export type EventTier = 'plus' | 'minimusikertag' | 'schulsong';
+
 // =============================================================================
 // Core Interfaces
 // =============================================================================

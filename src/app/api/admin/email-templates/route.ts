@@ -149,6 +149,19 @@ export async function POST(request: NextRequest) {
       is_schulsong: body.is_schulsong,
     };
 
+    // Normalize: exactly one event-type boolean true (defensive)
+    if (templateInput.is_plus) {
+      templateInput.is_minimusikertag = false;
+      templateInput.is_schulsong = false;
+    } else if (templateInput.is_schulsong) {
+      templateInput.is_minimusikertag = false;
+      templateInput.is_plus = false;
+    } else {
+      templateInput.is_minimusikertag = true;
+      templateInput.is_plus = false;
+      templateInput.is_schulsong = false;
+    }
+
     const airtable = getAirtableService();
     const template = await airtable.createEmailTemplate(templateInput);
 

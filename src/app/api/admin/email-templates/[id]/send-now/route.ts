@@ -13,10 +13,12 @@ import {
   getRecipientsForEvent,
   sendAutomatedEmail,
   eventMatchesTemplate,
+  getEventTier,
+  getTemplateTier,
   daysBetween,
   sleep,
 } from '@/lib/services/emailAutomationService';
-import { EventThresholdMatch } from '@/lib/types/email-automation';
+import { EventThresholdMatch, EventTier } from '@/lib/types/email-automation';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,17 +126,12 @@ export async function POST(
           isSchulsong: event.is_schulsong,
         };
 
-        // Check if event matches template's event type filters
+        // Check if event matches template's tier (exact match)
         if (!eventMatchesTemplate(thresholdMatch, template)) {
-          // Determine skip reason based on template filters
-          let skipReason = 'Event passt nicht zu Template-Filter';
-          if (template.is_minimusikertag && !event.is_minimusikertag) {
-            skipReason = 'Template erfordert Minimusikertag';
-          } else if (template.is_plus && !event.is_plus) {
-            skipReason = 'Template erfordert Plus-Event';
-          } else if (template.is_schulsong && !event.is_schulsong) {
-            skipReason = 'Template erfordert Schulsong';
-          }
+          const tierLabels: Record<EventTier, string> = { plus: 'PLUS', minimusikertag: 'Minimusikertag', schulsong: 'Schulsong' };
+          const eventTier = getEventTier(thresholdMatch);
+          const templateTier = getTemplateTier(template);
+          const skipReason = `Event ist ${tierLabels[eventTier]}, Template erfordert ${tierLabels[templateTier]}`;
 
           previewEvents.push({
             eventId: event.event_id,

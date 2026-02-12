@@ -121,6 +121,21 @@ export async function PUT(
     if (body.is_plus !== undefined) updateInput.is_plus = body.is_plus;
     if (body.is_schulsong !== undefined) updateInput.is_schulsong = body.is_schulsong;
 
+    // Normalize: exactly one event-type boolean true when tier fields are present
+    if (updateInput.is_plus !== undefined || updateInput.is_minimusikertag !== undefined || updateInput.is_schulsong !== undefined) {
+      if (updateInput.is_plus) {
+        updateInput.is_minimusikertag = false;
+        updateInput.is_schulsong = false;
+      } else if (updateInput.is_schulsong) {
+        updateInput.is_minimusikertag = false;
+        updateInput.is_plus = false;
+      } else {
+        updateInput.is_minimusikertag = true;
+        updateInput.is_plus = false;
+        updateInput.is_schulsong = false;
+      }
+    }
+
     const airtable = getAirtableService();
     const template = await airtable.updateEmailTemplate(id, updateInput);
 

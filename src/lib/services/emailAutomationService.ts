@@ -18,6 +18,7 @@ import {
   EventThresholdMatch,
   CreateEmailLogInput,
   Audience,
+  EventTier,
 } from '@/lib/types/email-automation';
 import { Event, Class, Parent, Registration, EVENTS_TABLE_ID, EVENTS_FIELD_IDS, ORDERS_TABLE_ID, ORDERS_FIELD_IDS } from '@/lib/types/airtable';
 
@@ -29,14 +30,31 @@ const RATE_LIMIT_DELAY_MS = 500; // 500ms delay between emails to respect Resend
 // =============================================================================
 
 /**
- * Check if an event matches a template's event type filters (AND logic).
- * Returns false if the template requires an event type the event doesn't have.
+ * Derive the effective tier for an event (highest wins).
+ * Hierarchy: PLUS > Minimusikertag > Schulsong
+ */
+export function getEventTier(event: { isMinimusikertag?: boolean; isPlus?: boolean; isSchulsong?: boolean }): EventTier {
+  if (event.isPlus) return 'plus';
+  if (event.isMinimusikertag) return 'minimusikertag';
+  if (event.isSchulsong) return 'schulsong';
+  return 'minimusikertag'; // fallback (legacy default)
+}
+
+/**
+ * Derive the effective tier for a template (highest wins).
+ */
+export function getTemplateTier(template: { is_minimusikertag: boolean; is_plus: boolean; is_schulsong: boolean }): EventTier {
+  if (template.is_plus) return 'plus';
+  if (template.is_minimusikertag) return 'minimusikertag';
+  if (template.is_schulsong) return 'schulsong';
+  return 'minimusikertag'; // fallback
+}
+
+/**
+ * Check if an event matches a template's tier (exact match).
  */
 export function eventMatchesTemplate(event: EventThresholdMatch, template: EmailTemplate): boolean {
-  if (template.is_minimusikertag && !event.isMinimusikertag) return false;
-  if (template.is_plus && !event.isPlus) return false;
-  if (template.is_schulsong && !event.isSchulsong) return false;
-  return true;
+  return getEventTier(event) === getTemplateTier(template);
 }
 
 /**
