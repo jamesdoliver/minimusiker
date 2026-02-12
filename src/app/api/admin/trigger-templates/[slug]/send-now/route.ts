@@ -12,6 +12,7 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import {
   getTeacherRecipientsForEvent,
   getParentRecipientsForEvent,
+  getEventTier,
   sleep,
 } from '@/lib/services/emailAutomationService';
 import {
@@ -37,10 +38,13 @@ function getEligibleEvents(filterName: string, allEvents: Event[]): Event[] {
   switch (filterName) {
     case 'schulsong_approved':
       return allEvents.filter(
-        (e) => e.is_schulsong && e.admin_approval_status === 'approved'
+        (e) => getEventTier({ isPlus: e.is_plus, isMinimusikertag: e.is_minimusikertag, isSchulsong: e.is_schulsong }) === 'schulsong'
+          && e.admin_approval_status === 'approved'
       );
     case 'schulsong_events':
-      return allEvents.filter((e) => e.is_schulsong);
+      return allEvents.filter(
+        (e) => getEventTier({ isPlus: e.is_plus, isMinimusikertag: e.is_minimusikertag, isSchulsong: e.is_schulsong }) === 'schulsong'
+      );
     case 'all_events':
       return allEvents;
     default:

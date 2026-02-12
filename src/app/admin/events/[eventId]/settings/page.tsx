@@ -110,6 +110,7 @@ export default function EventSettingsPage() {
   const [eventDate, setEventDate] = useState('');
   const [overrides, setOverrides] = useState<EventTimelineOverrides>({});
   const [savedOverrides, setSavedOverrides] = useState<EventTimelineOverrides>({});
+  const [isSchulsongOnly, setIsSchulsongOnly] = useState(false);
 
   // Load event data
   useEffect(() => {
@@ -136,6 +137,9 @@ export default function EventSettingsPage() {
               setSavedOverrides(parsed);
             }
           }
+          // Determine effective tier: schulsong-only when is_schulsong=true but not plus/minimusikertag
+          const { is_schulsong, is_plus, is_minimusikertag } = eventRecordResult;
+          setIsSchulsongOnly(is_schulsong && !is_plus && !is_minimusikertag);
         }
       } catch (err) {
         console.error('Error loading event:', err);
@@ -292,6 +296,10 @@ export default function EventSettingsPage() {
               eventDate={eventDate}
               onChange={(val) => updateValue(field, val)}
               onReset={() => resetField(field)}
+              disabled={field.key === 'merchandise_deadline_days' && !isSchulsongOnly}
+              disabledReason={field.key === 'merchandise_deadline_days' && !isSchulsongOnly
+                ? 'Nur für Schulsong-only Events relevant'
+                : undefined}
             />
           ))}
         </SettingsSection>
@@ -414,6 +422,8 @@ function ThresholdField({
   eventDate,
   onChange,
   onReset,
+  disabled,
+  disabledReason,
 }: {
   field: ThresholdFieldConfig;
   value: number;
@@ -423,31 +433,37 @@ function ThresholdField({
   eventDate: string;
   onChange: (val: string) => void;
   onReset: () => void;
+  disabled?: boolean;
+  disabledReason?: string;
 }) {
   return (
-    <div className="px-6 py-4">
+    <div className={`px-6 py-4 ${disabled ? 'opacity-50' : ''}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <label className="font-medium text-gray-900 text-sm">{field.label}</label>
-            {isModified && (
+            {isModified && !disabled && (
               <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" title="Vom Standard abweichend" />
             )}
           </div>
           <p className="text-xs text-gray-500 mt-0.5">{field.description}</p>
+          {disabled && disabledReason && (
+            <p className="text-xs text-amber-600 mt-0.5 italic">{disabledReason}</p>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <input
             type="number"
             min={0}
             max={365}
-            value={hasOverride ? value : ''}
+            value={hasOverride && !disabled ? value : ''}
             placeholder={`${field.suffix.includes('vor') ? '-' : '+'}${defaultValue}`}
             onChange={(e) => onChange(e.target.value)}
-            className="w-20 px-3 py-1.5 text-sm border rounded-lg text-right focus:ring-2 focus:ring-[#5a8a82] focus:border-[#5a8a82] outline-none placeholder:text-gray-300"
+            disabled={disabled}
+            className="w-20 px-3 py-1.5 text-sm border rounded-lg text-right focus:ring-2 focus:ring-[#5a8a82] focus:border-[#5a8a82] outline-none placeholder:text-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
           />
           <span className="text-xs text-gray-500 whitespace-nowrap w-28">{field.suffix}</span>
-          {isModified && (
+          {isModified && !disabled && (
             <button
               onClick={onReset}
               className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
@@ -460,7 +476,7 @@ function ThresholdField({
           )}
         </div>
       </div>
-      {eventDate && (
+      {eventDate && !disabled && (
         <p className="text-xs text-gray-400 mt-1">
           = {computeDate(eventDate, field, value)}
         </p>

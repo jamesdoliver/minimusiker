@@ -45,5 +45,8 @@ export async function GET(
 
   return NextResponse.json({
     timeline_overrides: event.timeline_overrides || null,
+    is_schulsong: event.is_schulsong ?? false,
+    is_plus: event.is_plus ?? false,
+    is_minimusikertag: event.is_minimusikertag ?? false,
   });
 }
