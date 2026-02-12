@@ -36,6 +36,9 @@ export default function EditBookingModal({
 }: EditBookingModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // Form state - School Name
+  const [schoolName, setSchoolName] = useState(booking.schoolName || '');
+
   // Form state - Contact Information
   const [contactName, setContactName] = useState(booking.contactPerson || '');
   const [contactEmail, setContactEmail] = useState(booking.contactEmail || '');
@@ -65,6 +68,7 @@ export default function EditBookingModal({
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
+      setSchoolName(booking.schoolName || '');
       setContactName(booking.contactPerson || '');
       setContactEmail(booking.contactEmail || '');
       setContactPhone(booking.phone || '');
@@ -164,6 +168,7 @@ export default function EditBookingModal({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          school_name: schoolName,
           school_contact_name: contactName,
           school_contact_email: contactEmail,
           school_phone: contactPhone,
@@ -283,6 +288,20 @@ export default function EditBookingModal({
               Contact Information
             </h3>
             <div className="space-y-4">
+              {/* School Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Schulname
+                </label>
+                <input
+                  type="text"
+                  value={schoolName}
+                  onChange={(e) => setSchoolName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Name der Schule / Einrichtung"
+                />
+              </div>
+
               {/* Contact Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">

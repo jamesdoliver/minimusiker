@@ -17,6 +17,7 @@ export interface SecondaryContact {
 
 // Request body interface
 interface EditBookingRequest {
+  school_name?: string;
   school_contact_name?: string;
   school_contact_email?: string;
   school_phone?: string;
@@ -100,6 +101,9 @@ export async function PATCH(
     // Build Airtable update object using field IDs
     const updateFields: Record<string, string | number | string[]> = {};
 
+    if (body.school_name !== undefined) {
+      updateFields[SCHOOL_BOOKINGS_FIELD_IDS.school_name] = body.school_name;
+    }
     if (body.school_contact_name !== undefined) {
       updateFields[SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name] = body.school_contact_name;
     }
@@ -166,7 +170,9 @@ export async function PATCH(
             zip?: string;
           } = {};
 
-          if (body.school_contact_name !== undefined) {
+          if (body.school_name !== undefined) {
+            clientData.name = body.school_name;
+          } else if (body.school_contact_name !== undefined) {
             clientData.name = body.school_contact_name;
           }
           if (body.school_contact_email !== undefined) {
