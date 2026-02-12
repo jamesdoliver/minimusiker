@@ -46,7 +46,7 @@ export const EVENT_MILESTONES = {
 
   // Post-event milestones (positive = days after)
   MINICARD_ORDER: 1, // Order minicards with access code
-  RECORDING_READY: 3, // Recordings typically available
+  RECORDING_READY: 7, // Previews available (+7d after event)
   REMINDER_EMAIL: 7, // First reminder to check portal
   PORTAL_REMINDER: 14, // Second reminder
   PORTAL_CLOSES: 30, // Parent portal access ends
