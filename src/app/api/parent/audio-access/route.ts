@@ -41,7 +41,7 @@ interface TrackEntry {
  *
  * Unified audio access endpoint for the parent portal.
  * Determines what audio content a parent can access based on:
- * - Whether audio has been released (all_tracks_approved + 7 days past event)
+ * - Time since event: +7 days = previews available, +14 days = fully released
  * - Whether the parent has purchased a Minicard for this event
  *
  * Non-buyers: only receive preview snippet URL (never the full file)
@@ -80,20 +80,19 @@ export async function GET(request: NextRequest) {
     const teacherService = getTeacherService();
     const r2 = getR2Service();
 
-    // 1. Check release status (same pattern as class-audio-status route)
+    // 1. Check release timing (purely time-based)
     const event = await airtableService.getEventByEventId(eventId);
-    const allTracksApproved = event?.all_tracks_approved === true;
     const eventDate = event?.event_date ? new Date(event.event_date) : null;
-    const sevenDaysAfter = eventDate ? new Date(eventDate) : null;
-    if (sevenDaysAfter) {
-      sevenDaysAfter.setDate(sevenDaysAfter.getDate() + 7);
-    }
-    const hasWaitingPeriodPassed = sevenDaysAfter ? new Date() >= sevenDaysAfter : false;
-    const isReleased = allTracksApproved && hasWaitingPeriodPassed;
 
-    // 1b. Check if previews are available (engineer has submitted audio)
-    const pipelineStage = event?.audio_pipeline_stage;
-    const hasPreviewsAvailable = pipelineStage === 'ready_for_review' || pipelineStage === 'approved';
+    const sevenDaysAfter = eventDate ? new Date(eventDate) : null;
+    if (sevenDaysAfter) sevenDaysAfter.setDate(sevenDaysAfter.getDate() + 7);
+
+    const fourteenDaysAfter = eventDate ? new Date(eventDate) : null;
+    if (fourteenDaysAfter) fourteenDaysAfter.setDate(fourteenDaysAfter.getDate() + 14);
+
+    const now = new Date();
+    const hasPreviewsAvailable = sevenDaysAfter ? now >= sevenDaysAfter : false;
+    const isReleased = fourteenDaysAfter ? now >= fourteenDaysAfter : false;
 
     // 2. Check minicard purchase status
     const hasMinicard = await hasMinicardForEvent(session.parentId, eventId);

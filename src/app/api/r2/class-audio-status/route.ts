@@ -39,11 +39,10 @@ export async function GET(request: NextRequest) {
     const airtableService = getAirtableService();
     const isR2Enabled = process.env.ENABLE_DIGITAL_DELIVERY === 'true';
 
-    // Fetch event to check approval status and event date
+    // Fetch event to check event date for time-based release
     const event = await airtableService.getEventByEventId(eventId);
-    const allTracksApproved = event?.all_tracks_approved === true;
 
-    // Check if 7 days have passed since the event date
+    // Check if 7 days have passed since the event date (purely time-based)
     const eventDate = event?.event_date ? new Date(event.event_date) : null;
     const sevenDaysAfter = eventDate ? new Date(eventDate) : null;
     if (sevenDaysAfter) {
@@ -51,8 +50,8 @@ export async function GET(request: NextRequest) {
     }
     const hasWaitingPeriodPassed = sevenDaysAfter ? new Date() >= sevenDaysAfter : false;
 
-    // Audio is visible only when admin approved ALL tracks AND 7 days have passed
-    const isVisible = allTracksApproved && hasWaitingPeriodPassed;
+    // Audio is visible when 7 days have passed since the event (time-based, no admin approval needed)
+    const isVisible = hasWaitingPeriodPassed;
 
     // Check for final audio in the new structure
     // Path: events/{eventId}/classes/{classId}/final/final.mp3
