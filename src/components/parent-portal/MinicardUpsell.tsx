@@ -1,11 +1,11 @@
 'use client';
 
 interface MinicardUpsellProps {
-  schoolName: string;
+  schoolName?: string;
   onScrollToShop?: () => void;
 }
 
-export default function MinicardUpsell({ schoolName, onScrollToShop }: MinicardUpsellProps) {
+export default function MinicardUpsell({ onScrollToShop }: MinicardUpsellProps) {
   const handleClick = () => {
     if (onScrollToShop) {
       onScrollToShop();
@@ -31,8 +31,7 @@ export default function MinicardUpsell({ schoolName, onScrollToShop }: MinicardU
             Die vollständige Aufnahme freischalten
           </h3>
           <p className="text-sm text-sage-700 mt-1">
-            Mit der Minicard erhältst du Zugang zur kompletten Aufnahme deiner Klasse
-            sowie zu allen Chor- und Lehrerliedern von {schoolName}.
+            Hört die vollen Songs deines Kindes und der gesamten Schule und besorgt sie euch digital per Minicard oder CD!
           </p>
           <button
             onClick={handleClick}
