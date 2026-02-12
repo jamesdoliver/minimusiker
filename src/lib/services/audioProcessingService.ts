@@ -12,8 +12,11 @@ const execFileAsync = promisify(execFile);
 // We do NOT use require('ffmpeg-static') because webpack inlines the module,
 // causing __dirname to resolve to the bundle directory instead of node_modules/.
 function resolveFfmpegBinaryPath(): string | null {
+  const tried: string[] = [];
+
   // 1. Honour the FFMPEG_BIN env var (same precedence as ffmpeg-static itself)
   if (process.env.FFMPEG_BIN) {
+    console.log('[ffmpeg] Using FFMPEG_BIN env var:', process.env.FFMPEG_BIN);
     return process.env.FFMPEG_BIN;
   }
 
@@ -21,7 +24,11 @@ function resolveFfmpegBinaryPath(): string | null {
   try {
     const pkgJsonPath = require.resolve('ffmpeg-static/package.json');
     const binPath = path.join(path.dirname(pkgJsonPath), 'ffmpeg');
-    if (existsSync(binPath)) return binPath;
+    tried.push(binPath);
+    if (existsSync(binPath)) {
+      console.log('[ffmpeg] Found via require.resolve:', binPath);
+      return binPath;
+    }
   } catch {
     // require.resolve failed — may be inlined by webpack
   }
@@ -30,20 +37,44 @@ function resolveFfmpegBinaryPath(): string | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const staticPath: string | null = require('ffmpeg-static');
-    if (staticPath && existsSync(staticPath)) return staticPath;
+    if (staticPath) tried.push(staticPath);
+    if (staticPath && existsSync(staticPath)) {
+      console.log('[ffmpeg] Found via require("ffmpeg-static"):', staticPath);
+      return staticPath;
+    }
   } catch {
     // Module resolution failed
   }
 
-  // 4. Probe known Vercel deployment paths
-  const vercelPaths = [
+  // 4. Probe known deployment paths
+  const probePaths = [
     '/var/task/node_modules/ffmpeg-static/ffmpeg',
     path.join(process.cwd(), 'node_modules/ffmpeg-static/ffmpeg'),
   ];
-  for (const p of vercelPaths) {
-    if (existsSync(p)) return p;
+
+  // 5. Walk up from __dirname to find node_modules
+  //    On Vercel, __dirname points somewhere under /var/task/ even if the exact
+  //    webpack-resolved path is wrong — walking up covers edge cases.
+  let dir = __dirname;
+  for (let i = 0; i < 10; i++) {
+    const candidate = path.join(dir, 'node_modules/ffmpeg-static/ffmpeg');
+    if (!probePaths.includes(candidate)) {
+      probePaths.push(candidate);
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
 
+  for (const p of probePaths) {
+    tried.push(p);
+    if (existsSync(p)) {
+      console.log('[ffmpeg] Found via probe:', p);
+      return p;
+    }
+  }
+
+  console.error('[ffmpeg] Binary not found. Tried:', tried);
   return null;
 }
 
@@ -64,23 +95,35 @@ async function getFfmpegPath(): Promise<string> {
   }
 
   if (!ffmpegPath) {
-    throw new Error('ffmpeg-static returned null/undefined — binary not bundled in deployment');
+    throw new Error('ffmpeg binary not found in any known location');
   }
 
-  // Try the original path first (works locally)
+  console.log('[ffmpeg] Source binary path:', ffmpegPath);
+
+  // Try the original path directly (works locally)
   try {
     await access(ffmpegPath, fsConstants.X_OK);
     resolvedFfmpegPath = ffmpegPath;
+    console.log('[ffmpeg] Using source directly (executable)');
     return ffmpegPath;
   } catch {
-    // Binary exists but isn't executable (Vercel strips permissions)
+    // Not executable — check if it at least exists
+  }
+
+  // Verify source exists before attempting copy
+  try {
+    await access(ffmpegPath, fsConstants.R_OK);
+  } catch {
+    throw new Error(`ffmpeg binary found at ${ffmpegPath} but not readable (ENOENT or permission denied)`);
   }
 
   // Copy to /tmp and make executable
   const tmpFfmpeg = '/tmp/ffmpeg';
+  console.log('[ffmpeg] Copying to /tmp and setting executable...');
   await copyFile(ffmpegPath, tmpFfmpeg);
   await chmod(tmpFfmpeg, 0o755);
   resolvedFfmpegPath = tmpFfmpeg;
+  console.log('[ffmpeg] Using /tmp/ffmpeg');
   return tmpFfmpeg;
 }
 
