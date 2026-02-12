@@ -159,6 +159,11 @@ export default function EventSettingsPage() {
     return displayValue(GLOBAL_DEFAULTS[field.key], field.negateForDisplay);
   };
 
+  // Check if a field has any override set (even if it matches the default)
+  const hasOverride = (field: ThresholdFieldConfig): boolean => {
+    return overrides[field.key] !== undefined;
+  };
+
   // Check if a field has been modified from its default
   const isModified = (field: ThresholdFieldConfig): boolean => {
     return overrides[field.key] !== undefined && overrides[field.key] !== GLOBAL_DEFAULTS[field.key];
@@ -166,6 +171,16 @@ export default function EventSettingsPage() {
 
   // Update a threshold value
   const updateValue = (field: ThresholdFieldConfig, rawValue: string) => {
+    // Allow clearing the input to remove the override
+    if (rawValue === '') {
+      setOverrides((prev) => {
+        const next = { ...prev };
+        delete next[field.key];
+        return next;
+      });
+      return;
+    }
+
     const numValue = parseInt(rawValue, 10);
     if (isNaN(numValue) || numValue < 0) return;
 
@@ -272,6 +287,7 @@ export default function EventSettingsPage() {
               field={field}
               value={getValue(field)}
               defaultValue={getDefault(field)}
+              hasOverride={hasOverride(field)}
               isModified={isModified(field)}
               eventDate={eventDate}
               onChange={(val) => updateValue(field, val)}
@@ -288,6 +304,7 @@ export default function EventSettingsPage() {
               field={field}
               value={getValue(field)}
               defaultValue={getDefault(field)}
+              hasOverride={hasOverride(field)}
               isModified={isModified(field)}
               eventDate={eventDate}
               onChange={(val) => updateValue(field, val)}
@@ -392,6 +409,7 @@ function ThresholdField({
   field,
   value,
   defaultValue,
+  hasOverride,
   isModified,
   eventDate,
   onChange,
@@ -400,6 +418,7 @@ function ThresholdField({
   field: ThresholdFieldConfig;
   value: number;
   defaultValue: number;
+  hasOverride: boolean;
   isModified: boolean;
   eventDate: string;
   onChange: (val: string) => void;
@@ -422,9 +441,10 @@ function ThresholdField({
             type="number"
             min={0}
             max={365}
-            value={value}
+            value={hasOverride ? value : ''}
+            placeholder={String(defaultValue)}
             onChange={(e) => onChange(e.target.value)}
-            className="w-20 px-3 py-1.5 text-sm border rounded-lg text-right focus:ring-2 focus:ring-[#5a8a82] focus:border-[#5a8a82] outline-none"
+            className="w-20 px-3 py-1.5 text-sm border rounded-lg text-right focus:ring-2 focus:ring-[#5a8a82] focus:border-[#5a8a82] outline-none placeholder:text-gray-300"
           />
           <span className="text-xs text-gray-500 whitespace-nowrap w-28">{field.suffix}</span>
           {isModified && (
