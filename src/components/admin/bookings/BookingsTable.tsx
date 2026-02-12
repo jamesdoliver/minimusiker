@@ -6,6 +6,7 @@ import BookingDetailsBreakdown from './BookingDetailsBreakdown';
 import StatusCircle from './StatusCircle';
 import EventTypeCircles from './EventTypeCircles';
 import { RegistrationProgress } from './RegistrationProgress';
+import { ClassSongCount } from './ClassSongCount';
 
 // Computed status type for styling
 type ComputedStatus = 'confirmed' | 'completed' | 'onHold' | 'pending';
@@ -109,6 +110,9 @@ export default function BookingsTable({ bookings, onEventDeleted, getComputedSta
                 Registration
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                C/S
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Audio
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -153,6 +157,12 @@ export default function BookingsTable({ bookings, onEventDeleted, getComputedSta
                       />
                     </td>
                     <td className="px-6 py-4 text-center">
+                      <ClassSongCount
+                        classCount={booking.classCount || 0}
+                        songCount={booking.songCount || 0}
+                      />
+                    </td>
+                    <td className="px-6 py-4 text-center">
                       <AudioPipelineIndicator
                         stage={booking.audioPipelineStage}
                         eventDate={booking.bookingDate}
@@ -175,7 +185,7 @@ export default function BookingsTable({ bookings, onEventDeleted, getComputedSta
                   </tr>
                   {isExpanded && (
                     <tr>
-                      <td colSpan={7} className="p-0">
+                      <td colSpan={8} className="p-0">
                         <div
                           className="overflow-hidden transition-all duration-300 ease-in-out"
                           style={{ maxHeight: isExpanded ? '1000px' : '0' }}

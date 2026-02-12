@@ -40,7 +40,9 @@ import {
   EVENT_MANUAL_COSTS_TABLE_ID,
   EVENT_MANUAL_COSTS_FIELD_IDS,
   isRegistrableClassType,
+  SONGS_LINKED_FIELD_IDS,
 } from '@/lib/types/airtable';
+import { SONGS_TABLE_ID } from '@/lib/types/teacher';
 import { ManualCost } from '@/lib/types/analytics';
 import {
   TeacherResource,
@@ -5365,6 +5367,78 @@ class AirtableService {
       }
     } catch (error) {
       console.error('Error fetching registration counts:', error);
+    }
+
+    return counts;
+  }
+
+  /**
+   * Get class counts for multiple events in a single query
+   * @param eventRecordIds Array of Event record IDs
+   * @returns Map of event record ID to class count
+   */
+  async getClassCountsByEventIds(eventRecordIds: string[]): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+
+    if (eventRecordIds.length === 0) return counts;
+
+    // Initialize all event IDs with 0
+    eventRecordIds.forEach(id => counts.set(id, 0));
+
+    try {
+      const records = await this.base(CLASSES_TABLE_ID)
+        .select({
+          fields: [CLASSES_FIELD_IDS.event_id],
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      for (const record of records) {
+        const eventIdArray = record.fields[CLASSES_FIELD_IDS.event_id] as string[] || [];
+        for (const eventId of eventIdArray) {
+          if (counts.has(eventId)) {
+            counts.set(eventId, (counts.get(eventId) || 0) + 1);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching class counts:', error);
+    }
+
+    return counts;
+  }
+
+  /**
+   * Get song counts for multiple events in a single query
+   * @param eventRecordIds Array of Event record IDs
+   * @returns Map of event record ID to song count
+   */
+  async getSongCountsByEventIds(eventRecordIds: string[]): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+
+    if (eventRecordIds.length === 0) return counts;
+
+    // Initialize all event IDs with 0
+    eventRecordIds.forEach(id => counts.set(id, 0));
+
+    try {
+      const records = await this.base(SONGS_TABLE_ID)
+        .select({
+          fields: [SONGS_LINKED_FIELD_IDS.event_link],
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      for (const record of records) {
+        const eventIdArray = record.fields[SONGS_LINKED_FIELD_IDS.event_link] as string[] || [];
+        for (const eventId of eventIdArray) {
+          if (counts.has(eventId)) {
+            counts.set(eventId, (counts.get(eventId) || 0) + 1);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching song counts:', error);
     }
 
     return counts;

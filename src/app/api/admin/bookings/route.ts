@@ -54,6 +54,9 @@ export interface BookingWithDetails {
   adminNotes?: string;
   // Discount code (simplybookHash)
   discountCode?: string;
+  // Class and song counts
+  classCount?: number;
+  songCount?: number;
 }
 
 // Staff member for dropdown
@@ -243,13 +246,19 @@ export async function GET(request: NextRequest) {
       .map(b => b.eventRecordId)
       .filter((id): id is string => !!id);
 
-    // Fetch registration counts in a single batch query
-    const registrationCounts = await airtableService.getRegistrationCountsByEventIds(eventRecordIds);
+    // Fetch registration, class, and song counts in parallel batch queries
+    const [registrationCounts, classCounts, songCounts] = await Promise.all([
+      airtableService.getRegistrationCountsByEventIds(eventRecordIds),
+      airtableService.getClassCountsByEventIds(eventRecordIds),
+      airtableService.getSongCountsByEventIds(eventRecordIds),
+    ]);
 
-    // Merge registration counts into bookings
+    // Merge counts into bookings
     const bookingsWithRegistrations = bookingsWithAccessCodes.map(booking => ({
       ...booking,
       registrationCount: booking.eventRecordId ? registrationCounts.get(booking.eventRecordId) || 0 : 0,
+      classCount: booking.eventRecordId ? classCounts.get(booking.eventRecordId) || 0 : 0,
+      songCount: booking.eventRecordId ? songCounts.get(booking.eventRecordId) || 0 : 0,
     }));
 
     // Filter out deleted events (soft-deleted via Event status)

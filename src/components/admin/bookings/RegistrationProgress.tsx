@@ -23,7 +23,7 @@ export function RegistrationProgress({ registered, estimated }: RegistrationProg
 
   return (
     <span className={`text-sm font-medium ${colorClass}`}>
-      {registered}/{estimated} ({percentage}%)
+      {percentage}%
     </span>
   );
 }
