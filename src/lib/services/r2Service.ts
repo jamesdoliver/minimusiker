@@ -167,6 +167,14 @@ interface FileMetadata {
   lastModified?: Date;
 }
 
+/** Sanitize a string for use as an S3/R2 metadata value (HTTP header safe — ASCII only). */
+function sanitizeMetadataValue(value: string): string {
+  return value
+    .normalize('NFD')                    // decompose ö → o + combining ¨
+    .replace(/[\u0300-\u036f]/g, '')     // strip combining diacritical marks
+    .replace(/[^\x20-\x7E]/g, '_');      // replace any remaining non-ASCII with _
+}
+
 class R2Service {
   private client: S3Client;
   private bucketName: string;
@@ -506,7 +514,9 @@ class R2Service {
           classId: classId,
           type: type,
           uploadDate: new Date().toISOString(),
-          ...additionalMetadata,
+          ...Object.fromEntries(
+            Object.entries(additionalMetadata ?? {}).map(([k, v]) => [k, sanitizeMetadataValue(v)])
+          ),
         },
       });
 
@@ -726,7 +736,7 @@ class R2Service {
           eventId: eventId,
           classId: classId,
           type: 'raw',
-          originalFilename: originalFilename,
+          originalFilename: sanitizeMetadataValue(originalFilename),
           uploadDate: new Date().toISOString(),
           ...(uploadedBy && { uploadedBy: uploadedBy }),
         },
@@ -1029,7 +1039,7 @@ class R2Service {
         ContentType: contentType,
         Metadata: {
           uploadId: uploadId,
-          originalFilename: filename,
+          originalFilename: sanitizeMetadataValue(filename),
           uploadDate: new Date().toISOString(),
         },
       });
@@ -2009,7 +2019,7 @@ class R2Service {
           eventId,
           classId,
           type: 'raw',
-          originalFilename,
+          originalFilename: sanitizeMetadataValue(originalFilename),
           uploadDate: new Date().toISOString(),
           ...(uploadedBy && { uploadedBy }),
         },
