@@ -442,7 +442,7 @@ function ThresholdField({
             min={0}
             max={365}
             value={hasOverride ? value : ''}
-            placeholder={String(defaultValue)}
+            placeholder={`${field.suffix.includes('vor') ? '-' : '+'}${defaultValue}`}
             onChange={(e) => onChange(e.target.value)}
             className="w-20 px-3 py-1.5 text-sm border rounded-lg text-right focus:ring-2 focus:ring-[#5a8a82] focus:border-[#5a8a82] outline-none placeholder:text-gray-300"
           />
