@@ -481,6 +481,13 @@ export async function PATCH(
         fieldUpdates.is_minimusikertag = body.is_minimusikertag;
       }
 
+      // Normalize: is_plus and is_minimusikertag are mutually exclusive
+      if (fieldUpdates.is_plus === true) {
+        fieldUpdates.is_minimusikertag = false;
+      } else if (fieldUpdates.is_minimusikertag === true) {
+        fieldUpdates.is_plus = false;
+      }
+
       updatedEvent = await airtableService.updateEventFields(eventRecordId, fieldUpdates);
 
       // Auto-assign/remove engineers based on schulsong toggle

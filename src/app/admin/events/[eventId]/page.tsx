@@ -310,7 +310,7 @@ export default function EventDetailPage() {
 
   // Event type toggle handlers
   const handleToggleChange = async (
-    field: 'is_plus' | 'is_kita' | 'is_schulsong' | 'is_minimusikertag',
+    field: 'is_kita' | 'is_schulsong',
     value: boolean
   ) => {
     setIsUpdatingToggles(field);
@@ -326,27 +326,50 @@ export default function EventDetailPage() {
         throw new Error(data.error || 'Failed to update setting');
       }
 
-      // Update local state
-      if (field === 'is_plus') {
-        setIsPlus(value);
-      } else if (field === 'is_kita') {
+      if (field === 'is_kita') {
         setIsKita(value);
       } else if (field === 'is_schulsong') {
         setIsSchulsong(value);
-      } else if (field === 'is_minimusikertag') {
-        setIsMinimusikertag(value);
       }
 
       const labelMap = {
-        is_plus: 'Minimusikertag PLUS',
         is_kita: 'Kita',
         is_schulsong: 'Schulsong',
-        is_minimusikertag: 'Minimusikertag',
       };
       toast.success(`${labelMap[field]} ${value ? 'enabled' : 'disabled'}`);
     } catch (err) {
       console.error('Error updating toggle:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to update setting');
+    } finally {
+      setIsUpdatingToggles(null);
+    }
+  };
+
+  // Tier switch handler (Minimusikertag ←→ PLUS, mutually exclusive)
+  const handleTierSwitch = async (newIsPlus: boolean) => {
+    if (newIsPlus === isPlus) return;
+    setIsUpdatingToggles('tier');
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          is_plus: newIsPlus,
+          is_minimusikertag: !newIsPlus,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update tier');
+      }
+
+      setIsPlus(newIsPlus);
+      setIsMinimusikertag(!newIsPlus);
+      toast.success(`Tier: ${newIsPlus ? 'PLUS' : 'Minimusikertag'}`);
+    } catch (err) {
+      console.error('Error updating tier:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to update tier');
     } finally {
       setIsUpdatingToggles(null);
     }
@@ -776,65 +799,51 @@ export default function EventDetailPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type</h3>
               <div className="space-y-3">
-                {/* Minimusikertag Toggle */}
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      checked={isMinimusikertag}
-                      onChange={(e) =>
-                        handleToggleChange('is_minimusikertag', e.target.checked)
-                      }
-                      disabled={isUpdatingToggles === 'is_minimusikertag'}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-green-500 peer-disabled:opacity-50 transition-colors" />
-                    <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform flex items-center justify-center">
-                      <span className="text-[8px] font-bold" style={{ color: '#166534' }}>M</span>
-                    </div>
-                  </div>
-                  <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                    Minimusikertag
-                  </span>
+                {/* Minimusikertag ←→ PLUS Segmented Control */}
+                <div className="flex items-center gap-3">
                   <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
-                    style={{ backgroundColor: '#86efac', color: '#166534' }}
+                    className={`inline-flex rounded-lg p-0.5 ${isUpdatingToggles === 'tier' ? 'opacity-50 pointer-events-none' : ''}`}
+                    style={{ backgroundColor: '#e5e7eb' }}
                   >
-                    M
+                    <button
+                      type="button"
+                      onClick={() => handleTierSwitch(false)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+                      style={!isPlus ? {
+                        backgroundColor: '#86efac',
+                        color: '#166534',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                      } : {
+                        backgroundColor: 'transparent',
+                        color: '#6b7280',
+                      }}
+                    >
+                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                        style={!isPlus ? { backgroundColor: '#166534', color: '#86efac' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
+                      >M</span>
+                      Minimusikertag
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTierSwitch(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+                      style={isPlus ? {
+                        backgroundColor: '#93c5fd',
+                        color: '#1e40af',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                      } : {
+                        backgroundColor: 'transparent',
+                        color: '#6b7280',
+                      }}
+                    >
+                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                        style={isPlus ? { backgroundColor: '#1e40af', color: '#93c5fd' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
+                      >+</span>
+                      PLUS
+                    </button>
                   </div>
-                  {isUpdatingToggles === 'is_minimusikertag' && (
-                    <LoadingSpinner size="sm" />
-                  )}
-                </label>
-
-                {/* Minimusikertag PLUS Toggle */}
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      checked={isPlus}
-                      onChange={(e) =>
-                        handleToggleChange('is_plus', e.target.checked)
-                      }
-                      disabled={isUpdatingToggles === 'is_plus'}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 peer-disabled:opacity-50 transition-colors" />
-                    <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
-                  </div>
-                  <span className="text-sm text-gray-700 group-hover:text-gray-900">
-                    Minimusikertag PLUS
-                  </span>
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
-                    style={{ backgroundColor: '#93c5fd', color: '#1e40af' }}
-                  >
-                    {isPlus ? '+' : 'M'}
-                  </div>
-                  {isUpdatingToggles === 'is_plus' && (
-                    <LoadingSpinner size="sm" />
-                  )}
-                </label>
+                  {isUpdatingToggles === 'tier' && <LoadingSpinner size="sm" />}
+                </div>
 
                 {/* Kita Toggle */}
                 <label className="flex items-center gap-3 cursor-pointer group">
