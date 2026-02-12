@@ -559,7 +559,7 @@ export const EVENTS_FIELD_IDS = {
   // Schulsong release date (set when admin approves schulsong after teacher approval)
   schulsong_released_at: 'fldIQeyEpW9lpmg5K', // DateTime - next workday 7am CET
   // Per-event timeline threshold overrides (JSON blob)
-  timeline_overrides: 'fldTODO_TIMELINE_OVERRIDES', // Multiline text - JSON with per-event timing overrides
+  timeline_overrides: 'fld25hstx4yePlpnB', // Multiline text - JSON with per-event timing overrides
 } as const;
 
 // Classes Table - 1 row per class
