@@ -91,6 +91,10 @@ export async function GET(request: NextRequest) {
     const hasWaitingPeriodPassed = sevenDaysAfter ? new Date() >= sevenDaysAfter : false;
     const isReleased = allTracksApproved && hasWaitingPeriodPassed;
 
+    // 1b. Check if previews are available (engineer has submitted audio)
+    const pipelineStage = event?.audio_pipeline_stage;
+    const hasPreviewsAvailable = pipelineStage === 'ready_for_review' || pipelineStage === 'approved';
+
     // 2. Check minicard purchase status
     const hasMinicard = await hasMinicardForEvent(session.parentId, eventId);
 
@@ -102,6 +106,7 @@ export async function GET(request: NextRequest) {
       success: true,
       hasMinicard,
       isReleased,
+      hasPreviewsAvailable,
       classPreview,
       releaseDate: sevenDaysAfter ? sevenDaysAfter.toISOString() : undefined,
     };

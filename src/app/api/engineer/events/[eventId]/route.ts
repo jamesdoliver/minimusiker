@@ -112,10 +112,11 @@ export async function GET(
           className: 'Schulsong',
           songs: [],  // Schulsong has its own dedicated rendering block
           rawFiles: schulsongAudioFiles.filter((f) => f.type === 'raw'),
-          previewFile: schulsongAudioFiles.find((f) => f.type === 'preview'),
+          previewFile: schulsongAudioFiles.find((f) => f.type === 'preview')
+            || schulsongAudioFiles.find((f) => f.type === 'final' && f.previewR2Key),
           finalMp3File: schulsongAudioFiles.find(
             (f) => f.type === 'final' && f.r2Key.endsWith('.mp3')
-          ),
+          ) || schulsongAudioFiles.find((f) => f.type === 'final' && f.mp3R2Key),
           finalWavFile: schulsongAudioFiles.find(
             (f) => f.type === 'final' && f.r2Key.endsWith('.wav')
           ),
@@ -144,8 +145,10 @@ export async function GET(
             songTitle: song.title,
             artist: song.artist,
             order: song.order,
-            previewFile: songFiles.find(f => f.type === 'preview'),
-            finalMp3File: songFiles.find(f => f.type === 'final' && f.r2Key.endsWith('.mp3')),
+            previewFile: songFiles.find(f => f.type === 'preview')
+              || songFiles.find(f => f.type === 'final' && f.previewR2Key),
+            finalMp3File: songFiles.find(f => f.type === 'final' && f.r2Key.endsWith('.mp3'))
+              || songFiles.find(f => f.type === 'final' && f.mp3R2Key),
             finalWavFile: songFiles.find(f => f.type === 'final' && f.r2Key.endsWith('.wav')),
           };
         });

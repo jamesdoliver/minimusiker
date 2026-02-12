@@ -26,6 +26,7 @@ interface AudioAccessResponse {
   success: boolean;
   hasMinicard: boolean;
   isReleased: boolean;
+  hasPreviewsAvailable?: boolean;
   classPreview: {
     hasAudio: boolean;
     previewUrl?: string;
@@ -220,6 +221,7 @@ function ParentPortalContent() {
   const hasAudio = audioAccess?.classPreview?.hasAudio ?? false;
   const isReleased = audioAccess?.isReleased ?? false;
   const hasMinicard = audioAccess?.hasMinicard ?? false;
+  const hasPreviewsAvailable = audioAccess?.hasPreviewsAvailable ?? false;
 
   // Scroll to shop section (for MinicardUpsell CTA)
   const scrollToShop = useCallback(() => {
@@ -399,13 +401,13 @@ function ParentPortalContent() {
 
       {/* ================================================================
           AUDIO SECTION — Conditional rendering based on access level
-          State A: !isReleased → Coming Soon
-          State B: isReleased && !hasMinicard → Preview only + upsell CTA
+          State A: !isReleased && !hasPreviewsAvailable → Coming Soon
+          State B: (hasPreviewsAvailable || isReleased) && !(isReleased && hasMinicard) → Preview + upsell CTA
           State C: isReleased && hasMinicard → Full tabbed interface
          ================================================================ */}
 
-      {/* State A: Audio not yet released — Coming Soon */}
-      {!isSchulsongOnly && hasAudio && !isReleased && !isLoadingAudio && (
+      {/* State A: Audio not yet released and no previews available — Coming Soon */}
+      {!isSchulsongOnly && hasAudio && !isReleased && !hasPreviewsAvailable && !isLoadingAudio && (
         <section className="bg-white py-12">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-sage-50 border border-sage-200 rounded-xl p-8 text-center">
@@ -430,8 +432,8 @@ function ParentPortalContent() {
         </section>
       )}
 
-      {/* State B: Released, no minicard — Preview only with upsell */}
-      {!isSchulsongOnly && hasAudio && isReleased && !hasMinicard && !isLoadingAudio && (
+      {/* State B: Previews available or released, but not full access — Preview with upsell */}
+      {!isSchulsongOnly && hasAudio && (hasPreviewsAvailable || isReleased) && !(isReleased && hasMinicard) && !isLoadingAudio && (
         <section className="bg-white py-12">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="bg-white rounded-xl shadow-lg p-6">

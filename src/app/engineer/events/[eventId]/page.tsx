@@ -832,7 +832,7 @@ export default function EngineerEventDetailPage() {
                   Submitting...
                 </>
               ) : (
-                'Submit for Review'
+                'Submit Audio'
               )}
             </button>
           </div>
