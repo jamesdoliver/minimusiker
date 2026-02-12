@@ -1,16 +1,53 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { writeFile, unlink, access, copyFile, chmod } from 'fs/promises';
-import { constants as fsConstants } from 'fs';
+import { constants as fsConstants, existsSync } from 'fs';
 import path from 'path';
 import { getR2Service } from './r2Service';
 import { getTeacherService } from './teacherService';
 
 const execFileAsync = promisify(execFile);
 
-// ffmpeg-static provides the path to a pre-compiled ffmpeg binary
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const ffmpegPath: string | null = require('ffmpeg-static');
+// Resolve ffmpeg binary path manually.
+// We do NOT use require('ffmpeg-static') because webpack inlines the module,
+// causing __dirname to resolve to the bundle directory instead of node_modules/.
+function resolveFfmpegBinaryPath(): string | null {
+  // 1. Honour the FFMPEG_BIN env var (same precedence as ffmpeg-static itself)
+  if (process.env.FFMPEG_BIN) {
+    return process.env.FFMPEG_BIN;
+  }
+
+  // 2. Try require.resolve to locate the package directory
+  try {
+    const pkgJsonPath = require.resolve('ffmpeg-static/package.json');
+    const binPath = path.join(path.dirname(pkgJsonPath), 'ffmpeg');
+    if (existsSync(binPath)) return binPath;
+  } catch {
+    // require.resolve failed — may be inlined by webpack
+  }
+
+  // 3. Try the original require('ffmpeg-static') — works locally where __dirname is correct
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const staticPath: string | null = require('ffmpeg-static');
+    if (staticPath && existsSync(staticPath)) return staticPath;
+  } catch {
+    // Module resolution failed
+  }
+
+  // 4. Probe known Vercel deployment paths
+  const vercelPaths = [
+    '/var/task/node_modules/ffmpeg-static/ffmpeg',
+    path.join(process.cwd(), 'node_modules/ffmpeg-static/ffmpeg'),
+  ];
+  for (const p of vercelPaths) {
+    if (existsSync(p)) return p;
+  }
+
+  return null;
+}
+
+const ffmpegPath: string | null = resolveFfmpegBinaryPath();
 
 // Cache the usable ffmpeg path across invocations within the same function instance
 let resolvedFfmpegPath: string | null = null;
