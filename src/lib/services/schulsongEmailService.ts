@@ -64,6 +64,7 @@ export async function sendSchulsongReleaseEmailForEvent(
     isMinimusikertag: event.is_minimusikertag,
     isPlus: event.is_plus,
     isSchulsong: event.is_schulsong,
+    isUnder100: event.is_under_100,
   };
 
   const recipients = await getTeacherRecipientsForEvent(event.event_id, event.id, eventData);
@@ -204,6 +205,7 @@ export async function sendSchulsongParentReleaseEmailForEvent(
     isMinimusikertag: event.is_minimusikertag,
     isPlus: event.is_plus,
     isSchulsong: event.is_schulsong,
+    isUnder100: event.is_under_100,
   };
 
   const recipients = await getParentRecipientsForEvent(event.event_id, event.id, eventData);

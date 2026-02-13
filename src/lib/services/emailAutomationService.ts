@@ -54,7 +54,9 @@ export function getTemplateTier(template: { is_minimusikertag: boolean; is_plus:
  * Check if an event matches a template's tier (exact match).
  */
 export function eventMatchesTemplate(event: EventThresholdMatch, template: EmailTemplate): boolean {
-  return getEventTier(event) === getTemplateTier(template);
+  if (getEventTier(event) !== getTemplateTier(template)) return false;
+  if (template.only_under_100 && !event.isUnder100) return false;
+  return true;
 }
 
 /**
@@ -207,6 +209,7 @@ export async function getEventsHittingThreshold(
           isMinimusikertag: event.is_minimusikertag,
           isPlus: event.is_plus,
           isSchulsong: event.is_schulsong,
+          isUnder100: event.is_under_100,
         });
       }
     }
@@ -870,6 +873,7 @@ export async function sendTestEmail(
         isMinimusikertag: event.is_minimusikertag,
         isPlus: event.is_plus,
         isSchulsong: event.is_schulsong,
+        isUnder100: event.is_under_100,
       };
 
       // Get recipients using the same pipeline as normal emails

@@ -31,6 +31,7 @@ export const EMAIL_TEMPLATES_FIELD_IDS = {
   template_type: 'fld1FaqKGyWwWwOp6',            // Single Select: timeline, trigger
   trigger_slug: 'fldBJsRxe1PxvTXoL',              // Single line text
   trigger_description: 'fldibypBMULVBtcIH',        // Long text
+  only_under_100: 'fld5822FIA25rLMdn',          // Checkbox - when true, only send to <100 kid events
 } as const;
 
 // =============================================================================
@@ -80,6 +81,7 @@ export interface EmailTemplate {
   templateType?: 'timeline' | 'trigger';         // Template category
   triggerSlug?: string;                          // Unique slug for trigger templates
   triggerDescription?: string;                   // Description of when trigger fires
+  only_under_100: boolean;                        // When true, only send to events with <100 kids
 }
 
 /**
@@ -139,6 +141,7 @@ export interface CreateEmailTemplateInput {
   templateType?: 'timeline' | 'trigger';
   triggerSlug?: string;
   triggerDescription?: string;
+  only_under_100?: boolean;
 }
 
 /**
@@ -159,6 +162,7 @@ export interface UpdateEmailTemplateInput {
   templateType?: 'timeline' | 'trigger';
   triggerSlug?: string;
   triggerDescription?: string;
+  only_under_100?: boolean;
 }
 
 /**
@@ -281,6 +285,7 @@ export interface EventThresholdMatch {
   isMinimusikertag?: boolean;
   isPlus?: boolean;
   isSchulsong?: boolean;
+  isUnder100?: boolean;
 }
 
 // =============================================================================

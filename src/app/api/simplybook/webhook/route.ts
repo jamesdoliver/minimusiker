@@ -148,7 +148,9 @@ export async function POST(request: Request) {
         staffId || undefined,
         booking.event_name || 'MiniMusiker', // SimplyBook service type, default to MiniMusiker if not provided
         mappedData.address, // School address
-        mappedData.phone // School phone
+        mappedData.phone, // School phone
+        undefined, // eventStatus
+        mappedData.numberOfChildren // estimatedChildren → auto-sets is_under_100
       );
       console.log('Created Event record:', eventRecord.id, 'event_id:', eventId);
 

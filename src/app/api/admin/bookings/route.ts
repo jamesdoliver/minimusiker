@@ -410,7 +410,8 @@ export async function POST(request: NextRequest) {
         'MiniMusiker',
         body.address || undefined,
         body.phone || undefined,
-        isPending ? 'Pending' : undefined
+        isPending ? 'Pending' : undefined,
+        estimatedChildren || undefined // estimatedChildren → auto-sets is_under_100
       );
       console.log('Created Event record for manual booking:', eventRecord.id);
 

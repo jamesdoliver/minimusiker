@@ -4761,7 +4761,8 @@ class AirtableService {
     eventType?: string,
     schoolAddress?: string,
     schoolPhone?: string,
-    eventStatus?: string
+    eventStatus?: string,
+    estimatedChildren?: number
   ): Promise<Event> {
     this.ensureNormalizedTablesInitialized();
 
@@ -4806,6 +4807,12 @@ class AirtableService {
       }
       if (schoolPhone) {
         eventFields[EVENTS_FIELD_IDS.school_phone] = schoolPhone;
+      }
+
+      // Add estimated children and auto-calculate is_under_100
+      if (estimatedChildren !== undefined) {
+        eventFields[EVENTS_FIELD_IDS.estimated_children] = estimatedChildren;
+        eventFields[EVENTS_FIELD_IDS.is_under_100] = estimatedChildren < 100;
       }
 
       const record = await this.base(EVENTS_TABLE_ID).create(eventFields);
@@ -5031,6 +5038,8 @@ class AirtableService {
       is_kita?: boolean;
       is_schulsong?: boolean;
       is_minimusikertag?: boolean;
+      is_under_100?: boolean;
+      estimated_children?: number;
     }
   ): Promise<Event> {
     try {
@@ -5050,6 +5059,12 @@ class AirtableService {
       }
       if (updates.is_minimusikertag !== undefined) {
         updateFields[EVENTS_FIELD_IDS.is_minimusikertag] = updates.is_minimusikertag;
+      }
+      if (updates.is_under_100 !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.is_under_100] = updates.is_under_100;
+      }
+      if (updates.estimated_children !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.estimated_children] = updates.estimated_children;
       }
 
       if (Object.keys(updateFields).length === 0) {
@@ -5308,6 +5323,8 @@ class AirtableService {
           EVENTS_FIELD_IDS.is_kita,
           EVENTS_FIELD_IDS.is_schulsong,
           EVENTS_FIELD_IDS.is_minimusikertag,
+          EVENTS_FIELD_IDS.is_under_100,
+          EVENTS_FIELD_IDS.estimated_children,
           EVENTS_FIELD_IDS.audio_pipeline_stage,
           EVENTS_FIELD_IDS.admin_notes,
         ],
@@ -5479,6 +5496,9 @@ class AirtableService {
       schulsong_released_at: record.get('schulsong_released_at') as string | undefined,
       // Per-event timeline threshold overrides
       timeline_overrides: record.get('timeline_overrides') as string | undefined,
+      // Under-100-kids flag and estimated children
+      is_under_100: record.get('is_under_100') as boolean | undefined,
+      estimated_children: record.get('estimated_children') as number | undefined,
     };
   }
 
@@ -5983,6 +6003,7 @@ class AirtableService {
       is_kita: (record.get(EMAIL_TEMPLATES_FIELD_IDS.is_kita) as boolean) || false,
       is_plus: (record.get(EMAIL_TEMPLATES_FIELD_IDS.is_plus) as boolean) || false,
       is_schulsong: (record.get(EMAIL_TEMPLATES_FIELD_IDS.is_schulsong) as boolean) || false,
+      only_under_100: (record.get(EMAIL_TEMPLATES_FIELD_IDS.only_under_100) as boolean) || false,
       templateType: (record.get(EMAIL_TEMPLATES_FIELD_IDS.template_type) as 'timeline' | 'trigger') || undefined,
       triggerSlug: (record.get(EMAIL_TEMPLATES_FIELD_IDS.trigger_slug) as string) || undefined,
       triggerDescription: (record.get(EMAIL_TEMPLATES_FIELD_IDS.trigger_description) as string) || undefined,
@@ -6087,6 +6108,7 @@ class AirtableService {
         [EMAIL_TEMPLATES_FIELD_IDS.is_kita]: data.is_kita ?? false,
         [EMAIL_TEMPLATES_FIELD_IDS.is_plus]: data.is_plus ?? false,
         [EMAIL_TEMPLATES_FIELD_IDS.is_schulsong]: data.is_schulsong ?? false,
+        [EMAIL_TEMPLATES_FIELD_IDS.only_under_100]: data.only_under_100 ?? false,
       };
       if (data.templateType) fields[EMAIL_TEMPLATES_FIELD_IDS.template_type] = data.templateType;
       if (data.triggerSlug) fields[EMAIL_TEMPLATES_FIELD_IDS.trigger_slug] = data.triggerSlug;
@@ -6122,6 +6144,7 @@ class AirtableService {
       if (data.is_kita !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.is_kita] = data.is_kita;
       if (data.is_plus !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.is_plus] = data.is_plus;
       if (data.is_schulsong !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.is_schulsong] = data.is_schulsong;
+      if (data.only_under_100 !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.only_under_100] = data.only_under_100;
       if (data.templateType !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.template_type] = data.templateType;
       if (data.triggerSlug !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.trigger_slug] = data.triggerSlug;
       if (data.triggerDescription !== undefined) fields[EMAIL_TEMPLATES_FIELD_IDS.trigger_description] = data.triggerDescription;

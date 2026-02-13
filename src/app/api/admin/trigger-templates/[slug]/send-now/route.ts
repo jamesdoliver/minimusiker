@@ -65,6 +65,7 @@ function eventToThresholdMatch(event: Event): EventThresholdMatch {
     isMinimusikertag: event.is_minimusikertag,
     isPlus: event.is_plus,
     isSchulsong: event.is_schulsong,
+    isUnder100: event.is_under_100,
   };
 }
 

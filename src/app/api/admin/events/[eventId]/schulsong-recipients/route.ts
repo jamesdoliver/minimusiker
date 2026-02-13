@@ -49,6 +49,7 @@ export async function GET(
       isMinimusikertag: event.is_minimusikertag,
       isPlus: event.is_plus,
       isSchulsong: event.is_schulsong,
+      isUnder100: event.is_under_100,
     };
 
     const [teachers, parents] = await Promise.all([

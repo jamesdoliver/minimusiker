@@ -326,6 +326,29 @@ export default function EmailTemplateEdit({ params }: PageProps) {
           </p>
         </div>
 
+        {/* Event Size Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Größenfilter
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={template.only_under_100 || false}
+                onChange={(e) => setTemplate({ ...template, only_under_100: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-10 h-5 bg-gray-300 rounded-full peer-checked:bg-primary transition-colors" />
+              <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full peer-checked:translate-x-5 transition-transform" />
+            </div>
+            <span className="text-sm text-gray-700">Nur Events unter 100 Kinder</span>
+          </label>
+          <p className="mt-1 text-xs text-gray-500">
+            Wenn aktiv, wird dieses Template nur an Events mit weniger als 100 Kindern gesendet.
+          </p>
+        </div>
+
         {/* Name */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">

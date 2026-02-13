@@ -120,6 +120,7 @@ export async function PUT(
     if (body.is_minimusikertag !== undefined) updateInput.is_minimusikertag = body.is_minimusikertag;
     if (body.is_plus !== undefined) updateInput.is_plus = body.is_plus;
     if (body.is_schulsong !== undefined) updateInput.is_schulsong = body.is_schulsong;
+    if (body.only_under_100 !== undefined) updateInput.only_under_100 = body.only_under_100;
 
     // Normalize: exactly one event-type boolean true when tier fields are present
     if (updateInput.is_plus !== undefined || updateInput.is_minimusikertag !== undefined || updateInput.is_schulsong !== undefined) {

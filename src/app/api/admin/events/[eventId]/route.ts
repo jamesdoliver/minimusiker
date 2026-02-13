@@ -198,10 +198,11 @@ export async function PATCH(
       body.is_minimusikertag !== undefined;
     const hasNotesUpdate = body.admin_notes !== undefined;
     const hasOverridesUpdate = body.timeline_overrides !== undefined;
+    const hasChildrenUpdate = body.estimated_children !== undefined;
 
-    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate) {
+    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate && !hasChildrenUpdate) {
       return NextResponse.json(
-        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children' },
         { status: 400 }
       );
     }
@@ -484,13 +485,15 @@ export async function PATCH(
 
     // Handle status and event type toggle updates
     let updatedEvent = existingEvent;
-    if (hasStatusUpdate || hasEventTypeUpdates) {
+    if (hasStatusUpdate || hasEventTypeUpdates || hasChildrenUpdate) {
       const fieldUpdates: {
         status?: 'Confirmed' | 'On Hold' | 'Cancelled' | null;
         is_plus?: boolean;
         is_kita?: boolean;
         is_schulsong?: boolean;
         is_minimusikertag?: boolean;
+        is_under_100?: boolean;
+        estimated_children?: number;
       } = {};
 
       if (hasStatusUpdate) {
@@ -515,6 +518,12 @@ export async function PATCH(
         fieldUpdates.is_minimusikertag = false;
       } else if (fieldUpdates.is_minimusikertag === true) {
         fieldUpdates.is_plus = false;
+      }
+
+      // Handle estimated_children update with auto-recalculated is_under_100
+      if (hasChildrenUpdate) {
+        fieldUpdates.estimated_children = body.estimated_children;
+        fieldUpdates.is_under_100 = body.estimated_children < 100;
       }
 
       updatedEvent = await airtableService.updateEventFields(eventRecordId, fieldUpdates);

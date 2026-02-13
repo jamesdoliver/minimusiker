@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
       is_kita: false,
       is_plus: body.is_plus,
       is_schulsong: body.is_schulsong,
+      only_under_100: body.only_under_100,
     };
 
     // Normalize: exactly one event-type boolean true (defensive)

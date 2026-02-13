@@ -560,6 +560,9 @@ export const EVENTS_FIELD_IDS = {
   schulsong_released_at: 'fldIQeyEpW9lpmg5K', // DateTime - next workday 7am CET
   // Per-event timeline threshold overrides (JSON blob)
   timeline_overrides: 'fld25hstx4yePlpnB', // Multiline text - JSON with per-event timing overrides
+  // Under-100-kids flag and estimated children count
+  is_under_100: 'fldcvcHcGfIkOUPFD',           // Checkbox - true when estimated children < 100
+  estimated_children: 'fldjnXCnyfeA1KSeX',       // Number - estimated kids (copied from SchoolBooking)
 } as const;
 
 // Classes Table - 1 row per class
@@ -707,6 +710,9 @@ export interface Event {
   schulsong_released_at?: string;
   // Per-event timeline threshold overrides (JSON blob)
   timeline_overrides?: string;
+  // Under-100-kids flag and estimated children count
+  is_under_100?: boolean;                         // Auto-calculated: estimatedChildren < 100
+  estimated_children?: number;                    // Estimated kids attending (from booking)
 }
 
 /**
