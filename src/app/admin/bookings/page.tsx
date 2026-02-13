@@ -39,7 +39,7 @@ function getComputedStatus(booking: BookingWithDetails): ComputedStatus {
 
   const eventDate = new Date(booking.bookingDate);
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 15);
+  cutoff.setDate(cutoff.getDate() - 28);
 
   return eventDate >= cutoff ? 'confirmed' : 'completed';
 }
