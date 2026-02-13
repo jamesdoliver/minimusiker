@@ -493,7 +493,77 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     availableVariables: ['engineerName', 'schoolName', 'eventDate', 'eventId', 'engineerPortalUrl'],
   },
 
-  // ─── 10. Schulsong Audio Release (Teacher) ──────────────────────────
+  // ─── 10. Engineer Schulsong Uploaded ────────────────────────────────
+  {
+    slug: 'engineer_schulsong_uploaded',
+    name: 'Schulsong Logic Project hochgeladen (Engineer)',
+    description: 'Wird an den zugewiesenen Engineer gesendet, wenn ein Schulsong Logic Project hochgeladen wird.',
+    recipientType: 'engineer',
+    triggerEventKey: 'staff:schulsong_upload',
+    defaultSubject: 'Neues Schulsong-Projekt bereit: {{schoolName}} – {{eventDate}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{engineerName}},
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Für das Event an der <strong>{{schoolName}}</strong> am <strong>{{eventDate}}</strong> wurde ein <strong>Schulsong Logic Project</strong> hochgeladen.
+  Du kannst jetzt mit dem Mixing des Schulsongs beginnen.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td align="center" style="padding: 8px 0 32px 0;">
+      <a href="{{engineerPortalUrl}}"
+         style="display: inline-block; background-color: #d85a6a; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 2px 4px rgba(216, 90, 106, 0.3);">
+        Zum Engineer-Portal
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Falls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:<br>
+  <a href="{{engineerPortalUrl}}" style="color: #d85a6a; word-break: break-all;">{{engineerPortalUrl}}</a>
+</p>`,
+    availableVariables: ['engineerName', 'schoolName', 'eventDate', 'eventId', 'engineerPortalUrl'],
+  },
+
+  // ─── 11. Engineer Minimusiker Uploaded ─────────────────────────────
+  {
+    slug: 'engineer_minimusiker_uploaded',
+    name: 'Minimusiker Logic Project hochgeladen (Engineer)',
+    description: 'Wird an den zugewiesenen Engineer gesendet, wenn ein Minimusiker Logic Project hochgeladen wird.',
+    recipientType: 'engineer',
+    triggerEventKey: 'staff:minimusiker_upload',
+    defaultSubject: 'Neues Minimusiker-Projekt bereit: {{schoolName}} – {{eventDate}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{engineerName}},
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Für das Event an der <strong>{{schoolName}}</strong> am <strong>{{eventDate}}</strong> wurde ein <strong>Minimusiker Logic Project</strong> hochgeladen.
+  Du kannst jetzt mit dem Mixing der Tracks beginnen.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td align="center" style="padding: 8px 0 32px 0;">
+      <a href="{{engineerPortalUrl}}"
+         style="display: inline-block; background-color: #d85a6a; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 2px 4px rgba(216, 90, 106, 0.3);">
+        Zum Engineer-Portal
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Falls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:<br>
+  <a href="{{engineerPortalUrl}}" style="color: #d85a6a; word-break: break-all;">{{engineerPortalUrl}}</a>
+</p>`,
+    availableVariables: ['engineerName', 'schoolName', 'eventDate', 'eventId', 'engineerPortalUrl'],
+  },
+
+  // ─── 12. Schulsong Audio Release (Teacher) ─────────────────────────
   {
     slug: 'schulsong_audio_release',
     name: 'Schulsong: Audio freigegeben',
@@ -523,7 +593,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     },
   },
 
-  // ─── 11. Schulsong Parent Release ──────────────────────────────────
+  // ─── 13. Schulsong Parent Release ──────────────────────────────────
   {
     slug: 'schulsong_parent_release',
     name: 'Schulsong: Eltern-Benachrichtigung',

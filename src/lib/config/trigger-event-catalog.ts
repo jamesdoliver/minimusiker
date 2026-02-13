@@ -80,6 +80,20 @@ export const TRIGGER_EVENT_CATALOG: TriggerEvent[] = [
     availableVariables: ['engineerName', 'schoolName', 'eventDate', 'eventId', 'engineerPortalUrl'],
     recipientMode: 'specific',
   },
+  {
+    key: 'staff:schulsong_upload',
+    name: 'Schulsong Logic Project hochgeladen',
+    description: 'Staff lädt ein Schulsong Logic Project für ein Event hoch.',
+    availableVariables: ['engineerName', 'schoolName', 'eventDate', 'eventId', 'engineerPortalUrl'],
+    recipientMode: 'specific',
+  },
+  {
+    key: 'staff:minimusiker_upload',
+    name: 'Minimusiker Logic Project hochgeladen',
+    description: 'Staff lädt ein Minimusiker Logic Project für ein Event hoch.',
+    availableVariables: ['engineerName', 'schoolName', 'eventDate', 'eventId', 'engineerPortalUrl'],
+    recipientMode: 'specific',
+  },
 ];
 
 export function getTriggerEvent(key: string): TriggerEvent | undefined {
