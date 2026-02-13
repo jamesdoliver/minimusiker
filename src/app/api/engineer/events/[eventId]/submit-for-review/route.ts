@@ -28,9 +28,9 @@ export async function POST(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    if (event.audio_pipeline_stage === 'approved') {
+    if (event.audio_pipeline_stage === 'finals_submitted') {
       return NextResponse.json(
-        { error: 'Event has already been approved' },
+        { error: 'Finals have already been submitted' },
         { status: 400 }
       );
     }
@@ -57,8 +57,8 @@ export async function POST(
     const totalClasses = classIdsWithSongs.size;
     const classesWithFinals = [...classIdsWithSongs].filter(cid => classIdsWithFinal.has(cid)).length;
 
-    // Set stage to ready_for_review
-    await airtableService.updateEventAudioPipelineStage(eventId, 'ready_for_review');
+    // Set stage to finals_submitted
+    await airtableService.updateEventAudioPipelineStage(eventId, 'finals_submitted');
 
     return NextResponse.json({
       success: true,

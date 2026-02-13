@@ -10,7 +10,7 @@ import OrderOverviewModal from './OrderOverviewModal';
 import EditBookingModal from './EditBookingModal';
 import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfirmModal';
 import StatusLight from './StatusLight';
-import AudioApprovalModal from './AudioApprovalModal';
+import AudioReviewModal from './AudioReviewModal';
 import { AudioStatusData } from '@/lib/types/audio-status';
 import { toast } from 'sonner';
 
@@ -39,7 +39,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
   const [showEditModal, setShowEditModal] = useState(false);
   const [audioStatus, setAudioStatus] = useState<AudioStatusData | null>(null);
   const [audioStatusLoading, setAudioStatusLoading] = useState(false);
-  const [showAudioApprovalModal, setShowAudioApprovalModal] = useState(false);
+  const [showAudioReviewModal, setShowAudioReviewModal] = useState(false);
 
   // Admin notes state
   const [notesText, setNotesText] = useState(booking.adminNotes || '');
@@ -454,20 +454,16 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
                 />
               </div>
               <button
-                onClick={() => setShowAudioApprovalModal(true)}
-                disabled={!audioStatus.staffUploadComplete || !audioStatus.mixMasterUploadComplete}
+                onClick={() => setShowAudioReviewModal(true)}
+                disabled={booking.audioPipelineStage !== 'finals_submitted'}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  audioStatus.approvalStatus === 'approved'
-                    ? 'bg-green-500 text-white hover:bg-green-600'
-                    : audioStatus.approvalStatus === 'ready_for_approval'
-                    ? 'bg-orange-500 text-white hover:bg-orange-600'
+                  booking.audioPipelineStage === 'finals_submitted'
+                    ? 'bg-blue-500 text-white hover:bg-blue-600'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                {audioStatus.approvalStatus === 'approved'
-                  ? 'Approved ✓'
-                  : audioStatus.approvalStatus === 'ready_for_approval'
-                  ? 'Review & Approve'
+                {booking.audioPipelineStage === 'finals_submitted'
+                  ? 'Review Audio'
                   : 'Pending'}
               </button>
             </div>
@@ -617,27 +613,12 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         }}
       />
 
-      {/* Audio Approval Modal */}
-      <AudioApprovalModal
-        isOpen={showAudioApprovalModal}
-        onClose={() => setShowAudioApprovalModal(false)}
+      {/* Audio Review Modal */}
+      <AudioReviewModal
+        isOpen={showAudioReviewModal}
+        onClose={() => setShowAudioReviewModal(false)}
         eventId={booking.code}
         schoolName={booking.schoolName}
-        onApprovalComplete={() => {
-          // Refresh audio status after approval
-          const fetchAudioStatus = async () => {
-            try {
-              const response = await fetch(`/api/admin/events/${encodeURIComponent(booking.code)}/audio-status`);
-              if (response.ok) {
-                const data = await response.json();
-                setAudioStatus(data.data);
-              }
-            } catch (error) {
-              console.error('Error refreshing audio status:', error);
-            }
-          };
-          fetchAudioStatus();
-        }}
       />
     </div>
   );

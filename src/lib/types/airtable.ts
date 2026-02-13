@@ -553,7 +553,7 @@ export const EVENTS_FIELD_IDS = {
   all_tracks_approved: 'flduTvUyy0DQmCN15', // Checkbox - True when admin approved ALL final tracks
   admin_approval_status: 'fldsO7ovNwD4TdtCw', // Single Select - pending | ready_for_approval | approved
   // Audio pipeline stage for admin bookings view
-  audio_pipeline_stage: 'fldlW3jUcGmhbkhug', // Single Select - not_started | in_progress | ready_for_review | approved
+  audio_pipeline_stage: 'fldlW3jUcGmhbkhug', // Single Select - not_started | staff_uploaded | finals_submitted
   // Admin notes
   admin_notes: 'fldmzzlsrI5lKKx16', // Multiline text - free-text admin notes
   // Schulsong release date (set when admin approves schulsong after teacher approval)
@@ -703,7 +703,7 @@ export interface Event {
   all_tracks_approved?: boolean;        // True when admin approved ALL final tracks
   admin_approval_status?: 'pending' | 'ready_for_approval' | 'approved';
   // Audio pipeline stage for admin bookings view
-  audio_pipeline_stage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved';
+  audio_pipeline_stage?: 'not_started' | 'staff_uploaded' | 'finals_submitted';
   // Admin notes
   admin_notes?: string;
   // Schulsong release date (set when admin approves schulsong after teacher approval)

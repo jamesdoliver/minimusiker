@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 /**
  * DELETE /api/engineer/events/[eventId]/audio-files/[audioFileId]
  * Delete a single final audio file (R2 + Airtable record).
- * Auto-reverts pipeline stage from ready_for_review to in_progress if needed.
+ * Auto-reverts pipeline stage from finals_submitted to staff_uploaded if needed.
  */
 export async function DELETE(
   request: NextRequest,
@@ -45,12 +45,12 @@ export async function DELETE(
       );
     }
 
-    // Check pipeline stage — block deletion if already approved
+    // Check pipeline stage — block deletion if finals already submitted
     const airtableService = getAirtableService();
     const event = await airtableService.getEventByEventId(eventId);
-    if (event?.audio_pipeline_stage === 'approved') {
+    if (event?.audio_pipeline_stage === 'finals_submitted') {
       return NextResponse.json(
-        { error: 'Cannot delete files after approval' },
+        { error: 'Cannot delete files after finals have been submitted' },
         { status: 403 }
       );
     }
@@ -61,11 +61,6 @@ export async function DELETE(
 
     // Delete Airtable record
     await teacherService.deleteAudioFile(audioFileId);
-
-    // Auto-revert pipeline stage if currently ready_for_review
-    if (event?.audio_pipeline_stage === 'ready_for_review') {
-      await airtableService.updateEventAudioPipelineStage(eventId, 'in_progress');
-    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

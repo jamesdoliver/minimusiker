@@ -17,7 +17,8 @@ import {
   sendCancellationNotification,
   sendSchulsongTeacherApprovedNotification,
   SchulsongTeacherApprovedData,
-  sendEngineerAudioUploadedEmail,
+  sendEngineerSchulsongUploadedEmail,
+  sendEngineerMinimusikerUploadedEmail,
 } from './resendService';
 import { getAirtableService } from './airtableService';
 
@@ -213,25 +214,29 @@ export async function triggerSchulsongTeacherApprovedNotification(
 }
 
 /**
- * Notify the assigned engineer when audio is uploaded for the first time.
- * Dedup: only sends if audio_pipeline_stage is 'not_started' (i.e., first upload).
+ * Notify the appropriate engineer when a Logic Project is uploaded.
+ * - Schulsong upload -> notifies Micha (ENGINEER_MICHA_ID)
+ * - Minimusiker upload -> notifies Jakob (ENGINEER_JAKOB_ID)
  */
-export async function notifyEngineerOfFirstUpload(eventId: string): Promise<void> {
+export async function notifyEngineerOfUpload(
+  eventId: string,
+  projectType: 'schulsong' | 'minimusiker'
+): Promise<void> {
   try {
     const airtable = getAirtableService();
     const event = await airtable.getEventByEventId(eventId);
     if (!event) {
-      console.log(`[NotificationService] notifyEngineerOfFirstUpload: Event not found: ${eventId}`);
+      console.log(`[NotificationService] notifyEngineerOfUpload: Event not found: ${eventId}`);
       return;
     }
 
-    // Dedup: only notify on first upload (stage transitions from not_started → in_progress)
-    if (event.audio_pipeline_stage && event.audio_pipeline_stage !== 'not_started') {
-      return;
-    }
+    // Determine which engineer to notify based on project type
+    const engineerId = projectType === 'schulsong'
+      ? process.env.ENGINEER_MICHA_ID
+      : process.env.ENGINEER_JAKOB_ID;
 
-    const engineerId = event.assigned_engineer?.[0];
     if (!engineerId) {
+      console.warn(`[NotificationService] No engineer ID configured for ${projectType}`);
       return;
     }
 
@@ -253,16 +258,22 @@ export async function notifyEngineerOfFirstUpload(eventId: string): Promise<void
 
     const engineerPortalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.minimusiker.de'}/engineer/events/${eventId}`;
 
-    await sendEngineerAudioUploadedEmail(engineer.email, {
+    const emailData = {
       engineerName: engineer.staff_name,
       schoolName: event.school_name,
       eventDate,
       eventId,
       engineerPortalUrl,
-    });
+    };
 
-    console.log(`[NotificationService] Engineer audio uploaded notification sent to ${engineer.email} for event ${eventId}`);
+    if (projectType === 'schulsong') {
+      await sendEngineerSchulsongUploadedEmail(engineer.email, emailData);
+    } else {
+      await sendEngineerMinimusikerUploadedEmail(engineer.email, emailData);
+    }
+
+    console.log(`[NotificationService] Engineer ${projectType} uploaded notification sent to ${engineer.email} for event ${eventId}`);
   } catch (error) {
-    console.error('[NotificationService] Error in notifyEngineerOfFirstUpload:', error);
+    console.error('[NotificationService] Error in notifyEngineerOfUpload:', error);
   }
 }

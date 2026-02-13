@@ -3940,7 +3940,7 @@ class AirtableService {
    */
   async updateEventAudioPipelineStage(
     eventId: string,
-    stage: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved'
+    stage: 'not_started' | 'staff_uploaded' | 'finals_submitted'
   ): Promise<void> {
     if (!this.useNormalizedTables()) {
       return;

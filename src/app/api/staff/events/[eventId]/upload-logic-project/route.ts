@@ -3,7 +3,7 @@ import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { notifyEngineerOfFirstUpload } from '@/lib/services/notificationService';
+import { notifyEngineerOfUpload } from '@/lib/services/notificationService';
 import { AudioFileType } from '@/lib/types/teacher';
 
 export const dynamic = 'force-dynamic';
@@ -144,21 +144,16 @@ export async function PUT(
       status: 'ready',
     });
 
-    // Check if both project types now exist
-    const allFiles = await teacherService.getAudioFilesByEventId(eventId);
-    const hasSchulsong = allFiles.some(f => f.type === 'logic-project-schulsong');
-    const hasMinimusiker = allFiles.some(f => f.type === 'logic-project-minimusiker');
-    const bothUploaded = hasSchulsong && hasMinimusiker;
-
-    if (bothUploaded) {
-      notifyEngineerOfFirstUpload(eventId).catch(err => console.error('Engineer notification error:', err));
-      await getAirtableService().updateEventAudioPipelineStage(eventId, 'in_progress');
-    }
+    // Notify the appropriate engineer for this specific upload type
+    notifyEngineerOfUpload(eventId, projectType as 'schulsong' | 'minimusiker').catch(err =>
+      console.error('Engineer notification error:', err)
+    );
+    // Update pipeline stage when any project is uploaded
+    await getAirtableService().updateEventAudioPipelineStage(eventId, 'staff_uploaded');
 
     return NextResponse.json({
       success: true,
       audioFile,
-      bothUploaded,
     });
   } catch (error) {
     console.error('Error confirming logic project upload:', error);

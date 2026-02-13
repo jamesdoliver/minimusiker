@@ -4,7 +4,7 @@ import { getAirtableService } from '@/lib/services/airtableService';
 
 export const dynamic = 'force-dynamic';
 
-const VALID_STAGES = ['not_started', 'in_progress', 'ready_for_review', 'approved'] as const;
+const VALID_STAGES = ['not_started', 'staff_uploaded', 'finals_submitted'] as const;
 type PipelineStage = typeof VALID_STAGES[number];
 
 /**

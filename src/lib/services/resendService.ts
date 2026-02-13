@@ -391,6 +391,38 @@ export async function sendEngineerAudioUploadedEmail(
   }, 'Engineer audio uploaded');
 }
 
+/**
+ * Send engineer notification when Schulsong Logic Project is uploaded
+ */
+export async function sendEngineerSchulsongUploadedEmail(
+  email: string,
+  data: EngineerAudioUploadedData
+): Promise<SendEmailResult> {
+  return sendTriggerEmail(email, 'engineer_schulsong_uploaded', {
+    engineerName: data.engineerName,
+    schoolName: data.schoolName,
+    eventDate: data.eventDate,
+    eventId: data.eventId,
+    engineerPortalUrl: data.engineerPortalUrl,
+  }, 'Engineer schulsong uploaded');
+}
+
+/**
+ * Send engineer notification when MiniMusiker Logic Project is uploaded
+ */
+export async function sendEngineerMinimusikerUploadedEmail(
+  email: string,
+  data: EngineerAudioUploadedData
+): Promise<SendEmailResult> {
+  return sendTriggerEmail(email, 'engineer_minimusiker_uploaded', {
+    engineerName: data.engineerName,
+    schoolName: data.schoolName,
+    eventDate: data.eventDate,
+    eventId: data.eventId,
+    engineerPortalUrl: data.engineerPortalUrl,
+  }, 'Engineer minimusiker uploaded');
+}
+
 // ============================================================================
 // SCHULSONG AUDIO RELEASE NOTIFICATION (Teacher)
 // ============================================================================

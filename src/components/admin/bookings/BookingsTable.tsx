@@ -11,7 +11,7 @@ import { ClassSongCount } from './ClassSongCount';
 // Computed status type for styling
 type ComputedStatus = 'confirmed' | 'completed' | 'onHold' | 'pending';
 
-function AudioPipelineIndicator({ stage, eventDate }: { stage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved'; eventDate?: string }) {
+function AudioPipelineIndicator({ stage, eventDate }: { stage?: 'not_started' | 'staff_uploaded' | 'finals_submitted'; eventDate?: string }) {
   let isFuture = false;
   if (eventDate) {
     const today = new Date();
@@ -21,17 +21,17 @@ function AudioPipelineIndicator({ stage, eventDate }: { stage?: 'not_started' | 
     isFuture = eventDay > today;
   }
 
-  if (isFuture || !stage || stage === 'not_started') {
+  if (isFuture) {
     return <span title="Event hasn't happened yet" className="text-gray-400">&#x23F3;</span>;
   }
-  if (stage === 'in_progress') {
-    return <span title="Audio in progress — waiting for uploads">&#x26A0;&#xFE0F;</span>;
+  if (!stage || stage === 'not_started') {
+    return <span title="Staff audio not uploaded">&#x274C;</span>;
   }
-  if (stage === 'ready_for_review') {
-    return <span title="Ready for admin review">&#x1F3A7;</span>;
+  if (stage === 'staff_uploaded') {
+    return <span title="Waiting for engineer finals">&#x2699;&#xFE0F;</span>;
   }
-  if (stage === 'approved') {
-    return <span title="Audio approved">&#x2705;</span>;
+  if (stage === 'finals_submitted') {
+    return <span title="Finals submitted">&#x2705;</span>;
   }
   return <span>—</span>;
 }

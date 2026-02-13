@@ -348,13 +348,13 @@ export default function EngineerEventDetailPage() {
       );
       const data = await response.json();
       if (!response.ok) {
-        alert(data.error || 'Failed to submit for review');
+        alert(data.error || 'Failed to submit finals');
         return;
       }
       await fetchEventDetail();
     } catch (err) {
       console.error('Submit error:', err);
-      alert('Failed to submit for review');
+      alert('Failed to submit finals');
     } finally {
       setIsSubmitting(false);
     }
@@ -367,7 +367,7 @@ export default function EngineerEventDetailPage() {
     ? allEventSongs.filter(s => s.finalMp3File || s.finalWavFile).length +
       (event.schulsongClass && (event.schulsongClass.finalMp3File || event.schulsongClass.finalWavFile) ? 1 : 0)
     : 0;
-  const showFooter = event && event.audioPipelineStage !== 'approved' && event.audioPipelineStage !== 'ready_for_review';
+  const showFooter = event && event.audioPipelineStage !== 'finals_submitted';
   const canSubmit = songsWithFinals > 0;
 
   if (isLoading) {
@@ -442,17 +442,17 @@ export default function EngineerEventDetailPage() {
               <p className="text-sm text-gray-500">Status</p>
               {(() => {
                 const stage = event.audioPipelineStage;
-                if (stage === 'approved') {
+                if (stage === 'finals_submitted') {
                   return (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Approved
+                      Finals Submitted
                     </span>
                   );
                 }
-                if (stage === 'ready_for_review') {
+                if (stage === 'staff_uploaded') {
                   return (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                      In Review
+                      Staff Uploaded
                     </span>
                   );
                 }
@@ -653,7 +653,7 @@ export default function EngineerEventDetailPage() {
                         <p className="text-xs text-gray-500 mt-1">Click to upload</p>
                       )}
                     </label>
-                    {event.schulsongClass.finalMp3File && event.audioPipelineStage !== 'approved' && (
+                    {event.schulsongClass.finalMp3File && event.audioPipelineStage !== 'finals_submitted' && (
                       <button
                         onClick={() => setDeletingFile(event.schulsongClass!.finalMp3File!)}
                         className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
@@ -699,7 +699,7 @@ export default function EngineerEventDetailPage() {
                         <p className="text-xs text-gray-500 mt-1">Click to upload</p>
                       )}
                     </label>
-                    {event.schulsongClass.finalWavFile && event.audioPipelineStage !== 'approved' && (
+                    {event.schulsongClass.finalWavFile && event.audioPipelineStage !== 'finals_submitted' && (
                       <button
                         onClick={() => setDeletingFile(event.schulsongClass!.finalWavFile!)}
                         className="mt-2 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
@@ -832,7 +832,7 @@ export default function EngineerEventDetailPage() {
                   Submitting...
                 </>
               ) : (
-                'Submit Audio'
+                'Submit Finals'
               )}
             </button>
           </div>
@@ -1061,7 +1061,7 @@ function SongRow({
               <p className="text-xs text-gray-500">Upload</p>
             )}
           </label>
-          {song.finalMp3File && audioPipelineStage !== 'approved' && (
+          {song.finalMp3File && audioPipelineStage !== 'finals_submitted' && (
             <button
               onClick={() => onDeleteFile(song.finalMp3File!)}
               className="mt-1.5 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"
@@ -1107,7 +1107,7 @@ function SongRow({
               <p className="text-xs text-gray-500">Upload</p>
             )}
           </label>
-          {song.finalWavFile && audioPipelineStage !== 'approved' && (
+          {song.finalWavFile && audioPipelineStage !== 'finals_submitted' && (
             <button
               onClick={() => onDeleteFile(song.finalWavFile!)}
               className="mt-1.5 w-full flex items-center justify-center gap-1 text-xs text-red-500 hover:text-red-700 transition-colors"

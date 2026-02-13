@@ -77,14 +77,9 @@ export async function POST(
     // Update event's all_tracks_approved and admin_approval_status
     await airtableService.updateEventApprovalStatus(resolvedEventId, allTracksApproved);
 
-    // Update audio pipeline stage
-    const hasRejectedTracks = finalFiles.some(f => f.approvalStatus === 'rejected');
-    if (allTracksApproved) {
-      await airtableService.updateEventAudioPipelineStage(resolvedEventId, 'approved');
-    } else if (hasRejectedTracks) {
-      // Rejected tracks means engineer needs to redo work
-      await airtableService.updateEventAudioPipelineStage(resolvedEventId, 'in_progress');
-    }
+    // Note: audio pipeline stage is no longer managed by track approval.
+    // Pipeline stages are: not_started → staff_uploaded → finals_submitted.
+    // Track approval only updates per-track status and the event-level approval flag.
 
     // Determine the overall approval status
     let adminApprovalStatus: AdminApprovalStatus = 'pending';

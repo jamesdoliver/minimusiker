@@ -49,7 +49,7 @@ export interface BookingWithDetails {
   registrationCount?: number;    // Count of registrations for linked event
   eventRecordId?: string;        // Event record ID for registration lookup
   // Audio pipeline
-  audioPipelineStage?: 'not_started' | 'in_progress' | 'ready_for_review' | 'approved';
+  audioPipelineStage?: 'not_started' | 'staff_uploaded' | 'finals_submitted';
   // Admin notes
   adminNotes?: string;
   // Discount code (simplybookHash)

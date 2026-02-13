@@ -3,7 +3,7 @@ import { verifyStaffSession } from '@/lib/auth/verifyStaffSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { notifyEngineerOfFirstUpload } from '@/lib/services/notificationService';
+import { notifyEngineerOfUpload } from '@/lib/services/notificationService';
 
 export const dynamic = 'force-dynamic';
 
@@ -142,11 +142,11 @@ export async function PUT(
     });
 
     // Notify engineer (fire-and-forget, before stage update so dedup check works)
-    notifyEngineerOfFirstUpload(eventId).catch(err => console.error('Engineer notification error:', err));
+    notifyEngineerOfUpload(eventId, 'minimusiker').catch(err => console.error('Engineer notification error:', err));
 
-    // Update audio pipeline stage to in_progress
+    // Update audio pipeline stage to staff_uploaded
     try {
-      await getAirtableService().updateEventAudioPipelineStage(eventId, 'in_progress');
+      await getAirtableService().updateEventAudioPipelineStage(eventId, 'staff_uploaded');
     } catch (e) {
       console.error('Error updating audio pipeline stage:', e);
     }
