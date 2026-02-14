@@ -4,6 +4,7 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { AudioStatusData, TrackApprovalInfo, AdminApprovalStatus } from '@/lib/types/audio-status';
+import { parseOverrides } from '@/lib/utils/eventThresholds';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,11 @@ export async function GET(
 
     // Use the resolved event_id (handles SimplyBook ID → real event_id resolution)
     const resolvedEventId = eventDetail.eventId;
+
+    // Get event record for timeline_overrides (audio_hidden check)
+    const event = await airtableService.getEventByEventId(resolvedEventId);
+    const overrides = parseOverrides(event?.timeline_overrides);
+    const audioHidden = overrides?.audio_hidden === true;
 
     // Get songs for this event
     const teacherService = getTeacherService();
@@ -116,6 +122,7 @@ export async function GET(
       approvalStatus,
       allTracksApproved,
       tracks,
+      audioHidden,
     };
 
     return NextResponse.json({

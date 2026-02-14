@@ -95,8 +95,13 @@ export async function GET(request: NextRequest) {
     if (releaseDate) releaseDate.setDate(releaseDate.getDate() + releaseDays);
 
     const now = new Date();
-    const hasPreviewsAvailable = previewDate ? now >= previewDate : false;
-    const isReleased = releaseDate ? now >= releaseDate : false;
+
+    // Audio visibility kill-switch: stored in timeline_overrides.audio_hidden.
+    // Default (absent) = visible. Admin can toggle audio_hidden=true to block parent access.
+    const audioHidden = overrides?.audio_hidden === true;
+
+    const hasPreviewsAvailable = previewDate ? now >= previewDate && !audioHidden : false;
+    const isReleased = releaseDate ? now >= releaseDate && !audioHidden : false;
 
     // 2. Check minicard purchase status
     const hasMinicard = await hasMinicardForEvent(session.parentId, eventId);

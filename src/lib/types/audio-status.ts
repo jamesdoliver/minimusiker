@@ -53,6 +53,8 @@ export interface AudioStatusData {
   allTracksApproved: boolean;
   /** Detailed information about each track */
   tracks: TrackApprovalInfo[];
+  /** Whether audio is hidden from parents (admin kill-switch) */
+  audioHidden: boolean;
 }
 
 /**

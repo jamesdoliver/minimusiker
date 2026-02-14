@@ -40,6 +40,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
   const [audioStatus, setAudioStatus] = useState<AudioStatusData | null>(null);
   const [audioStatusLoading, setAudioStatusLoading] = useState(false);
   const [showAudioReviewModal, setShowAudioReviewModal] = useState(false);
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
 
   // Admin notes state
   const [notesText, setNotesText] = useState(booking.adminNotes || '');
@@ -108,6 +109,33 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
 
     fetchAudioStatus();
   }, [booking.code]);
+
+  const handleToggleAudioVisibility = async () => {
+    if (!audioStatus || isTogglingVisibility) return;
+    const newHidden = !audioStatus.audioHidden;
+    setIsTogglingVisibility(true);
+    try {
+      const response = await fetch(
+        `/api/admin/events/${encodeURIComponent(booking.code)}/toggle-audio-visibility`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hidden: newHidden }),
+        }
+      );
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to toggle');
+      }
+      setAudioStatus(prev => prev ? { ...prev, audioHidden: newHidden } : null);
+      toast.success(newHidden ? 'Audio für Eltern ausgeblendet' : 'Audio für Eltern sichtbar');
+    } catch (error) {
+      console.error('Error toggling audio visibility:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to toggle audio visibility');
+    } finally {
+      setIsTogglingVisibility(false);
+    }
+  };
 
   // Generate QR code on mount
   useEffect(() => {
@@ -485,6 +513,24 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
                   label="Mix Master"
                   isComplete={audioStatus.mixMasterUploadComplete}
                 />
+                {/* Audio visibility toggle */}
+                <button
+                  onClick={handleToggleAudioVisibility}
+                  disabled={isTogglingVisibility}
+                  className="flex items-center gap-2 group"
+                  title={audioStatus.audioHidden ? 'Audio ist ausgeblendet – klicken zum Einblenden' : 'Audio ist sichtbar – klicken zum Ausblenden'}
+                >
+                  <div className={`relative w-9 h-5 rounded-full transition-colors ${
+                    isTogglingVisibility ? 'opacity-50' : ''
+                  } ${audioStatus.audioHidden ? 'bg-gray-300' : 'bg-green-500'}`}>
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                      audioStatus.audioHidden ? '' : 'translate-x-4'
+                    }`} />
+                  </div>
+                  <span className={`text-xs font-medium ${audioStatus.audioHidden ? 'text-red-600' : 'text-green-700'}`}>
+                    {audioStatus.audioHidden ? 'Ausgeblendet' : 'Sichtbar'}
+                  </span>
+                </button>
               </div>
               <button
                 onClick={() => setShowAudioReviewModal(true)}

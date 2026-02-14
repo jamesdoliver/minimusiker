@@ -657,6 +657,18 @@ class R2Service {
   }
 
   /**
+   * Generate a presigned upload URL for any R2 key.
+   */
+  async generatePresignedUploadUrl(key: string, contentType: string, expiresIn: number = 3600): Promise<string> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+    return getSignedUrl(this.client, command, { expiresIn });
+  }
+
+  /**
    * Delete a file from R2
    */
   async deleteFile(key: string): Promise<boolean> {

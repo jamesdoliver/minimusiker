@@ -217,9 +217,18 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        // Validate all values are numbers within reasonable bounds
+        // Validate all values are numbers within reasonable bounds (except known boolean/object keys)
         for (const [key, value] of Object.entries(parsed)) {
           if (key === 'milestones' || key === 'task_offsets') continue; // Phase 2 nested objects
+          if (key === 'audio_hidden') {
+            if (typeof value !== 'boolean') {
+              return NextResponse.json(
+                { success: false, error: `Invalid value for ${key}: must be a boolean` },
+                { status: 400 }
+              );
+            }
+            continue;
+          }
           if (typeof value !== 'number' || !isFinite(value as number) || Math.abs(value as number) > 365) {
             return NextResponse.json(
               { success: false, error: `Invalid value for ${key}: must be a finite number between -365 and 365` },

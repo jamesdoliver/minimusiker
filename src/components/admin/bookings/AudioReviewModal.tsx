@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AudioStatusData } from '@/lib/types/audio-status';
 import { toast } from 'sonner';
 
@@ -46,6 +46,15 @@ export default function AudioReviewModal({
     parentCount: number;
   } | null>(null);
   const [fetchingCounts, setFetchingCounts] = useState(false);
+
+  // Audio visibility toggle state
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+
+  // Replace audio state
+  const [replacingAudioId, setReplacingAudioId] = useState<string | null>(null);
+  const [replaceProgress, setReplaceProgress] = useState<string | null>(null);
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
+  const schulsongReplaceInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -170,6 +179,94 @@ export default function AudioReviewModal({
     setConfirmRelease(null);
   };
 
+  const handleToggleAudioVisibility = async () => {
+    if (!audioStatus || isTogglingVisibility) return;
+    const newHidden = !audioStatus.audioHidden;
+    setIsTogglingVisibility(true);
+    try {
+      const response = await fetch(
+        `/api/admin/events/${encodeURIComponent(eventId)}/toggle-audio-visibility`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hidden: newHidden }),
+        }
+      );
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to toggle');
+      }
+      setAudioStatus(prev => prev ? { ...prev, audioHidden: newHidden } : null);
+      toast.success(newHidden ? 'Audio für Eltern ausgeblendet' : 'Audio für Eltern sichtbar');
+    } catch (error) {
+      console.error('Error toggling audio visibility:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to toggle audio visibility');
+    } finally {
+      setIsTogglingVisibility(false);
+    }
+  };
+
+  const handleReplaceAudio = async (audioFileId: string, file: File) => {
+    setReplacingAudioId(audioFileId);
+    setReplaceProgress('Uploading...');
+    try {
+      // Step 1: Get presigned upload URL
+      const presignRes = await fetch(
+        `/api/admin/events/${encodeURIComponent(eventId)}/replace-audio`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioFileId,
+            filename: file.name,
+            contentType: file.type || 'audio/mpeg',
+          }),
+        }
+      );
+      if (!presignRes.ok) {
+        const data = await presignRes.json();
+        throw new Error(data.error || 'Failed to get upload URL');
+      }
+      const { uploadUrl, newR2Key } = await presignRes.json();
+
+      // Step 2: Upload file directly to R2
+      setReplaceProgress('Uploading file...');
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'audio/mpeg' },
+      });
+      if (!uploadRes.ok) {
+        throw new Error('Failed to upload file to storage');
+      }
+
+      // Step 3: Confirm upload
+      setReplaceProgress('Finalizing...');
+      const confirmRes = await fetch(
+        `/api/admin/events/${encodeURIComponent(eventId)}/replace-audio`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audioFileId, newR2Key, filename: file.name }),
+        }
+      );
+      if (!confirmRes.ok) {
+        const data = await confirmRes.json();
+        throw new Error(data.error || 'Failed to confirm replacement');
+      }
+
+      toast.success('Audio ersetzt');
+      // Refresh data
+      await Promise.all([fetchAudioStatus(), fetchSchulsongStatus()]);
+    } catch (error) {
+      console.error('Error replacing audio:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to replace audio');
+    } finally {
+      setReplacingAudioId(null);
+      setReplaceProgress(null);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('de-DE', {
@@ -204,6 +301,34 @@ export default function AudioReviewModal({
             </svg>
           </button>
         </div>
+
+        {/* Audio Visibility Banner */}
+        {audioStatus && (
+          <div className={`px-6 py-3 flex items-center justify-between ${
+            audioStatus.audioHidden ? 'bg-red-50 border-b border-red-200' : 'bg-green-50 border-b border-green-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${audioStatus.audioHidden ? 'bg-red-500' : 'bg-green-500'}`} />
+              <span className={`text-sm font-medium ${audioStatus.audioHidden ? 'text-red-700' : 'text-green-700'}`}>
+                {audioStatus.audioHidden ? 'Audio ist ausgeblendet (Eltern sehen nichts)' : 'Audio ist sichtbar für Eltern'}
+              </span>
+            </div>
+            <button
+              onClick={handleToggleAudioVisibility}
+              disabled={isTogglingVisibility}
+              className={`flex items-center gap-2 px-3 py-1 rounded-md text-sm font-medium transition-colors disabled:opacity-50 ${
+                audioStatus.audioHidden
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-red-100 text-red-700 hover:bg-red-200'
+              }`}
+            >
+              {isTogglingVisibility ? (
+                <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-r-transparent" />
+              ) : null}
+              {audioStatus.audioHidden ? 'Einblenden' : 'Ausblenden'}
+            </button>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -244,12 +369,46 @@ export default function AudioReviewModal({
                 )}
               </div>
 
-              {/* Audio player */}
+              {/* Audio player + Replace */}
               {schulsongFile.audioUrl && (
-                <div className="mb-3">
+                <div className="mb-3 space-y-2">
                   <audio controls className="w-full h-10" src={schulsongFile.audioUrl}>
                     Your browser does not support the audio element.
                   </audio>
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={schulsongReplaceInputRef}
+                      type="file"
+                      accept="audio/mpeg,.mp3,.wav,audio/wav"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file && schulsongFile.audioFileId) {
+                          handleReplaceAudio(schulsongFile.audioFileId, file);
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      onClick={() => schulsongReplaceInputRef.current?.click()}
+                      disabled={replacingAudioId === schulsongFile.audioFileId}
+                      className="px-3 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {replacingAudioId === schulsongFile.audioFileId ? (
+                        <>
+                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-600 border-r-transparent" />
+                          {replaceProgress}
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                          Ersetzen
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -481,9 +640,41 @@ export default function AudioReviewModal({
                   {!track.hasFinalAudio ? (
                     <p className="text-sm text-gray-400">No final audio uploaded yet</p>
                   ) : track.finalAudioUrl ? (
-                    <audio controls className="w-full h-10" src={track.finalAudioUrl}>
-                      Your browser does not support the audio element.
-                    </audio>
+                    <div className="space-y-2">
+                      <audio controls className="w-full h-10" src={track.finalAudioUrl}>
+                        Your browser does not support the audio element.
+                      </audio>
+                      {track.audioFileId && (
+                        <button
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'audio/mpeg,.mp3,.wav,audio/wav';
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (file) handleReplaceAudio(track.audioFileId, file);
+                            };
+                            input.click();
+                          }}
+                          disabled={replacingAudioId === track.audioFileId}
+                          className="px-3 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {replacingAudioId === track.audioFileId ? (
+                            <>
+                              <div className="h-3 w-3 animate-spin rounded-full border-2 border-gray-600 border-r-transparent" />
+                              {replaceProgress}
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                              </svg>
+                              Ersetzen
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   ) : null}
                 </div>
               ))}
