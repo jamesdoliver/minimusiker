@@ -80,7 +80,7 @@ export default function CreateBookingModal({
       setEventDate(prefillData?.eventDate || '');
       setStartTime('');
       setEndTime('');
-      setDatePending(!prefillData?.eventDate);
+      setDatePending(prefillData ? !prefillData.eventDate : false);
       setErrors({});
     }
   }, [isOpen, prefillData]);

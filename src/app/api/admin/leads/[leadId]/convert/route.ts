@@ -17,8 +17,8 @@ export async function POST(
     const { leadId } = await params;
     const airtableService = getAirtableService();
 
-    // Update lead stage to Won
-    const lead = await airtableService.updateLead(leadId, { stage: 'Won' });
+    // Fetch lead data (don't mark as Won yet — that happens when the booking is actually created)
+    const lead = await airtableService.getLeadById(leadId);
 
     // Return pre-fill data for CreateBookingModal
     const prefillData = {
