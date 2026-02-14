@@ -977,3 +977,73 @@ export interface CreateEventActivityInput {
   actorType: ActorType;
   metadata?: Record<string, unknown>;
 }
+
+// ======================================================================
+// LEADS TABLE - Sales pipeline for tracking prospective bookings
+// ======================================================================
+
+export const LEADS_TABLE_ID = 'tblPZ6REJCFYwldBh';
+
+export const LEADS_FIELD_IDS = {
+  school_name: 'fldh8pCvV8qqNZ91J',
+  contact_person: 'fld1kGA5w5G8fiFkD',
+  contact_email: 'fldCqx9EDpxEXshiL',
+  contact_phone: 'fldpi03HYI29Xj1OL',
+  address: 'fldL9d2TljNAlXsAx',
+  postal_code: 'fldAuTv1wsX4qySiY',
+  city: 'fldnandJl1DDzw2jw',
+  region: 'fldUsNuJOQqDwKUq5',
+  estimated_children: 'fldhI4zUmw0n4F31C',
+  event_type_interest: 'fldvwpYYMqyS6hMFw',
+  lead_source: 'fld1tuBhJ1c3ZxWh3',
+  stage: 'fldX6BtDMnCCcJlFB',
+  lost_reason: 'fldVDCLmsPqwze3ne',
+  schulsong_upsell: 'fldqpJOKA2QI6rA2F',
+  scs_funded: 'fldaQHV9V81YUvpff',
+  einrichtung: 'fld9cDahZvfeYPLbt',
+  assigned_staff: 'fldYS43T9kPbp0i2E',
+  call_notes: 'fldbzqhPFLaD9so51',
+  next_follow_up: 'fldoz1WRadpKZcP6S',
+  estimated_date: 'fld4EiwK640xIhWU7',
+  estimated_month: 'fldghsrNWoplr1oc4',
+  converted_booking_id: 'fldfd3b0ilM8STAGG',
+} as const;
+
+export type LeadStage = 'New' | 'Contacted' | 'In Discussion' | 'Won' | 'Lost';
+export type LeadSource = 'Inbound Call' | 'Outbound Call' | 'Website' | 'Referral' | 'Repeat Customer' | 'Event/Fair' | 'Other';
+export type EventTypeInterest = 'Minimusikertag' | 'Plus' | 'Kita' | 'Schulsong';
+
+export interface CallNote {
+  callNumber: number;
+  date: string;
+  notes: string;
+}
+
+export interface Lead {
+  id: string;
+  schoolName: string;
+  contactPerson: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
+  regionId?: string;
+  estimatedChildren?: number;
+  eventTypeInterest?: EventTypeInterest[];
+  leadSource?: LeadSource;
+  stage: LeadStage;
+  lostReason?: string;
+  schulsongUpsell?: boolean;
+  scsFunded?: boolean;
+  einrichtungId?: string;
+  assignedStaffId?: string;
+  assignedStaffName?: string;
+  callNotes: CallNote[];
+  nextFollowUp?: string;
+  estimatedDate?: string;
+  estimatedMonth?: string;
+  convertedBookingId?: string;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -24,6 +24,14 @@ import {
   // Teams/Regionen table
   TEAMS_REGIONEN_TABLE_ID,
   TEAMS_REGIONEN_FIELD_IDS,
+  // Leads CRM types and IDs
+  Lead,
+  CallNote,
+  LeadStage,
+  LeadSource,
+  EventTypeInterest,
+  LEADS_TABLE_ID,
+  LEADS_FIELD_IDS,
   // New normalized table types and IDs
   Event,
   Class,
@@ -4734,6 +4742,330 @@ class AirtableService {
     } catch (error) {
       console.error('Error clearing Einrichtung logo:', error);
       throw new Error(`Failed to clear logo: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // ==================== Leads CRM ====================
+
+  /**
+   * Transform an Airtable record to a Lead object
+   * Note: call_notes is stored as a JSON string in Airtable, parsed to CallNote[]
+   * Linked record fields (region, einrichtung, assigned_staff, converted_booking_id) are arrays in Airtable
+   */
+  private transformLeadRecord(record: any): Lead {
+    const fields = record.fields;
+
+    // Parse call_notes JSON string
+    let callNotes: CallNote[] = [];
+    const callNotesRaw = fields[LEADS_FIELD_IDS.call_notes] as string | undefined;
+    if (callNotesRaw) {
+      try {
+        callNotes = JSON.parse(callNotesRaw);
+      } catch {
+        callNotes = [];
+      }
+    }
+
+    // Linked record fields come as arrays, take first element
+    const regionArr = fields[LEADS_FIELD_IDS.region] as string[] | undefined;
+    const einrichtungArr = fields[LEADS_FIELD_IDS.einrichtung] as string[] | undefined;
+    const assignedStaffArr = fields[LEADS_FIELD_IDS.assigned_staff] as string[] | undefined;
+    const convertedBookingArr = fields[LEADS_FIELD_IDS.converted_booking_id] as string[] | undefined;
+
+    return {
+      id: record.id,
+      schoolName: (fields[LEADS_FIELD_IDS.school_name] as string) || '',
+      contactPerson: (fields[LEADS_FIELD_IDS.contact_person] as string) || '',
+      contactEmail: fields[LEADS_FIELD_IDS.contact_email] as string | undefined,
+      contactPhone: fields[LEADS_FIELD_IDS.contact_phone] as string | undefined,
+      address: fields[LEADS_FIELD_IDS.address] as string | undefined,
+      postalCode: fields[LEADS_FIELD_IDS.postal_code] as string | undefined,
+      city: fields[LEADS_FIELD_IDS.city] as string | undefined,
+      regionId: regionArr?.[0],
+      estimatedChildren: fields[LEADS_FIELD_IDS.estimated_children] as number | undefined,
+      eventTypeInterest: fields[LEADS_FIELD_IDS.event_type_interest] as EventTypeInterest[] | undefined,
+      leadSource: fields[LEADS_FIELD_IDS.lead_source] as LeadSource | undefined,
+      stage: (fields[LEADS_FIELD_IDS.stage] as LeadStage) || 'New',
+      lostReason: fields[LEADS_FIELD_IDS.lost_reason] as string | undefined,
+      schulsongUpsell: fields[LEADS_FIELD_IDS.schulsong_upsell] as boolean | undefined,
+      scsFunded: fields[LEADS_FIELD_IDS.scs_funded] as boolean | undefined,
+      einrichtungId: einrichtungArr?.[0],
+      assignedStaffId: assignedStaffArr?.[0],
+      callNotes,
+      nextFollowUp: fields[LEADS_FIELD_IDS.next_follow_up] as string | undefined,
+      estimatedDate: fields[LEADS_FIELD_IDS.estimated_date] as string | undefined,
+      estimatedMonth: fields[LEADS_FIELD_IDS.estimated_month] as string | undefined,
+      convertedBookingId: convertedBookingArr?.[0],
+      createdAt: record.createdTime || '',
+      updatedAt: '',
+    };
+  }
+
+  /**
+   * Get all leads from the Leads table
+   */
+  async getAllLeads(): Promise<Lead[]> {
+    try {
+      const allRecords = await this.base(LEADS_TABLE_ID)
+        .select({
+          pageSize: 100,
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      return allRecords.map((record) => this.transformLeadRecord(record));
+    } catch (error) {
+      console.error('Error fetching all leads:', error);
+      throw new Error(`Failed to fetch all leads: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Create a new lead record
+   * Auto-links to Einrichtung via findOrCreateEinrichtung
+   */
+  async createLead(data: {
+    schoolName: string;
+    contactPerson: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    address?: string;
+    postalCode?: string;
+    city?: string;
+    regionId?: string;
+    estimatedChildren?: number;
+    eventTypeInterest?: EventTypeInterest[];
+    leadSource?: LeadSource;
+    schulsongUpsell?: boolean;
+    scsFunded?: boolean;
+    assignedStaffId?: string;
+    initialNotes?: string;
+    estimatedDate?: string;
+    estimatedMonth?: string;
+  }): Promise<Lead> {
+    try {
+      // Create initial call note
+      const initialCallNote: CallNote = {
+        callNumber: 1,
+        date: new Date().toISOString().split('T')[0],
+        notes: data.initialNotes || '',
+      };
+
+      // Auto-link institution
+      const einrichtung = await this.findOrCreateEinrichtung(
+        data.schoolName,
+        data.contactEmail || ''
+      );
+
+      // Build fields object
+      const fields: Record<string, any> = {
+        [LEADS_FIELD_IDS.school_name]: data.schoolName,
+        [LEADS_FIELD_IDS.contact_person]: data.contactPerson,
+        [LEADS_FIELD_IDS.stage]: 'New' as LeadStage,
+        [LEADS_FIELD_IDS.call_notes]: JSON.stringify([initialCallNote]),
+        [LEADS_FIELD_IDS.einrichtung]: [einrichtung.id],
+      };
+
+      if (data.contactEmail !== undefined) {
+        fields[LEADS_FIELD_IDS.contact_email] = data.contactEmail;
+      }
+      if (data.contactPhone !== undefined) {
+        fields[LEADS_FIELD_IDS.contact_phone] = data.contactPhone;
+      }
+      if (data.address !== undefined) {
+        fields[LEADS_FIELD_IDS.address] = data.address;
+      }
+      if (data.postalCode !== undefined) {
+        fields[LEADS_FIELD_IDS.postal_code] = data.postalCode;
+      }
+      if (data.city !== undefined) {
+        fields[LEADS_FIELD_IDS.city] = data.city;
+      }
+      if (data.regionId !== undefined) {
+        fields[LEADS_FIELD_IDS.region] = [data.regionId];
+      }
+      if (data.estimatedChildren !== undefined) {
+        fields[LEADS_FIELD_IDS.estimated_children] = data.estimatedChildren;
+      }
+      if (data.eventTypeInterest !== undefined) {
+        fields[LEADS_FIELD_IDS.event_type_interest] = data.eventTypeInterest;
+      }
+      if (data.leadSource !== undefined) {
+        fields[LEADS_FIELD_IDS.lead_source] = data.leadSource;
+      }
+      if (data.schulsongUpsell !== undefined) {
+        fields[LEADS_FIELD_IDS.schulsong_upsell] = data.schulsongUpsell;
+      }
+      if (data.scsFunded !== undefined) {
+        fields[LEADS_FIELD_IDS.scs_funded] = data.scsFunded;
+      }
+      if (data.assignedStaffId !== undefined) {
+        fields[LEADS_FIELD_IDS.assigned_staff] = [data.assignedStaffId];
+      }
+      if (data.estimatedDate !== undefined) {
+        fields[LEADS_FIELD_IDS.estimated_date] = data.estimatedDate;
+      }
+      if (data.estimatedMonth !== undefined) {
+        fields[LEADS_FIELD_IDS.estimated_month] = data.estimatedMonth;
+      }
+
+      const record = await this.base(LEADS_TABLE_ID).create(fields);
+
+      // Re-fetch with returnFieldsByFieldId to get consistent transform
+      const createdRecord = await this.base(LEADS_TABLE_ID)
+        .find(record.id);
+
+      // Transform manually since find() doesn't use returnFieldsByFieldId
+      // Instead, re-select with field IDs
+      const refetchedRecords = await this.base(LEADS_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${record.id}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (refetchedRecords.length > 0) {
+        return this.transformLeadRecord(refetchedRecords[0]);
+      }
+
+      // Fallback: return a minimal Lead object from what we know
+      return this.transformLeadRecord(record);
+    } catch (error) {
+      console.error('Error creating lead:', error);
+      throw new Error(`Failed to create lead: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Update an existing lead record
+   * Only updates fields that are explicitly provided (uses !== undefined checks)
+   */
+  async updateLead(leadId: string, data: {
+    schoolName?: string;
+    contactPerson?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    address?: string;
+    postalCode?: string;
+    city?: string;
+    regionId?: string | null;
+    estimatedChildren?: number;
+    eventTypeInterest?: EventTypeInterest[];
+    leadSource?: LeadSource;
+    stage?: LeadStage;
+    lostReason?: string;
+    schulsongUpsell?: boolean;
+    scsFunded?: boolean;
+    einrichtungId?: string | null;
+    assignedStaffId?: string | null;
+    callNotes?: CallNote[];
+    nextFollowUp?: string | null;
+    estimatedDate?: string | null;
+    estimatedMonth?: string | null;
+    convertedBookingId?: string | null;
+  }): Promise<Lead> {
+    try {
+      const fields: Record<string, any> = {};
+
+      if (data.schoolName !== undefined) {
+        fields[LEADS_FIELD_IDS.school_name] = data.schoolName;
+      }
+      if (data.contactPerson !== undefined) {
+        fields[LEADS_FIELD_IDS.contact_person] = data.contactPerson;
+      }
+      if (data.contactEmail !== undefined) {
+        fields[LEADS_FIELD_IDS.contact_email] = data.contactEmail;
+      }
+      if (data.contactPhone !== undefined) {
+        fields[LEADS_FIELD_IDS.contact_phone] = data.contactPhone;
+      }
+      if (data.address !== undefined) {
+        fields[LEADS_FIELD_IDS.address] = data.address;
+      }
+      if (data.postalCode !== undefined) {
+        fields[LEADS_FIELD_IDS.postal_code] = data.postalCode;
+      }
+      if (data.city !== undefined) {
+        fields[LEADS_FIELD_IDS.city] = data.city;
+      }
+      if (data.regionId !== undefined) {
+        fields[LEADS_FIELD_IDS.region] = data.regionId ? [data.regionId] : [];
+      }
+      if (data.estimatedChildren !== undefined) {
+        fields[LEADS_FIELD_IDS.estimated_children] = data.estimatedChildren;
+      }
+      if (data.eventTypeInterest !== undefined) {
+        fields[LEADS_FIELD_IDS.event_type_interest] = data.eventTypeInterest;
+      }
+      if (data.leadSource !== undefined) {
+        fields[LEADS_FIELD_IDS.lead_source] = data.leadSource;
+      }
+      if (data.stage !== undefined) {
+        fields[LEADS_FIELD_IDS.stage] = data.stage;
+      }
+      if (data.lostReason !== undefined) {
+        fields[LEADS_FIELD_IDS.lost_reason] = data.lostReason;
+      }
+      if (data.schulsongUpsell !== undefined) {
+        fields[LEADS_FIELD_IDS.schulsong_upsell] = data.schulsongUpsell;
+      }
+      if (data.scsFunded !== undefined) {
+        fields[LEADS_FIELD_IDS.scs_funded] = data.scsFunded;
+      }
+      if (data.einrichtungId !== undefined) {
+        fields[LEADS_FIELD_IDS.einrichtung] = data.einrichtungId ? [data.einrichtungId] : [];
+      }
+      if (data.assignedStaffId !== undefined) {
+        fields[LEADS_FIELD_IDS.assigned_staff] = data.assignedStaffId ? [data.assignedStaffId] : [];
+      }
+      if (data.callNotes !== undefined) {
+        fields[LEADS_FIELD_IDS.call_notes] = JSON.stringify(data.callNotes);
+      }
+      if (data.nextFollowUp !== undefined) {
+        fields[LEADS_FIELD_IDS.next_follow_up] = data.nextFollowUp;
+      }
+      if (data.estimatedDate !== undefined) {
+        fields[LEADS_FIELD_IDS.estimated_date] = data.estimatedDate;
+      }
+      if (data.estimatedMonth !== undefined) {
+        fields[LEADS_FIELD_IDS.estimated_month] = data.estimatedMonth;
+      }
+      if (data.convertedBookingId !== undefined) {
+        fields[LEADS_FIELD_IDS.converted_booking_id] = data.convertedBookingId ? [data.convertedBookingId] : [];
+      }
+
+      await this.base(LEADS_TABLE_ID).update(leadId, fields);
+
+      // Re-fetch with returnFieldsByFieldId for consistent transform
+      const refetchedRecords = await this.base(LEADS_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${leadId}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (refetchedRecords.length === 0) {
+        throw new Error(`Lead ${leadId} not found after update`);
+      }
+
+      return this.transformLeadRecord(refetchedRecords[0]);
+    } catch (error) {
+      console.error('Error updating lead:', error);
+      throw new Error(`Failed to update lead: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Delete a lead record
+   */
+  async deleteLead(leadId: string): Promise<void> {
+    try {
+      await this.base(LEADS_TABLE_ID).destroy(leadId);
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      throw new Error(`Failed to delete lead: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
