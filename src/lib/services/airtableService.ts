@@ -49,6 +49,7 @@ import {
   EVENT_MANUAL_COSTS_FIELD_IDS,
   isRegistrableClassType,
   SONGS_LINKED_FIELD_IDS,
+  CalendarEntry,
 } from '@/lib/types/airtable';
 import { SONGS_TABLE_ID } from '@/lib/types/teacher';
 import { ManualCost } from '@/lib/types/analytics';
@@ -4912,11 +4913,6 @@ class AirtableService {
       const record = await this.base(LEADS_TABLE_ID).create(fields);
 
       // Re-fetch with returnFieldsByFieldId to get consistent transform
-      const createdRecord = await this.base(LEADS_TABLE_ID)
-        .find(record.id);
-
-      // Transform manually since find() doesn't use returnFieldsByFieldId
-      // Instead, re-select with field IDs
       const refetchedRecords = await this.base(LEADS_TABLE_ID)
         .select({
           filterByFormula: `RECORD_ID() = '${record.id}'`,
@@ -4934,6 +4930,30 @@ class AirtableService {
     } catch (error) {
       console.error('Error creating lead:', error);
       throw new Error(`Failed to create lead: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get a single lead by ID
+   */
+  async getLeadById(leadId: string): Promise<Lead> {
+    try {
+      const records = await this.base(LEADS_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${leadId}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        throw new Error('Lead not found');
+      }
+
+      return this.transformLeadRecord(records[0]);
+    } catch (error) {
+      console.error('Error fetching lead:', error);
+      throw new Error(`Failed to fetch lead: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -7088,6 +7108,263 @@ class AirtableService {
     } catch (error) {
       console.error('Error fetching registration:', error);
       return null;
+    }
+  }
+
+  // ==================== Master Calendar ====================
+
+  /**
+   * Get calendar bookings for a given month.
+   * Fetches bookings from SchoolBookings, enriches with staff names, region names,
+   * and event type data from the Events table.
+   * @param month - Month in "YYYY-MM" format
+   * @returns CalendarEntry[] for the requested month
+   */
+  async getCalendarBookings(month: string): Promise<CalendarEntry[]> {
+    try {
+      // Parse month to get date range
+      const [yearStr, monthStr] = month.split('-');
+      const year = parseInt(yearStr, 10);
+      const monthNum = parseInt(monthStr, 10);
+      const startDate = `${year}-${String(monthNum).padStart(2, '0')}-01`;
+      // Last day of month: create date for first day of NEXT month, subtract 1 day
+      const lastDay = new Date(year, monthNum, 0).getDate();
+      const endDate = `${year}-${String(monthNum).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+      // Query SchoolBookings for this month, excluding deleted
+      const bookingRecords = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
+        .select({
+          filterByFormula: `AND(
+            {${SCHOOL_BOOKINGS_FIELD_IDS.start_date}} >= '${startDate}',
+            {${SCHOOL_BOOKINGS_FIELD_IDS.start_date}} <= '${endDate}',
+            {${SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status}} != 'deleted'
+          )`,
+          fields: [
+            SCHOOL_BOOKINGS_FIELD_IDS.start_date,
+            SCHOOL_BOOKINGS_FIELD_IDS.school_name,
+            SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name,
+            SCHOOL_BOOKINGS_FIELD_IDS.school_phone,
+            SCHOOL_BOOKINGS_FIELD_IDS.region,
+            SCHOOL_BOOKINGS_FIELD_IDS.assigned_staff,
+            SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status,
+          ],
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      if (bookingRecords.length === 0) {
+        return [];
+      }
+
+      // Collect unique staff IDs and region IDs from bookings
+      const allStaffIds = new Set<string>();
+      const allRegionIds = new Set<string>();
+
+      for (const record of bookingRecords) {
+        const staffIds = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.assigned_staff] as string[] | undefined;
+        if (staffIds) {
+          staffIds.forEach(id => allStaffIds.add(id));
+        }
+        const regionIds = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.region] as string[] | undefined;
+        if (regionIds) {
+          regionIds.forEach(id => allRegionIds.add(id));
+        }
+      }
+
+      // Batch fetch staff names from Personen table
+      const staffNameMap = new Map<string, string>();
+      if (allStaffIds.size > 0) {
+        try {
+          const staffRecords = await this.base(PERSONEN_TABLE_ID)
+            .select({
+              filterByFormula: `OR(${Array.from(allStaffIds).map(id => `RECORD_ID() = '${id}'`).join(',')})`,
+              fields: [PERSONEN_FIELD_IDS.staff_name],
+              returnFieldsByFieldId: true,
+            })
+            .all();
+
+          staffRecords.forEach(record => {
+            const name = record.fields[PERSONEN_FIELD_IDS.staff_name] as string;
+            if (name) {
+              staffNameMap.set(record.id, name);
+            }
+          });
+        } catch (error) {
+          console.error('Error fetching staff names for calendar:', error);
+        }
+      }
+
+      // Batch fetch region names from Teams/Regionen table
+      const regionNameMap = new Map<string, string>();
+      if (allRegionIds.size > 0) {
+        try {
+          const regionRecords = await this.base(TEAMS_REGIONEN_TABLE_ID)
+            .select({
+              filterByFormula: `OR(${Array.from(allRegionIds).map(id => `RECORD_ID() = '${id}'`).join(',')})`,
+              fields: [TEAMS_REGIONEN_FIELD_IDS.name],
+              returnFieldsByFieldId: true,
+            })
+            .all();
+
+          regionRecords.forEach(record => {
+            const name = record.fields[TEAMS_REGIONEN_FIELD_IDS.name] as string;
+            if (name) {
+              regionNameMap.set(record.id, name);
+            }
+          });
+        } catch (error) {
+          console.error('Error fetching region names for calendar:', error);
+        }
+      }
+
+      // Fetch ALL Events to build eventByBookingId map
+      // Events use record.get() with field NAMES, not IDs
+      const allEventRecords: Airtable.Record<FieldSet>[] = [];
+      await this.base(EVENTS_TABLE_ID)
+        .select({
+          fields: [
+            EVENTS_FIELD_IDS.simplybook_booking,
+            EVENTS_FIELD_IDS.status,
+            EVENTS_FIELD_IDS.is_plus,
+            EVENTS_FIELD_IDS.is_kita,
+            EVENTS_FIELD_IDS.is_schulsong,
+            EVENTS_FIELD_IDS.is_minimusikertag,
+            EVENTS_FIELD_IDS.assigned_staff,
+          ],
+        })
+        .eachPage((records, fetchNextPage) => {
+          allEventRecords.push(...records);
+          fetchNextPage();
+        });
+
+      // Build eventByBookingId map: booking record ID -> event record
+      const bookingIds = new Set(bookingRecords.map(r => r.id));
+      const eventByBookingId = new Map<string, Airtable.Record<FieldSet>>();
+
+      for (const eventRecord of allEventRecords) {
+        const linkedBookings = eventRecord.get('simplybook_booking') as string[] | undefined;
+        if (linkedBookings) {
+          for (const bookingId of linkedBookings) {
+            if (bookingIds.has(bookingId)) {
+              eventByBookingId.set(bookingId, eventRecord);
+            }
+          }
+        }
+      }
+
+      // Also collect staff IDs from events (assigned_staff on events may differ from bookings)
+      const eventStaffIds = new Set<string>();
+      for (const eventRecord of eventByBookingId.values()) {
+        const staffIds = eventRecord.get('assigned_staff') as string[] | undefined;
+        if (staffIds) {
+          staffIds.forEach(id => {
+            if (!staffNameMap.has(id)) {
+              eventStaffIds.add(id);
+            }
+          });
+        }
+      }
+
+      // Fetch any additional staff names from events not already in staffNameMap
+      if (eventStaffIds.size > 0) {
+        try {
+          const extraStaffRecords = await this.base(PERSONEN_TABLE_ID)
+            .select({
+              filterByFormula: `OR(${Array.from(eventStaffIds).map(id => `RECORD_ID() = '${id}'`).join(',')})`,
+              fields: [PERSONEN_FIELD_IDS.staff_name],
+              returnFieldsByFieldId: true,
+            })
+            .all();
+
+          extraStaffRecords.forEach(record => {
+            const name = record.fields[PERSONEN_FIELD_IDS.staff_name] as string;
+            if (name) {
+              staffNameMap.set(record.id, name);
+            }
+          });
+        } catch (error) {
+          console.error('Error fetching event staff names for calendar:', error);
+        }
+      }
+
+      // Transform each booking record into a CalendarEntry
+      const entries: CalendarEntry[] = bookingRecords.map(record => {
+        const bookingId = record.id;
+        const dateStr = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.start_date] as string || '';
+        // Normalize date to YYYY-MM-DD (strip any time component)
+        const date = dateStr.substring(0, 10);
+        const schoolName = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.school_name] as string || '';
+        const contactName = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name] as string || '';
+        const contactPhone = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.school_phone] as string | undefined;
+        const regionIds = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.region] as string[] | undefined;
+        const regionId = regionIds?.[0];
+        const regionName = regionId ? regionNameMap.get(regionId) : undefined;
+
+        // Determine staff names: prefer event assigned_staff, fall back to booking assigned_staff
+        const eventRecord = eventByBookingId.get(bookingId);
+        let staffIds = eventRecord?.get('assigned_staff') as string[] | undefined;
+        if (!staffIds || staffIds.length === 0) {
+          staffIds = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.assigned_staff] as string[] | undefined;
+        }
+        const staffNames = (staffIds || [])
+          .map(id => staffNameMap.get(id))
+          .filter((name): name is string => Boolean(name));
+
+        // Determine event type from Event record flags
+        let eventType: CalendarEntry['eventType'] = 'Minimusikertag';
+        if (eventRecord) {
+          const isPlus = eventRecord.get('is_plus') as boolean | undefined;
+          const isKita = eventRecord.get('is_kita') as boolean | undefined;
+          const isSchulsong = eventRecord.get('is_schulsong') as boolean | undefined;
+          const isMinimusikertag = eventRecord.get('is_minimusikertag') as boolean | undefined;
+
+          if (isKita) {
+            eventType = 'Kita';
+          } else if (isPlus) {
+            eventType = 'Plus';
+          } else if (isSchulsong && !isMinimusikertag) {
+            eventType = 'Schulsong';
+          }
+          // Default: Minimusikertag
+        }
+
+        // Determine status: prefer Event status, fall back to booking simplybook_status
+        let status: CalendarEntry['status'] = 'Pending';
+        const eventStatus = eventRecord?.get('status') as string | undefined;
+        if (eventStatus === 'Confirmed') {
+          status = 'Confirmed';
+        } else if (eventStatus === 'On Hold') {
+          status = 'On Hold';
+        } else if (eventStatus === 'Pending') {
+          status = 'Pending';
+        } else {
+          // Fall back to booking status
+          const rawStatus = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status] as string || '';
+          if (rawStatus === 'confirmed') status = 'Confirmed';
+          else if (rawStatus === 'hold') status = 'On Hold';
+        }
+
+        return {
+          bookingId,
+          date,
+          schoolName,
+          contactName,
+          contactPhone,
+          regionId,
+          regionName,
+          staffNames,
+          eventType,
+          status,
+        };
+      });
+
+      // Sort by date ascending
+      entries.sort((a, b) => a.date.localeCompare(b.date));
+
+      return entries;
+    } catch (error) {
+      console.error('Error fetching calendar bookings:', error);
+      throw new Error(`Failed to fetch calendar bookings: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }

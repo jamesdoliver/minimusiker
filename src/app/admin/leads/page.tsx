@@ -7,6 +7,7 @@ import CreateLeadModal from '@/components/admin/leads/CreateLeadModal';
 import CreateBookingModal from '@/components/admin/bookings/CreateBookingModal';
 import LeadStageBadge from '@/components/admin/leads/LeadStageBadge';
 import LeadDetailsBreakdown from '@/components/admin/leads/LeadDetailsBreakdown';
+import MasterCalendar from '@/components/admin/leads/MasterCalendar';
 import type { LeadStage } from '@/lib/types/airtable';
 import type { LeadWithStaffName, StaffOption, RegionOption } from '@/app/api/admin/leads/route';
 
@@ -48,6 +49,7 @@ export default function AdminLeads() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [bookingPrefillData, setBookingPrefillData] = useState<BookingPrefillData | undefined>();
+  const [calendarRefreshTrigger, setCalendarRefreshTrigger] = useState(0);
 
   useEffect(() => {
     fetchLeads();
@@ -164,12 +166,7 @@ export default function AdminLeads() {
         throw new Error(data.error || 'Failed to convert lead');
       }
 
-      // Update lead stage locally
-      setLeads(prev => prev.map(l =>
-        l.id === leadId ? { ...l, stage: 'Won' as LeadStage } : l
-      ));
-
-      // Open CreateBookingModal with prefill data
+      // Open CreateBookingModal with prefill data (lead gets marked Won when booking is created)
       setBookingPrefillData(data.data);
       setShowBookingModal(true);
     } catch (err) {
@@ -335,6 +332,9 @@ export default function AdminLeads() {
           </button>
         </div>
       </div>
+
+      {/* Master Calendar */}
+      <MasterCalendar regions={regionList} refreshTrigger={calendarRefreshTrigger} />
 
       {/* Filter Panel */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6 space-y-4">
@@ -508,6 +508,7 @@ export default function AdminLeads() {
           setShowBookingModal(false);
           setBookingPrefillData(undefined);
           fetchLeads();
+          setCalendarRefreshTrigger(prev => prev + 1);
           toast.success('Lead converted to booking!');
         }}
         regions={regionList}

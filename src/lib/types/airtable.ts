@@ -1047,3 +1047,16 @@ export interface Lead {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface CalendarEntry {
+  bookingId: string;
+  date: string; // YYYY-MM-DD
+  schoolName: string;
+  contactName: string;
+  contactPhone?: string;
+  regionId?: string;
+  regionName?: string;
+  staffNames: string[];
+  eventType: 'Minimusikertag' | 'Plus' | 'Kita' | 'Schulsong';
+  status: 'Confirmed' | 'On Hold' | 'Pending';
+}
