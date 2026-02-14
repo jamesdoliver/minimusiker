@@ -84,6 +84,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Build a friendly download filename: "Schulsong_Grundschule am Mühlberg.mp3"
+    const ext = schulsongFile.r2Key.endsWith('.wav') ? 'wav' : 'mp3';
+    const schoolName = event?.school_name || '';
+    const downloadFilename = schoolName
+      ? `Schulsong_${schoolName}.${ext}`
+      : `schulsong.${ext}`;
+
     // Generate signed URLs
     const r2Service = getR2Service();
     let audioUrl: string | null = null;
@@ -91,10 +98,8 @@ export async function GET(request: NextRequest) {
 
     try {
       if (await r2Service.fileExists(schulsongFile.r2Key)) {
-        // 1 hour for playback
         audioUrl = await r2Service.generateSignedUrl(schulsongFile.r2Key, 3600);
-        // 24 hours for download
-        downloadUrl = await r2Service.generateSignedUrl(schulsongFile.r2Key, 86400);
+        downloadUrl = await r2Service.generateSignedUrl(schulsongFile.r2Key, 86400, downloadFilename);
       }
     } catch (err) {
       console.error('Error generating schulsong signed URLs:', err);
@@ -129,8 +134,6 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const extension = schulsongFile.r2Key.endsWith('.wav') ? 'wav' : 'mp3';
-
     return NextResponse.json({
       success: true,
       isSchulsong: true,
@@ -141,7 +144,7 @@ export async function GET(request: NextRequest) {
       hasAudio: true,
       audioUrl,
       downloadUrl,
-      filename: `schulsong.${extension}`,
+      filename: downloadFilename,
     });
   } catch (error) {
     console.error('Error fetching schulsong status:', error);
