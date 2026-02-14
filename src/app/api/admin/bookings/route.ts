@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import Airtable from 'airtable';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { SchoolBooking, SecondaryContact, TEAMS_REGIONEN_TABLE_ID, SCHOOL_BOOKINGS_TABLE_ID, SCHOOL_BOOKINGS_FIELD_IDS } from '@/lib/types/airtable';
+import { SchoolBooking, SecondaryContact, TEAMS_REGIONEN_TABLE_ID, SCHOOL_BOOKINGS_TABLE_ID, SCHOOL_BOOKINGS_FIELD_IDS, EVENTS_TABLE_ID, EVENTS_FIELD_IDS } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { getR2Service } from '@/lib/services/r2Service';
@@ -440,6 +440,35 @@ export async function POST(request: NextRequest) {
           }
         } catch (defaultClassError) {
           console.error('Error creating default class for manual booking:', defaultClassError);
+        }
+      }
+      // If created from a lead conversion, link the lead and store call notes
+      if (body.leadId && body.callNotes && eventRecord) {
+        try {
+          await airtableService.updateLead(body.leadId, {
+            convertedBookingId: record.id,
+            stage: 'Won',
+          });
+
+          const leadHistoryText = body.callNotes
+            .map((note: { callNumber: number; date: string; notes: string }) =>
+              `[Call ${note.callNumber} - ${note.date}]\n${note.notes}`
+            )
+            .join('\n\n');
+
+          const existingNotes = eventRecord.admin_notes || '';
+          const combinedNotes = existingNotes
+            ? `${existingNotes}\n\n--- Lead History ---\n${leadHistoryText}`
+            : `--- Lead History ---\n${leadHistoryText}`;
+
+          await base.table(EVENTS_TABLE_ID).update(eventRecord.id, {
+            [EVENTS_FIELD_IDS.admin_notes]: combinedNotes,
+          });
+
+          console.log(`Linked lead ${body.leadId} to booking ${record.id} with call notes`);
+        } catch (leadError) {
+          console.error('Error linking lead to booking:', leadError);
+          // Don't fail the booking creation if lead linking fails
         }
       }
     } catch (chainError) {

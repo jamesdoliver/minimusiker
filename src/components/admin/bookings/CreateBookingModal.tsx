@@ -8,11 +8,27 @@ interface RegionOption {
   name: string;
 }
 
+interface BookingPrefillData {
+  leadId?: string;
+  schoolName?: string;
+  contactName?: string;
+  contactEmail?: string;
+  phone?: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
+  regionId?: string;
+  estimatedChildren?: string;
+  eventDate?: string;
+  callNotes?: Array<{ callNumber: number; date: string; notes: string }>;
+}
+
 interface CreateBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   regions: RegionOption[];
+  prefillData?: BookingPrefillData;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -22,6 +38,7 @@ export default function CreateBookingModal({
   onClose,
   onSuccess,
   regions,
+  prefillData,
 }: CreateBookingModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -48,25 +65,25 @@ export default function CreateBookingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Reset form when modal opens
+  // Reset form when modal opens, apply prefill if available
   useEffect(() => {
     if (isOpen) {
-      setSchoolName('');
-      setContactName('');
-      setContactEmail('');
-      setPhone('');
-      setAddress('');
-      setPostalCode('');
-      setCity('');
-      setSelectedRegionId('');
-      setEstimatedChildren('');
-      setEventDate('');
+      setSchoolName(prefillData?.schoolName || '');
+      setContactName(prefillData?.contactName || '');
+      setContactEmail(prefillData?.contactEmail || '');
+      setPhone(prefillData?.phone || '');
+      setAddress(prefillData?.address || '');
+      setPostalCode(prefillData?.postalCode || '');
+      setCity(prefillData?.city || '');
+      setSelectedRegionId(prefillData?.regionId || '');
+      setEstimatedChildren(prefillData?.estimatedChildren || '');
+      setEventDate(prefillData?.eventDate || '');
       setStartTime('');
       setEndTime('');
-      setDatePending(false);
+      setDatePending(!prefillData?.eventDate);
       setErrors({});
     }
-  }, [isOpen]);
+  }, [isOpen, prefillData]);
 
   // Handle escape key
   useEffect(() => {
@@ -138,6 +155,9 @@ export default function CreateBookingModal({
         if (endTime) payload.endTime = endTime;
       }
 
+      if (prefillData?.leadId) payload.leadId = prefillData.leadId;
+      if (prefillData?.callNotes) payload.callNotes = prefillData.callNotes;
+
       const response = await fetch('/api/admin/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,9 +199,11 @@ export default function CreateBookingModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
             <h2 id="create-booking-modal-title" className="text-lg font-semibold text-gray-900">
-              Create Booking
+              {prefillData?.leadId ? 'Convert Lead to Booking' : 'Create Booking'}
             </h2>
-            <p className="text-sm text-gray-500 mt-0.5">Create a new manual booking</p>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {prefillData?.leadId ? 'Review and confirm the booking details' : 'Create a new manual booking'}
+            </p>
           </div>
           <button
             onClick={onClose}

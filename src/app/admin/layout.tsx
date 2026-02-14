@@ -10,6 +10,7 @@ import SettingsModal from '@/components/admin/settings/SettingsModal';
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: '📊' },
   { name: 'Bookings', href: '/admin/bookings', icon: '📋' },
+  { name: 'Leads', href: '/admin/leads', icon: '🎯' },
   { name: 'Tasks', href: '/admin/tasks', icon: '✅' },
   { name: 'Emails', href: '/admin/emails', icon: '📧' },
   { name: 'Upload', href: '/admin/upload', icon: '📤' },

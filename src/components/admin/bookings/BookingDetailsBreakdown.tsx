@@ -429,6 +429,39 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         </div>
       </div>
 
+      {/* Lead History — shown when booking was converted from a lead */}
+      {booking.adminNotes?.includes('--- Lead History ---') && (() => {
+        const leadHistoryStart = booking.adminNotes!.indexOf('--- Lead History ---');
+        const leadHistoryText = booking.adminNotes!.substring(leadHistoryStart + '--- Lead History ---'.length).trim();
+        const calls = leadHistoryText.split(/\n\n/).filter(Boolean).map(block => {
+          const headerMatch = block.match(/^\[Call (\d+) - (.+)\]\n([\s\S]*)$/);
+          if (headerMatch) {
+            return { callNumber: parseInt(headerMatch[1]), date: headerMatch[2], notes: headerMatch[3] };
+          }
+          return null;
+        }).filter(Boolean);
+
+        if (calls.length === 0) return null;
+
+        return (
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-blue-800 mb-3">Lead History</h4>
+              <div className="space-y-3">
+                {calls.map((call, i) => (
+                  <div key={i} className="border-l-2 border-blue-300 pl-3">
+                    <div className="text-xs font-medium text-blue-700">
+                      Call {call!.callNumber} — {call!.date}
+                    </div>
+                    <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{call!.notes}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Audio Status Section */}
       <div className="mt-6 pt-4 border-t border-gray-200">
         <h4 className="text-sm font-semibold text-gray-700 mb-3">Audio Status</h4>
