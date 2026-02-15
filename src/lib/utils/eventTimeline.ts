@@ -49,7 +49,6 @@ export const EVENT_MILESTONES = {
   RECORDING_READY: 7, // Previews available (+7d after event)
   REMINDER_EMAIL: 7, // First reminder to check portal
   PORTAL_REMINDER: 14, // Second reminder
-  PORTAL_CLOSES: 30, // Parent portal access ends
 } as const;
 
 export type Milestone = keyof typeof EVENT_MILESTONES;
@@ -71,7 +70,7 @@ export interface EventTimelineInfo {
   nextMilestone: Milestone | null;
   passedMilestones: Milestone[];
   upcomingMilestones: Milestone[];
-  isWithinPortalWindow: boolean; // Within active portal period (-56 to +30)
+  isWithinPortalWindow: boolean; // Within active portal period (from booking confirmation onward)
 }
 
 /**
@@ -190,7 +189,6 @@ export function getMilestoneLabel(milestone: Milestone): string {
     RECORDING_READY: 'Aufnahmen verfügbar',
     REMINDER_EMAIL: 'Erinnerungs-E-Mail',
     PORTAL_REMINDER: 'Portal-Erinnerung',
-    PORTAL_CLOSES: 'Portal schließt',
   };
   return labels[milestone];
 }
@@ -238,9 +236,8 @@ export function calculateEventTimeline(
     }
   }
 
-  // Portal window is from booking confirmed (-56) to portal closes (+30)
-  const isWithinPortalWindow =
-    daysUntilEvent <= 56 && daysUntilEvent >= -30;
+  // Portal window starts from booking confirmation — no end date (always accessible)
+  const isWithinPortalWindow = daysUntilEvent <= 56;
 
   return {
     eventDate: event,
