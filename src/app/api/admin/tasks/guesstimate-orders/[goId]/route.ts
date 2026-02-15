@@ -19,8 +19,7 @@ export async function GET(
     const { goId } = await params;
 
     const taskService = getTaskService();
-    const orders = await taskService.getGuesstimateOrders();
-    const order = orders.find((o) => o.id === goId);
+    const order = await taskService.getGuesstimateOrderById(goId);
 
     if (!order) {
       return NextResponse.json(

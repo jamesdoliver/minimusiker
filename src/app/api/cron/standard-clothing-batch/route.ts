@@ -92,6 +92,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
+    // Idempotency check: skip if batch already exists for this week
+    const alreadyExists = await service.batchTaskExists(batch.batch_id);
+    if (alreadyExists) {
+      const duration = Date.now() - startTime;
+      console.log(`[Standard Clothing Batch Cron] Batch ${batch.batch_id} already exists. Skipped in ${duration}ms`);
+      return NextResponse.json({
+        success: true,
+        status: 'skipped',
+        reason: 'batch_already_exists',
+        batch_id: batch.batch_id,
+      });
+    }
+
     // Create the batch task
     const taskId = await service.createBatchTask(batch);
 

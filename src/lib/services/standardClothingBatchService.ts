@@ -63,14 +63,14 @@ class StandardClothingBatchService {
    * Generate batch ID from a date, e.g. "STD-2026-W06"
    */
   private generateBatchId(date: Date): string {
-    const year = date.getUTCFullYear();
-    // ISO week number
+    // ISO week number: the Thursday of the week determines both the week number and the year
     const tempDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
     const dayNum = tempDate.getUTCDay() || 7;
     tempDate.setUTCDate(tempDate.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(tempDate.getUTCFullYear(), 0, 1));
+    const isoYear = tempDate.getUTCFullYear(); // ISO week year (from Thursday)
+    const yearStart = new Date(Date.UTC(isoYear, 0, 1));
     const weekNum = Math.ceil((((tempDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-    return `STD-${year}-W${String(weekNum).padStart(2, '0')}`;
+    return `STD-${isoYear}-W${String(weekNum).padStart(2, '0')}`;
   }
 
   /**
@@ -252,6 +252,28 @@ class StandardClothingBatchService {
   }
 
   /**
+   * Check if a batch task already exists for the given batch ID.
+   * Used as an idempotency check to prevent duplicate batch creation.
+   */
+  async batchTaskExists(batchId: string): Promise<boolean> {
+    const base = this.airtable.getBase();
+    const tasksTable = base(TASKS_TABLE_ID);
+
+    const sanitizedBatchId = batchId.replace(/'/g, "\\'");
+    const records = await tasksTable
+      .select({
+        filterByFormula: `AND(
+          {${TASKS_FIELD_IDS.task_type}} = 'standard_clothing_order',
+          SEARCH('${sanitizedBatchId}', {${TASKS_FIELD_IDS.task_name}})
+        )`,
+        maxRecords: 1,
+      })
+      .all();
+
+    return records.length > 0;
+  }
+
+  /**
    * Create a batch task in Airtable for the given batch.
    * Writes order_ids immediately for deduplication.
    */
@@ -284,6 +306,133 @@ class StandardClothingBatchService {
     });
 
     return task.id;
+  }
+
+  /**
+   * Get a single pending standard clothing batch by its task ID.
+   * Fetches only the specific task and its orders instead of all batches.
+   */
+  async getPendingBatchByTaskId(taskId: string): Promise<StandardClothingBatch | null> {
+    const base = this.airtable.getBase();
+    const tasksTable = base(TASKS_TABLE_ID);
+    const ordersTable = base(ORDERS_TABLE_ID);
+    const eventsTable = base(EVENTS_TABLE_ID);
+
+    // Fetch the specific task
+    let taskRecord;
+    try {
+      taskRecord = await tasksTable.find(taskId);
+    } catch {
+      return null;
+    }
+
+    const taskType = taskRecord.get(TASKS_FIELD_IDS.task_type) as string;
+    const status = taskRecord.get(TASKS_FIELD_IDS.status) as string;
+    if (taskType !== 'standard_clothing_order' || status !== 'pending') {
+      return null;
+    }
+
+    const taskName = taskRecord.get(TASKS_FIELD_IDS.task_name) as string || '';
+    const orderIdsStr = taskRecord.get(TASKS_FIELD_IDS.order_ids) as string | undefined;
+    const eventIds = taskRecord.get(TASKS_FIELD_IDS.event_id) as string[] | undefined;
+
+    if (!orderIdsStr) return null;
+
+    const orderIdArray = orderIdsStr.split(',').map((id) => id.trim()).filter(Boolean);
+
+    // Fetch only the specific orders for this batch
+    const orderRecords = await Promise.all(
+      orderIdArray.map(async (orderId) => {
+        try {
+          return await ordersTable.find(orderId);
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    // Build class-to-event map
+    const classToEvent = await buildClassToEventMap(this.airtable.getBase());
+
+    // Re-aggregate from order data
+    const aggregatedItems: AggregatedClothingItems = {
+      tshirts: Object.fromEntries(TSHIRT_SIZES.map((s) => [s, 0])),
+      hoodies: Object.fromEntries(HOODIE_SIZES.map((s) => [s, 0])),
+    };
+
+    let totalRevenue = 0;
+    let totalOrders = 0;
+    const eventRecordIds = new Set<string>();
+
+    for (const order of orderRecords) {
+      if (!order) continue;
+
+      const lineItemsJson = order.get(ORDERS_FIELD_IDS.line_items) as string;
+      if (!lineItemsJson) continue;
+
+      let lineItems: ShopifyOrderLineItem[];
+      try {
+        lineItems = JSON.parse(lineItemsJson);
+      } catch {
+        continue;
+      }
+
+      let hasStandard = false;
+      for (const item of lineItems) {
+        const details = getStandardClothingDetails(item.variant_id);
+        if (details) {
+          hasStandard = true;
+          totalRevenue += item.total;
+          if (details.type === 'tshirt') {
+            aggregatedItems.tshirts[details.size] =
+              (aggregatedItems.tshirts[details.size] || 0) + item.quantity;
+          } else {
+            aggregatedItems.hoodies[details.size] =
+              (aggregatedItems.hoodies[details.size] || 0) + item.quantity;
+          }
+        }
+      }
+
+      if (hasStandard) {
+        totalOrders++;
+        const eventRecordId = resolveOrderEventId(order, classToEvent);
+        if (eventRecordId) eventRecordIds.add(eventRecordId);
+      }
+    }
+
+    // Resolve event names
+    const eventRecordIdArray = eventIds || Array.from(eventRecordIds);
+    const eventNames: string[] = [];
+    for (const eventRecordId of eventRecordIdArray) {
+      try {
+        const eventRecord = await eventsTable.find(eventRecordId);
+        const schoolName = eventRecord.get(EVENTS_FIELD_IDS.school_name) as string;
+        if (schoolName) eventNames.push(schoolName);
+      } catch {
+        // Skip events that can't be found
+      }
+    }
+
+    // Extract batch ID from task name
+    const batchIdMatch = taskName.match(/STD-\d{4}-W\d{2}/);
+    const batchId = batchIdMatch ? batchIdMatch[0] : taskName;
+
+    // Extract week dates from description
+    const description = taskRecord.get(TASKS_FIELD_IDS.description) as string || '';
+    const dateMatch = description.match(/\((\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})\)/);
+
+    return {
+      task_id: taskId,
+      batch_id: batchId,
+      week_start: dateMatch?.[1] || '',
+      week_end: dateMatch?.[2] || '',
+      event_record_ids: eventRecordIdArray,
+      event_names: eventNames,
+      total_orders: totalOrders,
+      total_revenue: totalRevenue,
+      aggregated_items: aggregatedItems,
+      order_ids: orderIdArray,
+    };
   }
 
   /**

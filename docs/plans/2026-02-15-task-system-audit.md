@@ -1,7 +1,7 @@
 # Task System Audit — Findings & Improvement Plan
 
 **Date:** 2026-02-15
-**Status:** In Progress — Phase 3 (Phases 1 & 2 complete)
+**Status:** In Progress — Phase 4 (Phases 1–3 complete)
 
 ---
 
@@ -222,10 +222,10 @@ Critical security work:
 ### Phase 3: Data Integrity (~2 hours)
 Prevent silent data issues:
 
-- [ ] **#5** Batch cron idempotency (30 min)
-- [ ] **#6** ISO week year mismatch (15 min)
-- [ ] **#7** `recalculateDeadlinesForEvent` formula (30 min)
-- [ ] **#16** Fetch-all-then-filter pattern (30 min)
+- [x] **#5** Batch cron idempotency (30 min)
+- [x] **#6** ISO week year mismatch (15 min)
+- [x] **#7** `recalculateDeadlinesForEvent` formula (30 min)
+- [x] **#16** Fetch-all-then-filter pattern (30 min)
 
 ### Phase 4: UX Polish (~2.5 hours)
 Better admin experience:

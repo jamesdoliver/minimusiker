@@ -382,6 +382,21 @@ class TaskService {
   }
 
   /**
+   * Get a single GuesstimateOrder by its record ID
+   */
+  async getGuesstimateOrderById(goId: string): Promise<GuesstimateOrder | null> {
+    const base = this.airtable.getBase();
+    const table = base(GUESSTIMATE_ORDERS_TABLE_ID);
+
+    try {
+      const record = await table.find(goId);
+      return this.transformGuesstimateOrderRecord(record);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Get GuesstimateOrders enriched with event details (for incoming orders view)
    */
   async getGuesstimateOrdersEnriched(options?: { pendingOnly?: boolean }): Promise<GuesstimateOrderWithEventDetails[]> {
@@ -591,10 +606,12 @@ class TaskService {
     }
 
     // Find all pending tasks for this event
+    // Use SEARCH() with ARRAYJOIN() because event_id is a linked record field (array)
+    const sanitizedEventId = eventRecordId.replace(/'/g, "\\'");
     const records = await table
       .select({
         filterByFormula: `AND(
-          {${TASKS_FIELD_IDS.event_id}} = '${eventRecordId}',
+          SEARCH('${sanitizedEventId}', ARRAYJOIN({${TASKS_FIELD_IDS.event_id}})),
           {${TASKS_FIELD_IDS.status}} = 'pending'
         )`,
       })

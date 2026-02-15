@@ -37,8 +37,7 @@ export async function POST(
 
     // Get the batch data (re-aggregate from task)
     const service = getStandardClothingBatchService();
-    const batches = await service.getPendingStandardBatches();
-    const batch = batches.find((b) => b.task_id === batchTaskId);
+    const batch = await service.getPendingBatchByTaskId(batchTaskId);
 
     if (!batch) {
       return NextResponse.json(
