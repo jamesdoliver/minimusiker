@@ -1,7 +1,7 @@
 # Task System Audit — Findings & Improvement Plan
 
 **Date:** 2026-02-15
-**Status:** In Progress — Phase 1
+**Status:** In Progress — Phase 3 (Phases 1 & 2 complete)
 
 ---
 
@@ -201,23 +201,23 @@ Full audit of the admin task management system: services, API routes, UI compone
 ### Phase 1: Quick Wins (< 30 min each, ~45 min total)
 Low-risk, high-value fixes:
 
-- [ ] **#9** Form state persists across modal re-opens (5 min)
-- [ ] **#11** Zero/negative amounts accepted (5 min)
-- [ ] **#12** No `response.ok` check before `.json()` in 4 components (10 min)
-- [ ] **#17** Backdrop/Cancel closes modal during submit (5 min)
-- [ ] **#18** No Escape key in `TaskCompletionModal` (5 min)
-- [ ] **#22** Event ID always shows ellipsis (2 min)
-- [ ] **#20** Currency formatting inconsistency (5 min)
-- [ ] **#26** Completed tasks errors silently swallowed (3 min)
-- [ ] **#8** Airtable formula injection via search (5 min)
-- [ ] **#4** JWT secret fallback (2 min)
+- [x] **#9** Form state persists across modal re-opens (5 min)
+- [x] **#11** Zero/negative amounts accepted (5 min)
+- [x] **#12** No `response.ok` check before `.json()` in 4 components (10 min)
+- [x] **#17** Backdrop/Cancel closes modal during submit (5 min)
+- [x] **#18** No Escape key in `TaskCompletionModal` (5 min)
+- [x] **#22** Event ID always shows ellipsis (2 min)
+- [x] **#20** Currency formatting inconsistency (5 min)
+- [x] **#26** Completed tasks errors silently swallowed (3 min)
+- [x] **#8** Airtable formula injection via search (5 min)
+- [x] **#4** JWT secret fallback (2 min)
 
 ### Phase 2: Auth & Audit Trail (~90 min)
 Critical security work:
 
-- [ ] **#2** Add auth to all 11 unprotected routes (60 min)
-- [ ] **#3** Replace hardcoded admin email (15 min)
-- [ ] **#1** Double-completion guard (15 min)
+- [x] **#2** Add auth to all 11 unprotected routes (60 min)
+- [x] **#3** Replace hardcoded admin email (15 min)
+- [x] **#1** Double-completion guard (15 min)
 
 ### Phase 3: Data Integrity (~2 hours)
 Prevent silent data issues:

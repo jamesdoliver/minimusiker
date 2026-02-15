@@ -33,6 +33,7 @@ export default function TaskCompletionModal({
       setNotes('');
       setInvoiceFile(null);
       setError(null);
+      setIsSubmitting(false);
     }
   }, [isOpen]);
 

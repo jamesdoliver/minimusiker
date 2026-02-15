@@ -44,12 +44,12 @@ export default function IncomingOrdersView({ onStockArrived }: IncomingOrdersVie
       headers: { 'Content-Type': 'application/json' },
     });
 
+    const data = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Server error (${response.status})`);
+      throw new Error(data.error || `Server error (${response.status})`);
     }
 
-    const data = await response.json();
     if (!data.success) {
       throw new Error(data.error || 'Failed to mark order as arrived');
     }

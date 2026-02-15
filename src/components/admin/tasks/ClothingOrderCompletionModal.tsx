@@ -86,12 +86,11 @@ export default function ClothingOrderCompletionModal({
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server error (${response.status})`);
-      }
+      const data = await response.json().catch(() => ({}));
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Server error (${response.status})`);
+      }
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to complete order');

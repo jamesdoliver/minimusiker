@@ -5,6 +5,9 @@ import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
 
+const VALID_STATUSES: TaskStatus[] = ['pending', 'completed', 'cancelled'];
+const VALID_TYPES: TaskFilterTab[] = ['all', 'paper_order', 'clothing_order', 'standard_clothing_order', 'cd_master', 'cd_production', 'shipping'];
+
 /**
  * GET /api/admin/tasks
  * Get all tasks with optional filtering
@@ -20,9 +23,16 @@ export async function GET(request: NextRequest) {
     if (authError) return authError;
 
     const searchParams = request.nextUrl.searchParams;
-    const status = (searchParams.get('status') as TaskStatus) || 'pending';
-    const type = (searchParams.get('type') as TaskFilterTab) || 'all';
+    const statusParam = searchParams.get('status');
+    const typeParam = searchParams.get('type');
     const search = searchParams.get('search') || undefined;
+
+    const status: TaskStatus = statusParam && VALID_STATUSES.includes(statusParam as TaskStatus)
+      ? (statusParam as TaskStatus)
+      : 'pending';
+    const type: TaskFilterTab = typeParam && VALID_TYPES.includes(typeParam as TaskFilterTab)
+      ? (typeParam as TaskFilterTab)
+      : 'all';
 
     const taskService = getTaskService();
     const result = await taskService.getTasks({ status, type, search });

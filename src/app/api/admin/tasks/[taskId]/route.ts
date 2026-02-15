@@ -99,9 +99,11 @@ export async function PATCH(
     });
   } catch (error) {
     console.error('Error updating task:', error);
+    const message = error instanceof Error ? error.message : 'Failed to update task';
+    const status = message === 'Task is already completed' ? 409 : 500;
     return NextResponse.json(
-      { success: false, error: 'Failed to update task' },
-      { status: 500 }
+      { success: false, error: message },
+      { status }
     );
   }
 }
