@@ -10,9 +10,10 @@ import MinicardOrderCard from './MinicardOrderCard';
 interface MinicardOrdersViewProps {
   isActive: boolean;
   onCompleteTask: (task: TaskWithEventDetails) => void;
+  refreshKey?: number;
 }
 
-export default function MinicardOrdersView({ isActive, onCompleteTask }: MinicardOrdersViewProps) {
+export default function MinicardOrdersView({ isActive, onCompleteTask, refreshKey }: MinicardOrdersViewProps) {
   const [events, setEvents] = useState<MinicardOrderEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export default function MinicardOrdersView({ isActive, onCompleteTask }: Minicar
     if (isActive) {
       fetchMinicardOrders();
     }
-  }, [isActive, fetchMinicardOrders]);
+  }, [isActive, fetchMinicardOrders, refreshKey]);
 
   const handleCancelTask = async (event: MinicardOrderEvent) => {
     const confirmed = window.confirm(

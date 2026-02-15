@@ -25,10 +25,12 @@ export default function CompletedTasksView({
   isLoading,
   onRefresh,
 }: CompletedTasksViewProps) {
+  const PAGE_SIZE = 50;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<TaskFilterTab>('all');
   const [sortField, setSortField] = useState<'task' | 'school' | 'amount' | 'completed'>('completed');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -51,6 +53,12 @@ export default function CompletedTasksView({
     } catch {
       return 0;
     }
+  };
+
+  // Reset visible count when filter changes
+  const handleFilterChange = (filter: TaskFilterTab) => {
+    setTypeFilter(filter);
+    setVisibleCount(PAGE_SIZE);
   };
 
   // Filter and sort tasks
@@ -76,6 +84,9 @@ export default function CompletedTasksView({
     });
   }, [tasks, typeFilter, sortField, sortDirection]);
 
+  const visibleTasks = filteredTasks.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredTasks.length;
+
   if (isLoading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -97,9 +108,11 @@ export default function CompletedTasksView({
     <div>
       {/* Filter Row */}
       <div className="mb-4 flex items-center gap-4">
-        <TaskTypeFilter value={typeFilter} onChange={setTypeFilter} />
+        <TaskTypeFilter value={typeFilter} onChange={handleFilterChange} />
         <span className="text-sm text-gray-500">
-          {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}
+          {hasMore
+            ? `Showing ${visibleCount} of ${filteredTasks.length} tasks`
+            : `${filteredTasks.length} task${filteredTasks.length !== 1 ? 's' : ''}`}
         </span>
       </div>
 
@@ -151,7 +164,7 @@ export default function CompletedTasksView({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredTasks.map((task) => {
+              {visibleTasks.map((task) => {
                 const isExpanded = expandedId === task.id;
                 let completionData: CompletionData = {};
                 if (task.completion_data) {
@@ -289,6 +302,18 @@ export default function CompletedTasksView({
               })}
             </tbody>
           </table>
+
+          {/* Load More */}
+          {hasMore && (
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-center">
+              <button
+                onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
+                className="text-sm font-medium text-[#94B8B3] hover:text-[#7da39e] transition-colors"
+              >
+                Show more ({filteredTasks.length - visibleCount} remaining)
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

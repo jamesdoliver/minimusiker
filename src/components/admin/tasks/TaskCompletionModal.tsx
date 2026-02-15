@@ -77,11 +77,6 @@ export default function TaskCompletionModal({
 
       if (task.completion_type === 'monetary') {
         completionData.amount = parseFloat(amount);
-        // TODO: Handle invoice upload to R2 and store URL
-        if (invoiceFile) {
-          // For now, just note that there's an invoice
-          completionData.invoice_url = `invoice_${task.id}_${invoiceFile.name}`;
-        }
       }
 
       if (task.completion_type === 'checkbox') {
@@ -89,6 +84,26 @@ export default function TaskCompletionModal({
       }
 
       await onComplete(task.id, completionData);
+
+      // Upload invoice after task completion (so the task record exists with completion_data)
+      if (invoiceFile) {
+        try {
+          const formData = new FormData();
+          formData.append('file', invoiceFile);
+          const uploadRes = await fetch(`/api/admin/tasks/${task.id}/invoice`, {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          });
+          if (!uploadRes.ok) {
+            const uploadData = await uploadRes.json().catch(() => ({}));
+            console.error('Invoice upload failed:', uploadData.error || uploadRes.status);
+          }
+        } catch (uploadErr) {
+          console.error('Invoice upload error:', uploadErr);
+        }
+      }
+
       onClose();
     } catch (err) {
       console.error('Error completing task:', err);
@@ -100,9 +115,23 @@ export default function TaskCompletionModal({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setInvoiceFile(file);
+    if (!file) return;
+
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Invalid file type. Allowed: PDF, PNG, JPG');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
     }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size exceeds 10MB limit');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setError(null);
+    setInvoiceFile(file);
   };
 
   // Determine what will be created on completion

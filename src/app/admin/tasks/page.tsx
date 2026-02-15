@@ -58,6 +58,7 @@ export default function AdminTasks() {
   const [selectedTask, setSelectedTask] =
     useState<TaskWithEventDetails | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch pending tasks
   const fetchPendingTasks = useCallback(async () => {
@@ -209,6 +210,7 @@ export default function AdminTasks() {
 
     // Refresh tasks after completion
     await fetchPendingTasks();
+    setRefreshKey(k => k + 1);
   };
 
   // Handle search in completed tasks
@@ -362,7 +364,7 @@ export default function AdminTasks() {
             <StandardClothingBatchView isActive={activeTab === 'standard_clothing_order'} />
           ) : activeTab === 'paper_order' ? (
             <>
-              <MinicardOrdersView isActive={true} onCompleteTask={handleCompleteClick} />
+              <MinicardOrdersView isActive={true} onCompleteTask={handleCompleteClick} refreshKey={refreshKey} />
               <div className="mt-8 mb-4">
                 <h2 className="text-lg font-semibold text-gray-900">Flyers & Posters</h2>
                 <p className="text-sm text-gray-500">Individual print order tasks</p>

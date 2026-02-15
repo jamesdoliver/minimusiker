@@ -1,7 +1,7 @@
 # Task System Audit — Findings & Improvement Plan
 
 **Date:** 2026-02-15
-**Status:** In Progress — Phase 5 (Phases 1–4 complete)
+**Status:** In Progress — Phase 6 (Phases 1–5 complete)
 
 ---
 
@@ -241,9 +241,9 @@ Better admin experience:
 ### Phase 5: Bigger Efforts (half-day each)
 Need design thought:
 
-- [ ] **#10** Invoice upload implementation (2-3 hrs)
-- [ ] **#15** Completed tasks pagination (2-3 hrs)
-- [ ] **#14** Minicard completion flow (3-4 hrs)
+- [x] **#10** Invoice upload implementation (2-3 hrs)
+- [x] **#15** Completed tasks pagination (2-3 hrs)
+- [x] **#14** Minicard completion flow (3-4 hrs)
 - [ ] **#13** CD Master/Production templates (1-2 hrs, needs business requirements)
 
 ### Phase 6: Accessibility (ongoing)
