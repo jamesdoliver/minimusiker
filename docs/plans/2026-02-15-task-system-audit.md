@@ -1,7 +1,7 @@
 # Task System Audit — Findings & Improvement Plan
 
 **Date:** 2026-02-15
-**Status:** In Progress — Phase 4 (Phases 1–3 complete)
+**Status:** In Progress — Phase 5 (Phases 1–4 complete)
 
 ---
 
@@ -230,13 +230,13 @@ Prevent silent data issues:
 ### Phase 4: UX Polish (~2.5 hours)
 Better admin experience:
 
-- [ ] **#19** Inline refresh instead of full-page spinner (30 min)
-- [ ] **#23** Count badges on all view buttons (20 min)
-- [ ] **#24** Confirmation on "Mark Stock Arrived" (15 min)
-- [ ] **#25** Search race condition (15 min)
-- [ ] **#21** Sortable columns in completed tasks (45 min)
-- [ ] **#27** Mobile button overflow (10 min)
-- [ ] **#28** Clipped expanded content (5 min)
+- [x] **#19** Inline refresh instead of full-page spinner (30 min)
+- [x] **#23** Count badges on all view buttons (20 min)
+- [x] **#24** Confirmation on "Mark Stock Arrived" (15 min)
+- [x] **#25** Search race condition (15 min)
+- [x] **#21** Sortable columns in completed tasks (45 min)
+- [x] **#27** Mobile button overflow (10 min)
+- [x] **#28** Clipped expanded content (5 min)
 
 ### Phase 5: Bigger Efforts (half-day each)
 Need design thought:

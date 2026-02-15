@@ -120,7 +120,7 @@ export default function ClothingOrderCard({
       {/* Expanded Content */}
       <div
         className={`overflow-hidden transition-all duration-200 ${
-          isExpanded ? 'max-h-[500px]' : 'max-h-0'
+          isExpanded ? 'max-h-[1000px] overflow-y-auto' : 'max-h-0'
         }`}
       >
         <div className="px-4 pb-4 border-t border-gray-100">
@@ -170,7 +170,7 @@ export default function ClothingOrderCard({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 mt-6">
+          <div className="flex flex-wrap gap-3 mt-6">
             <button
               onClick={(e) => {
                 e.stopPropagation();

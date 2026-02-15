@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, Fragment } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { TaskWithEventDetails, TASK_TYPE_CONFIG, TaskFilterTab } from '@/lib/types/tasks';
 import TaskTypeBadge from './TaskTypeBadge';
 import TaskTypeFilter from './TaskTypeFilter';
@@ -27,15 +27,54 @@ export default function CompletedTasksView({
 }: CompletedTasksViewProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<TaskFilterTab>('all');
+  const [sortField, setSortField] = useState<'task' | 'school' | 'amount' | 'completed'>('completed');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  // Filter tasks by type
-  const filteredTasks = typeFilter === 'all'
-    ? tasks
-    : tasks.filter(task => task.task_type === typeFilter);
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'completed' ? 'desc' : 'asc');
+    }
+  };
+
+  const parseAmount = (task: TaskWithEventDetails): number => {
+    if (!task.completion_data) return 0;
+    try {
+      const data = JSON.parse(task.completion_data);
+      return data.amount || 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  // Filter and sort tasks
+  const filteredTasks = useMemo(() => {
+    const filtered = typeFilter === 'all'
+      ? tasks
+      : tasks.filter(task => task.task_type === typeFilter);
+
+    return [...filtered].sort((a, b) => {
+      const dir = sortDirection === 'asc' ? 1 : -1;
+      switch (sortField) {
+        case 'task':
+          return dir * a.task_name.localeCompare(b.task_name);
+        case 'school':
+          return dir * a.school_name.localeCompare(b.school_name);
+        case 'amount':
+          return dir * (parseAmount(a) - parseAmount(b));
+        case 'completed':
+          return dir * (new Date(a.completed_at || 0).getTime() - new Date(b.completed_at || 0).getTime());
+        default:
+          return 0;
+      }
+    });
+  }, [tasks, typeFilter, sortField, sortDirection]);
 
   if (isLoading) {
     return (
@@ -82,18 +121,30 @@ export default function CompletedTasksView({
             <thead className="bg-gray-50">
               <tr>
                 <th className="w-8 px-4 py-3"></th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Task
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  School
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Completed
-                </th>
+                {([
+                  { key: 'task' as const, label: 'Task' },
+                  { key: 'school' as const, label: 'School' },
+                  { key: 'amount' as const, label: 'Amount' },
+                  { key: 'completed' as const, label: 'Completed' },
+                ] as const).map(({ key, label }) => (
+                  <th
+                    key={key}
+                    onClick={() => handleSort(key)}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none"
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      {sortField === key && (
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          {sortDirection === 'asc'
+                            ? <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L10 6.414l-3.293 3.293a1 1 0 01-1.414 0z" />
+                            : <path d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L10 13.586l3.293-3.293a1 1 0 011.414 0z" />
+                          }
+                        </svg>
+                      )}
+                    </span>
+                  </th>
+                ))}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Invoice
                 </th>

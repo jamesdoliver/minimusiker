@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import TaskQueue from '@/components/admin/tasks/TaskQueue';
 import TaskTypeTabs from '@/components/admin/tasks/TaskTypeTabs';
@@ -46,11 +46,15 @@ export default function AdminTasks() {
     shipping: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TaskFilterTab>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('pending');
   const [searchQuery, setSearchQuery] = useState('');
+  const [incomingCount, setIncomingCount] = useState<number | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const hasLoadedRef = useRef(false);
   const [selectedTask, setSelectedTask] =
     useState<TaskWithEventDetails | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,7 +62,12 @@ export default function AdminTasks() {
   // Fetch pending tasks
   const fetchPendingTasks = useCallback(async () => {
     try {
-      setIsLoading(true);
+      // Only show full-page spinner on initial load (no data yet)
+      if (!hasLoadedRef.current) {
+        setIsLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
       const params = new URLSearchParams({ status: 'pending' });
 
       const response = await fetch(`/api/admin/tasks?${params}`, {
@@ -91,12 +100,14 @@ export default function AdminTasks() {
       console.error('Error fetching tasks:', err);
       setError(err instanceof Error ? err.message : 'Failed to load tasks');
     } finally {
+      hasLoadedRef.current = true;
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
   // Fetch completed tasks
-  const fetchCompletedTasks = useCallback(async (search?: string) => {
+  const fetchCompletedTasks = useCallback(async (search?: string, signal?: AbortSignal) => {
     try {
       setIsLoadingCompleted(true);
       const params = new URLSearchParams({ status: 'completed' });
@@ -106,6 +117,7 @@ export default function AdminTasks() {
 
       const response = await fetch(`/api/admin/tasks?${params}`, {
         credentials: 'include',
+        signal,
       });
 
       if (!response.ok) {
@@ -121,6 +133,7 @@ export default function AdminTasks() {
         throw new Error(data.error || 'Failed to load completed tasks');
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       console.error('Error fetching completed tasks:', err);
       setError(err instanceof Error ? err.message : 'Failed to load completed tasks');
     } finally {
@@ -128,14 +141,39 @@ export default function AdminTasks() {
     }
   }, []);
 
+  // Fetch incoming orders count for badge
+  const fetchIncomingCount = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/tasks/guesstimate-orders?status=pending', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setIncomingCount(Array.isArray(data.data) ? data.data.length : 0);
+        }
+      }
+    } catch {
+      // Silently fail — badge is optional
+    }
+  }, []);
+
   useEffect(() => {
     fetchPendingTasks();
-  }, [fetchPendingTasks]);
+    fetchIncomingCount();
+  }, [fetchPendingTasks, fetchIncomingCount]);
 
   useEffect(() => {
     if (viewMode === 'completed') {
-      fetchCompletedTasks(searchQuery);
+      // Abort previous search request to prevent stale results
+      searchAbortRef.current?.abort();
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
+      fetchCompletedTasks(searchQuery, controller.signal);
     }
+    return () => {
+      searchAbortRef.current?.abort();
+    };
   }, [viewMode, fetchCompletedTasks, searchQuery]);
 
   // Filter tasks based on active tab
@@ -212,10 +250,11 @@ export default function AdminTasks() {
         </div>
         <button
           onClick={fetchPendingTasks}
-          className="inline-flex items-center px-4 py-2 bg-[#94B8B3] text-white rounded-lg hover:bg-[#7da39e] transition-colors"
+          disabled={isRefreshing}
+          className="inline-flex items-center px-4 py-2 bg-[#94B8B3] text-white rounded-lg hover:bg-[#7da39e] transition-colors disabled:opacity-70"
         >
           <svg
-            className="w-4 h-4 mr-2"
+            className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -227,7 +266,7 @@ export default function AdminTasks() {
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          Refresh
+          {isRefreshing ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 
@@ -261,6 +300,17 @@ export default function AdminTasks() {
           }`}
         >
           Incoming Orders
+          {incomingCount !== null && incomingCount > 0 && (
+            <span
+              className={`ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-semibold rounded-full ${
+                viewMode === 'incoming'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-gray-100 text-gray-700'
+              }`}
+            >
+              {incomingCount}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setViewMode('completed')}
@@ -271,6 +321,17 @@ export default function AdminTasks() {
           }`}
         >
           Completed
+          {completedTasks.length > 0 && (
+            <span
+              className={`ml-2 inline-flex items-center justify-center min-w-[24px] h-6 px-2 text-xs font-semibold rounded-full ${
+                viewMode === 'completed'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-gray-100 text-gray-700'
+              }`}
+            >
+              {completedTasks.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -324,7 +385,7 @@ export default function AdminTasks() {
 
       {/* Incoming Orders View */}
       {viewMode === 'incoming' && (
-        <IncomingOrdersView onStockArrived={fetchPendingTasks} />
+        <IncomingOrdersView onStockArrived={() => { fetchPendingTasks(); fetchIncomingCount(); }} />
       )}
 
       {/* Completed Tasks View */}

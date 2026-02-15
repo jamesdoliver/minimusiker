@@ -10,6 +10,7 @@ interface IncomingOrderCardProps {
 
 export default function IncomingOrderCard({ order, onMarkArrived }: IncomingOrderCardProps) {
   const [isMarking, setIsMarking] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const formatDate = (dateStr: string) => {
@@ -29,6 +30,10 @@ export default function IncomingOrderCard({ order, onMarkArrived }: IncomingOrde
   };
 
   const handleMarkArrived = async () => {
+    if (!showConfirm) {
+      setShowConfirm(true);
+      return;
+    }
     setIsMarking(true);
     setError(null);
     try {
@@ -37,6 +42,7 @@ export default function IncomingOrderCard({ order, onMarkArrived }: IncomingOrde
       setError(err instanceof Error ? err.message : 'Failed to mark as arrived');
     } finally {
       setIsMarking(false);
+      setShowConfirm(false);
     }
   };
 
@@ -89,25 +95,41 @@ export default function IncomingOrderCard({ order, onMarkArrived }: IncomingOrde
         <span className="text-sm font-medium text-gray-700">
           {order.order_amount ? formatCurrency(order.order_amount) : ''}
         </span>
-        <button
-          onClick={handleMarkArrived}
-          disabled={isMarking}
-          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isMarking ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              Marking...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Mark Stock Arrived
-            </>
+        <div className="flex items-center gap-2">
+          {showConfirm && !isMarking && (
+            <button
+              onClick={() => setShowConfirm(false)}
+              className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
           )}
-        </button>
+          <button
+            onClick={handleMarkArrived}
+            disabled={isMarking}
+            className={`flex items-center gap-2 px-4 py-2 text-white text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+              showConfirm
+                ? 'bg-orange-600 hover:bg-orange-700'
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
+          >
+            {isMarking ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Marking...
+              </>
+            ) : showConfirm ? (
+              'Confirm Arrived?'
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Mark Stock Arrived
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
