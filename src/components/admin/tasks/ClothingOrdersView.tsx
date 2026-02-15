@@ -25,6 +25,9 @@ export default function ClothingOrdersView({ isActive }: ClothingOrdersViewProps
     setError(null);
     try {
       const response = await fetch('/api/admin/tasks/clothing-orders');
+      if (!response.ok) {
+        throw new Error(`Server error (${response.status})`);
+      }
       const data = await response.json();
       if (data.success) {
         setEvents(data.data.events);

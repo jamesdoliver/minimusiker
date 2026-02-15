@@ -64,8 +64,8 @@ export default function ClothingOrderCompletionModal({
 
   const handleSubmit = async () => {
     const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum < 0) {
-      setError('Please enter a valid amount');
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setError('Please enter a valid positive amount');
       return;
     }
 
@@ -85,6 +85,11 @@ export default function ClothingOrderCompletionModal({
           }),
         }
       );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server error (${response.status})`);
+      }
 
       const data = await response.json();
 

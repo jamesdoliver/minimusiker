@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStandardClothingBatchService } from '@/lib/services/standardClothingBatchService';
 import { getTaskService } from '@/lib/services/taskService';
+import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,9 @@ export async function GET(
   { params }: { params: Promise<{ batchTaskId: string }> }
 ) {
   try {
+    const [, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const { batchTaskId } = await params;
 
     if (!batchTaskId) {

@@ -143,10 +143,12 @@ class TaskService {
     }
 
     if (options.search) {
+      // Escape single quotes to prevent Airtable formula injection
+      const sanitizedSearch = options.search.replace(/'/g, "\\'");
       // Search across event_id, go_id display, and order_ids
       filters.push(`OR(
-        SEARCH(LOWER('${options.search}'), LOWER({${TASKS_FIELD_IDS.template_id}})),
-        SEARCH(LOWER('${options.search}'), LOWER({${TASKS_FIELD_IDS.order_ids}}))
+        SEARCH(LOWER('${sanitizedSearch}'), LOWER({${TASKS_FIELD_IDS.template_id}})),
+        SEARCH(LOWER('${sanitizedSearch}'), LOWER({${TASKS_FIELD_IDS.order_ids}}))
       )`);
     }
 
@@ -231,6 +233,12 @@ class TaskService {
     // Get the task first
     const record = await table.find(taskId);
     const task = this.transformTaskRecord(record);
+
+    // Guard against double-completion
+    if (task.status === 'completed') {
+      throw new Error('Task is already completed');
+    }
+
     const template = getTemplateById(task.template_id);
 
     let goId: string | undefined;

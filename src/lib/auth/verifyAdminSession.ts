@@ -1,7 +1,13 @@
 import jwt from 'jsonwebtoken';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-const ADMIN_JWT_SECRET = process.env.JWT_SECRET || 'admin-secret-key';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return secret;
+}
 
 export interface AdminSession {
   userId: string;
@@ -24,7 +30,7 @@ export function verifyAdminSession(request: NextRequest): AdminSession | null {
     }
 
     // Verify and decode the JWT token
-    const decoded = jwt.verify(token, ADMIN_JWT_SECRET) as AdminSession & { exp?: number; iat?: number };
+    const decoded = jwt.verify(token, getJwtSecret()) as AdminSession & { exp?: number; iat?: number };
 
     // Check if token is expired (jwt.verify should handle this, but double-check)
     if (decoded.exp && decoded.exp * 1000 < Date.now()) {
@@ -68,4 +74,20 @@ export function getAdminEmailFromRequest(request: NextRequest): string | null {
     return session.email;
   }
   return null;
+}
+
+/**
+ * Require admin authentication, returning the session or a 401 response.
+ * Usage: const [admin, errorResponse] = requireAdmin(request);
+ *        if (errorResponse) return errorResponse;
+ */
+export function requireAdmin(request: NextRequest): [AdminSession, null] | [null, NextResponse] {
+  const admin = verifyAdminSession(request);
+  if (!admin) {
+    return [null, NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    )];
+  }
+  return [admin, null];
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClothingOrdersService } from '@/lib/services/clothingOrdersService';
+import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,9 @@ export async function GET(
   { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
+    const [, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const { eventId } = await params;
 
     if (!eventId) {

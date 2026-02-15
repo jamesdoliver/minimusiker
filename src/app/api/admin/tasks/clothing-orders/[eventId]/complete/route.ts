@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getClothingOrdersService } from '@/lib/services/clothingOrdersService';
 import { CompleteClothingOrderRequest } from '@/lib/types/clothingOrders';
+import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,9 @@ export async function POST(
   { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
+    const [admin, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const { eventId } = await params;
 
     if (!eventId) {
@@ -40,8 +44,7 @@ export async function POST(
       );
     }
 
-    // TODO: Get admin email from session
-    const adminEmail = 'admin@minimusiker.de';
+    const adminEmail = admin.email;
 
     const clothingOrdersService = getClothingOrdersService();
     const result = await clothingOrdersService.completeClothingOrder(

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TaskWithEventDetails, TaskCompletionData } from '@/lib/types/tasks';
 import TaskTypeBadge from './TaskTypeBadge';
 
@@ -25,6 +25,28 @@ export default function TaskCompletionModal({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Reset form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setAmount('');
+      setConfirmed(false);
+      setNotes('');
+      setInvoiceFile(null);
+      setError(null);
+    }
+  }, [isOpen]);
+
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) onClose();
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+    }
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, isSubmitting, onClose]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,9 +54,12 @@ export default function TaskCompletionModal({
     setError(null);
 
     // Validate based on completion type
-    if (task.completion_type === 'monetary' && !amount) {
-      setError('Please enter the order amount');
-      return;
+    if (task.completion_type === 'monetary') {
+      const amountNum = parseFloat(amount);
+      if (!amount || isNaN(amountNum) || amountNum <= 0) {
+        setError('Please enter a valid positive amount');
+        return;
+      }
     }
 
     if (task.completion_type === 'checkbox' && !confirmed) {
@@ -88,7 +113,7 @@ export default function TaskCompletionModal({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-        onClick={onClose}
+        onClick={() => !isSubmitting && onClose()}
       />
 
       {/* Modal */}
@@ -104,7 +129,8 @@ export default function TaskCompletionModal({
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-500"
+              disabled={isSubmitting}
+              className="text-gray-400 hover:text-gray-500 disabled:opacity-50"
             >
               <svg
                 className="w-6 h-6"
@@ -245,7 +271,8 @@ export default function TaskCompletionModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
             >
               Cancel
             </button>

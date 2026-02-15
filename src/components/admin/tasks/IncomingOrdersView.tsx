@@ -18,6 +18,9 @@ export default function IncomingOrdersView({ onStockArrived }: IncomingOrdersVie
     setError(null);
     try {
       const response = await fetch('/api/admin/tasks/guesstimate-orders?status=pending');
+      if (!response.ok) {
+        throw new Error(`Server error (${response.status})`);
+      }
       const data = await response.json();
       if (data.success) {
         setOrders(data.data);
@@ -40,6 +43,11 @@ export default function IncomingOrdersView({ onStockArrived }: IncomingOrdersVie
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
     });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Server error (${response.status})`);
+    }
 
     const data = await response.json();
     if (!data.success) {

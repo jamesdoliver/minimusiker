@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTaskService } from '@/lib/services/taskService';
 import { CreateGuesstimateOrderInput } from '@/lib/types/tasks';
+import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   try {
+    const [, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const searchParams = request.nextUrl.searchParams;
     const eventId = searchParams.get('eventId') || undefined;
     const status = searchParams.get('status') || undefined;
@@ -51,6 +55,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const [, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const body: CreateGuesstimateOrderInput = await request.json();
 
     if (!body.event_id) {

@@ -154,7 +154,7 @@ export default function TaskCard({ task, onComplete }: TaskCardProps) {
         {/* IDs */}
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded font-mono">
-            Event: {task.event_id.substring(0, 30)}...
+            Event: {task.event_id.length > 30 ? `${task.event_id.substring(0, 30)}...` : task.event_id}
           </span>
           {task.go_display_id && (
             <span className="px-2 py-1 bg-sage-100 text-sage-800 rounded font-mono">

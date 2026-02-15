@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getStandardClothingBatchService } from '@/lib/services/standardClothingBatchService';
+import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,8 +8,11 @@ export const dynamic = 'force-dynamic';
  * GET /api/admin/tasks/standard-clothing-batches
  * Get all pending standard clothing batches
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const [, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const service = getStandardClothingBatchService();
     const batches = await service.getPendingStandardBatches();
 

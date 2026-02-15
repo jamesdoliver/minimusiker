@@ -150,7 +150,7 @@ export default function CompletedTasksView({
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {completionData.amount
-                          ? `€${completionData.amount.toFixed(2)}`
+                          ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(completionData.amount)
                           : '-'}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTaskService } from '@/lib/services/taskService';
 import { TaskStatus, TaskFilterTab } from '@/lib/types/tasks';
+import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   try {
+    const [, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const searchParams = request.nextUrl.searchParams;
     const status = (searchParams.get('status') as TaskStatus) || 'pending';
     const type = (searchParams.get('type') as TaskFilterTab) || 'all';

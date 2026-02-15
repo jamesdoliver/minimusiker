@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTaskService } from '@/lib/services/taskService';
+import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,10 +9,13 @@ export const dynamic = 'force-dynamic';
  * Get a single guesstimate order by ID
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ goId: string }> }
 ) {
   try {
+    const [, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const { goId } = await params;
 
     const taskService = getTaskService();
@@ -43,10 +47,13 @@ export async function GET(
  * Mark a guesstimate order as arrived (sets date_completed to today)
  */
 export async function PATCH(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ goId: string }> }
 ) {
   try {
+    const [, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const { goId } = await params;
 
     const taskService = getTaskService();

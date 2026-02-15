@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTaskService } from '@/lib/services/taskService';
 import { TaskCompletionData } from '@/lib/types/tasks';
+import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,9 @@ export async function GET(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const [, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const { taskId } = await params;
     const taskService = getTaskService();
     const task = await taskService.getTaskById(taskId);
@@ -58,12 +62,13 @@ export async function PATCH(
   { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
+    const [admin, authError] = requireAdmin(request);
+    if (authError) return authError;
+
     const { taskId } = await params;
     const body = await request.json();
 
-    // Get admin email from session/auth (for now, use a placeholder)
-    // TODO: Get actual admin email from session
-    const adminEmail = 'admin@minimusiker.de';
+    const adminEmail = admin.email;
 
     const taskService = getTaskService();
 

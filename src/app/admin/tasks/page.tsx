@@ -122,6 +122,7 @@ export default function AdminTasks() {
       }
     } catch (err) {
       console.error('Error fetching completed tasks:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load completed tasks');
     } finally {
       setIsLoadingCompleted(false);
     }

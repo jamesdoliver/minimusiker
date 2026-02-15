@@ -23,6 +23,9 @@ export default function StandardClothingBatchView({ isActive }: StandardClothing
     setError(null);
     try {
       const response = await fetch('/api/admin/tasks/standard-clothing-batches');
+      if (!response.ok) {
+        throw new Error(`Server error (${response.status})`);
+      }
       const data = await response.json();
       if (data.success) {
         setBatches(data.data.batches);
