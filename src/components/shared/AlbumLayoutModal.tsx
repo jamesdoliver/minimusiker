@@ -22,6 +22,8 @@ import { AlbumTrack, AlbumTrackUpdate } from '@/lib/services/teacherService';
 
 interface AlbumLayoutModalProps {
   eventId: string;
+  apiBaseUrl: string;
+  classesWithoutSongs?: string[];
   onClose: () => void;
   onSave?: () => void;
 }
@@ -120,6 +122,8 @@ function SortableTrackItem({
 
 export default function AlbumLayoutModal({
   eventId,
+  apiBaseUrl,
+  classesWithoutSongs,
   onClose,
   onSave,
 }: AlbumLayoutModalProps) {
@@ -139,7 +143,7 @@ export default function AlbumLayoutModal({
   useEffect(() => {
     async function fetchTracks() {
       try {
-        const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/album-order`);
+        const response = await fetch(apiBaseUrl);
 
         if (!response.ok) {
           const data = await response.json();
@@ -163,7 +167,7 @@ export default function AlbumLayoutModal({
     }
 
     fetchTracks();
-  }, [eventId]);
+  }, [eventId, apiBaseUrl]);
 
   // Check for changes
   useEffect(() => {
@@ -223,7 +227,7 @@ export default function AlbumLayoutModal({
         ...(track.editedClassName !== track.originalClassName && { className: track.editedClassName }),
       }));
 
-      const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/album-order`, {
+      const response = await fetch(apiBaseUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tracks: updates }),
@@ -259,6 +263,8 @@ export default function AlbumLayoutModal({
     }
   };
 
+  const missingSongs = classesWithoutSongs && classesWithoutSongs.length > 0;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
@@ -274,6 +280,21 @@ export default function AlbumLayoutModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {/* Missing songs warning */}
+          {missingSongs && (
+            <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p className="text-sm text-yellow-800">
+                  Folgende Klassen haben noch keine Lieder und fehlen in der Reihenfolge:{' '}
+                  <span className="font-medium">{classesWithoutSongs!.join(', ')}</span>
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Loading State */}
           {state === 'loading' && (
             <div className="py-12 text-center">

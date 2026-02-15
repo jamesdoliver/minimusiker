@@ -3215,14 +3215,11 @@ class TeacherService {
    * Get all songs for an event formatted for album layout modal
    * Includes songs from regular classes, groups, and collection types (choir, teacher_song)
    */
-  async getAlbumTracks(eventId: string, teacherEmail: string): Promise<AlbumTrack[]> {
+  /**
+   * Get album tracks without auth check — used by admin route directly
+   */
+  async getAlbumTracksData(eventId: string): Promise<AlbumTrack[]> {
     try {
-      // Verify teacher has access to this event
-      const event = await this.getTeacherEventDetail(eventId, teacherEmail);
-      if (!event) {
-        throw new Error('Event not found or access denied');
-      }
-
       // Get all songs for this event
       const songs = await this.getSongsByEventId(eventId);
 
@@ -3297,18 +3294,24 @@ class TeacherService {
     }
   }
 
+  async getAlbumTracks(eventId: string, teacherEmail: string): Promise<AlbumTrack[]> {
+    // Verify teacher has access to this event
+    const event = await this.getTeacherEventDetail(eventId, teacherEmail);
+    if (!event) {
+      throw new Error('Event not found or access denied');
+    }
+    return this.getAlbumTracksData(eventId);
+  }
+
   /**
    * Bulk update album order and optionally song titles/class names
    * Also updates class display_order based on first song position
    */
-  async updateAlbumOrder(eventId: string, teacherEmail: string, tracks: AlbumTrackUpdate[]): Promise<void> {
+  /**
+   * Update album order without auth check — used by admin route directly
+   */
+  async updateAlbumOrderData(eventId: string, tracks: AlbumTrackUpdate[]): Promise<void> {
     try {
-      // Verify teacher has access to this event
-      const event = await this.getTeacherEventDetail(eventId, teacherEmail);
-      if (!event) {
-        throw new Error('Event not found or access denied');
-      }
-
       // Update songs with new album order and optional title changes
       for (const track of tracks) {
         const updateData: { [key: string]: string | number } = {
@@ -3399,6 +3402,15 @@ class TeacherService {
       console.error('Error updating album order:', error);
       throw new Error(`Failed to update album order: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  async updateAlbumOrder(eventId: string, teacherEmail: string, tracks: AlbumTrackUpdate[]): Promise<void> {
+    // Verify teacher has access to this event
+    const event = await this.getTeacherEventDetail(eventId, teacherEmail);
+    if (!event) {
+      throw new Error('Event not found or access denied');
+    }
+    return this.updateAlbumOrderData(eventId, tracks);
   }
 
   // =============================================================================

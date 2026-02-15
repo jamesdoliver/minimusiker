@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { TeacherEventView, TeacherClassView, Song, ClassGroup } from '@/lib/types/teacher';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import InviteTeacherModal from '@/components/teacher/InviteTeacherModal';
-import AlbumLayoutModal from '@/components/teacher/AlbumLayoutModal';
+import AlbumLayoutModal from '@/components/shared/AlbumLayoutModal';
 import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModal';
 import SchulsongApprovalSection from '@/components/teacher/SchulsongApprovalSection';
 
@@ -1439,6 +1439,24 @@ export default function TeacherEventDetailPage() {
             )}
           </div>
 
+          {/* Missing songs warning */}
+          {event.classes.length > 0 && event.classes.some(c => c.songs.length === 0) && (
+            <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p className="text-sm text-yellow-800">
+                  Folgende Klassen haben noch keine Lieder:{' '}
+                  <span className="font-medium">
+                    {event.classes.filter(c => c.songs.length === 0).map(c => c.className).join(', ')}
+                  </span>
+                  {' '}&mdash; diese fehlen in der Album-Reihenfolge.
+                </p>
+              </div>
+            </div>
+          )}
+
           {event.classes.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
               <div className="text-4xl mb-4">📚</div>
@@ -1554,6 +1572,8 @@ export default function TeacherEventDetailPage() {
         {showAlbumLayoutModal && (
           <AlbumLayoutModal
             eventId={event.eventId}
+            apiBaseUrl={`/api/teacher/events/${encodeURIComponent(event.eventId)}/album-order`}
+            classesWithoutSongs={event.classes.filter(c => c.songs.length === 0).map(c => c.className)}
             onClose={() => setShowAlbumLayoutModal(false)}
             onSave={handleRefresh}
           />

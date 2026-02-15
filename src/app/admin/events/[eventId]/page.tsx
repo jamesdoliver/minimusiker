@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { SchoolEventDetail, TeamStaffMember } from '@/lib/types/airtable';
+import AlbumLayoutModal from '@/components/shared/AlbumLayoutModal';
 
 // Extended type that includes booking info from API fallback
 interface EventDetailWithBooking extends SchoolEventDetail {
@@ -126,6 +127,9 @@ export default function EventDetailPage() {
   // Collection management state (Choir and Teacher Song)
   const [collections, setCollections] = useState<Collection[]>([]);
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(new Set());
+
+  // Album layout modal state
+  const [showAlbumLayoutModal, setShowAlbumLayoutModal] = useState(false);
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -1024,7 +1028,19 @@ export default function EventDetailPage() {
       {/* Classes Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Classes & Songs</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold text-gray-900">Classes & Songs</h2>
+            <button
+              onClick={() => setShowAlbumLayoutModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              title="Album-Reihenfolge für das gedruckte Album festlegen"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              Album-Reihenfolge
+            </button>
+          </div>
           <button
             onClick={handleAddClass}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -1035,6 +1051,24 @@ export default function EventDetailPage() {
             Add Class
           </button>
         </div>
+
+        {/* Missing songs warning */}
+        {event.classes.length > 0 && event.classes.some((c: any) => (c.songs || []).length === 0) && (
+          <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <p className="text-sm text-yellow-800">
+                Folgende Klassen haben noch keine Lieder:{' '}
+                <span className="font-medium">
+                  {event.classes.filter((c: any) => (c.songs || []).length === 0).map((c: any) => c.className).join(', ')}
+                </span>
+                {' '}&mdash; diese fehlen in der Album-Reihenfolge.
+              </p>
+            </div>
+          </div>
+        )}
 
         {event.classes.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
@@ -1881,6 +1915,17 @@ export default function EventDetailPage() {
             toast.success('Teacher added successfully');
             fetchEventDetail();
           }}
+        />
+      )}
+
+      {/* Album Layout Modal */}
+      {showAlbumLayoutModal && (
+        <AlbumLayoutModal
+          eventId={eventId}
+          apiBaseUrl={`/api/admin/events/${encodeURIComponent(eventId)}/album-order`}
+          classesWithoutSongs={event?.classes.filter((c: any) => (c.songs || []).length === 0).map((c: any) => c.className)}
+          onClose={() => setShowAlbumLayoutModal(false)}
+          onSave={fetchEventDetail}
         />
       )}
 
