@@ -525,7 +525,7 @@ function ParentPortalContent() {
       </div>
 
       {/* Cart Drawer */}
-      <CartDrawer parentId={session.parentId} parentEmail={session.email} eventId={eventId} classId={classId} />
+      <CartDrawer parentId={session.parentId} parentEmail={session.email} eventId={eventId} classId={classId} schoolName={schoolName} />
     </div>
   );
 }

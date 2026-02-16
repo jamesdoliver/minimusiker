@@ -12,15 +12,16 @@ interface CartDrawerProps {
   parentEmail?: string;
   eventId?: string;
   classId?: string;
+  schoolName?: string;
 }
 
-export default function CartDrawer({ parentId, parentEmail, eventId, classId }: CartDrawerProps) {
+export default function CartDrawer({ parentId, parentEmail, eventId, classId, schoolName }: CartDrawerProps) {
   const t = useTranslations('shop.cart');
   const { cart, removeItem, updateQuantity, isCartOpen, setIsCartOpen } = useCart();
   const { checkout, isCheckingOut, error: checkoutError } = useCheckout();
 
   // Log props for debugging attribute flow
-  console.log('[CartDrawer] Props:', { parentId, parentEmail, eventId, classId });
+  console.log('[CartDrawer] Props:', { parentId, parentEmail, eventId, classId, schoolName });
 
   // Close drawer on escape key
   useEffect(() => {
@@ -51,6 +52,7 @@ export default function CartDrawer({ parentId, parentEmail, eventId, classId }: 
       parentEmail: parentEmail || '',
       eventId: eventId || '',
       classId: classId || '',
+      schoolName: schoolName || '',
     });
   };
 

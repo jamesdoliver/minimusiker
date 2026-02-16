@@ -65,6 +65,7 @@ function ShopContent() {
   const selectedChild = children[selectedChildIndex] || null;
   const eventId = selectedChild?.eventId || selectedChild?.bookingId || '';
   const classId = selectedChild?.classId || '';
+  const schoolName = selectedChild?.schoolName || '';
   const hasMultipleChildren = children.length > 1;
 
   // Verify parent session
@@ -200,7 +201,7 @@ function ShopContent() {
       </main>
 
       <CartSummary />
-      <CartDrawer parentId={parentId} parentEmail={parentEmail} eventId={eventId} classId={classId} />
+      <CartDrawer parentId={parentId} parentEmail={parentEmail} eventId={eventId} classId={classId} schoolName={schoolName} />
     </div>
   );
 }

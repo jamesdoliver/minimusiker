@@ -68,17 +68,18 @@ export async function POST(request: NextRequest) {
     // Determine discount codes to apply
     const discountCodes: string[] = [];
 
-    // 1. Early-bird check (requires event date lookup)
+    // 1. Early-bird check + schoolName backfill (requires event lookup)
     if (customAttributes?.eventId) {
       try {
         const airtable = getAirtableService();
         const event = await airtable.getEventByEventId(customAttributes.eventId);
+
+        // Early-bird discount only applies BEFORE the event day
         if (event?.event_date) {
           const eventDate = new Date(event.event_date);
           const daysUntilEvent = Math.ceil(
             (eventDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           );
-          // Early-bird discount only applies BEFORE the event day
           if (daysUntilEvent > 0) {
             discountCodes.push('EARLYBIRD10');
             console.log('[create-checkout] Early-bird discount applied:', {
@@ -87,8 +88,14 @@ export async function POST(request: NextRequest) {
             });
           }
         }
+
+        // Backfill schoolName from Event record if missing from request
+        if (!customAttributes.schoolName && event?.school_name) {
+          customAttributes.schoolName = event.school_name;
+          console.log('[create-checkout] Backfilled schoolName from Event:', event.school_name);
+        }
       } catch (error) {
-        console.error('[create-checkout] Error checking early-bird eligibility:', error);
+        console.error('[create-checkout] Error checking early-bird/schoolName:', error);
         // Continue without early-bird discount if lookup fails
       }
     }

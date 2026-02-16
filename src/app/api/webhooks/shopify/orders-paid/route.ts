@@ -58,7 +58,19 @@ export async function POST(request: NextRequest) {
       email: order.email,
       total: order.total_price,
       currency: order.currency,
+      source_name: order.source_name,
     });
+
+    // Detect direct Shopify storefront purchases (not through our headless app)
+    const isDirectPurchase = order.source_name === 'web';
+    if (isDirectPurchase) {
+      console.warn('[orders-paid] ⚠ Direct Shopify purchase detected:', {
+        orderNumber: order.name,
+        source_name: order.source_name,
+        email: order.email,
+        note: 'This order was placed through the Shopify Online Store, not our headless app. Custom attributes may be missing.',
+      });
+    }
 
     // Idempotency check: see if this order already exists in Airtable
     const shopifyEventId = request.headers.get('X-Shopify-Event-Id');
@@ -109,6 +121,8 @@ export async function POST(request: NextRequest) {
     const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY })
       .base(process.env.AIRTABLE_BASE_ID!);
 
+    let eventSchoolName: string | null = null;
+
     if (eventId) {
       try {
         // Look up by event_id OR legacy_booking_id for backward compatibility
@@ -117,12 +131,14 @@ export async function POST(request: NextRequest) {
           .select({
             filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = "${eventId}", {${EVENTS_FIELD_IDS.legacy_booking_id}} = "${eventId}")`,
             maxRecords: 1,
+            returnFieldsByFieldId: true,
           })
           .firstPage();
 
         if (events.length > 0) {
           eventRecordId = events[0].id;
-          console.log('[orders-paid] Found Event record:', eventRecordId);
+          eventSchoolName = events[0].fields[EVENTS_FIELD_IDS.school_name] as string || null;
+          console.log('[orders-paid] Found Event record:', eventRecordId, 'school_name:', eventSchoolName);
         } else {
           console.warn('[orders-paid] Event not found for eventId:', eventId);
         }
@@ -208,7 +224,7 @@ export async function POST(request: NextRequest) {
       [ORDERS_FIELD_IDS.order_id]: order.admin_graphql_api_id,
       [ORDERS_FIELD_IDS.order_number]: order.name,
       [ORDERS_FIELD_IDS.booking_id]: eventId || '',
-      [ORDERS_FIELD_IDS.school_name]: attributes.schoolName || attributes.school_name || '',
+      [ORDERS_FIELD_IDS.school_name]: attributes.schoolName || attributes.school_name || eventSchoolName || '',
       ...(parentRecordId ? { [ORDERS_FIELD_IDS.parent_id]: [parentRecordId] } : {}),
       ...(classRecordId ? { [ORDERS_FIELD_IDS.class_id]: [classRecordId] } : {}),
       ...(eventRecordId ? { [ORDERS_FIELD_IDS.event_id]: [eventRecordId] } : {}),
@@ -260,6 +276,11 @@ export async function POST(request: NextRequest) {
     // For parentId: use as-is (P1, P2, P3 format)
     if (parentId) {
       tags.push(`par-${parentId}`);
+    }
+
+    // Flag direct Shopify purchases for manual review
+    if (isDirectPurchase) {
+      tags.push('direct-purchase');
     }
 
     if (tags.length > 0) {
