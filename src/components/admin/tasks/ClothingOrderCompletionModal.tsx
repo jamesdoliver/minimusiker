@@ -108,11 +108,12 @@ export default function ClothingOrderCompletionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="clothing-modal-title">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={() => !isSubmitting && onClose()}
+        aria-hidden="true"
       />
 
       {/* Modal */}
@@ -122,7 +123,7 @@ export default function ClothingOrderCompletionModal({
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 id="clothing-modal-title" className="text-lg font-semibold text-gray-900">
                   Complete Clothing Order
                 </h2>
                 <p className="text-sm text-gray-600 mt-1">
@@ -132,9 +133,10 @@ export default function ClothingOrderCompletionModal({
               <button
                 onClick={onClose}
                 disabled={isSubmitting}
+                aria-label="Close dialog"
                 className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>

@@ -253,6 +253,7 @@ export default function AdminTasks() {
         <button
           onClick={fetchPendingTasks}
           disabled={isRefreshing}
+          aria-label="Refresh tasks"
           className="inline-flex items-center px-4 py-2 bg-[#94B8B3] text-white rounded-lg hover:bg-[#7da39e] transition-colors disabled:opacity-70"
         >
           <svg
@@ -260,6 +261,7 @@ export default function AdminTasks() {
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
+            aria-hidden="true"
           >
             <path
               strokeLinecap="round"
@@ -273,8 +275,12 @@ export default function AdminTasks() {
       </div>
 
       {/* View Mode Tabs */}
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-4 mb-6" role="tablist" aria-label="Task views">
         <button
+          id="tab-pending"
+          role="tab"
+          aria-selected={viewMode === 'pending'}
+          aria-controls="panel-pending"
           onClick={() => setViewMode('pending')}
           className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${
             viewMode === 'pending'
@@ -294,6 +300,10 @@ export default function AdminTasks() {
           </span>
         </button>
         <button
+          id="tab-incoming"
+          role="tab"
+          aria-selected={viewMode === 'incoming'}
+          aria-controls="panel-incoming"
           onClick={() => setViewMode('incoming')}
           className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${
             viewMode === 'incoming'
@@ -315,6 +325,10 @@ export default function AdminTasks() {
           )}
         </button>
         <button
+          id="tab-completed"
+          role="tab"
+          aria-selected={viewMode === 'completed'}
+          aria-controls="panel-completed"
           onClick={() => setViewMode('completed')}
           className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${
             viewMode === 'completed'
@@ -339,7 +353,7 @@ export default function AdminTasks() {
 
       {/* Pending Tasks View */}
       {viewMode === 'pending' && (
-        <>
+        <div id="panel-pending" role="tabpanel" aria-labelledby="tab-pending">
           {/* Task Type Tabs */}
           <div className="mb-6">
             <TaskTypeTabs
@@ -382,17 +396,19 @@ export default function AdminTasks() {
               onComplete={handleCompleteClick}
             />
           )}
-        </>
+        </div>
       )}
 
       {/* Incoming Orders View */}
       {viewMode === 'incoming' && (
-        <IncomingOrdersView onStockArrived={() => { fetchPendingTasks(); fetchIncomingCount(); }} />
+        <div id="panel-incoming" role="tabpanel" aria-labelledby="tab-incoming">
+          <IncomingOrdersView onStockArrived={() => { fetchPendingTasks(); fetchIncomingCount(); }} />
+        </div>
       )}
 
       {/* Completed Tasks View */}
       {viewMode === 'completed' && (
-        <>
+        <div id="panel-completed" role="tabpanel" aria-labelledby="tab-completed">
           {/* Search Bar */}
           <div className="mb-6 max-w-md">
             <TaskSearchBar
@@ -407,7 +423,7 @@ export default function AdminTasks() {
             isLoading={isLoadingCompleted}
             onRefresh={() => fetchCompletedTasks(searchQuery)}
           />
-        </>
+        </div>
       )}
 
       {/* Completion Modal */}

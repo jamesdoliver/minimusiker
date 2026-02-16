@@ -139,11 +139,12 @@ export default function TaskCompletionModal({
   const willCreateShipping = willCreateGoId && task.template_id !== 'minicard';
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="task-modal-title">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={() => !isSubmitting && onClose()}
+        aria-hidden="true"
       />
 
       {/* Modal */}
@@ -152,7 +153,7 @@ export default function TaskCompletionModal({
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 id="task-modal-title" className="text-lg font-semibold text-gray-900">
                 Complete Task
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">{task.task_name}</p>
@@ -160,6 +161,7 @@ export default function TaskCompletionModal({
             <button
               onClick={onClose}
               disabled={isSubmitting}
+              aria-label="Close dialog"
               className="text-gray-400 hover:text-gray-500 disabled:opacity-50"
             >
               <svg
@@ -167,6 +169,7 @@ export default function TaskCompletionModal({
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"

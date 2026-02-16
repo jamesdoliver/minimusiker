@@ -182,7 +182,16 @@ export default function CompletedTasksView({
                       className={`hover:bg-gray-50 cursor-pointer ${
                         isExpanded ? 'bg-gray-50' : ''
                       }`}
+                      tabIndex={0}
+                      role="button"
+                      aria-expanded={isExpanded}
                       onClick={() => toggleExpand(task.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleExpand(task.id);
+                        }
+                      }}
                     >
                       <td className="px-4 py-3">
                         <svg
@@ -192,6 +201,7 @@ export default function CompletedTasksView({
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
+                          aria-hidden="true"
                         >
                           <path
                             strokeLinecap="round"

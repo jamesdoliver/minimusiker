@@ -1,7 +1,7 @@
 # Task System Audit — Findings & Improvement Plan
 
 **Date:** 2026-02-15
-**Status:** In Progress — Phase 6 (Phases 1–5 complete)
+**Status:** Complete (Phases 1–6 done, #13 deferred pending business requirements)
 
 ---
 
@@ -249,7 +249,7 @@ Need design thought:
 ### Phase 6: Accessibility (ongoing)
 Best done incrementally as you touch each component:
 
-- [ ] **#29** Dialog semantics on modals
-- [ ] **#30** Tab semantics on view buttons
-- [ ] **#31** Keyboard-accessible table rows
-- [ ] **#32** Missing aria-labels throughout
+- [x] **#29** Dialog semantics on modals
+- [x] **#30** Tab semantics on view buttons
+- [x] **#31** Keyboard-accessible table rows
+- [x] **#32** Missing aria-labels throughout
