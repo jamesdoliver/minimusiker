@@ -349,17 +349,20 @@ export default function EventDetailPage() {
     }
   };
 
-  // Tier switch handler (Minimusikertag ←→ PLUS, mutually exclusive)
-  const handleTierSwitch = async (newIsPlus: boolean) => {
-    if (newIsPlus === isPlus) return;
+  // Tier switch handler (Off ←→ Minimusikertag ←→ PLUS)
+  const currentTier: 'off' | 'minimusikertag' | 'plus' = isPlus ? 'plus' : isMinimusikertag ? 'minimusikertag' : 'off';
+  const handleTierSwitch = async (newTier: 'off' | 'minimusikertag' | 'plus') => {
+    if (newTier === currentTier) return;
     setIsUpdatingToggles('tier');
+    const newIsPlus = newTier === 'plus';
+    const newIsMinimusikertag = newTier === 'minimusikertag';
     try {
       const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           is_plus: newIsPlus,
-          is_minimusikertag: !newIsPlus,
+          is_minimusikertag: newIsMinimusikertag,
         }),
       });
 
@@ -369,8 +372,9 @@ export default function EventDetailPage() {
       }
 
       setIsPlus(newIsPlus);
-      setIsMinimusikertag(!newIsPlus);
-      toast.success(`Tier: ${newIsPlus ? 'PLUS' : 'Minimusikertag'}`);
+      setIsMinimusikertag(newIsMinimusikertag);
+      const tierLabels = { off: 'Off', minimusikertag: 'Minimusikertag', plus: 'PLUS' };
+      toast.success(`Tier: ${tierLabels[newTier]}`);
     } catch (err) {
       console.error('Error updating tier:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to update tier');
@@ -815,7 +819,7 @@ export default function EventDetailPage() {
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type</h3>
               <div className="space-y-3">
-                {/* Minimusikertag ←→ PLUS Segmented Control */}
+                {/* Off ←→ Minimusikertag ←→ PLUS Segmented Control */}
                 <div className="flex items-center gap-3">
                   <div
                     className={`inline-flex rounded-lg p-0.5 ${isUpdatingToggles === 'tier' ? 'opacity-50 pointer-events-none' : ''}`}
@@ -823,9 +827,27 @@ export default function EventDetailPage() {
                   >
                     <button
                       type="button"
-                      onClick={() => handleTierSwitch(false)}
+                      onClick={() => handleTierSwitch('off')}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
-                      style={!isPlus ? {
+                      style={currentTier === 'off' ? {
+                        backgroundColor: '#d1d5db',
+                        color: '#374151',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                      } : {
+                        backgroundColor: 'transparent',
+                        color: '#6b7280',
+                      }}
+                    >
+                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                        style={currentTier === 'off' ? { backgroundColor: '#374151', color: '#d1d5db' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
+                      >&mdash;</span>
+                      Off
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTierSwitch('minimusikertag')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+                      style={currentTier === 'minimusikertag' ? {
                         backgroundColor: '#86efac',
                         color: '#166534',
                         boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
@@ -835,15 +857,15 @@ export default function EventDetailPage() {
                       }}
                     >
                       <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                        style={!isPlus ? { backgroundColor: '#166534', color: '#86efac' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
+                        style={currentTier === 'minimusikertag' ? { backgroundColor: '#166534', color: '#86efac' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
                       >M</span>
                       Minimusikertag
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleTierSwitch(true)}
+                      onClick={() => handleTierSwitch('plus')}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
-                      style={isPlus ? {
+                      style={currentTier === 'plus' ? {
                         backgroundColor: '#93c5fd',
                         color: '#1e40af',
                         boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
@@ -853,7 +875,7 @@ export default function EventDetailPage() {
                       }}
                     >
                       <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                        style={isPlus ? { backgroundColor: '#1e40af', color: '#93c5fd' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
+                        style={currentTier === 'plus' ? { backgroundColor: '#1e40af', color: '#93c5fd' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
                       >+</span>
                       PLUS
                     </button>
