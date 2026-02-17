@@ -104,7 +104,11 @@ export async function POST(request: NextRequest) {
     // Convert item to PrintableItemConfig format
     const printableConfig = getPrintableConfig(item.type);
     const pdfHeight = printableConfig?.pdfDimensions.height || 1000;
-    const scale = item.canvasScale || 1;
+    let scale = item.canvasScale || 1;
+    if (scale < 0.1 || scale > 5.0) {
+      console.warn(`[printables/preview] Clamping canvasScale ${scale} for item ${item.type} to range [0.1, 5.0]`);
+      scale = Math.max(0.1, Math.min(5.0, scale));
+    }
 
     // Convert text elements from CSS to PDF coordinates
     const textElementConfigs: TextElementConfig[] = item.textElements.map(element => {
@@ -218,7 +222,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate signed URL for download (expires in 5 minutes)
-    const signedUrl = await r2Service.generateSignedUrlForAssetsBucket(previewKey, 300);
+    // Signed URL expires in 1 hour (admin may revisit the tab)
+    const signedUrl = await r2Service.generateSignedUrlForAssetsBucket(previewKey, 3600);
 
     return NextResponse.json({
       success: true,

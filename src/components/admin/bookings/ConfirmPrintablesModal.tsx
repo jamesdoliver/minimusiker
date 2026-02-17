@@ -98,8 +98,11 @@ export default function ConfirmPrintablesModal({
   // Preview download state
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Ref for click-outside detection
+  const modalRef = useRef<HTMLDivElement>(null);
+
   // Guard: prevent async status load from overwriting user interactions
-  const userHasInteracted = useRef(false);
+  const userHasInteracted = useRef<Set<PrintableItemType>>(new Set());
 
   // Current item config
   const currentItem = PRINTABLE_ITEMS[currentStep];
@@ -108,7 +111,7 @@ export default function ConfirmPrintablesModal({
   // Run health check and load status when modal opens
   useEffect(() => {
     if (isOpen) {
-      userHasInteracted.current = false;
+      userHasInteracted.current = new Set();
       setCurrentStep(0);
       setItemEditorStates(initializeAllItemsEditorState(booking.schoolName, booking.bookingDate));
       // Reset all items to pending
@@ -131,6 +134,46 @@ export default function ConfirmPrintablesModal({
     }
   }, [isOpen, booking.schoolName]);
 
+  // Handle close with confirmation if user has made progress
+  const handleClose = useCallback(() => {
+    if (isGenerating) return;
+
+    const confirmed = Object.values(itemsStatus).filter(s => s === 'confirmed').length;
+    const skipped = Object.values(itemsStatus).filter(s => s === 'skipped').length;
+    if (confirmed + skipped > 0) {
+      const proceed = window.confirm(
+        'You have unsaved changes. Closing will discard your confirmed/skipped selections. Close anyway?'
+      );
+      if (!proceed) return;
+    }
+
+    onClose();
+  }, [isGenerating, itemsStatus, onClose]);
+
+  // Handle escape key - prevent close during generation
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isGenerating) {
+        handleClose();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, isGenerating, handleClose]);
+
+  // Handle click outside modal - prevent close during generation
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node) && !isGenerating) {
+        handleClose();
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, isGenerating, handleClose]);
+
   // Load existing printables status from R2
   const loadPrintablesStatus = async () => {
     setIsLoadingStatus(true);
@@ -146,12 +189,12 @@ export default function ConfirmPrintablesModal({
         return;
       }
       const data = await response.json();
-      if (data.status && !userHasInteracted.current) {
-        // Merge: only update keys present in API response, keep missing keys as 'pending'
+      if (data.status) {
+        // Merge: only update keys present in API response AND not yet touched by the user
         setItemsStatus((prev) => {
           const merged = { ...prev };
           PRINTABLE_ITEMS.forEach((item) => {
-            if (data.status[item.type]) {
+            if (data.status[item.type] && !userHasInteracted.current.has(item.type)) {
               merged[item.type] = data.status[item.type];
             }
           });
@@ -209,7 +252,7 @@ export default function ConfirmPrintablesModal({
 
   // Handle confirm current item and go to next
   const handleConfirmAndNext = () => {
-    userHasInteracted.current = true;
+    userHasInteracted.current.add(currentItem.type);
     setItemsStatus((prev) => ({
       ...prev,
       [currentItem.type]: 'confirmed',
@@ -222,7 +265,7 @@ export default function ConfirmPrintablesModal({
 
   // Handle skip current item and go to next
   const handleSkip = () => {
-    userHasInteracted.current = true;
+    userHasInteracted.current.add(currentItem.type);
     setItemsStatus((prev) => ({
       ...prev,
       [currentItem.type]: 'skipped',
@@ -426,7 +469,7 @@ export default function ConfirmPrintablesModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+      <div ref={modalRef} className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
@@ -434,8 +477,9 @@ export default function ConfirmPrintablesModal({
             <p className="text-sm text-gray-500">Confirm printables for this event</p>
           </div>
           <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            onClick={handleClose}
+            disabled={isGenerating}
+            className={`p-2 hover:bg-gray-100 rounded-lg transition-colors ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
             aria-label="Close"
           >
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -444,33 +488,60 @@ export default function ConfirmPrintablesModal({
           </button>
         </div>
 
-        {/* Health check warning */}
-        {(isCheckingHealth || healthError) && (
-          <div className={`px-6 py-3 ${healthError ? 'bg-red-50' : 'bg-blue-50'}`}>
-            {isCheckingHealth ? (
-              <div className="flex items-center gap-2 text-blue-700 text-sm">
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        {/* Health check warnings */}
+        {isCheckingHealth && (
+          <div className="px-6 py-3 bg-blue-50">
+            <div className="flex items-center gap-2 text-blue-700 text-sm">
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Checking templates and assets...
+            </div>
+          </div>
+        )}
+        {healthError && (
+          <div className="px-6 py-3 bg-red-50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-red-700 text-sm">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                Checking templates and assets...
+                {healthError}
               </div>
-            ) : healthError ? (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-red-700 text-sm">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  {healthError}
-                </div>
-                <button
-                  onClick={checkHealth}
-                  className="text-sm text-red-700 hover:text-red-800 underline"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : null}
+              <button
+                onClick={checkHealth}
+                className="text-sm text-red-700 hover:text-red-800 underline"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+        {!isCheckingHealth && healthCheck && healthCheck.templatesMissing.length > 0 && (
+          <div className="px-6 py-3 bg-yellow-50">
+            <div className="flex items-center gap-2 text-yellow-700 text-sm">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>
+                Missing templates: {healthCheck.templatesMissing.join(', ')}. These items will fail during generation if confirmed.
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Warning: no access code means QR codes will be blank on flyer backs */}
+        {!booking.accessCode && !isCheckingHealth && (
+          <div className="px-6 py-3 bg-yellow-50">
+            <div className="flex items-center gap-2 text-yellow-700 text-sm">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>
+                <strong>No access code found</strong> for this event. Flyer back pages will be generated without QR codes.
+              </span>
+            </div>
           </div>
         )}
 

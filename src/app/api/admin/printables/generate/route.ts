@@ -170,7 +170,11 @@ export async function POST(request: NextRequest) {
     const itemConfigs: PrintableItemConfig[] = confirmedItems.map(item => {
       const printableConfig = getPrintableConfig(item.type);
       const pdfHeight = printableConfig?.pdfDimensions.height || 1000;
-      const scale = item.canvasScale || 1;
+      let scale = item.canvasScale || 1;
+      if (scale < 0.1 || scale > 5.0) {
+        console.warn(`[printables/generate] Clamping canvasScale ${scale} for item ${item.type} to range [0.1, 5.0]`);
+        scale = Math.max(0.1, Math.min(5.0, scale));
+      }
 
       // Convert text elements from CSS to PDF coordinates
       const textElementConfigs: TextElementConfig[] = item.textElements.map(element => {
