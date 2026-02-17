@@ -104,6 +104,9 @@ export default function ConfirmPrintablesModal({
   // Guard: prevent async status load from overwriting user interactions
   const userHasInteracted = useRef<Set<PrintableItemType>>(new Set());
 
+  // localStorage key prefix for persisting editor state across sessions
+  const storageKeyPrefix = `printables-editor-${booking.code}`;
+
   // Current item config
   const currentItem = PRINTABLE_ITEMS[currentStep];
   const currentEditorState = itemEditorStates[currentItem.type];
@@ -112,14 +115,34 @@ export default function ConfirmPrintablesModal({
   useEffect(() => {
     if (isOpen) {
       userHasInteracted.current = new Set();
-      setCurrentStep(0);
-      setItemEditorStates(initializeAllItemsEditorState(booking.schoolName, booking.bookingDate));
-      // Reset all items to pending
-      const initialStatus: Record<PrintableItemType, ItemStatus> = {} as Record<PrintableItemType, ItemStatus>;
-      PRINTABLE_ITEMS.forEach((item) => {
-        initialStatus[item.type] = 'pending';
-      });
-      setItemsStatus(initialStatus);
+
+      // Try to restore from localStorage
+      let restored = false;
+      try {
+        const savedEditor = localStorage.getItem(`${storageKeyPrefix}-editor`);
+        const savedStatus = localStorage.getItem(`${storageKeyPrefix}-status`);
+        const savedStep = localStorage.getItem(`${storageKeyPrefix}-step`);
+
+        if (savedEditor && savedStatus) {
+          setItemEditorStates(JSON.parse(savedEditor));
+          setItemsStatus(JSON.parse(savedStatus));
+          setCurrentStep(savedStep ? parseInt(savedStep, 10) : 0);
+          restored = true;
+        }
+      } catch {
+        // JSON parse failed — fall through to fresh init
+      }
+
+      if (!restored) {
+        setCurrentStep(0);
+        setItemEditorStates(initializeAllItemsEditorState(booking.schoolName, booking.bookingDate));
+        const initialStatus: Record<PrintableItemType, ItemStatus> = {} as Record<PrintableItemType, ItemStatus>;
+        PRINTABLE_ITEMS.forEach((item) => {
+          initialStatus[item.type] = 'pending';
+        });
+        setItemsStatus(initialStatus);
+      }
+
       setIsGenerating(false);
       setGenerationError(null);
       setGenerationResult(null);
@@ -134,21 +157,11 @@ export default function ConfirmPrintablesModal({
     }
   }, [isOpen, booking.schoolName]);
 
-  // Handle close with confirmation if user has made progress
+  // Handle close - block during generation, otherwise close (state is persisted in localStorage)
   const handleClose = useCallback(() => {
     if (isGenerating) return;
-
-    const confirmed = Object.values(itemsStatus).filter(s => s === 'confirmed').length;
-    const skipped = Object.values(itemsStatus).filter(s => s === 'skipped').length;
-    if (confirmed + skipped > 0) {
-      const proceed = window.confirm(
-        'You have unsaved changes. Closing will discard your confirmed/skipped selections. Close anyway?'
-      );
-      if (!proceed) return;
-    }
-
     onClose();
-  }, [isGenerating, itemsStatus, onClose]);
+  }, [isGenerating, onClose]);
 
   // Handle escape key - prevent close during generation
   useEffect(() => {
@@ -173,6 +186,25 @@ export default function ConfirmPrintablesModal({
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, isGenerating, handleClose]);
+
+  // Persist editor state to localStorage
+  useEffect(() => {
+    if (isOpen) {
+      localStorage.setItem(`${storageKeyPrefix}-editor`, JSON.stringify(itemEditorStates));
+    }
+  }, [isOpen, storageKeyPrefix, itemEditorStates]);
+
+  useEffect(() => {
+    if (isOpen) {
+      localStorage.setItem(`${storageKeyPrefix}-status`, JSON.stringify(itemsStatus));
+    }
+  }, [isOpen, storageKeyPrefix, itemsStatus]);
+
+  useEffect(() => {
+    if (isOpen) {
+      localStorage.setItem(`${storageKeyPrefix}-step`, String(currentStep));
+    }
+  }, [isOpen, storageKeyPrefix, currentStep]);
 
   // Load existing printables status from R2
   const loadPrintablesStatus = async () => {
@@ -317,8 +349,11 @@ export default function ConfirmPrintablesModal({
         throw new Error(result.error || 'Failed to generate printables');
       }
 
-      // If fully successful (no failures), close modal after short delay
+      // If fully successful (no failures), clear saved state and close modal after short delay
       if (result.success && !result.partialSuccess) {
+        localStorage.removeItem(`${storageKeyPrefix}-editor`);
+        localStorage.removeItem(`${storageKeyPrefix}-status`);
+        localStorage.removeItem(`${storageKeyPrefix}-step`);
         setTimeout(() => {
           onClose();
         }, 1500);
@@ -389,8 +424,11 @@ export default function ConfirmPrintablesModal({
 
       setGenerationResult(newResult);
 
-      // If now fully successful, close modal
+      // If now fully successful, clear saved state and close modal
       if (newResult.results.failed.length === 0) {
+        localStorage.removeItem(`${storageKeyPrefix}-editor`);
+        localStorage.removeItem(`${storageKeyPrefix}-status`);
+        localStorage.removeItem(`${storageKeyPrefix}-step`);
         setTimeout(() => {
           onClose();
         }, 1500);
