@@ -5385,7 +5385,7 @@ class AirtableService {
   async updateEventFields(
     eventRecordId: string,
     updates: {
-      status?: 'Confirmed' | 'On Hold' | 'Cancelled' | null;
+      status?: 'Confirmed' | 'On Hold' | 'Cancelled' | 'Pending' | null;
       is_plus?: boolean;
       is_kita?: boolean;
       is_schulsong?: boolean;

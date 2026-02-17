@@ -203,8 +203,23 @@ export async function GET(request: NextRequest) {
               eventId,
               booking.id,
               schoolName,
-              eventDate
+              eventDate,
+              undefined,
+              'MiniMusiker',
+              undefined,
+              undefined,
+              booking.simplybookStatus === 'pending' ? 'Pending' : undefined,
             );
+          }
+
+          // Backfill: if Event exists without status and booking is pending, set Pending
+          if (event && !event.status && booking.simplybookStatus === 'pending') {
+            try {
+              await airtableService.updateEventFields(event.id, { status: 'Pending' });
+              event.status = 'Pending';
+            } catch (e) {
+              console.error(`Failed to backfill Pending status for event ${event.id}:`, e);
+            }
           }
 
           if (event) {

@@ -106,7 +106,7 @@ export async function GET(
     // Fetch Event record to get status and type fields
     const airtableService = getAirtableService();
     let eventStatusAndType: {
-      eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted';
+      eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted' | 'Pending';
       isPlus?: boolean;
       isKita?: boolean;
       isSchulsong?: boolean;
