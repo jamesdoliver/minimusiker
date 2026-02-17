@@ -257,7 +257,7 @@ export async function PATCH(
 
     // Validate status if provided (empty string clears the status)
     if (hasStatusUpdate && body.status !== '') {
-      const validStatuses = ['Confirmed', 'On Hold', 'Cancelled'];
+      const validStatuses = ['Confirmed', 'On Hold', 'Cancelled', 'Pending'];
       if (!validStatuses.includes(body.status)) {
         return NextResponse.json(
           { success: false, error: `Invalid status. Expected one of: ${validStatuses.join(', ')} (or empty string to clear)` },

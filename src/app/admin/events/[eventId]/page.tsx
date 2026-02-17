@@ -21,13 +21,13 @@ interface EventDetailWithBooking extends SchoolEventDetail {
     costCategory?: string;
   };
   // Event status and type fields
-  eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted';
+  eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted' | 'Pending';
   isPlus?: boolean;
   isKita?: boolean;
   isSchulsong?: boolean;
 }
 
-type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted';
+type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted' | 'Pending';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EventBadge from '@/components/admin/EventBadge';
 import StatsPill from '@/components/admin/StatsPill';
@@ -793,6 +793,8 @@ export default function EventDetailPage() {
                   className={`w-4 h-4 rounded-full ${
                     eventStatus === 'Confirmed'
                       ? 'bg-green-500'
+                      : eventStatus === 'Pending'
+                      ? 'bg-yellow-500'
                       : eventStatus === 'On Hold'
                       ? 'bg-red-500'
                       : eventStatus === 'Cancelled'
@@ -808,6 +810,7 @@ export default function EventDetailPage() {
                 >
                   <option value="">No status</option>
                   <option value="Confirmed">Confirmed</option>
+                  <option value="Pending">Pending</option>
                   <option value="On Hold">On Hold</option>
                   <option value="Cancelled">Cancelled</option>
                 </select>
