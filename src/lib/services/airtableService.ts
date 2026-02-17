@@ -4516,13 +4516,13 @@ class AirtableService {
         })
         .all();
 
-      // Filter out deleted records and records without start_date
+      // Filter out deleted records; allow pending bookings without a date
       const validRecords = allRecords.filter(record => {
         const status = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status] as string | undefined;
         if (status === 'deleted') return false;
 
         const startDateStr = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.start_date] as string | undefined;
-        return Boolean(startDateStr);
+        return status === 'pending' || Boolean(startDateStr);
       });
 
       // Sort by start_date descending (newest first)
