@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
+import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 
@@ -30,6 +31,15 @@ export async function POST(
     }
 
     const eventId = decodeURIComponent(params.eventId);
+
+    // Resolve SimplyBook ID → real event_id (handles both formats)
+    const airtableService = getAirtableService();
+    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    if (!eventDetail) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+    const resolvedEventId = eventDetail.eventId;
+
     const teacherService = getTeacherService();
 
     // Look up the existing audio file
@@ -39,7 +49,7 @@ export async function POST(
     }
 
     // Verify the audio file belongs to this event
-    if (audioFile.eventId !== eventId) {
+    if (audioFile.eventId !== resolvedEventId) {
       return NextResponse.json({ error: 'Audio file does not belong to this event' }, { status: 403 });
     }
 
@@ -51,9 +61,9 @@ export async function POST(
     // Build the key based on whether this is a schulsong or regular track
     let newR2Key: string;
     if (audioFile.isSchulsong) {
-      newR2Key = `recordings/${eventId}/schulsong/final/replaced_${timestamp}.${ext}`;
+      newR2Key = `recordings/${resolvedEventId}/schulsong/final/replaced_${timestamp}.${ext}`;
     } else {
-      newR2Key = `recordings/${eventId}/${audioFile.classId}/${audioFile.songId}/final/replaced_${timestamp}.${ext}`;
+      newR2Key = `recordings/${resolvedEventId}/${audioFile.classId}/${audioFile.songId}/final/replaced_${timestamp}.${ext}`;
     }
 
     const uploadUrl = await r2Service.generatePresignedUploadUrl(newR2Key, contentType);
@@ -98,6 +108,15 @@ export async function PUT(
     }
 
     const eventId = decodeURIComponent(params.eventId);
+
+    // Resolve SimplyBook ID → real event_id (handles both formats)
+    const airtableService = getAirtableService();
+    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    if (!eventDetail) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+    const resolvedEventId = eventDetail.eventId;
+
     const teacherService = getTeacherService();
 
     // Look up the existing audio file
@@ -107,7 +126,7 @@ export async function PUT(
     }
 
     // Verify ownership
-    if (audioFile.eventId !== eventId) {
+    if (audioFile.eventId !== resolvedEventId) {
       return NextResponse.json({ error: 'Audio file does not belong to this event' }, { status: 403 });
     }
 

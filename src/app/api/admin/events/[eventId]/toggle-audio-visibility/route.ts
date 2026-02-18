@@ -35,8 +35,15 @@ export async function POST(
     const eventId = decodeURIComponent(params.eventId);
     const airtableService = getAirtableService();
 
+    // Resolve SimplyBook ID → real event_id (handles both formats)
+    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    if (!eventDetail) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+    const resolvedEventId = eventDetail.eventId;
+
     // Get the current event to read existing timeline_overrides
-    const event = await airtableService.getEventByEventId(eventId);
+    const event = await airtableService.getEventByEventId(resolvedEventId);
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
@@ -49,7 +56,7 @@ export async function POST(
 
     // Write back
     const base = airtableService['base'];
-    const recordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+    const recordId = await airtableService.getEventsRecordIdByBookingId(resolvedEventId);
     if (!recordId) {
       return NextResponse.json({ error: 'Event record not found' }, { status: 404 });
     }

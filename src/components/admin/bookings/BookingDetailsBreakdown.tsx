@@ -534,16 +534,14 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
               </div>
               <button
                 onClick={() => setShowAudioReviewModal(true)}
-                disabled={booking.audioPipelineStage !== 'finals_submitted'}
+                disabled={!audioStatus || audioStatus.mixMasterUploadedCount === 0}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  booking.audioPipelineStage === 'finals_submitted'
+                  audioStatus && audioStatus.mixMasterUploadedCount > 0
                     ? 'bg-blue-500 text-white hover:bg-blue-600'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                {booking.audioPipelineStage === 'finals_submitted'
-                  ? 'Review Audio'
-                  : 'Pending'}
+                View Audio
               </button>
             </div>
           ) : (
