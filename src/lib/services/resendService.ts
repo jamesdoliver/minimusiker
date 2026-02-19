@@ -16,6 +16,7 @@ import {
 } from './triggerTemplateService';
 import { getCampaignEmailTemplate, EmailTemplateOptions } from './emailTemplateWrapper';
 import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
+import { getActivityService } from '@/lib/services/activityService';
 
 interface SendEmailResult {
   success: boolean;
@@ -117,7 +118,7 @@ async function sendTriggerEmail(
   slug: string,
   variables: Record<string, string>,
   logLabel: string,
-  options?: { parentEmail?: string },
+  options?: { parentEmail?: string; eventRecordId?: string },
 ): Promise<SendEmailResult> {
   const trigger = await getTriggerTemplate(slug);
   if (!trigger.active) return { success: true, messageId: 'disabled' };
@@ -160,6 +161,19 @@ async function sendTriggerEmail(
     }
 
     console.log(`[Notification] ${logLabel} sent to ${Array.isArray(to) ? to.length + ' recipients' : to}`);
+
+    // Log email_sent activity (fire-and-forget)
+    if (options?.eventRecordId) {
+      getActivityService().logActivity({
+        eventRecordId: options.eventRecordId,
+        activityType: 'email_sent',
+        description: `${logLabel} sent to ${Array.isArray(to) ? to.join(', ') : to}`,
+        actorEmail: 'system@minimusiker.de',
+        actorType: 'system',
+        metadata: { slug, recipient: Array.isArray(to) ? to.join(', ') : to },
+      });
+    }
+
     return { success: true, messageId: data?.id };
   } catch (error) {
     console.error(`Resend ${logLabel} error:`, error);
