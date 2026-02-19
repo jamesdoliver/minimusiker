@@ -160,7 +160,7 @@ export default function AlbumLayoutModal({
 
         const data = await response.json();
         console.log('[AlbumLayout] GET response:', data.tracks?.length, 'tracks',
-          data.tracks?.map((t: AlbumTrack) => `${t.albumOrder}. ${t.songTitle}`));
+          data.tracks?.map((t: AlbumTrack) => `${t.albumOrder}. ${t.songTitle} [${t.className}]`));
         const editableTracks: EditableTrack[] = data.tracks.map((t: AlbumTrack) => ({
           ...t,
           editedTitle: t.songTitle,
@@ -237,7 +237,16 @@ export default function AlbumLayoutModal({
         ...(track.editedClassName !== track.originalClassName && { className: track.editedClassName }),
       }));
 
+      // Log FULL payload including title/className changes
+      const changedFields = updates.filter(u => u.title !== undefined || u.className !== undefined);
       console.log('[AlbumLayout] PUT', apiBaseUrl, 'updates:', updates.map(u => `${u.albumOrder}. ${u.songId}`));
+      if (changedFields.length > 0) {
+        console.log('[AlbumLayout] PUT changed fields:', changedFields.map(u =>
+          `${u.songId}: ${u.title !== undefined ? `title="${u.title}"` : ''}${u.className !== undefined ? ` class="${u.className}"` : ''}`
+        ));
+      } else {
+        console.log('[AlbumLayout] PUT: only order changes, no title/className edits');
+      }
 
       const response = await fetch(apiBaseUrl, {
         method: 'PUT',
@@ -266,10 +275,12 @@ export default function AlbumLayoutModal({
         const verifyOrder = verifyData.tracks?.map((t: AlbumTrack) => t.songId);
         const expectedOrder = updates.map(u => u.songId);
         const orderMatch = JSON.stringify(verifyOrder) === JSON.stringify(expectedOrder);
-        console.log('[AlbumLayout] VERIFY after save:', orderMatch ? 'MATCH' : 'MISMATCH',
-          { expected: expectedOrder, actual: verifyOrder });
+        console.log('[AlbumLayout] VERIFY order:', orderMatch ? 'MATCH' : 'MISMATCH');
+        console.log('[AlbumLayout] VERIFY titles+classes:', verifyData.tracks?.map(
+          (t: AlbumTrack) => `${t.albumOrder}. ${t.songTitle} [${t.className}]`
+        ));
         if (!orderMatch) {
-          console.error('[AlbumLayout] SAVE DID NOT PERSIST! Expected:', expectedOrder, 'Got:', verifyOrder);
+          console.error('[AlbumLayout] ORDER MISMATCH! Expected:', expectedOrder, 'Got:', verifyOrder);
         }
       }
 

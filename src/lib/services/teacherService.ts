@@ -3312,6 +3312,18 @@ class TeacherService {
    */
   async updateAlbumOrderData(eventId: string, tracks: AlbumTrackUpdate[]): Promise<void> {
     try {
+      // Log what changes are being made
+      const titleChanges = tracks.filter(t => t.title !== undefined);
+      const classNameChanges = tracks.filter(t => t.className !== undefined);
+      console.log(`[updateAlbumOrderData] eventId="${eventId}", ${tracks.length} tracks, ` +
+        `${titleChanges.length} title changes, ${classNameChanges.length} className changes`);
+      if (titleChanges.length > 0) {
+        console.log(`[updateAlbumOrderData] title changes:`, titleChanges.map(t => `${t.songId}: "${t.title}"`));
+      }
+      if (classNameChanges.length > 0) {
+        console.log(`[updateAlbumOrderData] className changes:`, classNameChanges.map(t => `${t.songId}: class="${t.className}" classId=${t.classId}`));
+      }
+
       // Update songs with new album order and optional title changes
       for (const track of tracks) {
         const updateData: { [key: string]: string | number } = {
