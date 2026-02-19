@@ -21,7 +21,9 @@ export async function GET(
     const eventId = decodeURIComponent(params.eventId);
     const teacherService = getTeacherService();
 
+    console.log(`[admin/album-order] GET eventId="${eventId}"`);
     const tracks = await teacherService.getAlbumTracksData(eventId);
+    console.log(`[admin/album-order] GET returning ${tracks.length} tracks:`, tracks.map(t => `${t.albumOrder}. ${t.songTitle} (${t.songId})`));
 
     return NextResponse.json({
       success: true,
@@ -68,7 +70,9 @@ export async function PUT(
       );
     }
 
+    console.log(`[admin/album-order] PUT eventId="${eventId}", ${tracks.length} tracks:`, tracks.map(t => `${t.albumOrder}. ${t.songId}`));
     await teacherService.updateAlbumOrderData(eventId, tracks);
+    console.log(`[admin/album-order] PUT completed successfully`);
 
     return NextResponse.json({
       success: true,
