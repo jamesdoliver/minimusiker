@@ -279,8 +279,8 @@ export async function PATCH(
       eventRecordId = eventsByEventId;
     }
 
-    // If not found, try by simplybookId via SchoolBookings
-    if (!eventRecordId && /^\d+$/.test(eventId)) {
+    // If not found, try by simplybookId via SchoolBookings (supports manual codes like "M-a3f9b2")
+    if (!eventRecordId) {
       const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
       if (booking) {
         const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
@@ -672,7 +672,8 @@ export async function DELETE(
       eventRecordId = eventsByEventId;
     }
 
-    if (!eventRecordId && /^\d+$/.test(eventId)) {
+    // If not found, try by simplybookId via SchoolBookings (supports manual codes like "M-a3f9b2")
+    if (!eventRecordId) {
       const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
       if (booking) {
         const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);

@@ -27,7 +27,16 @@ interface BookingsStats {
  * - Completed: event_date is >15 days past
  */
 function getComputedStatus(booking: BookingWithDetails): ComputedStatus {
-  // Pending status overrides all other logic
+  // Cancelled or Deleted events should never show as pending
+  if (booking.eventStatus === 'Cancelled' || booking.eventStatus === 'Deleted') {
+    if (!booking.bookingDate) return 'completed';
+    const eventDate = new Date(booking.bookingDate);
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 28);
+    return eventDate >= cutoff ? 'confirmed' : 'completed';
+  }
+
+  // Pending status overrides date-based logic
   if (booking.eventStatus === 'Pending') {
     return 'pending';
   }
@@ -35,6 +44,11 @@ function getComputedStatus(booking: BookingWithDetails): ComputedStatus {
   // On Hold status overrides date-based logic
   if (booking.eventStatus === 'On Hold') {
     return 'onHold';
+  }
+
+  // No date = pending (booking created without an appointment)
+  if (!booking.bookingDate) {
+    return 'pending';
   }
 
   const eventDate = new Date(booking.bookingDate);

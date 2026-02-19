@@ -148,6 +148,9 @@ export default function BookingsTable({ bookings, onEventDeleted, getComputedSta
                       <div className="text-sm font-medium text-gray-900">
                         {booking.schoolName || 'Unknown School'}
                       </div>
+                      {booking.contactPerson && booking.schoolName === booking.contactPerson && (
+                        <div className="text-xs text-amber-600">School name missing</div>
+                      )}
                       <div className="text-xs text-gray-500">ID: {booking.code}</div>
                     </td>
                     <td className="px-6 py-4">
