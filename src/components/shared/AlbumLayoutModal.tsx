@@ -145,7 +145,13 @@ export default function AlbumLayoutModal({
       try {
         const url = `${apiBaseUrl}${apiBaseUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`;
         console.log('[AlbumLayout] GET', url);
-        const response = await fetch(url, { cache: 'no-store' });
+        const response = await fetch(url, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          },
+        });
 
         if (!response.ok) {
           const data = await response.json();
@@ -248,7 +254,13 @@ export default function AlbumLayoutModal({
 
       // Verification: re-fetch to confirm save persisted
       const verifyUrl = `${apiBaseUrl}${apiBaseUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-      const verifyResponse = await fetch(verifyUrl, { cache: 'no-store' });
+      const verifyResponse = await fetch(verifyUrl, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
       if (verifyResponse.ok) {
         const verifyData = await verifyResponse.json();
         const verifyOrder = verifyData.tracks?.map((t: AlbumTrack) => t.songId);
