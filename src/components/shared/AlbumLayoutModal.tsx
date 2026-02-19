@@ -143,7 +143,7 @@ export default function AlbumLayoutModal({
   useEffect(() => {
     async function fetchTracks() {
       try {
-        const response = await fetch(apiBaseUrl);
+        const response = await fetch(apiBaseUrl, { cache: 'no-store' });
 
         if (!response.ok) {
           const data = await response.json();

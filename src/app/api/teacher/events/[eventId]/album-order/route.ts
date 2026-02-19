@@ -29,6 +29,8 @@ export async function GET(
     return NextResponse.json({
       success: true,
       tracks,
+    }, {
+      headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {
     console.error('Error fetching album tracks:', error);
