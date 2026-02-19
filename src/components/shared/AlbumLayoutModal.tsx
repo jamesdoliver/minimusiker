@@ -139,11 +139,12 @@ export default function AlbumLayoutModal({
     })
   );
 
-  // Fetch tracks on mount
+  // Fetch tracks on mount — cache-bust with timestamp to prevent stale data
   useEffect(() => {
     async function fetchTracks() {
       try {
-        const response = await fetch(apiBaseUrl, { cache: 'no-store' });
+        const url = `${apiBaseUrl}${apiBaseUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`;
+        const response = await fetch(url, { cache: 'no-store' });
 
         if (!response.ok) {
           const data = await response.json();
