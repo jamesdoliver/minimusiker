@@ -4,6 +4,7 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { notifyEngineerOfUpload } from '@/lib/services/notificationService';
+import { getActivityService } from '@/lib/services/activityService';
 
 export const dynamic = 'force-dynamic';
 
@@ -140,6 +141,19 @@ export async function PUT(
       durationSeconds,
       status: 'ready',
     });
+
+    // Log audio upload activity (fire-and-forget)
+    const eventRecordIdForActivity = await getAirtableService().getEventsRecordIdByBookingId(eventId);
+    if (eventRecordIdForActivity) {
+      getActivityService().logActivity({
+        eventRecordId: eventRecordIdForActivity,
+        activityType: 'audio_uploaded',
+        description: `Audio uploaded for "${song.title || filename}"`,
+        actorEmail: session.email,
+        actorType: 'teacher',
+        metadata: { songId, filename, type: 'raw' },
+      });
+    }
 
     // Notify engineer (fire-and-forget, before stage update so dedup check works)
     notifyEngineerOfUpload(eventId, 'minimusiker').catch(err => console.error('Engineer notification error:', err));
