@@ -3241,19 +3241,31 @@ class TeacherService {
         classMap.set(classId, { name: className, type: classType, displayOrder });
       }
 
-      // Get groups for this event
-      const groupRecords = await this.base(GROUPS_TABLE_ID)
-        .select({
-          filterByFormula: `SEARCH('${eventId.replace(/'/g, "\\'")}', ARRAYJOIN({${GROUPS_FIELD_IDS.event_id}}))`,
-          returnFieldsByFieldId: true,
-        })
-        .all();
+      // Get groups by looking up group_ids found in songs (the linked-record
+      // SEARCH on event_id fails for numeric SimplyBook IDs like "1718")
+      const groupClassIds = [...new Set(songs
+        .map(s => s.classId)
+        .filter(id => id.startsWith('group_'))
+      )];
 
-      // Add groups to class map
-      for (const record of groupRecords) {
-        const groupId = record.fields[GROUPS_FIELD_IDS.group_id] as string;
-        const groupName = record.fields[GROUPS_FIELD_IDS.group_name] as string;
-        classMap.set(groupId, { name: groupName, type: 'regular', displayOrder: 999 }); // Groups at end by default
+      for (const groupId of groupClassIds) {
+        try {
+          const groupRecords = await this.base(GROUPS_TABLE_ID)
+            .select({
+              filterByFormula: `{${GROUPS_FIELD_IDS.group_id}} = '${groupId.replace(/'/g, "\\'")}'`,
+              returnFieldsByFieldId: true,
+              maxRecords: 1,
+            })
+            .firstPage();
+
+          if (groupRecords.length > 0) {
+            const record = groupRecords[0];
+            const groupName = record.fields[GROUPS_FIELD_IDS.group_name] as string;
+            classMap.set(groupId, { name: groupName, type: 'regular', displayOrder: 999 });
+          }
+        } catch (err) {
+          console.error(`Error fetching group ${groupId}:`, err);
+        }
       }
 
       // Build album tracks array
