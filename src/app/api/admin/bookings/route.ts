@@ -7,6 +7,7 @@ import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { triggerNewBookingNotification } from '@/lib/services/notificationService';
 
 export const dynamic = 'force-dynamic';
 
@@ -212,13 +213,14 @@ export async function GET(request: NextRequest) {
             );
           }
 
-          // Backfill: if Event exists without status and booking is pending, set Pending
+          // Sync: if booking is pending but Event has no status or a non-terminal status, set Pending
+          // Don't override Deleted or Cancelled — those are intentional admin actions
           if (event && !event.status && booking.simplybookStatus === 'pending') {
             try {
               await airtableService.updateEventFields(event.id, { status: 'Pending' });
               event.status = 'Pending';
             } catch (e) {
-              console.error(`Failed to backfill Pending status for event ${event.id}:`, e);
+              console.error(`Failed to sync Pending status for event ${event.id}:`, e);
             }
           }
 
@@ -276,9 +278,9 @@ export async function GET(request: NextRequest) {
       songCount: booking.eventRecordId ? songCounts.get(booking.eventRecordId) || 0 : 0,
     }));
 
-    // Filter out deleted events (soft-deleted via Event status)
+    // Filter out deleted/cancelled bookings and soft-deleted events
     const visibleBookings = bookingsWithRegistrations.filter(
-      (booking) => booking.eventStatus !== 'Deleted'
+      (booking) => booking.eventStatus !== 'Deleted' && booking.status !== 'deleted' && booking.status !== 'cancelled'
     );
 
     // Calculate stats from visible bookings only
@@ -489,6 +491,26 @@ export async function POST(request: NextRequest) {
     } catch (chainError) {
       // Don't fail the entire request — booking was created successfully
       console.error('Error in post-creation chain for manual booking:', chainError);
+    }
+
+    // Send admin notification for new manual booking
+    try {
+      await triggerNewBookingNotification({
+        bookingId: bookingCode,
+        schoolName: schoolName.trim(),
+        contactName: contactName.trim(),
+        contactEmail: contactEmail.trim(),
+        contactPhone: body.phone || '',
+        eventDate: eventDate || '',
+        estimatedChildren: body.estimatedChildren || undefined,
+        region: body.regionName || '',
+        address: body.address || '',
+        city: body.city || '',
+        status: isPending ? 'Ausstehend' : 'Bestätigt',
+      });
+    } catch (notificationError) {
+      // Log but don't fail the booking creation
+      console.error('Error sending admin notification for manual booking:', notificationError);
     }
 
     return NextResponse.json({

@@ -51,6 +51,7 @@ export interface BookingNotificationData {
   region?: string;
   address?: string;
   city?: string;
+  status?: string; // e.g. "Ausstehend", "Bestätigt" — shown in email template as {{status}}
 }
 
 // Date change notification data

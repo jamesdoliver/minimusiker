@@ -206,6 +206,7 @@ export async function sendNewBookingNotification(
     estimatedChildren: data.estimatedChildren?.toString() || '',
     region: data.region || '',
     address: data.address ? `${data.address}${data.city ? `, ${data.city}` : ''}` : '',
+    status: data.status || '',
   }, 'New booking notification');
 }
 

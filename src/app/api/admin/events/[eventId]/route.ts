@@ -10,6 +10,7 @@ import { simplybookService } from '@/lib/services/simplybookService';
 import {
   triggerDateChangeNotification,
   triggerCancellationNotification,
+  triggerNewBookingNotification,
 } from '@/lib/services/notificationService';
 
 export const dynamic = 'force-dynamic';
@@ -335,7 +336,7 @@ export async function PATCH(
         metadata: { oldDate, newDate: body.event_date, simplybookSynced },
       });
 
-      // Send admin notification for date change
+      // Send admin notification for date change (or "booking confirmed" if first date)
       try {
         // Get booking details for notification
         let contactName = '';
@@ -343,6 +344,7 @@ export async function PATCH(
         let contactPhone = '';
         let schoolAddress = existingEvent?.school_address || '';
         let city = '';
+        let estimatedChildren: number | undefined;
 
         if (existingEvent?.simplybook_booking?.[0]) {
           const booking = await airtableService.getSchoolBookingById(existingEvent.simplybook_booking[0]);
@@ -352,21 +354,40 @@ export async function PATCH(
             contactPhone = booking.schoolPhone || '';
             schoolAddress = schoolAddress || booking.schoolAddress || '';
             city = booking.city || '';
+            estimatedChildren = booking.estimatedChildren;
           }
         }
 
-        await triggerDateChangeNotification({
-          bookingId: eventId,
-          schoolName: existingEvent?.school_name || '',
-          contactName,
-          contactEmail,
-          contactPhone,
-          eventDate: body.event_date,
-          address: schoolAddress,
-          city,
-          oldDate,
-          newDate: body.event_date,
-        });
+        // If the old date was empty, this is a pending booking getting its first date → "Booking Confirmed"
+        const isFirstDateAssignment = !existingEvent?.event_date;
+
+        if (isFirstDateAssignment) {
+          await triggerNewBookingNotification({
+            bookingId: eventId,
+            schoolName: existingEvent?.school_name || '',
+            contactName,
+            contactEmail,
+            contactPhone,
+            eventDate: body.event_date,
+            estimatedChildren,
+            address: schoolAddress,
+            city,
+            status: 'Bestätigt',
+          });
+        } else {
+          await triggerDateChangeNotification({
+            bookingId: eventId,
+            schoolName: existingEvent?.school_name || '',
+            contactName,
+            contactEmail,
+            contactPhone,
+            eventDate: body.event_date,
+            address: schoolAddress,
+            city,
+            oldDate,
+            newDate: body.event_date,
+          });
+        }
       } catch (notificationError) {
         console.warn('Could not send date change notification:', notificationError);
       }
