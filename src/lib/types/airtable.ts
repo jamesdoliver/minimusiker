@@ -953,7 +953,11 @@ export type EventActivityType =
   | 'song_deleted'
   | 'tasks_generated'
   | 'booking_status_changed'
-  | 'event_deleted';
+  | 'event_deleted'
+  | 'phone_call'
+  | 'email_discussion'
+  | 'audio_uploaded'
+  | 'email_sent';
 
 export type ActorType = 'teacher' | 'admin' | 'system';
 

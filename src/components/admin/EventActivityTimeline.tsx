@@ -28,6 +28,10 @@ const ACTIVITY_CONFIG: Record<
   tasks_generated: { icon: '✅', color: 'text-green-600', bgColor: 'bg-green-100' },
   booking_status_changed: { icon: '📋', color: 'text-amber-600', bgColor: 'bg-amber-100' },
   event_deleted: { icon: '🗑️', color: 'text-red-600', bgColor: 'bg-red-100' },
+  phone_call: { icon: '📞', color: 'text-cyan-600', bgColor: 'bg-cyan-100' },
+  email_discussion: { icon: '💬', color: 'text-violet-600', bgColor: 'bg-violet-100' },
+  audio_uploaded: { icon: '🎧', color: 'text-emerald-600', bgColor: 'bg-emerald-100' },
+  email_sent: { icon: '📧', color: 'text-sky-600', bgColor: 'bg-sky-100' },
 };
 
 function formatRelativeTime(dateString: string): string {
