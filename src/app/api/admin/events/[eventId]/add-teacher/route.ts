@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { resolveEventId } from '@/lib/utils/eventResolver';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,11 +31,12 @@ export async function POST(
     const teacherService = getTeacherService();
     const airtableService = getAirtableService();
 
-    // Get the event record ID
-    const eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
-    if (!eventRecordId) {
+    // Get the event record ID (supports event_id, legacy_booking_id, SimplyBook ID, access code)
+    const resolved = await resolveEventId(eventId);
+    if (!resolved) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
+    const eventRecordId = resolved.eventRecordId;
 
     // Get event details for school name
     const event = await airtableService.getEventById(eventRecordId);
