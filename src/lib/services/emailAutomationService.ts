@@ -142,9 +142,10 @@ export function substituteTemplateVariables(
     }
   }
 
-  // Remove any remaining unreplaced variables (or leave them as markers for debugging)
-  // For production, you might want to replace with empty string:
-  // result = result.replace(/\{\{[a-z_]+\}\}/g, '');
+  // Remove any remaining unreplaced {{variable}} placeholders to prevent
+  // raw template variables from appearing in sent emails.
+  // Supports snake_case, camelCase, and date math patterns like {{event_date+7}}.
+  result = result.replace(/\{\{[^}]+\}\}/g, '');
 
   return result;
 }

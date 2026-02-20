@@ -487,6 +487,27 @@ export function getSampleVariables(slug: string): Record<string, string> {
       eventLink: 'https://minimusiker.app/e/1234',
       parentPortalLink: 'https://minimusiker.app/familie',
     },
+    schulsong_parent_release: {
+      schoolName: 'Grundschule Sonnenschein',
+      eventLink: 'https://minimusiker.app/e/1234',
+      parentPortalLink: 'https://minimusiker.app/familie',
+      parentName: 'Anna',
+      merchandiseDeadline: '15.03.2025',
+    },
+    engineer_schulsong_uploaded: {
+      engineerName: 'Max',
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      eventId: 'evt_example_123',
+      engineerPortalUrl: 'https://app.minimusiker.de/engineer',
+    },
+    engineer_minimusiker_uploaded: {
+      engineerName: 'Max',
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      eventId: 'evt_example_123',
+      engineerPortalUrl: 'https://app.minimusiker.de/engineer',
+    },
   };
 
   return samples[slug] || {};
