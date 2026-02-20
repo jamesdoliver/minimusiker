@@ -93,8 +93,31 @@ export default function EmailCheckStep({
     }
   };
 
-  const handleGoToPortal = () => {
-    router.push('/familie');
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  const handleGoToPortal = async () => {
+    setIsRedirecting(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/auth/parent-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        router.push('/familie');
+      } else {
+        setError('Login fehlgeschlagen. Bitte versuche es erneut.');
+        setIsRedirecting(false);
+      }
+    } catch (err) {
+      console.error('Portal redirect login error:', err);
+      setError('Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
+      setIsRedirecting(false);
+    }
   };
 
   const handleContinueAnyway = () => {
@@ -138,12 +161,20 @@ export default function EmailCheckStep({
           </div>
         )}
 
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
         <div className="flex flex-col gap-3">
           <button
             onClick={handleGoToPortal}
-            className="w-full px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
+            disabled={isRedirecting}
+            className="w-full px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {t('goToPortal')}
+            {isRedirecting && <LoadingSpinner size="sm" />}
+            {isRedirecting ? 'Weiterleitung...' : t('goToPortal')}
           </button>
           <button
             onClick={handleContinueAnyway}
