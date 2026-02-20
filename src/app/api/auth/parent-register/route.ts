@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { sendParentWelcomeEmail } from '@/lib/services/resendService';
 import { ParentSession } from '@/lib/types/airtable';
 import {
   RegistrationRequest,
@@ -253,21 +252,20 @@ export async function POST(request: NextRequest) {
       expiresIn: PARENT_SESSION_DURATION,
     });
 
-    // Step 7: Send welcome email (fire and forget - don't block registration)
-    // Only send if there are new children being registered
-    if (newChildren.length > 0) {
-      try {
-        await sendParentWelcomeEmail(sanitizedData.parentEmail, {
-          parentName: sanitizedData.parentFirstName,
-          childName: newChildren.map((c) => c.childName).join(', '),
-          schoolName: eventDetails.schoolName,
-        });
-        console.log('[parent-register] Welcome email sent to:', sanitizedData.parentEmail);
-      } catch (emailError) {
-        // Log but don't fail registration if email fails
-        console.error('[parent-register] Failed to send welcome email:', emailError);
-      }
-    }
+    // Step 7: Welcome email disabled — portal access is instant so no email needed
+    // To re-enable, uncomment the block below:
+    // if (newChildren.length > 0) {
+    //   try {
+    //     await sendParentWelcomeEmail(sanitizedData.parentEmail, {
+    //       parentName: sanitizedData.parentFirstName,
+    //       childName: newChildren.map((c) => c.childName).join(', '),
+    //       schoolName: eventDetails.schoolName,
+    //     });
+    //     console.log('[parent-register] Welcome email sent to:', sanitizedData.parentEmail);
+    //   } catch (emailError) {
+    //     console.error('[parent-register] Failed to send welcome email:', emailError);
+    //   }
+    // }
 
     // Step 8: Return success with session
     const response = NextResponse.json<RegistrationResponse>(
