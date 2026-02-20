@@ -39,6 +39,7 @@ function AudioPipelineIndicator({ stage, eventDate }: { stage?: 'not_started' | 
 interface BookingsTableProps {
   bookings: BookingWithDetails[];
   onEventDeleted?: (bookingId: string) => void;
+  onNotesUpdate?: (bookingId: string, notes: string) => void;
   getComputedStatus?: (booking: BookingWithDetails) => ComputedStatus;
 }
 
@@ -71,7 +72,7 @@ function formatDate(dateString: string): string {
   }
 }
 
-export default function BookingsTable({ bookings, onEventDeleted, getComputedStatus }: BookingsTableProps) {
+export default function BookingsTable({ bookings, onEventDeleted, onNotesUpdate, getComputedStatus }: BookingsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const toggleRow = (bookingId: string) => {
@@ -193,7 +194,7 @@ export default function BookingsTable({ bookings, onEventDeleted, getComputedSta
                           className="overflow-hidden transition-all duration-300 ease-in-out"
                           style={{ maxHeight: isExpanded ? '1000px' : '0' }}
                         >
-                          <BookingDetailsBreakdown booking={booking} onEventDeleted={onEventDeleted} />
+                          <BookingDetailsBreakdown booking={booking} onEventDeleted={onEventDeleted} onNotesUpdate={onNotesUpdate} />
                         </div>
                       </td>
                     </tr>

@@ -17,9 +17,10 @@ import { toast } from 'sonner';
 interface BookingDetailsBreakdownProps {
   booking: BookingWithDetails;
   onEventDeleted?: (bookingId: string) => void;
+  onNotesUpdate?: (bookingId: string, notes: string) => void;
 }
 
-export default function BookingDetailsBreakdown({ booking, onEventDeleted }: BookingDetailsBreakdownProps) {
+export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNotesUpdate }: BookingDetailsBreakdownProps) {
   const [showPrintablesModal, setShowPrintablesModal] = useState(false);
   const [showOrdersModal, setShowOrdersModal] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -70,6 +71,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         });
         if (res.ok) {
           setNotesSaveStatus('saved');
+          onNotesUpdate?.(booking.id, value);
         } else {
           setNotesSaveStatus('idle');
           toast.error('Failed to save notes');
@@ -79,7 +81,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted }: Boo
         toast.error('Failed to save notes');
       }
     }, 1000);
-  }, [booking.code]);
+  }, [booking.code, booking.id, onNotesUpdate]);
 
   // Cleanup debounce timer
   useEffect(() => {

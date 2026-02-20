@@ -121,6 +121,12 @@ export default function AdminBookings() {
     setBookings(prev => prev.filter(b => b.id !== bookingId));
   }, []);
 
+  const handleNotesUpdate = useCallback((bookingId: string, notes: string) => {
+    setBookings(prev => prev.map(b =>
+      b.id === bookingId ? { ...b, adminNotes: notes } : b
+    ));
+  }, []);
+
   // Toggle a status filter
   const toggleStatus = (status: ComputedStatus) => {
     setActiveStatuses(prev => {
@@ -483,6 +489,7 @@ export default function AdminBookings() {
       <BookingsTable
         bookings={filteredBookings}
         onEventDeleted={handleEventDeleted}
+        onNotesUpdate={handleNotesUpdate}
         getComputedStatus={getComputedStatus}
       />
 
