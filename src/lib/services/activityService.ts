@@ -30,7 +30,6 @@ class ActivityService {
    */
   async logActivity(input: CreateEventActivityInput): Promise<void> {
     try {
-      // Build fields object for Airtable
       const fields: Airtable.FieldSet = {
         [EVENT_ACTIVITY_FIELD_IDS.event_id]: [input.eventRecordId],
         [EVENT_ACTIVITY_FIELD_IDS.activity_type]: input.activityType,
@@ -43,14 +42,19 @@ class ActivityService {
         fields[EVENT_ACTIVITY_FIELD_IDS.metadata] = JSON.stringify(input.metadata);
       }
 
-      await this.base(EVENT_ACTIVITY_TABLE_ID).create([{ fields }]);
+      console.log('[ActivityService] Creating record with fields:', JSON.stringify(fields, null, 2));
+
+      const result = await this.base(EVENT_ACTIVITY_TABLE_ID).create([{ fields }]);
 
       console.log(
-        `[ActivityService] Logged: ${input.activityType} by ${input.actorEmail}`
+        `[ActivityService] Logged: ${input.activityType} by ${input.actorEmail} (record: ${result[0]?.id})`
       );
     } catch (error) {
-      // Never throw - just log the error
-      console.error('[ActivityService] Failed to log activity:', error);
+      console.error('[ActivityService] Failed to log activity:', {
+        error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
+        input: { ...input, metadata: undefined },
+        tableId: EVENT_ACTIVITY_TABLE_ID,
+      });
     }
   }
 
@@ -157,6 +161,14 @@ class ActivityService {
         return `Booking status changed to "${details.newStatus}"`;
       case 'event_deleted':
         return `Event "${details.schoolName}" deleted by admin`;
+      case 'phone_call':
+        return `Call '${details.schoolName}': ${details.description}`;
+      case 'email_discussion':
+        return `Email '${details.schoolName}': ${details.description}`;
+      case 'audio_uploaded':
+        return `Audio uploaded for "${details.songTitle || 'event'}" by ${details.staffName || 'staff'}`;
+      case 'email_sent':
+        return `${details.emailType || 'Email'} sent to ${details.recipient}`;
       default:
         return 'Activity logged';
     }

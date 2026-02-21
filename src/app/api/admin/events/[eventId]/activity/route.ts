@@ -96,3 +96,97 @@ export async function GET(
     );
   }
 }
+
+/**
+ * POST /api/admin/events/[eventId]/activity
+ * Create a manual activity entry (phone_call or email_discussion)
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { eventId: string } }
+) {
+  try {
+    const admin = verifyAdminSession(request);
+    if (!admin) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const eventId = decodeURIComponent(params.eventId);
+    const body = await request.json();
+
+    const { activityType, description } = body;
+
+    // Validate activity type
+    if (!activityType || !['phone_call', 'email_discussion'].includes(activityType)) {
+      return NextResponse.json(
+        { success: false, error: 'activityType must be phone_call or email_discussion' },
+        { status: 400 }
+      );
+    }
+
+    if (!description || typeof description !== 'string' || description.trim().length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'description is required' },
+        { status: 400 }
+      );
+    }
+
+    // Resolve event record ID (same logic as GET)
+    let eventRecordId: string | null = null;
+    const airtableService = getAirtableService();
+
+    const eventsByEventId = await airtableService.getEventsRecordIdByBookingId(eventId);
+    if (eventsByEventId) {
+      eventRecordId = eventsByEventId;
+    }
+
+    if (!eventRecordId && /^\d+$/.test(eventId)) {
+      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      if (booking) {
+        const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (eventRecord) {
+          eventRecordId = eventRecord.id;
+        }
+      }
+    }
+
+    if (!eventRecordId) {
+      if (eventId.startsWith('rec')) {
+        eventRecordId = eventId;
+      } else {
+        return NextResponse.json(
+          { success: false, error: 'Event not found' },
+          { status: 404 }
+        );
+      }
+    }
+
+    // Log the manual activity
+    const activityService = getActivityService();
+    await activityService.logActivity({
+      eventRecordId,
+      activityType,
+      description: description.trim(),
+      actorEmail: admin.email,
+      actorType: 'admin',
+      metadata: { manualEntry: true },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `${activityType} entry created`,
+    });
+  } catch (error) {
+    console.error('Error creating manual activity:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create activity',
+      },
+      { status: 500 }
+    );
+  }
+}

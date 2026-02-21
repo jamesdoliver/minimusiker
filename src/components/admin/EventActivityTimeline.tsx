@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { EventActivity, EventActivityType } from '@/lib/types/airtable';
+import { toast } from 'sonner';
 
 interface EventActivityTimelineProps {
   eventId: string;
+  schoolName?: string;
+  compact?: boolean;
 }
 
-// Activity type icons and colors
 const ACTIVITY_CONFIG: Record<
   EventActivityType,
   { icon: string; color: string; bgColor: string }
@@ -28,11 +30,14 @@ const ACTIVITY_CONFIG: Record<
   tasks_generated: { icon: '✅', color: 'text-green-600', bgColor: 'bg-green-100' },
   booking_status_changed: { icon: '📋', color: 'text-amber-600', bgColor: 'bg-amber-100' },
   event_deleted: { icon: '🗑️', color: 'text-red-600', bgColor: 'bg-red-100' },
+  phone_call: { icon: '📞', color: 'text-blue-600', bgColor: 'bg-blue-100' },
+  email_discussion: { icon: '✉️', color: 'text-blue-600', bgColor: 'bg-blue-100' },
+  audio_uploaded: { icon: '🎤', color: 'text-purple-600', bgColor: 'bg-purple-100' },
+  email_sent: { icon: '📧', color: 'text-green-600', bgColor: 'bg-green-100' },
 };
 
 function formatRelativeTime(dateString: string): string {
   if (!dateString) return '';
-
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -42,10 +47,10 @@ function formatRelativeTime(dateString: string): string {
   const diffDays = Math.floor(diffHours / 24);
 
   if (diffSecs < 60) return 'Just now';
-  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
 
   return date.toLocaleDateString('de-DE', {
     day: 'numeric',
@@ -56,27 +61,27 @@ function formatRelativeTime(dateString: string): string {
 
 function formatActorName(email: string, actorType: string): string {
   if (actorType === 'system') return 'System';
-
-  // Try to extract a readable name from email
   if (email.includes('@')) {
     const namePart = email.split('@')[0];
-    // Convert john.doe or john_doe to John Doe
     return namePart
       .replace(/[._]/g, ' ')
       .replace(/\b\w/g, (char) => char.toUpperCase());
   }
-
   return email;
 }
 
-export default function EventActivityTimeline({ eventId }: EventActivityTimelineProps) {
+export default function EventActivityTimeline({ eventId, schoolName, compact }: EventActivityTimelineProps) {
   const [activities, setActivities] = useState<EventActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
+
+  // Manual entry state
+  const [manualEntryType, setManualEntryType] = useState<'phone_call' | 'email_discussion' | null>(null);
+  const [manualDescription, setManualDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const LIMIT = 20;
 
@@ -94,9 +99,7 @@ export default function EventActivityTimeline({ eventId }: EventActivityTimeline
           { credentials: 'include' }
         );
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch activities');
-        }
+        if (!response.ok) throw new Error('Failed to fetch activities');
 
         const data = await response.json();
 
@@ -129,148 +132,169 @@ export default function EventActivityTimeline({ eventId }: EventActivityTimeline
     fetchActivities(offset, true);
   };
 
-  if (error) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div className="text-red-600 text-sm">Failed to load activity timeline: {error}</div>
-      </div>
-    );
-  }
+  const handleSubmitManualEntry = async () => {
+    if (!manualEntryType || !manualDescription.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch(
+        `/api/admin/events/${encodeURIComponent(eventId)}/activity`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            activityType: manualEntryType,
+            description: schoolName
+              ? `${manualEntryType === 'phone_call' ? 'Call' : 'Email'} '${schoolName}': ${manualDescription.trim()}`
+              : manualDescription.trim(),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to create entry');
+      }
+
+      toast.success(manualEntryType === 'phone_call' ? 'Call logged' : 'Email logged');
+      setManualEntryType(null);
+      setManualDescription('');
+      // Refresh the timeline
+      setOffset(0);
+      fetchActivities(0);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to log entry');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      {/* Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <span className="text-xl">📜</span>
-          <h3 className="text-lg font-semibold text-gray-900">Activity Timeline</h3>
-          {activities.length > 0 && (
-            <span className="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-0.5 rounded-full">
-              {activities.length}
-              {hasMore && '+'}
-            </span>
-          )}
-        </div>
-        <svg
-          className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+    <div className="flex flex-col h-full" onClick={(e) => e.stopPropagation()}>
+      {/* Manual entry buttons */}
+      <div className="flex gap-2 mb-3">
+        <button
+          onClick={() => setManualEntryType(manualEntryType === 'phone_call' ? null : 'phone_call')}
+          className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+            manualEntryType === 'phone_call'
+              ? 'bg-blue-100 text-blue-700'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+          📞 + Call
+        </button>
+        <button
+          onClick={() => setManualEntryType(manualEntryType === 'email_discussion' ? null : 'email_discussion')}
+          className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+            manualEntryType === 'email_discussion'
+              ? 'bg-blue-100 text-blue-700'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          ✉️ + Email
+        </button>
+      </div>
 
-      {/* Content */}
-      {isExpanded && (
-        <div className="border-t border-gray-100">
-          {isLoading ? (
-            <div className="p-6 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-[#5a8a82]"></div>
-              <span className="ml-3 text-gray-500">Loading activities...</span>
-            </div>
-          ) : activities.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">
-              <span className="text-3xl mb-2 block">📭</span>
-              No activity recorded yet
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {activities.map((activity) => {
-                const config = ACTIVITY_CONFIG[activity.activityType] || {
-                  icon: '📝',
-                  color: 'text-gray-600',
-                  bgColor: 'bg-gray-100',
-                };
-
-                return (
-                  <div
-                    key={activity.id}
-                    className="p-4 hover:bg-gray-50/50 transition-colors"
-                  >
-                    <div className="flex gap-3">
-                      {/* Icon */}
-                      <div
-                        className={`flex-shrink-0 w-8 h-8 rounded-full ${config.bgColor} flex items-center justify-center text-sm`}
-                      >
-                        {config.icon}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900">{activity.description}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-gray-500">
-                            {formatActorName(activity.actorEmail, activity.actorType)}
-                          </span>
-                          <span className="text-gray-300">·</span>
-                          <span className="text-xs text-gray-400">
-                            {formatRelativeTime(activity.createdAt)}
-                          </span>
-                          {activity.actorType === 'teacher' && (
-                            <>
-                              <span className="text-gray-300">·</span>
-                              <span className="text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">
-                                Teacher
-                              </span>
-                            </>
-                          )}
-                          {activity.actorType === 'system' && (
-                            <>
-                              <span className="text-gray-300">·</span>
-                              <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                                System
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Load More Button */}
-              {hasMore && (
-                <div className="p-4">
-                  <button
-                    onClick={handleLoadMore}
-                    disabled={isLoadingMore}
-                    className="w-full py-2 px-4 text-sm font-medium text-[#5a8a82] hover:text-[#4a7a72] hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isLoadingMore ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-[#5a8a82]"></div>
-                        Loading...
-                      </>
-                    ) : (
-                      <>
-                        Load more activities
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+      {/* Manual entry form */}
+      {manualEntryType && (
+        <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <label className="text-xs font-medium text-blue-800 block mb-1">
+            {manualEntryType === 'phone_call' ? 'Call notes' : 'Email notes'}
+          </label>
+          <textarea
+            value={manualDescription}
+            onChange={(e) => setManualDescription(e.target.value)}
+            rows={2}
+            className="w-full text-xs border border-blue-300 rounded px-2 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-blue-500"
+            placeholder="What was discussed..."
+            autoFocus
+          />
+          <div className="flex gap-2 mt-1">
+            <button
+              onClick={handleSubmitManualEntry}
+              disabled={isSubmitting || !manualDescription.trim()}
+              className="px-2 py-1 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {isSubmitting ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              onClick={() => { setManualEntryType(null); setManualDescription(''); }}
+              className="px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Scrollable timeline */}
+      <div className={`overflow-y-auto flex-1 ${compact ? 'max-h-[320px]' : 'max-h-[400px]'}`}>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-6">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-[#5a8a82]"></div>
+            <span className="ml-2 text-xs text-gray-500">Loading...</span>
+          </div>
+        ) : error ? (
+          <div className="text-xs text-red-600 py-4 text-center">{error}</div>
+        ) : activities.length === 0 ? (
+          <div className="py-6 text-center text-xs text-gray-500">
+            No activity recorded yet
+          </div>
+        ) : (
+          <div className="space-y-0">
+            {activities.map((activity) => {
+              const config = ACTIVITY_CONFIG[activity.activityType] || {
+                icon: '📝',
+                color: 'text-gray-600',
+                bgColor: 'bg-gray-100',
+              };
+
+              return (
+                <div key={activity.id} className="flex gap-2 py-2 border-b border-gray-50 last:border-0">
+                  <div className={`flex-shrink-0 w-6 h-6 rounded-full ${config.bgColor} flex items-center justify-center text-xs`}>
+                    {config.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-900 leading-tight">{activity.description}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] text-gray-500">
+                        {formatActorName(activity.actorEmail, activity.actorType)}
+                      </span>
+                      <span className="text-gray-300 text-[10px]">·</span>
+                      <span className="text-[10px] text-gray-400">
+                        {formatRelativeTime(activity.createdAt)}
+                      </span>
+                      {activity.actorType === 'teacher' && (
+                        <span className="text-[10px] bg-teal-100 text-teal-700 px-1 rounded">
+                          Teacher
+                        </span>
+                      )}
+                      {activity.actorType === 'system' && (
+                        <span className="text-[10px] bg-gray-100 text-gray-600 px-1 rounded">
+                          System
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {hasMore && (
+              <div className="pt-2">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                  className="w-full py-1.5 text-xs font-medium text-[#5a8a82] hover:bg-gray-50 rounded transition-colors disabled:opacity-50"
+                >
+                  {isLoadingMore ? 'Loading...' : 'Load more'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

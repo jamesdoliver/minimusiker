@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
-import QRCode from 'qrcode';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
 import ConfirmPrintablesModal from './ConfirmPrintablesModal';
 import RefreshBookingModal from './RefreshBookingModal';
@@ -11,6 +10,7 @@ import EditBookingModal from './EditBookingModal';
 import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfirmModal';
 import StatusLight from './StatusLight';
 import AudioReviewModal from './AudioReviewModal';
+import EventActivityTimeline from '@/components/admin/EventActivityTimeline';
 import { AudioStatusData } from '@/lib/types/audio-status';
 import { toast } from 'sonner';
 
@@ -23,7 +23,6 @@ interface BookingDetailsBreakdownProps {
 export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNotesUpdate }: BookingDetailsBreakdownProps) {
   const [showPrintablesModal, setShowPrintablesModal] = useState(false);
   const [showOrdersModal, setShowOrdersModal] = useState(false);
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [discountCopied, setDiscountCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -139,25 +138,6 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
     }
   };
 
-  // Generate QR code on mount
-  useEffect(() => {
-    if (booking.shortUrl) {
-      QRCode.toDataURL(`https://${booking.shortUrl}`, {
-        width: 240, // 2x for retina display
-        margin: 1,
-      }).then(setQrDataUrl).catch(console.error);
-    }
-  }, [booking.shortUrl]);
-
-  // Download QR code as PNG
-  const handleDownloadQr = () => {
-    if (!qrDataUrl) return;
-    const link = document.createElement('a');
-    link.download = `qr-${booking.schoolName.replace(/[^a-zA-Z0-9]/g, '-')}-${booking.code}.png`;
-    link.href = qrDataUrl;
-    link.click();
-  };
-
   // Copy link to clipboard
   const handleCopyLink = () => {
     if (!booking.shortUrl) return;
@@ -269,10 +249,11 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
 
   return (
     <div className="bg-gray-50 px-8 py-6 border-t border-gray-200">
+      {/* 3-Column Layout: Information | Notes | Activity Log */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Contact Information */}
+        {/* Information Column */}
         <div>
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Contact Information</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Information</h4>
           <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
             <div>
               <label className="text-xs text-gray-500 uppercase tracking-wide">Contact Person</label>
@@ -302,88 +283,14 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
                 )}
               </p>
             </div>
-          </div>
-
-          {/* Event QR Code - below Contact Information */}
-          {booking.shortUrl && (
-            <div className="mt-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">Event QR Code</h4>
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <div className="flex flex-col items-center">
-                  {/* QR Code Image */}
-                  {qrDataUrl ? (
-                    <img
-                      src={qrDataUrl}
-                      alt="Event QR Code"
-                      width={120}
-                      height={120}
-                      className="mb-3"
-                    />
-                  ) : (
-                    <div className="w-[120px] h-[120px] bg-gray-100 rounded flex items-center justify-center mb-3">
-                      <svg className="w-6 h-6 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                    </div>
-                  )}
-
-                  {/* Link Display */}
-                  <p className="text-xs font-mono text-gray-600 mb-3 text-center break-all">
-                    {booking.shortUrl}
-                  </p>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleCopyLink}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                    >
-                      {linkCopied ? (
-                        <>
-                          <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                          Copy Link
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={handleDownloadQr}
-                      disabled={!qrDataUrl}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Download
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Location Information */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Location</h4>
-          <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
             <div>
               <label className="text-xs text-gray-500 uppercase tracking-wide">Address</label>
-              <p className="text-sm text-gray-900">{booking.address || '-'}</p>
-              {(booking.postalCode || booking.city) && (
-                <p className="text-sm text-gray-900">
-                  {[booking.postalCode, booking.city].filter(Boolean).join(' ')}
-                </p>
-              )}
+              <p className="text-sm text-gray-900">
+                {booking.address || '-'}
+                {(booking.postalCode || booking.city) && (
+                  <>, {[booking.postalCode, booking.city].filter(Boolean).join(' ')}</>
+                )}
+              </p>
             </div>
             <div>
               <label className="text-xs text-gray-500 uppercase tracking-wide">Region & Team</label>
@@ -391,16 +298,9 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
                 {[
                   booking.region,
                   booking.assignedStaffNames?.join(', ')
-                ].filter(Boolean).join(' - ') || '-'}
+                ].filter(Boolean).join(' \u2014 ') || '-'}
               </p>
             </div>
-          </div>
-        </div>
-
-        {/* Booking Details */}
-        <div>
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Booking Details</h4>
-          <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
             <div>
               <label className="text-xs text-gray-500 uppercase tracking-wide">Booking Code</label>
               <p className="text-sm font-mono text-gray-900">{booking.code}</p>
@@ -429,10 +329,6 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
               </div>
             )}
             <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wide">Event Type</label>
-              <p className="text-sm text-gray-900">{booking.eventName || 'MiniMusiker Day'}</p>
-            </div>
-            <div>
               <label className="text-xs text-gray-500 uppercase tracking-wide">Time</label>
               <p className="text-sm text-gray-900">
                 {booking.startTime && booking.endTime
@@ -440,57 +336,63 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
                   : booking.startTime || '-'}
               </p>
             </div>
-            <div onClick={(e) => e.stopPropagation()}>
-              <label className="text-xs text-gray-500 uppercase tracking-wide">Admin Notes</label>
-              <textarea
-                value={notesText}
-                onChange={(e) => handleNotesChange(e.target.value)}
-                rows={3}
-                className="mt-1 w-full text-sm text-gray-900 border border-gray-300 rounded-md px-3 py-2 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Add notes about this deal..."
-              />
-              {notesSaveStatus !== 'idle' && (
-                <p className={`text-xs mt-1 ${notesSaveStatus === 'saving' ? 'text-gray-400' : 'text-green-600'}`}>
-                  {notesSaveStatus === 'saving' ? 'Saving...' : 'Saved'}
-                </p>
-              )}
-            </div>
+            {booking.shortUrl && (
+              <div>
+                <button
+                  onClick={handleCopyLink}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                >
+                  {linkCopied ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Copy QR Link
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Notes Column */}
+        <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Notes</h4>
+          <div className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col flex-1">
+            <textarea
+              value={notesText}
+              onChange={(e) => handleNotesChange(e.target.value)}
+              className="w-full text-sm text-gray-900 border border-gray-300 rounded-md px-3 py-2 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 min-h-[280px] flex-1"
+              placeholder="Add notes about this booking..."
+            />
+            {notesSaveStatus !== 'idle' && (
+              <p className={`text-xs mt-1 ${notesSaveStatus === 'saving' ? 'text-gray-400' : 'text-green-600'}`}>
+                {notesSaveStatus === 'saving' ? 'Saving...' : 'Saved'}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Activity Log Column */}
+        <div className="flex flex-col">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">Activity Log</h4>
+          <div className="bg-white rounded-lg border border-gray-200 p-4 flex-1">
+            <EventActivityTimeline
+              eventId={booking.code}
+              schoolName={booking.schoolName}
+              compact
+            />
           </div>
         </div>
       </div>
-
-      {/* Lead History — shown when booking was converted from a lead */}
-      {booking.adminNotes?.includes('--- Lead History ---') && (() => {
-        const leadHistoryStart = booking.adminNotes!.indexOf('--- Lead History ---');
-        const leadHistoryText = booking.adminNotes!.substring(leadHistoryStart + '--- Lead History ---'.length).trim();
-        const calls = leadHistoryText.split(/\n\n/).filter(Boolean).map(block => {
-          const headerMatch = block.match(/^\[Call (\d+) - (.+)\]\n([\s\S]*)$/);
-          if (headerMatch) {
-            return { callNumber: parseInt(headerMatch[1]), date: headerMatch[2], notes: headerMatch[3] };
-          }
-          return null;
-        }).filter(Boolean);
-
-        if (calls.length === 0) return null;
-
-        return (
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-blue-800 mb-3">Lead History</h4>
-              <div className="space-y-3">
-                {calls.map((call, i) => (
-                  <div key={i} className="border-l-2 border-blue-300 pl-3">
-                    <div className="text-xs font-medium text-blue-700">
-                      Call {call!.callNumber} — {call!.date}
-                    </div>
-                    <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{call!.notes}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* Audio Status Section */}
       <div className="mt-6 pt-4 border-t border-gray-200">
@@ -552,40 +454,34 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
         </div>
       </div>
 
-      {/* Actions Row */}
-      <div className="mt-6 pt-4 border-t border-gray-200 flex justify-between">
-        {/* Left side - Delete button */}
-        <div>
-          <button
-            onClick={() => setIsDeleteModalOpen(true)}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            Delete Event
-          </button>
-        </div>
-
-        {/* Right side - existing action buttons */}
-        <div className="flex gap-3">
+      {/* Compact Actions Row */}
+      <div className="mt-6 pt-4 border-t border-gray-200 flex flex-wrap items-center gap-1.5">
+        <button
+          onClick={() => setIsDeleteModalOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Delete
+        </button>
         <button
           onClick={() => setShowEditModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
-          Edit Booking
+          Edit
         </button>
         <button
           onClick={() => handleRefresh()}
           disabled={isRefreshing}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
         >
           {isRefreshing ? (
             <>
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
@@ -593,42 +489,41 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
             </>
           ) : (
             <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              Refresh Booking Data
+              Refresh
             </>
           )}
         </button>
         <button
           onClick={() => setShowPrintablesModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-[#F4A261] text-white rounded-lg hover:bg-[#E07B3A] transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#F4A261] text-white rounded-lg hover:bg-[#E07B3A] transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          Confirm Printables
+          Printables
         </button>
         <button
           onClick={() => setShowOrdersModal(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
           </svg>
-          Order Overview
+          Orders
         </button>
         <Link
           href={`/admin/events/${booking.code}`}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 min-w-[140px] bg-[#94B8B3] text-white rounded-lg hover:bg-[#7da39e] transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#94B8B3] text-white rounded-lg hover:bg-[#7da39e] transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
           </svg>
-          View Event Details
+          View Event
         </Link>
-        </div>
       </div>
 
       {/* Delete Event Confirmation Modal */}
