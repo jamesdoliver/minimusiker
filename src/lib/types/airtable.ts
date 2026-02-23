@@ -563,6 +563,10 @@ export const EVENTS_FIELD_IDS = {
   // Under-100-kids flag and estimated children count
   is_under_100: 'fldcvcHcGfIkOUPFD',           // Checkbox - true when estimated children < 100
   estimated_children: 'fldjnXCnyfeA1KSeX',       // Number - estimated kids (copied from SchoolBooking)
+  // Deal Builder fields
+  deal_builder_enabled: 'fld19LJoYvr3ZVKpc',  // Checkbox - master toggle for Deal Builder
+  deal_type: 'fldJNjJnyIPOMmb9y',                        // Single Select: mimu, mimu_scs, schus, schus_xl
+  deal_config: 'fldw4PwiZTkShCZ7q',                    // Long Text - JSON blob with deal-specific config
 } as const;
 
 // Classes Table - 1 row per class
@@ -665,6 +669,75 @@ export const ORDERS_FIELD_IDS = {
   cancel_reason: 'fld768qHuCqNujx8c',      // Shopify cancel reason
 } as const;
 
+// SchulClothingOrders Table — SCS t-shirt size tracking (one order per event)
+export const SCHUL_CLOTHING_ORDERS_TABLE_ID = 'tblaeifRk2n67iRDF';
+
+export const SCHUL_CLOTHING_ORDERS_FIELD_IDS = {
+  order_id: 'fld1idghUxvWMnwxf',           // Autonumber — primary field
+  event_id: 'fldHKyfC4G5Lh2ESu',           // Linked Record → Events
+  size_98_104: 'fldLPhus9skFiPmx6',          // Number — quantity for 98/104 (3-4J)
+  size_110_116: 'fldzc2XeLwFIs9Yae',        // Number — quantity for 110/116 (5-6J)
+  size_122_128: 'fld3gNHdGfv0e8OZ8',        // Number — quantity for 122/128 (7-8J)
+  size_134_146: 'fldk5mc9RGbWmgktk',        // Number — quantity for 134/146 (9-11J)
+  size_152_164: 'fldaw4pKcfpZ1GGQh',        // Number — quantity for 152/164 (12-14J)
+  total_quantity: 'fldsexF1KLujEO4uA',         // Formula — sum of all sizes
+  last_updated_by: 'fldYYNg2EzskCBhyC',  // Email — who last edited
+  last_updated_at: 'fldU176X40XmdnN3m',  // Last Modified Time
+  notes: 'fldI0Sj0KsbaYFJGH',                 // Long Text — optional notes
+} as const;
+
+export interface SchulClothingOrder {
+  id: string;                       // Airtable record ID
+  order_id?: number;                // Autonumber
+  event_id?: string[];              // Linked record → Events
+  size_98_104: number;
+  size_110_116: number;
+  size_122_128: number;
+  size_134_146: number;
+  size_152_164: number;
+  total_quantity?: number;           // Formula field (read-only)
+  last_updated_by?: string;
+  last_updated_at?: string;
+  notes?: string;
+}
+
+// ======================================================================
+// Deal Builder Types
+// ======================================================================
+
+export type DealType = 'mimu' | 'mimu_scs' | 'schus' | 'schus_xl';
+
+export type CustomFees = Partial<{
+  base: number;
+  under_100_kids: number;
+  distance_surcharge: number;
+  cheaper_music_small: number;   // ≤250 kids
+  cheaper_music_large: number;   // >250 kids
+  over_250_kids: number;
+  standard_song_discount: number;
+  no_song_discount: number;
+  no_shirts_discount: number;
+}>;
+
+export interface DealConfig {
+  // #mimu options
+  cheaper_music?: boolean;
+  distance_surcharge?: boolean;
+  // #mimuSCS options
+  scs_song_option?: 'schusXL' | 'schus' | 'none';
+  scs_shirts_included?: boolean;
+  scs_audio_pricing?: 'standard' | 'plus';
+  // Custom fee overrides (admin-editable)
+  custom_fees?: CustomFees;
+  // Calculated (stored for display/reporting)
+  calculated_fee?: number;
+  fee_breakdown?: {
+    base: number;
+    items: { label: string; amount: number }[];
+    total: number;
+  };
+}
+
 // ======================================================================
 // Normalized Table Interfaces
 // ======================================================================
@@ -713,6 +786,10 @@ export interface Event {
   // Under-100-kids flag and estimated children count
   is_under_100?: boolean;                         // Auto-calculated: estimatedChildren < 100
   estimated_children?: number;                    // Estimated kids attending (from booking)
+  // Deal Builder fields
+  deal_builder_enabled?: boolean;                 // Master toggle — when true, Deal Builder controls this event
+  deal_type?: DealType;                           // Selected deal type
+  deal_config?: DealConfig;                       // JSON blob with deal-specific configuration
 }
 
 /**
@@ -957,7 +1034,8 @@ export type EventActivityType =
   | 'phone_call'
   | 'email_discussion'
   | 'audio_uploaded'
-  | 'email_sent';
+  | 'email_sent'
+  | 'deal_type_changed';
 
 export type ActorType = 'teacher' | 'admin' | 'system';
 
