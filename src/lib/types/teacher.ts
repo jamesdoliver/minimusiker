@@ -243,6 +243,9 @@ export interface TeacherEventView {
   schoolAddress?: string; // From SchoolBookings - per-booking address
   schoolPhone?: string; // From SchoolBookings - per-booking phone
   isSchulsong?: boolean; // Whether this event has a schulsong (for teacher approval workflow)
+  dealType?: string; // Deal type for Deal Builder events
+  scsShirtsIncluded?: boolean; // Whether SCS shirts are included (for clothing order form)
+  estimatedChildren?: number; // Estimated children (for clothing order max quantity)
   // Progress tracking fields (for dashboard)
   progress?: {
     classesCount: number; // Number of classes created

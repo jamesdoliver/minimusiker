@@ -117,11 +117,18 @@ function ShopContent() {
         );
         if (response.ok) {
           const data = await response.json();
-          setShopProfile(resolveShopProfile({
-            isMinimusikertag: data.isMinimusikertag,
-            isPlus: data.isPlus,
-            isSchulsong: data.isSchulsong,
-          }));
+          setShopProfile(resolveShopProfile(
+            {
+              isMinimusikertag: data.isMinimusikertag,
+              isPlus: data.isPlus,
+              isSchulsong: data.isSchulsong,
+            },
+            {
+              enabled: data.dealBuilderEnabled,
+              type: data.dealType,
+              config: data.dealConfig,
+            }
+          ));
           setEventDate(data.eventDate || null);
           if (data.timelineOverrides) {
             setTimelineOverridesJson(data.timelineOverrides);

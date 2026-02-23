@@ -9,6 +9,7 @@ import InviteTeacherModal from '@/components/teacher/InviteTeacherModal';
 import AlbumLayoutModal from '@/components/shared/AlbumLayoutModal';
 import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModal';
 import SchulsongApprovalSection from '@/components/teacher/SchulsongApprovalSection';
+import SchulClothingOrder from '@/components/shared/SchulClothingOrder';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'Datum unbekannt';
@@ -1392,6 +1393,17 @@ export default function TeacherEventDetailPage() {
             </div>
           )}
         </div>
+
+        {/* SCS Clothing Order - Only shown for mimu_scs events with shirts included */}
+        {event.dealType === 'mimu_scs' && event.scsShirtsIncluded !== false && (
+          <div className="mb-8">
+            <SchulClothingOrder
+              eventId={event.eventId}
+              apiBasePath="/api/teacher/events"
+              maxQuantity={(event.estimatedChildren ?? 0) > 250 ? 500 : 250}
+            />
+          </div>
+        )}
 
         {/* Schulsong Approval Section - Only shown for events with schulsong feature */}
         {event.isSchulsong && (

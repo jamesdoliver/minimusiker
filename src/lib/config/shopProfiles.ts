@@ -4,13 +4,18 @@
  * Defines product catalogs and Shopify variant mappings per event type.
  * The admin toggles (is_minimusikertag, is_plus, is_schulsong) determine
  * which profile the parent portal shop displays.
+ *
+ * When Deal Builder is enabled, deal_type + deal_config override the
+ * boolean flags to select the correct profile (including SCS profiles).
  */
+
+import type { DealType, DealConfig } from '@/lib/types/airtable';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export type AudioProductId = 'minicard' | 'cd' | 'tonie' | 'minicard-cd-bundle';
+export type AudioProductId = 'minicard' | 'cd' | 'tonie' | 'minicard-cd-bundle' | 'bluetooth-box';
 export type ClothingProductId = 'tshirt' | 'hoodie' | 'tshirt-hoodie';
 
 export interface AudioProduct {
@@ -34,7 +39,7 @@ export interface ClothingProduct {
   isPersonalized?: boolean;
 }
 
-export type ShopProfileType = 'minimusikertag' | 'plus' | 'schulsong-only';
+export type ShopProfileType = 'minimusikertag' | 'plus' | 'schulsong-only' | 'scs' | 'scs-plus';
 
 export interface ShopProfile {
   profileType: ShopProfileType;
@@ -151,6 +156,13 @@ const MINIMUSIKERTAG_AUDIO: AudioProduct[] = [
     savings: 9,
     imageEmoji: '🎁',
   },
+  {
+    id: 'bluetooth-box',
+    name: 'Bluetooth Box',
+    description: 'Tragbare Bluetooth-Box mit allen Songs',
+    price: 39.00,
+    imageEmoji: '🔊',
+  },
 ];
 
 const MINIMUSIKERTAG_VARIANT_MAP: Record<string, string> = {
@@ -159,6 +171,7 @@ const MINIMUSIKERTAG_VARIANT_MAP: Record<string, string> = {
   'cd': 'gid://shopify/ProductVariant/53258098639194',
   'tonie': 'gid://shopify/ProductVariant/53271523557722',
   'minicard-cd-bundle': 'gid://shopify/ProductVariant/53327238824282',
+  'bluetooth-box': 'gid://shopify/ProductVariant/TODO_BT_BOX_STANDARD',
 
   // Standard T-Shirt sizes
   'tshirt-standard-98/104 (3-4J)': 'gid://shopify/ProductVariant/53328491512154',
@@ -232,6 +245,13 @@ const PLUS_AUDIO: AudioProduct[] = [
     savings: 3,
     imageEmoji: '🎁',
   },
+  {
+    id: 'bluetooth-box',
+    name: 'Bluetooth Box',
+    description: 'Tragbare Bluetooth-Box mit allen Songs',
+    price: 34.00,
+    imageEmoji: '🔊',
+  },
 ];
 
 const PLUS_VARIANT_MAP: Record<string, string> = {
@@ -241,6 +261,7 @@ const PLUS_VARIANT_MAP: Record<string, string> = {
   'cd': 'gid://shopify/ProductVariant/53525559771482',
   'tonie': 'gid://shopify/ProductVariant/53525526217050',
   'minicard-cd-bundle': 'gid://shopify/ProductVariant/53525549089114',
+  'bluetooth-box': 'gid://shopify/ProductVariant/TODO_BT_BOX_PLUS',
 };
 
 export const PLUS_PROFILE: ShopProfile = {
@@ -263,6 +284,91 @@ export const SCHULSONG_ONLY_PROFILE: ShopProfile = {
   standardClothingProducts: STANDARD_CLOTHING,
   shopifyVariantMap: MINIMUSIKERTAG_VARIANT_MAP,
   shopifyTagFilter: 'minimusiker-shop',
+};
+
+// ============================================================================
+// SCS PROFILE (Startchancenschule — reduced product set)
+// ============================================================================
+
+// SCS audio: CD, Tonie, Bluetooth Box only — NO Minicard, NO MC+CD bundle
+const SCS_AUDIO: AudioProduct[] = [
+  {
+    id: 'cd',
+    name: 'CD',
+    description: 'Die klassische CD für deinen CD-Player - im plastikfreien Digifile mit Liederliste',
+    price: 19.00,
+    imageEmoji: '💿',
+  },
+  {
+    id: 'tonie',
+    name: 'Tonie',
+    description: 'Kreativ-Tonie mit Minicard',
+    price: 29.00,
+    imageEmoji: '🎵',
+  },
+  {
+    id: 'bluetooth-box',
+    name: 'Bluetooth Box',
+    description: 'Tragbare Bluetooth-Box mit allen Songs',
+    price: 39.00,
+    imageEmoji: '🔊',
+  },
+];
+
+const SCS_PLUS_AUDIO: AudioProduct[] = [
+  {
+    id: 'cd',
+    name: 'CD',
+    description: 'Die klassische CD für deinen CD-Player - im plastikfreien Digifile mit Liederliste',
+    price: 13.00,
+    imageEmoji: '💿',
+  },
+  {
+    id: 'tonie',
+    name: 'Tonie',
+    description: 'Kreativ-Tonie mit Minicard',
+    price: 23.00,
+    imageEmoji: '🎵',
+  },
+  {
+    id: 'bluetooth-box',
+    name: 'Bluetooth Box',
+    description: 'Tragbare Bluetooth-Box mit allen Songs',
+    price: 34.00,
+    imageEmoji: '🔊',
+  },
+];
+
+// SCS clothing: Hoodie only — T-shirt is free via SchulClothingOrder, not sold in shop
+const SCS_HOODIE_ONLY: ClothingProduct[] = [
+  {
+    id: 'hoodie',
+    name: 'Minimusiker Schul-Hoodie',
+    description: 'Der gemütliche Minimusiker Schul-Hoodie – extra für eure Schule gemacht',
+    price: 49.00,
+    imageSrc: '/images/familie_portal/Hoodie Fallback Picture.png',
+    showTshirtSize: false,
+    showHoodieSize: true,
+    isPersonalized: true,
+  },
+];
+
+export const SCS_PROFILE: ShopProfile = {
+  profileType: 'scs',
+  audioProducts: SCS_AUDIO,
+  personalizedClothingProducts: SCS_HOODIE_ONLY,
+  standardClothingProducts: SCS_HOODIE_ONLY,
+  shopifyVariantMap: MINIMUSIKERTAG_VARIANT_MAP,
+  shopifyTagFilter: 'minimusiker-shop',
+};
+
+export const SCS_PLUS_PROFILE: ShopProfile = {
+  profileType: 'scs-plus',
+  audioProducts: SCS_PLUS_AUDIO,
+  personalizedClothingProducts: SCS_HOODIE_ONLY,
+  standardClothingProducts: SCS_HOODIE_ONLY,
+  shopifyVariantMap: PLUS_VARIANT_MAP,
+  shopifyTagFilter: 'PLUS',
 };
 
 // ============================================================================
@@ -291,22 +397,44 @@ export const MINICARD_VARIANT_IDS = new Set([
 // PROFILE RESOLUTION
 // ============================================================================
 
-interface ShopProfileFlags {
+export interface ShopProfileFlags {
   isMinimusikertag?: boolean;
   isPlus?: boolean;
   isSchulsong?: boolean;
 }
 
+export interface DealProfileOverride {
+  enabled?: boolean;
+  type?: DealType;
+  config?: DealConfig;
+}
+
 /**
  * Resolve the shop profile from admin event type flags.
  *
- * Priority: schulsong-only > plus > minimusikertag
+ * When Deal Builder is enabled, deal_type + deal_config take priority.
+ * Otherwise falls back to legacy boolean flags.
  *
- * - schulsong-only: isSchulsong=true AND isMinimusikertag=false
- * - plus: isPlus=true (when not schulsong-only)
- * - minimusikertag: default fallback
+ * Legacy priority: schulsong-only > plus > minimusikertag
  */
-export function resolveShopProfile(flags: ShopProfileFlags): ShopProfile {
+export function resolveShopProfile(
+  flags: ShopProfileFlags,
+  deal?: DealProfileOverride
+): ShopProfile {
+  // Deal Builder resolution (only when enabled)
+  if (deal?.enabled && deal.type) {
+    if (deal.type === 'mimu_scs') {
+      return deal.config?.scs_audio_pricing === 'plus' ? SCS_PLUS_PROFILE : SCS_PROFILE;
+    }
+    if (deal.type === 'mimu') {
+      return deal.config?.cheaper_music ? PLUS_PROFILE : MINIMUSIKERTAG_PROFILE;
+    }
+    if (deal.type === 'schus' || deal.type === 'schus_xl') {
+      return SCHULSONG_ONLY_PROFILE;
+    }
+  }
+
+  // Legacy boolean flag fallback (existing events or deal_builder_enabled=false)
   const { isMinimusikertag, isPlus, isSchulsong } = flags;
 
   // Schulsong-only takes highest priority

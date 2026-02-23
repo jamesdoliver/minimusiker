@@ -42,6 +42,9 @@ import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModa
 import EventActivityTimeline from '@/components/admin/EventActivityTimeline';
 import DateChangeModal from '@/components/admin/events/DateChangeModal';
 import AddTeacherModal from '@/components/admin/AddTeacherModal';
+import DealBuilder from '@/components/admin/DealBuilder';
+import SchulClothingOrder from '@/components/shared/SchulClothingOrder';
+import type { DealType, DealConfig } from '@/lib/types/airtable';
 
 // Group type for admin view
 interface ClassGroup {
@@ -159,6 +162,13 @@ export default function EventDetailPage() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdatingToggles, setIsUpdatingToggles] = useState<string | null>(null); // Track which toggle is updating
 
+  // Deal Builder state
+  const [dealBuilderEnabled, setDealBuilderEnabled] = useState(false);
+  const [dealType, setDealType] = useState<DealType | null>(null);
+  const [dealConfig, setDealConfig] = useState<DealConfig>({});
+  const [estimatedChildren, setEstimatedChildren] = useState<number | undefined>(undefined);
+  const [isUpdatingDeal, setIsUpdatingDeal] = useState(false);
+
   // Refresh teacher state
   const [isRefreshingTeacher, setIsRefreshingTeacher] = useState(false);
 
@@ -199,6 +209,11 @@ export default function EventDetailPage() {
       setIsKita(data.data?.isKita || false);
       setIsSchulsong(data.data?.isSchulsong || false);
       setIsMinimusikertag(data.data?.isMinimusikertag === true);
+      // Deal Builder state
+      setDealBuilderEnabled(data.data?.dealBuilderEnabled || false);
+      setDealType(data.data?.dealType || null);
+      setDealConfig(data.data?.dealConfig || {});
+      setEstimatedChildren(data.data?.estimatedChildren);
     } catch (err) {
       console.error('Error fetching event detail:', err);
       setError(err instanceof Error ? err.message : 'Failed to load event details');
@@ -380,6 +395,55 @@ export default function EventDetailPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to update tier');
     } finally {
       setIsUpdatingToggles(null);
+    }
+  };
+
+  // Deal Builder handlers
+  const handleDealToggleEnabled = async (enabled: boolean) => {
+    setIsUpdatingDeal(true);
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deal_builder_enabled: enabled,
+          ...(enabled && dealType ? { deal_type: dealType, deal_config: dealConfig } : {}),
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to toggle Deal Builder');
+      setDealBuilderEnabled(enabled);
+      // Re-fetch to sync boolean flags
+      fetchEventDetail();
+      toast.success(enabled ? 'Deal Builder enabled' : 'Deal Builder disabled');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to toggle Deal Builder');
+    } finally {
+      setIsUpdatingDeal(false);
+    }
+  };
+
+  const handleDealUpdate = async (newDealType: DealType | null, newConfig: DealConfig) => {
+    setIsUpdatingDeal(true);
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deal_builder_enabled: true,
+          deal_type: newDealType,
+          deal_config: newConfig,
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to save deal');
+      setDealType(newDealType);
+      setDealConfig(newConfig);
+      // Re-fetch to sync boolean flags
+      fetchEventDetail();
+      toast.success('Deal saved');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save deal');
+    } finally {
+      setIsUpdatingDeal(false);
     }
   };
 
@@ -819,8 +883,8 @@ export default function EventDetailPage() {
             </div>
 
             {/* Event Type Toggles */}
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type</h3>
+            <div className={dealBuilderEnabled ? 'opacity-50 pointer-events-none' : ''}>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type {dealBuilderEnabled && <span className="text-xs text-gray-400">(controlled by Deal Builder)</span>}</h3>
               <div className="space-y-3">
                 {/* Off ←→ Minimusikertag ←→ PLUS Segmented Control */}
                 <div className="flex items-center gap-3">
@@ -937,6 +1001,31 @@ export default function EventDetailPage() {
                 </label>
               </div>
             </div>
+
+            {/* Deal Builder */}
+            <div className="mt-4">
+              <DealBuilder
+                eventId={eventId}
+                enabled={dealBuilderEnabled}
+                dealType={dealType}
+                dealConfig={dealConfig}
+                estimatedChildren={estimatedChildren}
+                onToggleEnabled={handleDealToggleEnabled}
+                onUpdate={handleDealUpdate}
+                isUpdating={isUpdatingDeal}
+              />
+            </div>
+
+            {/* SCS Clothing Order (only for mimuSCS with shirts included) */}
+            {dealType === 'mimu_scs' && dealConfig.scs_shirts_included !== false && (
+              <div className="mt-4">
+                <SchulClothingOrder
+                  eventId={eventId}
+                  apiBasePath="/api/admin/events"
+                  maxQuantity={(estimatedChildren ?? 0) > 250 ? 500 : 250}
+                />
+              </div>
+            )}
           </div>
         </div>
 

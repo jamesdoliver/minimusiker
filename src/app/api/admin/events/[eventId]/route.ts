@@ -3,10 +3,11 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { getTaskService } from '@/lib/services/taskService';
 import { getActivityService, ActivityService } from '@/lib/services/activityService';
 import { sendStaffReassignmentEmail } from '@/lib/services/resendService';
-import { SchoolEventDetail, EVENTS_TABLE_ID, EVENTS_FIELD_IDS, PERSONEN_TABLE_ID, PERSONEN_FIELD_IDS } from '@/lib/types/airtable';
+import { SchoolEventDetail, EVENTS_TABLE_ID, EVENTS_FIELD_IDS, PERSONEN_TABLE_ID, PERSONEN_FIELD_IDS, DealType, DealConfig } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { simplybookService } from '@/lib/services/simplybookService';
+import { dealTypeToFlags } from '@/lib/utils/dealCalculator';
 import {
   triggerDateChangeNotification,
   triggerCancellationNotification,
@@ -112,6 +113,10 @@ export async function GET(
       isKita?: boolean;
       isSchulsong?: boolean;
       isMinimusikertag?: boolean;
+      dealBuilderEnabled?: boolean;
+      dealType?: DealType | null;
+      dealConfig?: DealConfig | null;
+      estimatedChildren?: number;
     } = {};
 
     try {
@@ -141,6 +146,10 @@ export async function GET(
             isKita: eventRecord.is_kita || isKitaFromEventType,
             isSchulsong: eventRecord.is_schulsong,
             isMinimusikertag: eventRecord.is_minimusikertag === true,
+            dealBuilderEnabled: eventRecord.deal_builder_enabled,
+            dealType: eventRecord.deal_type || null,
+            dealConfig: eventRecord.deal_config || null,
+            estimatedChildren: eventRecord.estimated_children,
           };
         }
       }
@@ -200,12 +209,37 @@ export async function PATCH(
     const hasNotesUpdate = body.admin_notes !== undefined;
     const hasOverridesUpdate = body.timeline_overrides !== undefined;
     const hasChildrenUpdate = body.estimated_children !== undefined;
+    const hasDealUpdate =
+      body.deal_builder_enabled !== undefined ||
+      body.deal_type !== undefined ||
+      body.deal_config !== undefined;
 
-    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate && !hasChildrenUpdate) {
+    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate && !hasChildrenUpdate && !hasDealUpdate) {
       return NextResponse.json(
-        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children, deal_builder_enabled, deal_type, deal_config' },
         { status: 400 }
       );
+    }
+
+    // Validate deal_type if provided
+    if (body.deal_type !== undefined && body.deal_type !== null) {
+      const validDealTypes: DealType[] = ['mimu', 'mimu_scs', 'schus', 'schus_xl'];
+      if (!validDealTypes.includes(body.deal_type)) {
+        return NextResponse.json(
+          { success: false, error: `Invalid deal_type. Expected one of: ${validDealTypes.join(', ')}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate deal_config JSON if provided
+    if (body.deal_config !== undefined && body.deal_config !== null) {
+      if (typeof body.deal_config !== 'object') {
+        return NextResponse.json(
+          { success: false, error: 'deal_config must be a JSON object' },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate timeline_overrides JSON if provided
@@ -619,6 +653,48 @@ export async function PATCH(
       await base(EVENTS_TABLE_ID).update(eventRecordId, {
         [EVENTS_FIELD_IDS.timeline_overrides]: body.timeline_overrides || '',
       });
+    }
+
+    // Handle deal builder updates
+    if (hasDealUpdate) {
+      const dealFieldUpdates: Record<string, unknown> = {};
+
+      if (body.deal_builder_enabled !== undefined) {
+        dealFieldUpdates.deal_builder_enabled = body.deal_builder_enabled;
+      }
+      if (body.deal_type !== undefined) {
+        dealFieldUpdates.deal_type = body.deal_type;
+      }
+      if (body.deal_config !== undefined) {
+        dealFieldUpdates.deal_config = body.deal_config ? JSON.stringify(body.deal_config) : '';
+      }
+
+      // When deal builder is enabled and a deal type is set, auto-sync boolean flags
+      if (body.deal_builder_enabled && body.deal_type) {
+        const flags = dealTypeToFlags(body.deal_type as DealType, (body.deal_config || {}) as DealConfig);
+        dealFieldUpdates.is_plus = flags.is_plus;
+        dealFieldUpdates.is_kita = flags.is_kita;
+        dealFieldUpdates.is_schulsong = flags.is_schulsong;
+        dealFieldUpdates.is_minimusikertag = flags.is_minimusikertag;
+      }
+
+      updatedEvent = await airtableService.updateEventFields(eventRecordId, dealFieldUpdates);
+
+      // Log activity for deal type change
+      if (body.deal_type !== undefined) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'deal_type_changed',
+          description: `Deal type ${body.deal_type ? `set to #${body.deal_type}` : 'cleared'}`,
+          actorEmail: admin.email,
+          actorType: 'admin',
+          metadata: {
+            dealType: body.deal_type,
+            dealConfig: body.deal_config,
+            dealBuilderEnabled: body.deal_builder_enabled,
+          },
+        });
+      }
     }
 
     return NextResponse.json({

@@ -5392,6 +5392,9 @@ class AirtableService {
       is_minimusikertag?: boolean;
       is_under_100?: boolean;
       estimated_children?: number;
+      deal_builder_enabled?: boolean;
+      deal_type?: string | null;
+      deal_config?: string;
     }
   ): Promise<Event> {
     try {
@@ -5417,6 +5420,15 @@ class AirtableService {
       }
       if (updates.estimated_children !== undefined) {
         updateFields[EVENTS_FIELD_IDS.estimated_children] = updates.estimated_children;
+      }
+      if (updates.deal_builder_enabled !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.deal_builder_enabled] = updates.deal_builder_enabled;
+      }
+      if (updates.deal_type !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.deal_type] = updates.deal_type;
+      }
+      if (updates.deal_config !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.deal_config] = updates.deal_config;
       }
 
       if (Object.keys(updateFields).length === 0) {
@@ -5851,6 +5863,14 @@ class AirtableService {
       // Under-100-kids flag and estimated children
       is_under_100: record.get('is_under_100') as boolean | undefined,
       estimated_children: record.get('estimated_children') as number | undefined,
+      // Deal Builder fields
+      deal_builder_enabled: record.get('deal_builder_enabled') as boolean | undefined,
+      deal_type: record.get('deal_type') as Event['deal_type'] | undefined,
+      deal_config: (() => {
+        const raw = record.get('deal_config') as string | undefined;
+        if (!raw) return undefined;
+        try { return JSON.parse(raw); } catch { return undefined; }
+      })(),
     };
   }
 
