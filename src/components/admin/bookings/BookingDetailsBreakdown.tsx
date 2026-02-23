@@ -13,6 +13,7 @@ import AudioReviewModal from './AudioReviewModal';
 import EventActivityTimeline from '@/components/admin/EventActivityTimeline';
 import { AudioStatusData } from '@/lib/types/audio-status';
 import { toast } from 'sonner';
+import QRCode from 'qrcode';
 
 interface BookingDetailsBreakdownProps {
   booking: BookingWithDetails;
@@ -144,6 +145,24 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
     navigator.clipboard.writeText(`https://${booking.shortUrl}`);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  // Download QR code as PNG
+  const handleDownloadQR = async () => {
+    if (!booking.shortUrl) return;
+    try {
+      const dataUrl = await QRCode.toDataURL(`https://${booking.shortUrl}`, {
+        width: 400,
+        margin: 1,
+        errorCorrectionLevel: 'M',
+      });
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `qr-${booking.accessCode || 'event'}.png`;
+      a.click();
+    } catch {
+      toast.error('Failed to generate QR code');
+    }
   };
 
   // Copy discount code to clipboard
@@ -338,26 +357,30 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
             </div>
             {booking.shortUrl && (
               <div>
-                <button
-                  onClick={handleCopyLink}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-                >
-                  {linkCopied ? (
-                    <>
-                      <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      Copy QR Link
-                    </>
-                  )}
-                </button>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">Access Link</label>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <button
+                    onClick={handleCopyLink}
+                    className="text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
+                    title="Click to copy"
+                  >
+                    {linkCopied ? (
+                      <span className="text-green-600 font-sans">Copied!</span>
+                    ) : (
+                      booking.shortUrl
+                    )}
+                  </button>
+                  <button
+                    onClick={handleDownloadQR}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+                    title="Download QR code"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    QR
+                  </button>
+                </div>
               </div>
             )}
           </div>
