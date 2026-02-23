@@ -104,6 +104,10 @@ export default function ConfirmPrintablesModal({
   // Guard: prevent async status load from overwriting user interactions
   const userHasInteracted = useRef<Set<PrintableItemType>>(new Set());
 
+  // Guard: prevent loadPrintablesStatus from jumping the step after the user
+  // has navigated or if a previous session was restored from localStorage.
+  const stepSetByUser = useRef(false);
+
   // localStorage key prefix for persisting editor state across sessions
   const storageKeyPrefix = `printables-editor-${booking.code}`;
 
@@ -115,6 +119,7 @@ export default function ConfirmPrintablesModal({
   useEffect(() => {
     if (isOpen) {
       userHasInteracted.current = new Set();
+      stepSetByUser.current = false;
 
       // Try to restore from localStorage
       let restored = false;
@@ -128,6 +133,8 @@ export default function ConfirmPrintablesModal({
           setItemsStatus(JSON.parse(savedStatus));
           setCurrentStep(savedStep ? parseInt(savedStep, 10) : 0);
           restored = true;
+          // Preserved session — don't let async status load jump the step
+          stepSetByUser.current = true;
         }
       } catch {
         // JSON parse failed — fall through to fresh init
@@ -233,12 +240,15 @@ export default function ConfirmPrintablesModal({
           return merged;
         });
 
-        // Find the first pending or skipped item to jump to
-        const firstPendingOrSkippedIndex = PRINTABLE_ITEMS.findIndex(
-          (item) => data.status[item.type] === 'pending' || data.status[item.type] === 'skipped'
-        );
-        if (firstPendingOrSkippedIndex >= 0) {
-          setCurrentStep(firstPendingOrSkippedIndex);
+        // Jump to the first pending/skipped item, but only if the user hasn't
+        // already navigated or if we didn't restore a previous session.
+        if (!stepSetByUser.current) {
+          const firstPendingOrSkippedIndex = PRINTABLE_ITEMS.findIndex(
+            (item) => data.status[item.type] === 'pending' || data.status[item.type] === 'skipped'
+          );
+          if (firstPendingOrSkippedIndex >= 0) {
+            setCurrentStep(firstPendingOrSkippedIndex);
+          }
         }
       }
     } catch (error) {
@@ -285,6 +295,7 @@ export default function ConfirmPrintablesModal({
   // Handle confirm current item and go to next
   const handleConfirmAndNext = () => {
     userHasInteracted.current.add(currentItem.type);
+    stepSetByUser.current = true;
     setItemsStatus((prev) => ({
       ...prev,
       [currentItem.type]: 'confirmed',
@@ -298,6 +309,7 @@ export default function ConfirmPrintablesModal({
   // Handle skip current item and go to next
   const handleSkip = () => {
     userHasInteracted.current.add(currentItem.type);
+    stepSetByUser.current = true;
     setItemsStatus((prev) => ({
       ...prev,
       [currentItem.type]: 'skipped',
@@ -311,6 +323,7 @@ export default function ConfirmPrintablesModal({
   // Handle go back
   const handleBack = () => {
     if (currentStep > 0) {
+      stepSetByUser.current = true;
       setCurrentStep(currentStep - 1);
     }
   };
@@ -605,7 +618,7 @@ export default function ConfirmPrintablesModal({
                 return (
                   <button
                     key={item.type}
-                    onClick={() => setCurrentStep(index)}
+                    onClick={() => { stepSetByUser.current = true; setCurrentStep(index); }}
                     className={`w-3 h-3 rounded-full transition-all ${dotClass} ${
                       isCurrent ? 'ring-2 ring-[#F4A261] ring-offset-1 scale-125' : ''
                     }`}

@@ -60,6 +60,14 @@ export default function PrintableEditor({
   const [templateExists, setTemplateExists] = useState(true);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
+  // Refs to break the re-render cascade: handleCanvasLoad no longer depends on
+  // editorState/onEditorStateChange, so it won't be recreated on every text edit.
+  const editorStateRef = useRef(editorState);
+  editorStateRef.current = editorState;
+
+  const onEditorStateChangeRef = useRef(onEditorStateChange);
+  onEditorStateChangeRef.current = onEditorStateChange;
+
   // Measure the right panel's available height for the canvas
   const rightPanelRef = useRef<HTMLDivElement>(null);
   const [panelHeight, setPanelHeight] = useState<number>(600);
@@ -78,20 +86,30 @@ export default function PrintableEditor({
     return () => observer.disconnect();
   }, []);
 
-  // Handle image canvas load - store scale factor and rescale elements if needed
+  // Handle image canvas load - store scale factor and rescale elements if needed.
+  // Uses refs so this callback is STABLE — it won't be recreated on every editorState
+  // change, which breaks the cascade: edit → new handleCanvasLoad → new onLoad prop →
+  // reportDimensions recreated → effect fires → setCanvasDimensions → extra re-render.
   const handleCanvasLoad = useCallback(
     (dims: { width: number; height: number; scale: number }) => {
-      setCanvasDimensions(dims);
+      // Use functional updater to skip re-render when dimensions haven't changed
+      setCanvasDimensions((prev) => {
+        if (prev && prev.width === dims.width && prev.height === dims.height && prev.scale === dims.scale) {
+          return prev; // Same reference — no re-render
+        }
+        return dims;
+      });
       setTemplateExists(true);
 
-      const oldScale = editorState.canvasScale ?? 1;
+      const currentState = editorStateRef.current;
+      const oldScale = currentState.canvasScale ?? 1;
       const newScale = dims.scale;
 
       if (oldScale !== newScale) {
         // Rescale all text element positions, sizes, font sizes, and QR positions
         // This handles the initial scale=1 → actual scale transition, and window resizes
         const ratio = newScale / oldScale;
-        const rescaledElements = editorState.textElements.map((el) => ({
+        const rescaledElements = currentState.textElements.map((el) => ({
           ...el,
           position: {
             x: el.position.x * ratio,
@@ -104,23 +122,23 @@ export default function PrintableEditor({
           fontSize: el.fontSize * ratio,
         }));
 
-        const rescaledQr = editorState.qrPosition
+        const rescaledQr = currentState.qrPosition
           ? {
-              x: editorState.qrPosition.x * ratio,
-              y: editorState.qrPosition.y * ratio,
-              size: editorState.qrPosition.size * ratio,
+              x: currentState.qrPosition.x * ratio,
+              y: currentState.qrPosition.y * ratio,
+              size: currentState.qrPosition.size * ratio,
             }
-          : editorState.qrPosition;
+          : currentState.qrPosition;
 
-        onEditorStateChange({
-          ...editorState,
+        onEditorStateChangeRef.current({
+          ...currentState,
           canvasScale: newScale,
           textElements: rescaledElements,
           qrPosition: rescaledQr,
         });
       }
     },
-    [editorState, onEditorStateChange]
+    [] // Stable — uses refs for mutable state
   );
 
   // Handle image canvas error (preview image doesn't exist)

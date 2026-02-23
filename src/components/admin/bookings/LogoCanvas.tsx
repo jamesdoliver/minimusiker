@@ -57,6 +57,13 @@ export default function ImageCanvas({
     return () => clearTimeout(timeoutId);
   }, [templateType, imageLoaded, hasError, onError, config?.name]);
 
+  // Ref for onLoad so reportDimensions doesn't depend on it.
+  // Without this, every parent re-render (e.g. text edit → new editorState →
+  // new handleCanvasLoad → new onLoad prop) would recreate reportDimensions,
+  // fire the effect, and trigger a cascade of extra re-renders.
+  const onLoadRef = useRef(onLoad);
+  onLoadRef.current = onLoad;
+
   // Measure the actual rendered image size and report to parent
   const reportDimensions = useCallback(() => {
     const img = imgRef.current;
@@ -67,8 +74,8 @@ export default function ImageCanvas({
     const height = rect.height;
     const scale = width / previewDimensions.width;
 
-    onLoad?.({ width, height, scale });
-  }, [imageLoaded, previewDimensions.width, onLoad]);
+    onLoadRef.current?.({ width, height, scale });
+  }, [imageLoaded, previewDimensions.width]);
 
   // Report dimensions whenever the image loads or the container resizes
   useEffect(() => {
