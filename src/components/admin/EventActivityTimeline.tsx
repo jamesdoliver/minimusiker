@@ -34,6 +34,7 @@ const ACTIVITY_CONFIG: Record<
   email_discussion: { icon: '✉️', color: 'text-blue-600', bgColor: 'bg-blue-100' },
   audio_uploaded: { icon: '🎤', color: 'text-purple-600', bgColor: 'bg-purple-100' },
   email_sent: { icon: '📧', color: 'text-green-600', bgColor: 'bg-green-100' },
+  deal_type_changed: { icon: '💰', color: 'text-emerald-600', bgColor: 'bg-emerald-100' },
 };
 
 function formatRelativeTime(dateString: string): string {
