@@ -186,7 +186,7 @@ export async function getEarlyBirdTargets(accessCodes: number[]): Promise<Campai
 
     // Build login link using access_code
     const loginLink = event.accessCode
-      ? `https://minimusiker.app/${event.accessCode}`
+      ? `https://minimusiker.app/e/${event.accessCode}`
       : `https://minimusiker.app`; // Fallback if no access code
 
     recipients.push({
