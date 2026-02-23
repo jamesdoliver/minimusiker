@@ -35,7 +35,7 @@ export function validateParentName(name: string): {
     return { valid: false, error: 'Name must be 50 characters or less' };
   }
 
-  const namePattern = /^[a-zA-Z\s\-'.]+$/;
+  const namePattern = /^[\p{L}\s\-'.]+$/u;
   if (!namePattern.test(trimmed)) {
     return {
       valid: false,
@@ -96,8 +96,8 @@ export function validateChildName(name: string): {
     };
   }
 
-  // Allow letters, spaces, hyphens, apostrophes
-  const namePattern = /^[a-zA-Z\s\-'.]+$/;
+  // Allow letters (including Unicode: ä, ö, ü, ß, é, etc.), spaces, hyphens, apostrophes
+  const namePattern = /^[\p{L}\s\-'.]+$/u;
   if (!namePattern.test(trimmed)) {
     return {
       valid: false,
@@ -132,8 +132,8 @@ export function validateGradeLevel(grade: string): {
     };
   }
 
-  // Allow alphanumeric, spaces, and common punctuation
-  const gradePattern = /^[a-zA-Z0-9\s\-'.()]+$/;
+  // Allow alphanumeric (including Unicode letters), spaces, and common punctuation
+  const gradePattern = /^[\p{L}0-9\s\-'.()]+$/u;
   if (!gradePattern.test(trimmed)) {
     return {
       valid: false,

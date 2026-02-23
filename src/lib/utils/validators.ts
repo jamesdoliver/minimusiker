@@ -83,8 +83,8 @@ export function validateClassName(className: string): {
     return { valid: false, error: 'Class name must be 100 characters or less' };
   }
 
-  // Check for invalid characters (allow letters, numbers, spaces, hyphens, apostrophes, periods)
-  const validPattern = /^[a-zA-Z0-9\s\-'.]+$/;
+  // Check for invalid characters (allow letters incl. Unicode, numbers, spaces, hyphens, apostrophes, periods)
+  const validPattern = /^[\p{L}0-9\s\-'.]+$/u;
   if (!validPattern.test(trimmed)) {
     return {
       valid: false,
@@ -353,7 +353,7 @@ export function validateParentName(name: string): {
     return { valid: false, error: 'Name must be 50 characters or less' };
   }
 
-  const namePattern = /^[a-zA-Z\s\-'.]+$/;
+  const namePattern = /^[\p{L}\s\-'.]+$/u;
   if (!namePattern.test(trimmed)) {
     return {
       valid: false,
@@ -420,8 +420,8 @@ export function validateChildName(name: string): {
     };
   }
 
-  // Allow letters, spaces, hyphens, apostrophes
-  const namePattern = /^[a-zA-Z\s\-'.]+$/;
+  // Allow letters (including Unicode: ä, ö, ü, ß, é, etc.), spaces, hyphens, apostrophes
+  const namePattern = /^[\p{L}\s\-'.]+$/u;
   if (!namePattern.test(trimmed)) {
     return {
       valid: false,
