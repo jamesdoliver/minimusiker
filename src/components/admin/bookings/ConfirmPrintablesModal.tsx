@@ -129,7 +129,20 @@ export default function ConfirmPrintablesModal({
         const savedStep = localStorage.getItem(`${storageKeyPrefix}-step`);
 
         if (savedEditor && savedStatus) {
-          setItemEditorStates(JSON.parse(savedEditor));
+          // Sanitize restored editor states — fix NaN values from previous bugs
+          const parsed = JSON.parse(savedEditor) as Record<PrintableItemType, PrintableEditorState>;
+          for (const key of Object.keys(parsed) as PrintableItemType[]) {
+            const state = parsed[key];
+            if (state.qrPosition) {
+              const qr = state.qrPosition;
+              if (!Number.isFinite(qr.x) || !Number.isFinite(qr.y) || !Number.isFinite(qr.size)) {
+                // Corrupted QR position — reinitialize from defaults
+                const fresh = initializeEditorState(key, booking.schoolName, state.canvasScale ?? 1, booking.bookingDate);
+                state.qrPosition = fresh.qrPosition;
+              }
+            }
+          }
+          setItemEditorStates(parsed);
           setItemsStatus(JSON.parse(savedStatus));
           setCurrentStep(savedStep ? parseInt(savedStep, 10) : 0);
           restored = true;

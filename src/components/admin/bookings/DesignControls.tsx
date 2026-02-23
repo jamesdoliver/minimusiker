@@ -151,7 +151,7 @@ export default function DesignControls({
             </div>
           </div>
 
-          {hasQrCode && qrPosition && qrSize && (
+          {hasQrCode && qrPosition && typeof qrSize === 'number' && qrSize > 0 && (
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
                 QR Code Position
