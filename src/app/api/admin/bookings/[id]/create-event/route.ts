@@ -31,19 +31,7 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Booking not found' }, { status: 404 });
     }
 
-    // 2. Check if event already exists (idempotent)
-    const existingEvent = await airtableService.getEventBySchoolBookingId(bookingId);
-    if (existingEvent) {
-      return NextResponse.json({
-        success: true,
-        message: 'Event already exists',
-        eventId: existingEvent.event_id,
-        eventRecordId: existingEvent.id,
-        alreadyExisted: true,
-      });
-    }
-
-    // 3. Generate event_id
+    // 2. Generate event_id
     const schoolName = booking.schoolName || booking.schoolContactName || 'Unknown';
     const eventDate = booking.startDate || new Date().toISOString().split('T')[0];
     const isPending = !booking.startDate;
@@ -54,7 +42,19 @@ export async function POST(
       booking.startDate || undefined
     );
 
-    // 4. Create Events record
+    // 3. Check if event already exists (fast formula query by event_id)
+    const existingEvent = await airtableService.getEventByEventId(eventId);
+    if (existingEvent) {
+      return NextResponse.json({
+        success: true,
+        message: 'Event already exists',
+        eventId: existingEvent.event_id,
+        eventRecordId: existingEvent.id,
+        alreadyExisted: true,
+      });
+    }
+
+    // 4. Create Events record (has its own idempotency check via formula filter)
     const eventRecord = await airtableService.createEventFromBooking(
       eventId,
       bookingId,

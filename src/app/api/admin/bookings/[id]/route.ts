@@ -181,11 +181,12 @@ export async function PATCH(
     let eventCreated = false;
     if (airtableUpdated && body.event_date) {
       try {
-        const existingEvent = await airtableService.getEventBySchoolBookingId(bookingId);
-        if (!existingEvent) {
-          const schoolName = booking.schoolName || booking.schoolContactName || 'Unknown';
-          const eventId = generateEventId(schoolName, 'MiniMusiker', body.event_date);
+        const schoolName = booking.schoolName || booking.schoolContactName || 'Unknown';
+        const eventId = generateEventId(schoolName, 'MiniMusiker', body.event_date);
 
+        // Fast formula-based check instead of full table scan
+        const existingEvent = await airtableService.getEventByEventId(eventId);
+        if (!existingEvent) {
           const eventRecord = await airtableService.createEventFromBooking(
             eventId,
             bookingId,
