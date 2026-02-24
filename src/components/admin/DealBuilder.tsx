@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { DealType, DealConfig, CustomFees } from '@/lib/types/airtable';
-import { calculateDealFee, FeeBreakdown, MIMU_DEFAULTS, MIMU_SCS_DEFAULTS } from '@/lib/utils/dealCalculator';
+import { calculateDealFee, FeeBreakdown, MIMU_DEFAULTS, MIMU_SCS_DEFAULTS, isKleineEinrichtungOn, isGrosseEinrichtungOn } from '@/lib/utils/dealCalculator';
 
 interface DealBuilderProps {
   eventId: string;
@@ -90,6 +90,75 @@ function FeeInput({
   );
 }
 
+function DealRow({
+  label,
+  enabled,
+  onToggle,
+  feeKey,
+  defaultValue,
+  customFees,
+  onFeeChange,
+  isNegative,
+  disabled,
+  isAuto,
+  onResetAuto,
+  toggleColor = 'green',
+}: {
+  label: string;
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
+  feeKey: keyof CustomFees;
+  defaultValue: number;
+  customFees?: CustomFees;
+  onFeeChange: (key: keyof CustomFees, value: number | undefined) => void;
+  isNegative?: boolean;
+  disabled?: boolean;
+  isAuto?: boolean;
+  onResetAuto?: () => void;
+  toggleColor?: 'green' | 'orange';
+}) {
+  const colorClass = toggleColor === 'orange' ? 'peer-checked:bg-orange-500' : 'peer-checked:bg-green-500';
+  return (
+    <div className="flex items-center gap-3">
+      <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+        <div className="relative flex-shrink-0">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => onToggle(e.target.checked)}
+            disabled={disabled}
+            className="sr-only peer"
+          />
+          <div className={`w-9 h-5 bg-gray-200 rounded-full peer ${colorClass} peer-disabled:opacity-50 transition-colors`} />
+          <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+        </div>
+        <span className="text-sm text-gray-800 font-medium">{label}</span>
+        {isAuto && (
+          <span className="text-[10px] font-medium bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">auto</span>
+        )}
+        {!isAuto && onResetAuto && (
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); onResetAuto(); }}
+            className="text-[10px] text-gray-400 hover:text-amber-600 underline"
+            title="Reset to auto"
+          >
+            reset auto
+          </button>
+        )}
+      </label>
+      <FeeInput
+        feeKey={feeKey}
+        defaultValue={defaultValue}
+        customFees={customFees}
+        onChange={onFeeChange}
+        isNegative={isNegative}
+        disabled={disabled}
+      />
+    </div>
+  );
+}
+
 export default function DealBuilder({
   enabled,
   dealType,
@@ -131,9 +200,20 @@ export default function DealBuilder({
     setLocalType(type);
     // Reset config for the new type with sensible defaults
     if (type === 'mimu') {
-      setLocalConfig({ cheaper_music: false, distance_surcharge: false });
+      setLocalConfig({
+        pauschale_enabled: true,
+        music_pricing_enabled: false,
+        distance_surcharge: false,
+        // kleine_einrichtung_enabled: undefined → auto from estimatedChildren
+      });
     } else if (type === 'mimu_scs') {
-      setLocalConfig({ scs_song_option: 'schusXL', scs_shirts_included: true, scs_audio_pricing: 'standard' });
+      setLocalConfig({
+        scs_pauschale_enabled: true,
+        scs_song_option: 'schusXL',
+        scs_shirts_included: true,
+        scs_audio_pricing: 'standard',
+        // grosse_einrichtung_enabled: undefined → auto from estimatedChildren
+      });
     } else {
       setLocalConfig({});
     }
@@ -222,79 +302,68 @@ export default function DealBuilder({
           {/* #mimu options */}
           {localType === 'mimu' && (
             <div className="bg-green-50 rounded-lg p-3 space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={localConfig.cheaper_music || false}
-                    onChange={(e) => updateConfig({ cheaper_music: e.target.checked })}
-                    disabled={isUpdating}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-green-500 peer-disabled:opacity-50 transition-colors" />
-                  <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
-                </div>
-                <div>
-                  <span className="text-sm text-gray-800 font-medium">Cheaper Music</span>
-                  <p className="text-xs text-gray-500">
-                    Saves parents on audio &mdash; Fee:{' '}
-                    <FeeInput
-                      feeKey={(estimatedChildren ?? 0) > 250 ? 'cheaper_music_large' : 'cheaper_music_small'}
-                      defaultValue={(estimatedChildren ?? 0) > 250 ? MIMU_DEFAULTS.cheaper_music_large : MIMU_DEFAULTS.cheaper_music_small}
-                      customFees={localConfig.custom_fees}
-                      onChange={handleFeeChange}
-                      disabled={isUpdating}
-                    />
-                  </p>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={localConfig.distance_surcharge || false}
-                    onChange={(e) => updateConfig({ distance_surcharge: e.target.checked })}
-                    disabled={isUpdating}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-green-500 peer-disabled:opacity-50 transition-colors" />
-                  <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
-                </div>
-                <div>
-                  <span className="text-sm text-gray-800 font-medium">Distance Surcharge</span>
-                  <p className="text-xs text-gray-500">
-                    <FeeInput
-                      feeKey="distance_surcharge"
-                      defaultValue={MIMU_DEFAULTS.distance_surcharge}
-                      customFees={localConfig.custom_fees}
-                      onChange={handleFeeChange}
-                      disabled={isUpdating}
-                    />
-                  </p>
-                </div>
-              </label>
-
-              {(estimatedChildren ?? 0) < 100 && (
-                <div className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded flex items-center gap-1">
-                  <span>Auto: unter 100 Kinder</span>
-                  <FeeInput
-                    feeKey="under_100_kids"
-                    defaultValue={MIMU_DEFAULTS.under_100_kids}
-                    customFees={localConfig.custom_fees}
-                    onChange={handleFeeChange}
-                    disabled={isUpdating}
-                  />
-                </div>
-              )}
+              <DealRow
+                label="Pauschale"
+                enabled={localConfig.pauschale_enabled !== false}
+                onToggle={(v) => updateConfig({ pauschale_enabled: v })}
+                feeKey="base"
+                defaultValue={MIMU_DEFAULTS.base}
+                customFees={localConfig.custom_fees}
+                onFeeChange={handleFeeChange}
+                disabled={isUpdating}
+              />
+              <DealRow
+                label="Plus-Preise für Musik"
+                enabled={localConfig.music_pricing_enabled || false}
+                onToggle={(v) => updateConfig({ music_pricing_enabled: v })}
+                feeKey="music_pricing"
+                defaultValue={MIMU_DEFAULTS.music_pricing}
+                customFees={localConfig.custom_fees}
+                onFeeChange={handleFeeChange}
+                disabled={isUpdating}
+              />
+              <DealRow
+                label="Entfernungspauschale"
+                enabled={localConfig.distance_surcharge || false}
+                onToggle={(v) => updateConfig({ distance_surcharge: v })}
+                feeKey="distance_surcharge"
+                defaultValue={MIMU_DEFAULTS.distance_surcharge}
+                customFees={localConfig.custom_fees}
+                onFeeChange={handleFeeChange}
+                disabled={isUpdating}
+              />
+              <DealRow
+                label="kleine Einrichtung"
+                enabled={isKleineEinrichtungOn(localConfig, estimatedChildren)}
+                onToggle={(v) => updateConfig({ kleine_einrichtung_enabled: v })}
+                feeKey="under_100_kids"
+                defaultValue={MIMU_DEFAULTS.under_100_kids}
+                customFees={localConfig.custom_fees}
+                onFeeChange={handleFeeChange}
+                disabled={isUpdating}
+                isAuto={localConfig.kleine_einrichtung_enabled === undefined}
+                onResetAuto={() => updateConfig({ kleine_einrichtung_enabled: undefined })}
+              />
             </div>
           )}
 
           {/* #mimuSCS options */}
           {localType === 'mimu_scs' && (
             <div className="bg-orange-50 rounded-lg p-3 space-y-3">
+              <DealRow
+                label="Pauschale"
+                enabled={localConfig.scs_pauschale_enabled !== false}
+                onToggle={(v) => updateConfig({ scs_pauschale_enabled: v })}
+                feeKey="base"
+                defaultValue={MIMU_SCS_DEFAULTS.base}
+                customFees={localConfig.custom_fees}
+                onFeeChange={handleFeeChange}
+                disabled={isUpdating}
+                toggleColor="orange"
+              />
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">School Song</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Schulsong</label>
                 <select
                   value={localConfig.scs_song_option || 'schusXL'}
                   onChange={(e) => updateConfig({ scs_song_option: e.target.value as DealConfig['scs_song_option'] })}
@@ -333,33 +402,32 @@ export default function DealBuilder({
                 )}
               </div>
 
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={localConfig.scs_shirts_included !== false}
-                    onChange={(e) => updateConfig({ scs_shirts_included: e.target.checked })}
-                    disabled={isUpdating}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-orange-500 peer-disabled:opacity-50 transition-colors" />
-                  <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
-                </div>
-                <div>
-                  <span className="text-sm text-gray-800 font-medium">School T-Shirts Included</span>
-                  <p className="text-xs text-gray-500 flex items-center gap-1">
-                    <span>Opt-out saves</span>
-                    <FeeInput
-                      feeKey="no_shirts_discount"
-                      defaultValue={MIMU_SCS_DEFAULTS.no_shirts_discount}
-                      customFees={localConfig.custom_fees}
-                      onChange={handleFeeChange}
-                      isNegative
-                      disabled={isUpdating}
-                    />
-                  </p>
-                </div>
-              </label>
+              <DealRow
+                label="T-Shirts inklusive"
+                enabled={localConfig.scs_shirts_included !== false}
+                onToggle={(v) => updateConfig({ scs_shirts_included: v })}
+                feeKey="no_shirts_discount"
+                defaultValue={MIMU_SCS_DEFAULTS.no_shirts_discount}
+                customFees={localConfig.custom_fees}
+                onFeeChange={handleFeeChange}
+                isNegative
+                disabled={isUpdating}
+                toggleColor="orange"
+              />
+
+              <DealRow
+                label="Grosse Einrichtung"
+                enabled={isGrosseEinrichtungOn(localConfig, estimatedChildren)}
+                onToggle={(v) => updateConfig({ grosse_einrichtung_enabled: v })}
+                feeKey="over_250_kids"
+                defaultValue={MIMU_SCS_DEFAULTS.over_250_kids}
+                customFees={localConfig.custom_fees}
+                onFeeChange={handleFeeChange}
+                disabled={isUpdating}
+                isAuto={localConfig.grosse_einrichtung_enabled === undefined}
+                onResetAuto={() => updateConfig({ grosse_einrichtung_enabled: undefined })}
+                toggleColor="orange"
+              />
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Audio Pricing</label>
@@ -373,19 +441,6 @@ export default function DealBuilder({
                   <option value="plus">PLUS prices (cheaper for parents)</option>
                 </select>
               </div>
-
-              {(estimatedChildren ?? 0) > 250 && (
-                <div className="text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded flex items-center gap-1">
-                  <span>Auto: over 250 children</span>
-                  <FeeInput
-                    feeKey="over_250_kids"
-                    defaultValue={MIMU_SCS_DEFAULTS.over_250_kids}
-                    customFees={localConfig.custom_fees}
-                    onChange={handleFeeChange}
-                    disabled={isUpdating}
-                  />
-                </div>
-              )}
             </div>
           )}
 
@@ -406,16 +461,7 @@ export default function DealBuilder({
               <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Fee Summary</h4>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between text-gray-600">
-                  <span className="flex items-center gap-1">
-                    <span>Base fee</span>
-                    <FeeInput
-                      feeKey="base"
-                      defaultValue={localType === 'mimu_scs' ? MIMU_SCS_DEFAULTS.base : MIMU_DEFAULTS.base}
-                      customFees={localConfig.custom_fees}
-                      onChange={handleFeeChange}
-                      disabled={isUpdating}
-                    />
-                  </span>
+                  <span>Base fee</span>
                   <span>{formatCurrency(feeBreakdown.base)}</span>
                 </div>
                 {feeBreakdown.items.map((item, i) => (

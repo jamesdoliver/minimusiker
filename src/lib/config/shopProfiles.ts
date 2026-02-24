@@ -427,7 +427,7 @@ export function resolveShopProfile(
       return deal.config?.scs_audio_pricing === 'plus' ? SCS_PLUS_PROFILE : SCS_PROFILE;
     }
     if (deal.type === 'mimu') {
-      return deal.config?.cheaper_music ? PLUS_PROFILE : MINIMUSIKERTAG_PROFILE;
+      return (deal.config?.music_pricing_enabled ?? deal.config?.cheaper_music) ? PLUS_PROFILE : MINIMUSIKERTAG_PROFILE;
     }
     if (deal.type === 'schus' || deal.type === 'schus_xl') {
       return SCHULSONG_ONLY_PROFILE;

@@ -711,8 +711,9 @@ export type CustomFees = Partial<{
   base: number;
   under_100_kids: number;
   distance_surcharge: number;
-  cheaper_music_small: number;   // ≤250 kids
-  cheaper_music_large: number;   // >250 kids
+  cheaper_music_small: number;   // LEGACY ≤250 kids
+  cheaper_music_large: number;   // LEGACY >250 kids
+  music_pricing: number;         // NEW — single flat amount
   over_250_kids: number;
   standard_song_discount: number;
   no_song_discount: number;
@@ -720,13 +721,19 @@ export type CustomFees = Partial<{
 }>;
 
 export interface DealConfig {
-  // #mimu options
-  cheaper_music?: boolean;
+  // #mimu toggles
+  pauschale_enabled?: boolean;
+  music_pricing_enabled?: boolean;          // replaces cheaper_music
   distance_surcharge?: boolean;
-  // #mimuSCS options
+  kleine_einrichtung_enabled?: boolean;     // undefined = auto from kids < 100
+  // #mimuSCS toggles
+  scs_pauschale_enabled?: boolean;
+  grosse_einrichtung_enabled?: boolean;     // undefined = auto from kids > 250
   scs_song_option?: 'schusXL' | 'schus' | 'none';
   scs_shirts_included?: boolean;
   scs_audio_pricing?: 'standard' | 'plus';
+  // Legacy
+  cheaper_music?: boolean;                  // kept for backward compat
   // Custom fee overrides (admin-editable)
   custom_fees?: CustomFees;
   // Calculated (stored for display/reporting)

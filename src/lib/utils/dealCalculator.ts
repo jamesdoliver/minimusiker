@@ -10,8 +10,9 @@ export const MIMU_DEFAULTS = {
   base: 0,
   under_100_kids: 600,
   distance_surcharge: 200,
-  cheaper_music_small: 1000,
-  cheaper_music_large: 2000,
+  music_pricing: 0,
+  cheaper_music_small: 1000,     // LEGACY
+  cheaper_music_large: 2000,     // LEGACY
 } as const;
 
 export const MIMU_SCS_DEFAULTS = {
@@ -26,6 +27,18 @@ export const MIMU_SCS_DEFAULTS = {
 function fee(cf: CustomFees | undefined, key: keyof CustomFees, defaultValue: number): number {
   const v = cf?.[key];
   return v !== undefined ? v : defaultValue;
+}
+
+/** Auto-toggle: kleine Einrichtung ON when kids < 100 (admin can override) */
+export function isKleineEinrichtungOn(config: DealConfig, estimatedChildren?: number): boolean {
+  if (config.kleine_einrichtung_enabled !== undefined) return config.kleine_einrichtung_enabled;
+  return (estimatedChildren ?? 0) < 100;
+}
+
+/** Auto-toggle: grosse Einrichtung ON when kids > 250 (admin can override) */
+export function isGrosseEinrichtungOn(config: DealConfig, estimatedChildren?: number): boolean {
+  if (config.grosse_einrichtung_enabled !== undefined) return config.grosse_einrichtung_enabled;
+  return (estimatedChildren ?? 0) > 250;
 }
 
 /**
@@ -48,16 +61,16 @@ export function calculateDealFee(
   const cf = config.custom_fees;
 
   if (dealType === 'mimu') {
-    const base = fee(cf, 'base', MIMU_DEFAULTS.base);
+    const base = config.pauschale_enabled !== false
+      ? fee(cf, 'base', MIMU_DEFAULTS.base)
+      : 0;
     const items: { label: string; amount: number }[] = [];
 
-    if (kids < 100) {
-      items.push({ label: 'Unter 100 Kinder', amount: fee(cf, 'under_100_kids', MIMU_DEFAULTS.under_100_kids) });
-    }
-    if (config.distance_surcharge) {
-      items.push({ label: 'Entfernungszuschlag', amount: fee(cf, 'distance_surcharge', MIMU_DEFAULTS.distance_surcharge) });
-    }
-    if (config.cheaper_music) {
+    // Plus-Preise für Musik
+    if (config.music_pricing_enabled === true) {
+      items.push({ label: 'Plus-Preise für Musik', amount: fee(cf, 'music_pricing', MIMU_DEFAULTS.music_pricing) });
+    } else if (config.music_pricing_enabled === undefined && config.cheaper_music === true) {
+      // Legacy fallback: old configs with cheaper_music
       const surcharge = kids > 250
         ? fee(cf, 'cheaper_music_large', MIMU_DEFAULTS.cheaper_music_large)
         : fee(cf, 'cheaper_music_small', MIMU_DEFAULTS.cheaper_music_small);
@@ -67,17 +80,24 @@ export function calculateDealFee(
       });
     }
 
+    if (config.distance_surcharge) {
+      items.push({ label: 'Entfernungspauschale', amount: fee(cf, 'distance_surcharge', MIMU_DEFAULTS.distance_surcharge) });
+    }
+
+    if (isKleineEinrichtungOn(config, estimatedChildren)) {
+      items.push({ label: 'kleine Einrichtung', amount: fee(cf, 'under_100_kids', MIMU_DEFAULTS.under_100_kids) });
+    }
+
     const total = base + items.reduce((sum, i) => sum + i.amount, 0);
     return { base, items, total };
   }
 
   if (dealType === 'mimu_scs') {
-    const base = fee(cf, 'base', MIMU_SCS_DEFAULTS.base);
+    const base = config.scs_pauschale_enabled !== false
+      ? fee(cf, 'base', MIMU_SCS_DEFAULTS.base)
+      : 0;
     const items: { label: string; amount: number }[] = [];
 
-    if (kids > 250) {
-      items.push({ label: 'Über 250 Kinder', amount: fee(cf, 'over_250_kids', MIMU_SCS_DEFAULTS.over_250_kids) });
-    }
     if (config.scs_song_option === 'schus') {
       items.push({ label: 'Standard-Schulsong', amount: fee(cf, 'standard_song_discount', MIMU_SCS_DEFAULTS.standard_song_discount) });
     } else if (config.scs_song_option === 'none') {
@@ -85,6 +105,9 @@ export function calculateDealFee(
     }
     if (config.scs_shirts_included === false) {
       items.push({ label: 'Keine T-Shirts', amount: fee(cf, 'no_shirts_discount', MIMU_SCS_DEFAULTS.no_shirts_discount) });
+    }
+    if (isGrosseEinrichtungOn(config, estimatedChildren)) {
+      items.push({ label: 'Grosse Einrichtung', amount: fee(cf, 'over_250_kids', MIMU_SCS_DEFAULTS.over_250_kids) });
     }
 
     const total = base + items.reduce((sum, i) => sum + i.amount, 0);
@@ -107,8 +130,8 @@ export function dealTypeToFlags(dealType: DealType, config: DealConfig): {
   switch (dealType) {
     case 'mimu':
       return {
-        is_minimusikertag: !config.cheaper_music,
-        is_plus: config.cheaper_music === true,
+        is_minimusikertag: !(config.music_pricing_enabled ?? config.cheaper_music),
+        is_plus: (config.music_pricing_enabled ?? config.cheaper_music) === true,
         is_kita: false,
         is_schulsong: true,
       };
