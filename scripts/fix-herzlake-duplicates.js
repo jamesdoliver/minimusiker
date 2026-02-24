@@ -17,36 +17,26 @@ const readline = require('readline');
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
 
 // Table IDs
-const EVENTS_TABLE = 'tblqsvSttKD81MF8v';
 const SONGS_TABLE = 'tblPjGWQlHuG8jp5X';
 const AUDIO_FILES_TABLE = 'tbloCM4tmH7mYoyXR';
 const CLASSES_TABLE = 'tblwydZ8INAemRJaC';
-const SCHOOL_BOOKINGS_TABLE = 'tblrktl5eLJEWE4M6';
 
 // Field IDs
-const EVENTS_FIELD_IDS = {
-  event_id: 'fldcNaHZyr6E5khDe',
-  school_name: 'fld5QcpEsDFrLun6w',
-  event_date: 'fld7pswBblm9jlOsS',
-  assigned_engineer: 'fldHK6sQA3jrU6O2H',
-  assigned_staff: 'fldKFG7lVsO1w9Td3',
-  simplybook_booking: 'fldK7vyxLd9MxgmES',
-  classes: 'fld08ht43r8rknIPI',
-  status: 'fld636QqQuc5Uwyec',
-};
-
-const SONGS_LINKED_FIELD_IDS = {
+const SONGS_FID = {
+  title: 'fldLjwkTwckDqT3Xl',
+  class_id: 'fldK4wCT5oKZDN6sE',
+  event_id: 'fldCKN3IXHPczIWfs',
   event_link: 'fldygKERszsLFRBaS',
 };
 
-const AUDIO_FILES_LINKED_FIELD_IDS = {
+const AUDIO_FID = {
+  event_id: 'fldwtYA1GwhVf3Ia7',
   event_link: 'fldTFdrvuzIWd9WbK',
 };
 
-const CLASSES_FIELD_IDS = {
+const CLASSES_FID = {
   class_id: 'fld4BTJZ9GJwHBpHX',
   class_name: 'fldBCX9GXfRB9rrth',
-  event_id: 'fldPfaqRjhg1LZNXh',
 };
 
 function ask(question) {
@@ -57,8 +47,8 @@ function ask(question) {
 async function main() {
   console.log('=== Herzlake Duplicate Event Diagnostic ===\n');
 
-  // Step 1: Find all events matching Herzlake / Nikolaus
-  const events = await base(EVENTS_TABLE).select({
+  // Step 1: Find all events matching Herzlake / Nikolaus (Events table uses field names)
+  const events = await base('Events').select({
     filterByFormula: `OR(SEARCH('Herzlake', {school_name}), SEARCH('Nikolaus', {school_name}))`,
   }).all();
 
@@ -73,34 +63,48 @@ async function main() {
   const eventData = [];
 
   for (const event of events) {
-    const eventId = event.get('event_id') || event.fields[EVENTS_FIELD_IDS.event_id];
-    const schoolName = event.get('school_name') || event.fields[EVENTS_FIELD_IDS.school_name];
-    const eventDate = event.get('event_date') || event.fields[EVENTS_FIELD_IDS.event_date];
-    const assignedEngineer = event.get('assigned_engineer') || event.fields[EVENTS_FIELD_IDS.assigned_engineer] || [];
-    const assignedStaff = event.get('assigned_staff') || event.fields[EVENTS_FIELD_IDS.assigned_staff] || [];
-    const linkedClasses = event.get('classes') || event.fields[EVENTS_FIELD_IDS.classes] || [];
-    const bookingLink = event.get('simplybook_booking') || event.fields[EVENTS_FIELD_IDS.simplybook_booking] || [];
-    const status = event.get('status') || event.fields[EVENTS_FIELD_IDS.status];
+    const eventId = event.get('event_id');
+    const schoolName = event.get('school_name');
+    const eventDate = event.get('event_date');
+    const assignedEngineer = event.get('assigned_engineer') || [];
+    const assignedStaff = event.get('assigned_staff') || [];
+    const linkedClasses = event.get('classes') || [];
+    const bookingLink = event.get('simplybook_booking') || [];
+    const status = event.get('status');
 
-    // Songs by text event_id field
+    // Songs by text event_id field (table ID requires field IDs + returnFieldsByFieldId)
     const songsByTextId = await base(SONGS_TABLE).select({
-      filterByFormula: `{event_id} = '${eventId}'`,
+      filterByFormula: `{${SONGS_FID.event_id}} = '${eventId}'`,
+      returnFieldsByFieldId: true,
     }).all();
 
     // Songs by linked event_link (Airtable record ID)
-    const songsByLink = await base(SONGS_TABLE).select({
-      filterByFormula: `{${SONGS_LINKED_FIELD_IDS.event_link}} = '${event.id}'`,
-    }).all();
+    let songsByLink = [];
+    try {
+      songsByLink = await base(SONGS_TABLE).select({
+        filterByFormula: `FIND('${event.id}', ARRAYJOIN({${SONGS_FID.event_link}}))`,
+        returnFieldsByFieldId: true,
+      }).all();
+    } catch (e) {
+      console.log(`  Note: Could not query songs by event_link (field may not exist yet)`);
+    }
 
     // Audio files by text event_id field
     const audioByTextId = await base(AUDIO_FILES_TABLE).select({
-      filterByFormula: `{event_id} = '${eventId}'`,
+      filterByFormula: `{${AUDIO_FID.event_id}} = '${eventId}'`,
+      returnFieldsByFieldId: true,
     }).all();
 
     // Audio files by linked event_link
-    const audioByLink = await base(AUDIO_FILES_TABLE).select({
-      filterByFormula: `{${AUDIO_FILES_LINKED_FIELD_IDS.event_link}} = '${event.id}'`,
-    }).all();
+    let audioByLink = [];
+    try {
+      audioByLink = await base(AUDIO_FILES_TABLE).select({
+        filterByFormula: `FIND('${event.id}', ARRAYJOIN({${AUDIO_FID.event_link}}))`,
+        returnFieldsByFieldId: true,
+      }).all();
+    } catch (e) {
+      console.log(`  Note: Could not query audio by event_link (field may not exist yet)`);
+    }
 
     // Classes by linked record
     const classes = [];
@@ -143,14 +147,14 @@ async function main() {
     console.log(`  Booking Link:     ${bookingLink.length > 0 ? bookingLink.join(', ') : 'None'}`);
     console.log(`  Classes (linked): ${classes.length}`);
     classes.forEach((c) => {
-      const cName = c.get('class_name') || c.fields[CLASSES_FIELD_IDS.class_name] || 'Unknown';
-      const cId = c.get('class_id') || c.fields[CLASSES_FIELD_IDS.class_id] || 'N/A';
+      const cName = c.fields[CLASSES_FID.class_name] || c.get('class_name') || 'Unknown';
+      const cId = c.fields[CLASSES_FID.class_id] || c.get('class_id') || 'N/A';
       console.log(`    - ${cName} (${cId})`);
     });
     console.log(`  Songs (text):     ${songsByTextId.length}`);
-    songsByTextId.forEach((s) => console.log(`    - ${s.get('title') || 'Untitled'} [class: ${s.get('class_id') || 'N/A'}]`));
+    songsByTextId.forEach((s) => console.log(`    - ${s.fields[SONGS_FID.title] || 'Untitled'} [class: ${s.fields[SONGS_FID.class_id] || 'N/A'}]`));
     console.log(`  Songs (link):     ${songsByLink.length}`);
-    songsByLink.forEach((s) => console.log(`    - ${s.get('title') || 'Untitled'} [class: ${s.get('class_id') || 'N/A'}]`));
+    songsByLink.forEach((s) => console.log(`    - ${s.fields[SONGS_FID.title] || 'Untitled'} [class: ${s.fields[SONGS_FID.class_id] || 'N/A'}]`));
     console.log(`  Audio (text):     ${audioByTextId.length}`);
     console.log(`  Audio (link):     ${audioByLink.length}`);
     console.log('');
@@ -205,14 +209,14 @@ async function main() {
       return;
     }
 
-    // Reassign songs
+    // Reassign songs (using field IDs for table ID access)
     const songIds = Array.from(songsToFix);
     for (let i = 0; i < songIds.length; i += 10) {
       const batch = songIds.slice(i, i + 10).map((id) => ({
         id,
         fields: {
-          event_id: canonical.eventId,
-          [SONGS_LINKED_FIELD_IDS.event_link]: [canonical.recordId],
+          [SONGS_FID.event_id]: canonical.eventId,
+          [SONGS_FID.event_link]: [canonical.recordId],
         },
       }));
       await base(SONGS_TABLE).update(batch);
@@ -225,21 +229,21 @@ async function main() {
       const batch = audioIds.slice(i, i + 10).map((id) => ({
         id,
         fields: {
-          event_id: canonical.eventId,
-          [AUDIO_FILES_LINKED_FIELD_IDS.event_link]: [canonical.recordId],
+          [AUDIO_FID.event_id]: canonical.eventId,
+          [AUDIO_FID.event_link]: [canonical.recordId],
         },
       }));
       await base(AUDIO_FILES_TABLE).update(batch);
       console.log(`  Updated ${batch.length} audio file(s)`);
     }
 
-    // Reassign classes
+    // Reassign classes (using field names since .find() returns field names)
     if (classesToFix.length > 0) {
       for (let i = 0; i < classesToFix.length; i += 10) {
         const batch = classesToFix.slice(i, i + 10).map((id) => ({
           id,
           fields: {
-            [CLASSES_FIELD_IDS.event_id]: [canonical.recordId],
+            [CLASSES_FID.class_id]: [canonical.recordId],
           },
         }));
         await base(CLASSES_TABLE).update(batch);
@@ -247,10 +251,10 @@ async function main() {
       }
     }
 
-    // Transfer engineer assignment if needed
+    // Transfer engineer assignment if needed (Events table uses field names)
     if (needsEngineer) {
-      await base(EVENTS_TABLE).update(canonical.recordId, {
-        [EVENTS_FIELD_IDS.assigned_engineer]: orphan.assignedEngineer,
+      await base('Events').update(canonical.recordId, {
+        assigned_engineer: orphan.assignedEngineer,
       });
       console.log(`  Transferred engineer assignment: ${orphan.assignedEngineer.join(', ')}`);
     }
@@ -258,7 +262,7 @@ async function main() {
     // Delete orphan event
     const deleteAnswer = await ask(`\nDelete orphan event record ${orphan.recordId}? (yes/no): `);
     if (deleteAnswer.toLowerCase() === 'yes') {
-      await base(EVENTS_TABLE).destroy(orphan.recordId);
+      await base('Events').destroy(orphan.recordId);
       console.log(`  Deleted orphan event: ${orphan.recordId}`);
     } else {
       console.log('  Orphan event NOT deleted.');
