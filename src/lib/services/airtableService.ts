@@ -4090,7 +4090,10 @@ class AirtableService {
 
   /**
    * Optimized: Get engineer event summaries with minimal Airtable calls.
-   * Instead of fetching ALL events and filtering, queries only events assigned to this engineer.
+   * Fetches all events and filters by engineer assignment in JS.
+   * Airtable formulas resolve linked records to display names (not record IDs),
+   * so formula-based filtering doesn't work for linked record ID matching.
+   * With ~77 events total, fetching all and filtering in JS is 1 API call.
    * ~3-5 API calls total (down from ~100).
    */
   async getEngineerEventSummaries(engineerId: string): Promise<{
@@ -4104,26 +4107,30 @@ class AirtableService {
     this.ensureNormalizedTablesInitialized();
 
     try {
-      // Single query: only events assigned to this engineer
+      // Fetch all events, filter by engineer in JS (linked record IDs can't be matched in formulas)
       const eventRecords = await this.base(EVENTS_TABLE_ID)
         .select({
-          filterByFormula: `SEARCH('${engineerId}', ARRAYJOIN({${EVENTS_FIELD_IDS.assigned_engineer}}, ','))`,
           returnFieldsByFieldId: true,
           sort: [{ field: EVENTS_FIELD_IDS.event_date, direction: 'desc' }],
         })
         .all();
 
-      return eventRecords.map((record) => {
-        const linkedClassIds = (record.fields[EVENTS_FIELD_IDS.classes] as string[]) || [];
-        return {
-          eventId: record.fields[EVENTS_FIELD_IDS.event_id] as string,
-          schoolName: record.fields[EVENTS_FIELD_IDS.school_name] as string,
-          eventDate: record.fields[EVENTS_FIELD_IDS.event_date] as string,
-          eventType: record.fields[EVENTS_FIELD_IDS.event_type] as string,
-          classCount: linkedClassIds.length,
-          assignedEngineerIds: (record.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[]) || [],
-        };
-      });
+      return eventRecords
+        .filter((record) => {
+          const assignedEngineers = (record.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[]) || [];
+          return assignedEngineers.includes(engineerId);
+        })
+        .map((record) => {
+          const linkedClassIds = (record.fields[EVENTS_FIELD_IDS.classes] as string[]) || [];
+          return {
+            eventId: record.fields[EVENTS_FIELD_IDS.event_id] as string,
+            schoolName: record.fields[EVENTS_FIELD_IDS.school_name] as string,
+            eventDate: record.fields[EVENTS_FIELD_IDS.event_date] as string,
+            eventType: record.fields[EVENTS_FIELD_IDS.event_type] as string,
+            classCount: linkedClassIds.length,
+            assignedEngineerIds: (record.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[]) || [],
+          };
+        });
     } catch (error) {
       console.error('Error fetching optimized engineer event summaries:', error);
       throw new Error(`Failed to fetch engineer events: ${error instanceof Error ? error.message : 'Unknown error'}`);
