@@ -190,6 +190,8 @@ export async function getEventsHittingThreshold(
 
     for (const event of events) {
       if (!event.event_date) continue;
+      // Skip cancelled or deleted events — no further communication
+      if (event.status === 'Cancelled' || event.status === 'Deleted') continue;
 
       // Compare dates (normalize to YYYY-MM-DD)
       const eventDateStr = event.event_date.split('T')[0];
@@ -766,6 +768,7 @@ export async function processSchulsongReleaseEmails(
   const eligible = allEvents.filter(
     (e) =>
       e.is_schulsong &&
+      e.status !== 'Cancelled' && e.status !== 'Deleted' &&
       e.admin_approval_status === 'approved' &&
       e.schulsong_released_at &&
       new Date(e.schulsong_released_at) <= now
