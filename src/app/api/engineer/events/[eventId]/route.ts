@@ -17,7 +17,11 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/engineer/events/[eventId]
- * Get event detail with classes and audio files for engineer
+ * Get event detail with classes and audio files for engineer.
+ *
+ * Optimized: Single event fetch (includes assignment check, is_schulsong, pipeline stage),
+ * batch class fetch, parallel songs + audio loading.
+ * ~5-7 Airtable calls total (down from ~21+).
  */
 export async function GET(
   request: NextRequest,
@@ -30,29 +34,32 @@ export async function GET(
     }
 
     const eventId = decodeURIComponent(params.eventId);
+    const teacherService = getTeacherService();
 
-    // Verify engineer is assigned to this event
-    const isAssigned = await getAirtableService().isEngineerAssignedToEvent(
-      session.engineerId,
-      eventId
+    // Single optimized fetch: event record + assignment check + class records (2-3 calls)
+    const result = await getAirtableService().getEngineerEventDetailOptimized(
+      eventId,
+      session.engineerId
     );
 
-    if (!isAssigned) {
+    if (!result) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+
+    if (!result.isAssigned) {
       return NextResponse.json(
         { error: 'You are not assigned to this event' },
         { status: 403 }
       );
     }
 
-    // Get event details
-    const eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
-    if (!eventDetail) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-    }
+    const { event } = result;
 
-    // Get audio files for this event
-    const teacherService = getTeacherService();
-    const allAudioFiles = await teacherService.getAudioFilesByEventId(eventId);
+    // Parallel fetch: songs + audio files (2 calls)
+    const [allSongs, allAudioFiles] = await Promise.all([
+      teacherService.getSongsByEventId(eventId),
+      teacherService.getAudioFilesByEventId(eventId),
+    ]);
 
     // Separate logic project files (event-level, visible to all engineers)
     // before applying role-based filtering to regular audio files
@@ -61,19 +68,15 @@ export async function GET(
     );
 
     // Filter audio files based on engineer role (Micha=schulsong, Jakob=regular)
-    // Only filter if engineer IDs are configured
     if (ENGINEER_IDS.MICHA && ENGINEER_IDS.JAKOB) {
       if (session.engineerId === ENGINEER_IDS.MICHA) {
-        // Micha only sees schulsong tracks
         audioFiles = audioFiles.filter(f => f.isSchulsong === true);
       } else if (session.engineerId === ENGINEER_IDS.JAKOB) {
-        // Jakob only sees non-schulsong (regular) tracks
         audioFiles = audioFiles.filter(f => !f.isSchulsong);
       }
-      // If engineer is neither Micha nor Jakob, show all files (admin/fallback case)
     }
 
-    // Generate signed URLs for regular audio files (logic projects excluded — they use separate download route)
+    // Generate signed URLs for regular audio files
     const r2Service = getR2Service();
     const audioFilesWithUrls: AudioFileWithUrl[] = await Promise.all(
       audioFiles.map(async (file) => {
@@ -92,16 +95,13 @@ export async function GET(
       })
     );
 
-    // Check if event has schulsong feature enabled
-    const isSchulsong = await getAirtableService().getEventIsSchulsong(eventId);
-
     // Auto-create schulsong class if event has schulsong enabled
     let schulsongClassView: EngineerClassView | undefined;
-    if (isSchulsong) {
+    if (event.isSchulsong) {
       const schulsongClass = await teacherService.ensureSchulsongClass({
         eventId,
-        schoolName: eventDetail.schoolName,
-        bookingDate: eventDetail.eventDate,
+        schoolName: event.schoolName,
+        bookingDate: event.eventDate,
       });
       if (schulsongClass) {
         const schulsongAudioFiles = audioFilesWithUrls.filter(
@@ -110,7 +110,7 @@ export async function GET(
         schulsongClassView = {
           classId: schulsongClass.classId,
           className: 'Schulsong',
-          songs: [],  // Schulsong has its own dedicated rendering block
+          songs: [],
           rawFiles: schulsongAudioFiles.filter((f) => f.type === 'raw'),
           previewFile: schulsongAudioFiles.find((f) => f.type === 'preview')
             || schulsongAudioFiles.find((f) => f.type === 'final' && f.previewR2Key),
@@ -124,13 +124,9 @@ export async function GET(
       }
     }
 
-    // Fetch songs for this event
-    const allSongs = await teacherService.getSongsByEventId(eventId);
-
     // Group audio files by class (excluding schulsong class from regular classes)
-    // Micha only handles schulsong — skip regular classes entirely for him
     const isMichaEngineer = ENGINEER_IDS.MICHA && session.engineerId === ENGINEER_IDS.MICHA;
-    const classesWithAudio: EngineerClassView[] = isMichaEngineer ? [] : eventDetail.classes
+    const classesWithAudio: EngineerClassView[] = isMichaEngineer ? [] : event.classes
       .filter((classDetail) => !schulsongClassView || classDetail.classId !== schulsongClassView.classId)
       .map((classDetail) => {
         const classAudioFiles = audioFilesWithUrls.filter(
@@ -175,7 +171,7 @@ export async function GET(
       mixingStatus = 'in-progress';
     }
 
-    // Schulsong-only override: if there are no regular classes, derive status from schulsong
+    // Schulsong-only override
     if (schulsongClassView && classesWithAudio.length === 0) {
       const hasSchulsongFinal = !!(schulsongClassView.finalMp3File || schulsongClassView.finalWavFile);
       if (hasSchulsongFinal) {
@@ -184,10 +180,6 @@ export async function GET(
         mixingStatus = 'in-progress';
       }
     }
-
-    // Fetch audio_pipeline_stage from the event record
-    const eventRecord = await getAirtableService().getEventByEventId(eventId);
-    const audioPipelineStage = eventRecord?.audio_pipeline_stage;
 
     // Extract logic project files from the unfiltered list (visible to all engineers)
     const logicProjects: LogicProjectInfo[] = allAudioFiles
@@ -200,15 +192,15 @@ export async function GET(
       }));
 
     const response: EngineerEventDetail = {
-      eventId: eventDetail.eventId,
-      schoolName: eventDetail.schoolName,
-      eventDate: eventDetail.eventDate,
-      eventType: eventDetail.eventType,
+      eventId: event.eventId,
+      schoolName: event.schoolName,
+      eventDate: event.eventDate,
+      eventType: event.eventType,
       classes: classesWithAudio,
       mixingStatus,
-      isSchulsong,
+      isSchulsong: event.isSchulsong,
       schulsongClass: schulsongClassView,
-      audioPipelineStage,
+      audioPipelineStage: event.audioPipelineStage as EngineerEventDetail['audioPipelineStage'],
       logicProjects: logicProjects.length > 0 ? logicProjects : undefined,
     };
 

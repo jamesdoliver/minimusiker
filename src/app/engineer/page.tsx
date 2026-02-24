@@ -1,15 +1,11 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { EngineerEventSummary, EngineerMixingStatus } from '@/lib/types/engineer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
-
-interface EngineerInfo {
-  email: string;
-  name: string;
-}
+import { useEngineerEvents } from '@/lib/hooks/useEngineerEvents';
 
 type StatusFilter = 'all' | 'pending' | 'in-progress' | 'completed';
 
@@ -51,43 +47,15 @@ function formatDate(dateStr: string): string {
 
 export default function EngineerPortal() {
   const router = useRouter();
-  const [events, setEvents] = useState<EngineerEventSummary[]>([]);
-  const [engineerInfo, setEngineerInfo] = useState<EngineerInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { events, isLoading, error, isUnauthorized } = useEngineerEvents();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    checkAuthAndFetchData();
-  }, []);
-
-  const checkAuthAndFetchData = async () => {
-    try {
-      const response = await fetch('/api/engineer/events');
-
-      if (response.status === 401) {
-        router.push('/engineer-login');
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch events');
-      }
-
-      const data = await response.json();
-      setEvents(data.events || []);
-
-      // Get engineer info from a separate endpoint or cookie
-      // For now we'll just use placeholder
-      setEngineerInfo({ email: '', name: 'Engineer' });
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-    } finally {
-      setIsLoading(false);
+    if (isUnauthorized) {
+      router.push('/engineer-login');
     }
-  };
+  }, [isUnauthorized, router]);
 
   const handleLogout = async () => {
     try {

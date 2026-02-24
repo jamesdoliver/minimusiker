@@ -4089,6 +4089,48 @@ class AirtableService {
   }
 
   /**
+   * Optimized: Get engineer event summaries with minimal Airtable calls.
+   * Instead of fetching ALL events and filtering, queries only events assigned to this engineer.
+   * ~3-5 API calls total (down from ~100).
+   */
+  async getEngineerEventSummaries(engineerId: string): Promise<{
+    eventId: string;
+    schoolName: string;
+    eventDate: string;
+    eventType: string;
+    classCount: number;
+    assignedEngineerIds: string[];
+  }[]> {
+    this.ensureNormalizedTablesInitialized();
+
+    try {
+      // Single query: only events assigned to this engineer
+      const eventRecords = await this.base(EVENTS_TABLE_ID)
+        .select({
+          filterByFormula: `SEARCH('${engineerId}', ARRAYJOIN({${EVENTS_FIELD_IDS.assigned_engineer}}, ','))`,
+          returnFieldsByFieldId: true,
+          sort: [{ field: EVENTS_FIELD_IDS.event_date, direction: 'desc' }],
+        })
+        .all();
+
+      return eventRecords.map((record) => {
+        const linkedClassIds = (record.fields[EVENTS_FIELD_IDS.classes] as string[]) || [];
+        return {
+          eventId: record.fields[EVENTS_FIELD_IDS.event_id] as string,
+          schoolName: record.fields[EVENTS_FIELD_IDS.school_name] as string,
+          eventDate: record.fields[EVENTS_FIELD_IDS.event_date] as string,
+          eventType: record.fields[EVENTS_FIELD_IDS.event_type] as string,
+          classCount: linkedClassIds.length,
+          assignedEngineerIds: (record.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[]) || [],
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching optimized engineer event summaries:', error);
+      throw new Error(`Failed to fetch engineer events: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Check if an engineer is assigned to a specific event
    */
   async isEngineerAssignedToEvent(engineerId: string, bookingId: string): Promise<boolean> {
@@ -4127,6 +4169,86 @@ class AirtableService {
         console.error('Error checking engineer assignment:', error);
         return false;
       }
+    }
+  }
+
+  /**
+   * Optimized: Get engineer event detail with minimal Airtable calls.
+   * Single event fetch, batch class fetch, returns all data needed for the detail page.
+   * Also returns assignment check and is_schulsong to avoid separate queries.
+   * ~3-4 API calls total (down from ~21+).
+   */
+  async getEngineerEventDetailOptimized(eventId: string, engineerId: string): Promise<{
+    isAssigned: boolean;
+    event: {
+      eventId: string;
+      schoolName: string;
+      eventDate: string;
+      eventType: string;
+      isSchulsong: boolean;
+      audioPipelineStage?: string;
+      classes: Array<{
+        classId: string;
+        className: string;
+        classType: string;
+      }>;
+    };
+  } | null> {
+    this.ensureNormalizedTablesInitialized();
+
+    try {
+      // Single event fetch — extracts assignment, is_schulsong, pipeline stage, and class IDs
+      const eventRecords = await this.base(EVENTS_TABLE_ID)
+        .select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+          returnFieldsByFieldId: true,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      if (eventRecords.length === 0) return null;
+
+      const record = eventRecords[0];
+      const assignedEngineers = (record.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[]) || [];
+      const isAssigned = assignedEngineers.includes(engineerId);
+
+      const linkedClassIds = (record.fields[EVENTS_FIELD_IDS.classes] as string[]) || [];
+
+      // Batch class fetch: single OR query for all class IDs
+      let classes: Array<{ classId: string; className: string; classType: string }> = [];
+      if (linkedClassIds.length > 0) {
+        const orClauses = linkedClassIds.map((id) => `RECORD_ID() = '${id}'`);
+        const classRecords = await this.base(CLASSES_TABLE_ID)
+          .select({
+            filterByFormula: linkedClassIds.length === 1 ? orClauses[0] : `OR(${orClauses.join(',')})`,
+            returnFieldsByFieldId: true,
+          })
+          .all();
+
+        classes = classRecords.map((cr) => ({
+          classId: cr.fields[CLASSES_FIELD_IDS.class_id] as string,
+          className: cr.fields[CLASSES_FIELD_IDS.class_name] as string,
+          classType: (cr.fields[CLASSES_FIELD_IDS.class_type] as string) || 'regular',
+        }));
+
+        classes.sort((a, b) => a.className.localeCompare(b.className));
+      }
+
+      return {
+        isAssigned,
+        event: {
+          eventId: record.fields[EVENTS_FIELD_IDS.event_id] as string,
+          schoolName: record.fields[EVENTS_FIELD_IDS.school_name] as string,
+          eventDate: record.fields[EVENTS_FIELD_IDS.event_date] as string,
+          eventType: record.fields[EVENTS_FIELD_IDS.event_type] as string,
+          isSchulsong: (record.fields[EVENTS_FIELD_IDS.is_schulsong] as boolean) || false,
+          audioPipelineStage: record.fields[EVENTS_FIELD_IDS.audio_pipeline_stage] as string | undefined,
+          classes,
+        },
+      };
+    } catch (error) {
+      console.error('Error fetching optimized engineer event detail:', error);
+      throw new Error(`Failed to fetch event detail: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -5119,7 +5241,7 @@ class AirtableService {
     this.ensureNormalizedTablesInitialized();
 
     try {
-      // Check if event already exists (idempotency)
+      // Check if event already exists by exact event_id (idempotency)
       const existingRecords = await this.base(EVENTS_TABLE_ID).select({
         filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = "${eventId}"`,
         maxRecords: 1,
@@ -5128,6 +5250,37 @@ class AirtableService {
       if (existingRecords.length > 0) {
         console.log(`Event ${eventId} already exists, returning existing record`);
         return this.transformEventRecord(existingRecords[0]);
+      }
+
+      // Broader duplicate check: same school_name + same event_date (±1 day)
+      // Prevents duplicates caused by re-processing webhooks or timezone edge cases
+      if (schoolName && eventDate) {
+        const normalizedName = schoolName.trim().replace(/\s+/g, ' ').toLowerCase();
+        const targetDate = new Date(eventDate);
+        const dayBefore = new Date(targetDate);
+        dayBefore.setDate(dayBefore.getDate() - 1);
+        const dayAfter = new Date(targetDate);
+        dayAfter.setDate(dayAfter.getDate() + 1);
+
+        const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+        const nearDuplicates = await this.base(EVENTS_TABLE_ID).select({
+          filterByFormula: `AND(
+            LOWER({${EVENTS_FIELD_IDS.school_name}}) = '${normalizedName.replace(/'/g, "\\'")}',
+            IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${formatDate(dayBefore)}'),
+            IS_BEFORE({${EVENTS_FIELD_IDS.event_date}}, '${formatDate(dayAfter)}')
+          )`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (nearDuplicates.length > 0) {
+          const existingEvent = this.transformEventRecord(nearDuplicates[0]);
+          console.warn(
+            `[createEventFromBooking] Potential duplicate: found existing event ${existingEvent.event_id} ` +
+            `for "${schoolName}" on ${eventDate}. Returning existing instead of creating new.`
+          );
+          return existingEvent;
+        }
       }
 
       // Create the Event record

@@ -604,44 +604,54 @@ class TeacherService {
    * Get songs for an event (all classes)
    */
   async getSongsByEventId(eventId: string): Promise<Song[]> {
-    if (this.useNormalizedTables()) {
-      this.ensureNormalizedTablesInitialized();
-      // Use text field (event_id) for querying - linked record queries don't work
-      // reliably in Airtable formulas. The text event_id is always set and indexed.
-      try {
-        const records = await this.base(SONGS_TABLE)
-          .select({
-            filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
-            sort: [
-              { field: 'class_id', direction: 'asc' },
-              { field: 'order', direction: 'asc' },
-            ],
-          })
-          .all();
+    try {
+      // Primary query: by text event_id field (fast, indexed)
+      const records = await this.base(SONGS_TABLE)
+        .select({
+          filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
+          sort: [
+            { field: 'class_id', direction: 'asc' },
+            { field: 'order', direction: 'asc' },
+          ],
+        })
+        .all();
 
+      if (records.length > 0) {
         return records.map((record) => this.transformSongRecord(record));
-      } catch (error) {
-        console.error('Error getting songs by event ID (normalized):', error);
-        return [];
       }
-    } else {
-      // LEGACY: Use text field (event_id)
-      try {
-        const records = await this.base(SONGS_TABLE)
-          .select({
-            filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
-            sort: [
-              { field: 'class_id', direction: 'asc' },
-              { field: 'order', direction: 'asc' },
-            ],
-          })
-          .all();
 
-        return records.map((record) => this.transformSongRecord(record));
-      } catch (error) {
-        console.error('Error getting songs by event ID:', error);
-        return [];
+      // Fallback: resolve eventId to Airtable record ID and query by linked event_link field.
+      // This handles the case where songs have the correct linked record but a different text event_id.
+      if (this.useNormalizedTables()) {
+        this.ensureNormalizedTablesInitialized();
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (eventRecords.length > 0) {
+          const eventRecordId = eventRecords[0].id;
+          const linkedRecords = await this.base(SONGS_TABLE)
+            .select({
+              filterByFormula: `{${SONGS_LINKED_FIELD_IDS.event_link}} = '${eventRecordId}'`,
+              sort: [
+                { field: 'class_id', direction: 'asc' },
+                { field: 'order', direction: 'asc' },
+              ],
+            })
+            .all();
+
+          if (linkedRecords.length > 0) {
+            console.warn(`[getSongsByEventId] Found ${linkedRecords.length} songs via event_link fallback for ${eventId}`);
+            return linkedRecords.map((record) => this.transformSongRecord(record));
+          }
+        }
       }
+
+      return [];
+    } catch (error) {
+      console.error('Error getting songs by event ID:', error);
+      return [];
     }
   }
 
@@ -689,13 +699,13 @@ class TeacherService {
         created_at: new Date().toISOString(),
       };
 
-      // If using normalized tables, also populate linked record fields
-      if (this.useNormalizedTables()) {
-        // Ensure tables are initialized
-        this.ensureNormalizedTablesInitialized();
+      // Always populate linked record fields (event_link, class_link) to prevent
+      // mismatches between text event_id and the linked record reference.
+      this.ensureNormalizedTablesInitialized();
 
+      if (this.eventsTable && this.classesTable) {
         // Find Classes record by class_id
-        const classRecords = await this.classesTable!.select({
+        const classRecords = await this.classesTable.select({
           filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${data.classId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
@@ -705,7 +715,7 @@ class TeacherService {
         }
 
         // Find Events record by event_id
-        const eventRecords = await this.eventsTable!.select({
+        const eventRecords = await this.eventsTable.select({
           filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${data.eventId.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
         }).firstPage();
@@ -906,6 +916,31 @@ class TeacherService {
         console.error('Error getting audio files by event ID:', error);
         return [];
       }
+    }
+  }
+
+  /**
+   * Batch get audio files for multiple event IDs in a single Airtable query.
+   * Uses OR formula to avoid N+1 queries.
+   */
+  async batchGetAudioFilesByEventIds(eventIds: string[]): Promise<AudioFile[]> {
+    if (eventIds.length === 0) return [];
+
+    try {
+      const orClauses = eventIds.map((id) => `{event_id} = '${id.replace(/'/g, "\\'")}'`);
+      const formula = eventIds.length === 1 ? orClauses[0] : `OR(${orClauses.join(',')})`;
+
+      const records = await this.base(AUDIO_FILES_TABLE)
+        .select({
+          filterByFormula: formula,
+          sort: [{ field: 'uploaded_at', direction: 'desc' }],
+        })
+        .all();
+
+      return records.map((record) => this.transformAudioFileRecord(record));
+    } catch (error) {
+      console.error('Error batch getting audio files:', error);
+      return [];
     }
   }
 

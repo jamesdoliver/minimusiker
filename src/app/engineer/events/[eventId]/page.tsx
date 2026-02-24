@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EngineerBatchUploadModal from '@/components/engineer/EngineerBatchUploadModal';
 import { useClientZipDownload, ZipDownloadFile } from '@/lib/hooks/useClientZipDownload';
 import ZipDownloadModal from '@/components/engineer/ZipDownloadModal';
+import { useEngineerEventDetail } from '@/lib/hooks/useEngineerEventDetail';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'No date';
@@ -40,9 +41,16 @@ export default function EngineerEventDetailPage() {
   const params = useParams();
   const eventId = decodeURIComponent(params.eventId as string);
 
-  const [event, setEvent] = useState<EngineerEventDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // SWR-powered data fetching with automatic caching and revalidation
+  const {
+    event,
+    isLoading,
+    isUnauthorized,
+    isForbidden,
+    error,
+    refresh: fetchEventDetail,
+  } = useEngineerEventDetail(eventId);
+
   const [uploadStates, setUploadStates] = useState<Record<string, SongUploadState>>({});
   const zipDownload = useClientZipDownload();
   const isDownloadingZip = zipDownload.state.status === 'downloading';
@@ -54,6 +62,20 @@ export default function EngineerEventDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [processingSongIds, setProcessingSongIds] = useState<Set<string>>(new Set());
   const [processedSongIds, setProcessedSongIds] = useState<Set<string>>(new Set());
+
+  // Handle auth redirects
+  useEffect(() => {
+    if (isUnauthorized) {
+      router.push('/engineer-login');
+    }
+  }, [isUnauthorized, router]);
+
+  // Clear optimistic UI markers when fresh data arrives from SWR
+  useEffect(() => {
+    if (event) {
+      setProcessedSongIds(new Set());
+    }
+  }, [event]);
 
   const handleToggleSchulsong = async (audioFileId: string, currentValue: boolean) => {
     setTogglingSchulsong(audioFileId);
@@ -71,7 +93,7 @@ export default function EngineerEventDetailPage() {
       );
 
       if (response.ok) {
-        await fetchEventDetail();
+        fetchEventDetail();
       } else {
         const errorData = await response.json();
         alert(errorData.error || 'Failed to toggle schulsong');
@@ -81,40 +103,6 @@ export default function EngineerEventDetailPage() {
       alert('Failed to toggle schulsong');
     } finally {
       setTogglingSchulsong(null);
-    }
-  };
-
-  useEffect(() => {
-    fetchEventDetail();
-  }, [eventId]);
-
-  const fetchEventDetail = async () => {
-    try {
-      const response = await fetch(`/api/engineer/events/${encodeURIComponent(eventId)}`);
-
-      if (response.status === 401) {
-        router.push('/engineer-login');
-        return;
-      }
-
-      if (response.status === 403) {
-        setError('You are not assigned to this event');
-        setIsLoading(false);
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch event details');
-      }
-
-      const data = await response.json();
-      setEvent(data.event);
-      setProcessedSongIds(new Set());
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load event');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -285,7 +273,7 @@ export default function EngineerEventDetailPage() {
       }));
 
       // Refresh event data
-      await fetchEventDetail();
+      fetchEventDetail();
     } catch (err) {
       console.error('Upload error:', err);
       setUploadStates((prev) => ({
@@ -330,7 +318,7 @@ export default function EngineerEventDetailPage() {
         return;
       }
       setDeletingFile(null);
-      await fetchEventDetail();
+      fetchEventDetail();
     } catch (err) {
       console.error('Delete error:', err);
       alert('Failed to delete file');
@@ -351,7 +339,7 @@ export default function EngineerEventDetailPage() {
         alert(data.error || 'Failed to submit finals');
         return;
       }
-      await fetchEventDetail();
+      fetchEventDetail();
     } catch (err) {
       console.error('Submit error:', err);
       alert('Failed to submit finals');
@@ -378,12 +366,12 @@ export default function EngineerEventDetailPage() {
     );
   }
 
-  if (error) {
+  if (error || isForbidden) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-4xl mx-auto">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-600">{isForbidden ? 'You are not assigned to this event' : error}</p>
           </div>
           <Link
             href="/engineer"
