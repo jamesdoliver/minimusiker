@@ -31,6 +31,7 @@ interface EditBookingRequest {
   event_date?: string;
   start_time?: string;
   end_time?: string;
+  estimated_children?: number;
   secondary_contacts?: SecondaryContact[];
 }
 
@@ -134,6 +135,9 @@ export async function PATCH(
       // Region is a linked record - pass as array
       updateFields[SCHOOL_BOOKINGS_FIELD_IDS.region] = body.region ? [body.region] : [];
     }
+    if (body.estimated_children !== undefined) {
+      updateFields[SCHOOL_BOOKINGS_FIELD_IDS.estimated_children] = body.estimated_children;
+    }
     // Store secondary contacts as JSON in long text field
     if (body.secondary_contacts !== undefined) {
       updateFields[SCHOOL_BOOKINGS_FIELD_IDS.secondary_contacts] = JSON.stringify(body.secondary_contacts);
@@ -165,6 +169,22 @@ export async function PATCH(
         await updateSchoolBookingById(bookingId, updateFields);
         airtableUpdated = true;
         console.log(`[EditBooking] Updated Airtable booking: ${bookingId}`);
+
+        // Sync estimated_children to the linked Event record
+        if (body.estimated_children !== undefined) {
+          try {
+            const linkedEvent = await airtableService.getEventByBookingRecordId(bookingId);
+            if (linkedEvent) {
+              await airtableService.updateEventFields(linkedEvent.id, {
+                estimated_children: body.estimated_children,
+                is_under_100: body.estimated_children < 100,
+              });
+              console.log(`[EditBooking] Synced estimated_children=${body.estimated_children} to Event ${linkedEvent.id}`);
+            }
+          } catch (eventErr) {
+            console.warn('[EditBooking] Failed to sync estimated_children to Event:', eventErr);
+          }
+        }
       }
     } catch (airtableError) {
       console.error('[EditBooking] Airtable update failed:', airtableError);

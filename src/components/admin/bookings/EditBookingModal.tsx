@@ -55,6 +55,11 @@ export default function EditBookingModal({
   const [startTime, setStartTime] = useState(booking.startTime || '');
   const [endTime, setEndTime] = useState(booking.endTime || '');
 
+  // Form state - Estimated Children
+  const [estimatedChildren, setEstimatedChildren] = useState<string>(
+    booking.numberOfChildren ? String(booking.numberOfChildren) : ''
+  );
+
   // Form state - Secondary Contacts
   const [secondaryContacts, setSecondaryContacts] = useState<SecondaryContact[]>(
     booking.secondaryContacts || []
@@ -84,6 +89,7 @@ export default function EditBookingModal({
       setEventDate(booking.bookingDate || '');
       setStartTime(booking.startTime || '');
       setEndTime(booking.endTime || '');
+      setEstimatedChildren(booking.numberOfChildren ? String(booking.numberOfChildren) : '');
       setSecondaryContacts(booking.secondaryContacts || []);
       setErrors({});
     }
@@ -187,6 +193,7 @@ export default function EditBookingModal({
           event_date: eventDate || undefined,
           start_time: startTime || undefined,
           end_time: endTime || undefined,
+          estimated_children: estimatedChildren !== '' ? parseInt(estimatedChildren, 10) : undefined,
           secondary_contacts: secondaryContacts.length > 0 ? secondaryContacts : undefined,
         }),
       });
@@ -310,6 +317,21 @@ export default function EditBookingModal({
                   onChange={(e) => setSchoolName(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Name der Schule / Einrichtung"
+                />
+              </div>
+
+              {/* Estimated Children */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Est. Kinder
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={estimatedChildren}
+                  onChange={(e) => setEstimatedChildren(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Anzahl Kinder"
                 />
               </div>
 
