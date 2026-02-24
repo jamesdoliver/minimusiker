@@ -5352,8 +5352,9 @@ class AirtableService {
 
           await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecordId, {
             [SCHOOL_BOOKINGS_FIELD_IDS.start_date]: newDate,
+            [SCHOOL_BOOKINGS_FIELD_IDS.end_date]: newDate,
           });
-          console.log(`Updated SchoolBooking ${bookingRecordId} start_date to: ${newDate}`);
+          console.log(`Updated SchoolBooking ${bookingRecordId} start_date and end_date to: ${newDate}`);
           bookingUpdated = true;
         } catch (bookingError) {
           console.error('Warning: Could not update linked SchoolBooking:', bookingError);

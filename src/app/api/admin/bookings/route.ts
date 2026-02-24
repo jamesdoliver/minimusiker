@@ -198,6 +198,8 @@ export async function GET(request: NextRequest) {
 
         return {
           ...baseBooking,
+          // Use Events table event_date as authoritative source (stays in sync with activity log)
+          bookingDate: event.event_date || baseBooking.bookingDate,
           accessCode: event.access_code,
           shortUrl: event.access_code ? `minimusiker.app/e/${event.access_code}` : undefined,
           eventStatus: event.status,
