@@ -58,12 +58,19 @@ export async function POST(
     const classesWithFinals = [...classIdsWithSongs].filter(cid => classIdsWithFinal.has(cid)).length;
 
     // Set stage to finals_submitted
-    await airtableService.updateEventAudioPipelineStage(eventId, 'finals_submitted');
+    let pipelineUpdated = false;
+    try {
+      await airtableService.updateEventAudioPipelineStage(eventId, 'finals_submitted');
+      pipelineUpdated = true;
+    } catch (pipelineError) {
+      console.error('Pipeline stage update failed:', pipelineError);
+    }
 
     return NextResponse.json({
       success: true,
       classesWithFinals,
       totalClasses,
+      pipelineUpdated,
     });
   } catch (error) {
     console.error('Error submitting for review:', error);

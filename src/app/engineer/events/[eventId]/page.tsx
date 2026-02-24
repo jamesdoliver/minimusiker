@@ -60,6 +60,7 @@ export default function EngineerEventDetailPage() {
   const [deletingFile, setDeletingFile] = useState<AudioFileWithUrl | null>(null);
   const [isDeletingFile, setIsDeletingFile] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [processingSongIds, setProcessingSongIds] = useState<Set<string>>(new Set());
   const [processedSongIds, setProcessedSongIds] = useState<Set<string>>(new Set());
 
@@ -339,10 +340,14 @@ export default function EngineerEventDetailPage() {
         alert(data.error || 'Failed to submit finals');
         return;
       }
+      if (!data.pipelineUpdated) {
+        alert('Finals recorded but pipeline status could not be updated. Please contact admin.');
+      }
+      setSubmissionSuccess(true);
       fetchEventDetail();
     } catch (err) {
       console.error('Submit error:', err);
-      alert('Failed to submit finals');
+      alert('Failed to submit finals. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -792,7 +797,7 @@ export default function EngineerEventDetailPage() {
       </main>
 
       {/* Sticky Submit Footer */}
-      {showFooter && (
+      {showFooter && !submissionSuccess && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
@@ -823,6 +828,18 @@ export default function EngineerEventDetailPage() {
                 'Submit Finals'
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Success Banner */}
+      {submissionSuccess && (
+        <div className="fixed bottom-0 left-0 right-0 bg-green-50 border-t border-green-200 shadow-lg z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-3">
+            <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <p className="text-green-800 font-medium text-sm">Finals submitted successfully!</p>
           </div>
         </div>
       )}

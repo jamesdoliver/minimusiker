@@ -3973,7 +3973,7 @@ class AirtableService {
       console.log(`[updateEventAudioPipelineStage] Updated event ${eventId}: stage=${stage}`);
     } catch (error) {
       console.error('[updateEventAudioPipelineStage] Error:', error);
-      // Don't throw - pipeline stage updates are non-critical
+      throw error;
     }
   }
 
