@@ -19,9 +19,10 @@ interface BookingDetailsBreakdownProps {
   booking: BookingWithDetails;
   onEventDeleted?: (bookingId: string) => void;
   onNotesUpdate?: (bookingId: string, notes: string) => void;
+  onRefresh?: () => void;
 }
 
-export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNotesUpdate }: BookingDetailsBreakdownProps) {
+export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNotesUpdate, onRefresh }: BookingDetailsBreakdownProps) {
   const [showPrintablesModal, setShowPrintablesModal] = useState(false);
   const [showOrdersModal, setShowOrdersModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -42,6 +43,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
   const [audioStatusLoading, setAudioStatusLoading] = useState(false);
   const [showAudioReviewModal, setShowAudioReviewModal] = useState(false);
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
 
   // Admin notes state
   const [notesText, setNotesText] = useState(booking.adminNotes || '');
@@ -173,6 +175,29 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
     setTimeout(() => setDiscountCopied(false), 2000);
   };
 
+  // Create event for bookings missing one
+  const handleCreateEvent = async () => {
+    setIsCreatingEvent(true);
+    try {
+      const response = await fetch(`/api/admin/bookings/${booking.id}/create-event`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success(data.alreadyExisted ? 'Event already exists' : 'Event created successfully');
+        onRefresh?.();
+      } else {
+        toast.error(data.error || 'Failed to create event');
+      }
+    } catch (error) {
+      console.error('Create event error:', error);
+      toast.error('Failed to create event');
+    } finally {
+      setIsCreatingEvent(false);
+    }
+  };
+
   // Refresh booking data from SimplyBook
   const handleRefresh = async (forceRefreshOverride?: boolean) => {
     const useForceRefresh = forceRefreshOverride ?? forceRefresh;
@@ -227,8 +252,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
       if (data.success) {
         setShowRefreshModal(false);
         setRefreshData(null);
-        // Refresh the page to show updated data
-        window.location.reload();
+        onRefresh?.();
       } else {
         alert(`Failed to apply updates: ${data.error}`);
       }
@@ -479,6 +503,30 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
 
       {/* Compact Actions Row */}
       <div className="mt-6 pt-4 border-t border-gray-200 flex flex-wrap items-center gap-1.5">
+        {!booking.eventRecordId && (
+          <button
+            onClick={handleCreateEvent}
+            disabled={isCreatingEvent}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors disabled:opacity-50"
+          >
+            {isCreatingEvent ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Creating...
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create Event
+              </>
+            )}
+          </button>
+        )}
         <button
           onClick={() => setIsDeleteModalOpen(true)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
@@ -605,8 +653,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
         onClose={() => setShowEditModal(false)}
         booking={booking}
         onSuccess={() => {
-          // Reload page to show updated data
-          window.location.reload();
+          onRefresh?.();
         }}
       />
 

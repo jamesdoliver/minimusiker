@@ -171,9 +171,15 @@ export default function CreateBookingModal({
         throw new Error(data.error || 'Failed to create booking');
       }
 
-      toast.success('Booking created successfully', {
-        description: `Code: ${data.bookingCode} | Discount: ${data.discountCode}`,
-      });
+      if (data.success && !data.eventCreated) {
+        toast.warning('Booking created but event setup failed. Use "Create Event" button to retry.', {
+          duration: 8000,
+        });
+      } else {
+        toast.success('Booking created successfully', {
+          description: `Code: ${data.bookingCode} | Discount: ${data.discountCode}`,
+        });
+      }
 
       onSuccess();
     } catch (error) {

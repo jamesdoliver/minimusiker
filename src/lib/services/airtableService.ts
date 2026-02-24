@@ -5716,6 +5716,59 @@ class AirtableService {
   }
 
   /**
+   * Download the entire Events table once and return a Map<bookingRecordId, Event>.
+   * Replaces N individual getEventBySchoolBookingId calls with a single table scan.
+   */
+  async getAllEventsIndexedByBookingId(): Promise<Map<string, Event>> {
+    const map = new Map<string, Event>();
+
+    try {
+      const allRecords: Airtable.Record<FieldSet>[] = [];
+
+      await this.base(EVENTS_TABLE_ID).select({
+        fields: [
+          EVENTS_FIELD_IDS.event_id,
+          EVENTS_FIELD_IDS.school_name,
+          EVENTS_FIELD_IDS.event_date,
+          EVENTS_FIELD_IDS.event_type,
+          EVENTS_FIELD_IDS.assigned_staff,
+          EVENTS_FIELD_IDS.assigned_engineer,
+          EVENTS_FIELD_IDS.created_at,
+          EVENTS_FIELD_IDS.legacy_booking_id,
+          EVENTS_FIELD_IDS.simplybook_booking,
+          EVENTS_FIELD_IDS.access_code,
+          EVENTS_FIELD_IDS.status,
+          EVENTS_FIELD_IDS.is_plus,
+          EVENTS_FIELD_IDS.is_kita,
+          EVENTS_FIELD_IDS.is_schulsong,
+          EVENTS_FIELD_IDS.is_minimusikertag,
+          EVENTS_FIELD_IDS.is_under_100,
+          EVENTS_FIELD_IDS.estimated_children,
+          EVENTS_FIELD_IDS.audio_pipeline_stage,
+          EVENTS_FIELD_IDS.admin_notes,
+        ],
+      }).eachPage((records, fetchNextPage) => {
+        allRecords.push(...records);
+        fetchNextPage();
+      });
+
+      for (const record of allRecords) {
+        const event = this.transformEventRecord(record);
+        const bookingIds = record.get('simplybook_booking') as string[] | undefined;
+        if (bookingIds) {
+          for (const bookingId of bookingIds) {
+            map.set(bookingId, event);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching all Events indexed by booking ID:', error);
+    }
+
+    return map;
+  }
+
+  /**
    * Get registration counts for multiple events in a single query
    * @param eventRecordIds Array of Event record IDs (not event_id strings)
    * @returns Map of event record ID to registration count

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import BookingsTable from '@/components/admin/bookings/BookingsTable';
 import CreateBookingModal from '@/components/admin/bookings/CreateBookingModal';
-import { BookingWithDetails, StaffOption, RegionOption } from '@/app/api/admin/bookings/route';
+import { BookingWithDetails } from '@/app/api/admin/bookings/route';
+import { useBookings } from '@/lib/hooks/useBookings';
 
 // Tier 1: Computed status (mutually exclusive)
 type ComputedStatus = 'confirmed' | 'completed' | 'onHold' | 'pending';
@@ -59,12 +60,7 @@ function getComputedStatus(booking: BookingWithDetails): ComputedStatus {
 }
 
 export default function AdminBookings() {
-  // Data state
-  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
-  const [staffList, setStaffList] = useState<StaffOption[]>([]);
-  const [regionList, setRegionList] = useState<RegionOption[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { bookings, staffList, regionList, isLoading, isValidating, error, mutate, refresh } = useBookings();
 
   // Tier 1: Status toggles (multi-select, OR logic)
   const [activeStatuses, setActiveStatuses] = useState<Set<ComputedStatus>>(new Set<ComputedStatus>(['confirmed']));
@@ -84,48 +80,39 @@ export default function AdminBookings() {
   // Create booking modal
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  useEffect(() => {
-    fetchBookings();
-  }, []);
-
-  const fetchBookings = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch('/api/admin/bookings', {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch bookings');
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
-        setBookings(data.data.bookings || []);
-        setStaffList(data.data.staffList || []);
-        setRegionList(data.data.regionList || []);
-      } else {
-        throw new Error(data.error || 'Failed to load bookings');
-      }
-    } catch (err) {
-      console.error('Error fetching bookings:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load bookings');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleEventDeleted = useCallback((bookingId: string) => {
-    setBookings(prev => prev.filter(b => b.id !== bookingId));
-  }, []);
+    mutate(
+      (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          data: {
+            ...current.data,
+            bookings: current.data.bookings.filter(b => b.id !== bookingId),
+          },
+        };
+      },
+      { revalidate: false }
+    );
+  }, [mutate]);
 
   const handleNotesUpdate = useCallback((bookingId: string, notes: string) => {
-    setBookings(prev => prev.map(b =>
-      b.id === bookingId ? { ...b, adminNotes: notes } : b
-    ));
-  }, []);
+    mutate(
+      (current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          data: {
+            ...current.data,
+            bookings: current.data.bookings.map(b =>
+              b.id === bookingId ? { ...b, adminNotes: notes } : b
+            ),
+          },
+        };
+      },
+      { revalidate: false }
+    );
+  }, [mutate]);
 
   // Toggle a status filter
   const toggleStatus = (status: ComputedStatus) => {
@@ -247,6 +234,11 @@ export default function AdminBookings() {
     return filtered;
   }, [bookings, activeStatuses, activeTypes, staffFilter, regionFilter, monthFilter, childrenFilter, searchQuery]);
 
+  // Count bookings without linked events
+  const missingEventCount = useMemo(() => {
+    return bookings.filter(b => !b.eventRecordId && b.status !== 'cancelled').length;
+  }, [bookings]);
+
   // Check if any filters are active (beyond status tab)
   const hasActiveFilters = activeTypes.size > 0 || staffFilter || regionFilter || monthFilter || childrenFilter || searchQuery;
 
@@ -263,7 +255,7 @@ export default function AdminBookings() {
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <p className="text-red-600">Error: {error}</p>
         <button
-          onClick={fetchBookings}
+          onClick={refresh}
           className="mt-2 text-sm text-red-700 underline hover:no-underline"
         >
           Try again
@@ -276,7 +268,12 @@ export default function AdminBookings() {
     <div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Bookings Overview</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-gray-900">Bookings Overview</h1>
+          {isValidating && !isLoading && (
+            <span className="text-xs text-gray-400 animate-pulse">Updating...</span>
+          )}
+        </div>
         <div className="flex gap-3">
           <button
             onClick={() => setShowCreateModal(true)}
@@ -288,7 +285,7 @@ export default function AdminBookings() {
             Create Booking
           </button>
           <button
-            onClick={fetchBookings}
+            onClick={refresh}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <svg
@@ -485,11 +482,23 @@ export default function AdminBookings() {
         </p>
       )}
 
+      {/* Warning banner for bookings without events */}
+      {missingEventCount > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 flex items-start gap-3">
+          <span className="text-yellow-600 text-lg flex-shrink-0">&#x26A0;</span>
+          <p className="text-sm text-yellow-800">
+            <strong>{missingEventCount} booking(s)</strong> have no linked event &mdash; parents cannot register.
+            Expand the booking and use &ldquo;Create Event&rdquo; to fix.
+          </p>
+        </div>
+      )}
+
       {/* Bookings Table */}
       <BookingsTable
         bookings={filteredBookings}
         onEventDeleted={handleEventDeleted}
         onNotesUpdate={handleNotesUpdate}
+        onRefresh={refresh}
         getComputedStatus={getComputedStatus}
       />
 
@@ -497,7 +506,7 @@ export default function AdminBookings() {
       <CreateBookingModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onSuccess={() => { setShowCreateModal(false); fetchBookings(); }}
+        onSuccess={() => { setShowCreateModal(false); mutate(); }}
         regions={regionList}
       />
     </div>

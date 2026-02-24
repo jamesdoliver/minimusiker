@@ -40,6 +40,7 @@ interface BookingsTableProps {
   bookings: BookingWithDetails[];
   onEventDeleted?: (bookingId: string) => void;
   onNotesUpdate?: (bookingId: string, notes: string) => void;
+  onRefresh?: () => void;
   getComputedStatus?: (booking: BookingWithDetails) => ComputedStatus;
 }
 
@@ -72,7 +73,7 @@ function formatDate(dateString: string): string {
   }
 }
 
-export default function BookingsTable({ bookings, onEventDeleted, onNotesUpdate, getComputedStatus }: BookingsTableProps) {
+export default function BookingsTable({ bookings, onEventDeleted, onNotesUpdate, onRefresh, getComputedStatus }: BookingsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const toggleRow = (bookingId: string) => {
@@ -146,8 +147,13 @@ export default function BookingsTable({ bookings, onEventDeleted, onNotesUpdate,
                       <ChevronIcon isOpen={isExpanded} />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
                         {booking.schoolName || 'Unknown School'}
+                        {!booking.eventRecordId && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded">
+                            No Event
+                          </span>
+                        )}
                       </div>
                       {booking.contactPerson && booking.schoolName === booking.contactPerson && (
                         <div className="text-xs text-amber-600">School name missing</div>
@@ -194,7 +200,7 @@ export default function BookingsTable({ bookings, onEventDeleted, onNotesUpdate,
                           className="overflow-hidden transition-all duration-300 ease-in-out"
                           style={{ maxHeight: isExpanded ? '1000px' : '0' }}
                         >
-                          <BookingDetailsBreakdown booking={booking} onEventDeleted={onEventDeleted} onNotesUpdate={onNotesUpdate} />
+                          <BookingDetailsBreakdown booking={booking} onEventDeleted={onEventDeleted} onNotesUpdate={onNotesUpdate} onRefresh={onRefresh} />
                         </div>
                       </td>
                     </tr>

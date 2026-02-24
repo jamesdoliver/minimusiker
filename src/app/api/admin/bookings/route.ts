@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import Airtable from 'airtable';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { SchoolBooking, SecondaryContact, TEAMS_REGIONEN_TABLE_ID, SCHOOL_BOOKINGS_TABLE_ID, SCHOOL_BOOKINGS_FIELD_IDS, EVENTS_TABLE_ID, EVENTS_FIELD_IDS } from '@/lib/types/airtable';
+import { SchoolBooking, SecondaryContact, Event, TEAMS_REGIONEN_TABLE_ID, SCHOOL_BOOKINGS_TABLE_ID, SCHOOL_BOOKINGS_FIELD_IDS, EVENTS_TABLE_ID, EVENTS_FIELD_IDS } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { getR2Service } from '@/lib/services/r2Service';
@@ -175,88 +175,47 @@ export async function GET(request: NextRequest) {
       airtableService.getAllRegions(),
     ]);
 
-    // Extract all region IDs and fetch names
+    // Extract all region IDs and fetch names + batch-fetch events in parallel
     const allRegionIds = airtableBookings
       .map(b => Array.isArray(b.region) ? b.region[0] : b.region)
       .filter((id): id is string => Boolean(id));
-    const regionMap = await fetchRegionNames(allRegionIds);
+
+    const [regionMap, eventsMap] = await Promise.all([
+      fetchRegionNames(allRegionIds),
+      airtableService.getAllEventsIndexedByBookingId(),
+    ]);
 
     // Build staff ID to name map for resolving assigned staff names
     const staffMap = new Map(staffList.map(s => [s.id, s.name]));
 
-    // Transform to API format and fetch/create Events with access codes and status fields
-    const bookingsWithAccessCodes: BookingWithDetails[] = await Promise.all(
-      airtableBookings.map(async (booking) => {
-        const baseBooking = transformToBookingWithDetails(booking, regionMap);
+    // Transform to API format, enriching with event data from the map
+    const bookingsWithAccessCodes: BookingWithDetails[] = airtableBookings.map((booking) => {
+      const baseBooking = transformToBookingWithDetails(booking, regionMap);
+      const event: Event | undefined = eventsMap.get(booking.id);
 
-        // Fetch the linked Event to get access_code and status fields
-        try {
-          let event = await airtableService.getEventBySchoolBookingId(booking.id);
+      if (event) {
+        const isKitaFromEventType = event.event_type === 'Minimusikertag Kita';
 
-          // If no Event exists, create one
-          if (!event) {
-            const schoolName = booking.schoolName || booking.schoolContactName || 'Unknown School';
-            const eventDate = booking.startDate || new Date().toISOString().split('T')[0];
-            const eventId = generateEventId(schoolName, 'MiniMusiker', eventDate);
+        return {
+          ...baseBooking,
+          accessCode: event.access_code,
+          shortUrl: event.access_code ? `minimusiker.app/e/${event.access_code}` : undefined,
+          eventStatus: event.status,
+          isPlus: event.is_plus,
+          isKita: event.is_kita || isKitaFromEventType,
+          isSchulsong: event.is_schulsong,
+          isMinimusikertag: event.is_minimusikertag === true,
+          eventType: event.event_type,
+          assignedStaff: event.assigned_staff,
+          assignedStaffNames: event.assigned_staff?.map(id => staffMap.get(id)).filter(Boolean) as string[],
+          eventRecordId: event.id,
+          audioPipelineStage: event.audio_pipeline_stage,
+          adminNotes: event.admin_notes,
+        };
+      }
 
-            console.log(`Creating Event for booking ${booking.id} (${schoolName})`);
-            event = await airtableService.createEventFromBooking(
-              eventId,
-              booking.id,
-              schoolName,
-              eventDate,
-              undefined,
-              'MiniMusiker',
-              undefined,
-              undefined,
-              booking.simplybookStatus === 'pending' ? 'Pending' : undefined,
-            );
-          }
-
-          // Sync: if booking is pending but Event has no status or a non-terminal status, set Pending
-          // Don't override Deleted or Cancelled — those are intentional admin actions
-          if (event && !event.status && booking.simplybookStatus === 'pending') {
-            try {
-              await airtableService.updateEventFields(event.id, { status: 'Pending' });
-              event.status = 'Pending';
-            } catch (e) {
-              console.error(`Failed to sync Pending status for event ${event.id}:`, e);
-            }
-          }
-
-          if (event) {
-            // Determine if this is a Kita event based on event_type or is_kita flag
-            const isKitaFromEventType = event.event_type === 'Minimusikertag Kita';
-
-            return {
-              ...baseBooking,
-              accessCode: event.access_code,
-              shortUrl: event.access_code ? `minimusiker.app/e/${event.access_code}` : undefined,
-              // Event status and type fields
-              eventStatus: event.status,
-              isPlus: event.is_plus,
-              isKita: event.is_kita || isKitaFromEventType, // Support legacy event_type
-              isSchulsong: event.is_schulsong,
-              isMinimusikertag: event.is_minimusikertag === true,
-              eventType: event.event_type,
-              // Staff assignment
-              assignedStaff: event.assigned_staff,
-              assignedStaffNames: event.assigned_staff?.map(id => staffMap.get(id)).filter(Boolean) as string[],
-              // Event record ID for registration lookup
-              eventRecordId: event.id,
-              // Audio pipeline
-              audioPipelineStage: event.audio_pipeline_stage,
-              // Admin notes
-              adminNotes: event.admin_notes,
-            };
-          }
-        } catch (error) {
-          console.warn(`Failed to fetch/create Event for booking ${booking.id}:`, error);
-        }
-
-        return baseBooking;
-      })
-    );
+      return baseBooking;
+    });
 
     // Collect event record IDs for registration count lookup
     const eventRecordIds = bookingsWithAccessCodes
@@ -405,6 +364,7 @@ export async function POST(request: NextRequest) {
     console.log(`Created manual SchoolBooking record: ${record.id} (code: ${bookingCode})`);
 
     // Post-creation chain: Event, R2 structure, default class
+    let eventCreated = false;
     try {
       const airtableService = getAirtableService();
       const r2Service = getR2Service();
@@ -431,6 +391,7 @@ export async function POST(request: NextRequest) {
         estimatedChildren || undefined // estimatedChildren → auto-sets is_under_100
       );
       console.log('Created Event record for manual booking:', eventRecord.id);
+      eventCreated = true;
 
       // Initialize R2 event folder structure
       const initResult = await r2Service.initializeEventStructure(eventId);
@@ -518,6 +479,7 @@ export async function POST(request: NextRequest) {
       bookingId: record.id,
       bookingCode,
       discountCode,
+      eventCreated,
     });
   } catch (error) {
     console.error('Error creating manual booking:', error);

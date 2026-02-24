@@ -2321,6 +2321,36 @@ class TeacherService {
   // =============================================================================
 
   /**
+   * Get registration count for an event using normalized tables or legacy fallback
+   */
+  private async getRegistrationCountForEvent(eventId: string): Promise<number> {
+    if (this.useNormalizedTables()) {
+      try {
+        const airtableService = getAirtableService();
+        const eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+        if (!eventRecordId) return 0;
+        const counts = await airtableService.getRegistrationCountsByEventIds([eventRecordId]);
+        return counts.get(eventRecordId) || 0;
+      } catch (err) {
+        console.warn('Could not get normalized registration count:', err);
+        return 0;
+      }
+    }
+    // Legacy fallback
+    try {
+      const records = await this.base(PARENT_JOURNEY_TABLE)
+        .select({
+          filterByFormula: `AND({${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
+        })
+        .all();
+      return records.length;
+    } catch (err) {
+      console.warn('Could not get legacy registration count:', err);
+      return 0;
+    }
+  }
+
+  /**
    * Get events for a teacher (by email)
    * Returns events where the teacher's email matches the school contact
    */
@@ -2329,25 +2359,28 @@ class TeacherService {
       // Get teacher's bookings from SchoolBookings table (source of truth)
       const schoolBookings = await getAirtableService().getBookingsForTeacher(teacherEmail);
 
-      // Also check parent_journey_table for legacy/test events not in SchoolBookings
-      const legacyRecords = await this.base(PARENT_JOURNEY_TABLE)
-        .select({
-          filterByFormula: `LOWER({${AIRTABLE_FIELD_IDS.parent_email}}) = LOWER('${teacherEmail.replace(/'/g, "\\'")}')`,
-        })
-        .all();
-
-      // Collect unique event IDs from legacy records
+      // Check parent_journey_table for legacy/test events not in SchoolBookings
+      // Only query when not using normalized tables (legacy fallback)
       const legacyEventIds = new Set<string>();
       const legacyEventData = new Map<string, { schoolName: string; eventDate: string; eventType: string }>();
-      for (const record of legacyRecords) {
-        const eventId = (record.fields.booking_id || record.fields[AIRTABLE_FIELD_IDS.booking_id]) as string;
-        if (eventId && !legacyEventIds.has(eventId)) {
-          legacyEventIds.add(eventId);
-          legacyEventData.set(eventId, {
-            schoolName: (record.fields.school_name || record.fields[AIRTABLE_FIELD_IDS.school_name] || '') as string,
-            eventDate: (record.fields.booking_date || record.fields[AIRTABLE_FIELD_IDS.booking_date] || '') as string,
-            eventType: (record.fields.event_type || record.fields[AIRTABLE_FIELD_IDS.event_type] || '') as string,
-          });
+
+      if (!this.useNormalizedTables()) {
+        const legacyRecords = await this.base(PARENT_JOURNEY_TABLE)
+          .select({
+            filterByFormula: `LOWER({${AIRTABLE_FIELD_IDS.parent_email}}) = LOWER('${teacherEmail.replace(/'/g, "\\'")}')`,
+          })
+          .all();
+
+        for (const record of legacyRecords) {
+          const eventId = (record.fields.booking_id || record.fields[AIRTABLE_FIELD_IDS.booking_id]) as string;
+          if (eventId && !legacyEventIds.has(eventId)) {
+            legacyEventIds.add(eventId);
+            legacyEventData.set(eventId, {
+              schoolName: (record.fields.school_name || record.fields[AIRTABLE_FIELD_IDS.school_name] || '') as string,
+              eventDate: (record.fields.booking_date || record.fields[AIRTABLE_FIELD_IDS.booking_date] || '') as string,
+              eventType: (record.fields.event_type || record.fields[AIRTABLE_FIELD_IDS.event_type] || '') as string,
+            });
+          }
         }
       }
 
@@ -2459,19 +2492,7 @@ class TeacherService {
         const classesCount = classViews.length;
         const songsCount = songs.length;
 
-        // Count registrations for this event from parent_journey_table
-        // (registrations with actual children, not class placeholders)
-        let registrationsCount = 0;
-        try {
-          const registrationRecords = await this.base(PARENT_JOURNEY_TABLE)
-            .select({
-              filterByFormula: `AND({${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
-            })
-            .all();
-          registrationsCount = registrationRecords.length;
-        } catch (err) {
-          console.warn('Could not get registration count:', err);
-        }
+        const registrationsCount = await this.getRegistrationCountForEvent(eventId);
 
         // Calculate total expected children (sum of total_children from all classes)
         const totalChildrenExpected = classViews.reduce(
@@ -2593,17 +2614,7 @@ class TeacherService {
         const classesCount = classViews.length;
         const songsCount = songs.length;
 
-        let registrationsCount = 0;
-        try {
-          const registrationRecords = await this.base(PARENT_JOURNEY_TABLE)
-            .select({
-              filterByFormula: `AND({${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
-            })
-            .all();
-          registrationsCount = registrationRecords.length;
-        } catch (err) {
-          console.warn('Could not get registration count:', err);
-        }
+        const registrationsCount = await this.getRegistrationCountForEvent(eventId);
 
         const totalChildrenExpected = classViews.reduce((sum, cls) => sum + (cls.numChildren || 0), 0);
         const msPerDay = 24 * 60 * 60 * 1000;
@@ -2716,17 +2727,7 @@ class TeacherService {
         const classesCount = classViews.length;
         const songsCount = songs.length;
 
-        let registrationsCount = 0;
-        try {
-          const registrationRecords = await this.base(PARENT_JOURNEY_TABLE)
-            .select({
-              filterByFormula: `AND({${AIRTABLE_FIELD_IDS.booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
-            })
-            .all();
-          registrationsCount = registrationRecords.length;
-        } catch (err) {
-          console.warn('Could not get registration count:', err);
-        }
+        const registrationsCount = await this.getRegistrationCountForEvent(eventId);
 
         const totalChildrenExpected = classViews.reduce((sum, cls) => sum + (cls.numChildren || 0), 0);
         const msPerDay = 24 * 60 * 60 * 1000;
@@ -3062,19 +3063,21 @@ class TeacherService {
   async getRegistrationsForClass(classRecordId: string, classId: string): Promise<Array<{ id: string; table: 'legacy' | 'normalized' }>> {
     const results: Array<{ id: string; table: 'legacy' | 'normalized' }> = [];
 
-    // Check legacy parent_journey_table using class_id string
-    try {
-      const legacyRecords = await this.base(PARENT_JOURNEY_TABLE)
-        .select({
-          filterByFormula: `AND({${AIRTABLE_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
-        })
-        .all();
+    // Check legacy parent_journey_table using class_id string (only when not using normalized tables)
+    if (!this.useNormalizedTables()) {
+      try {
+        const legacyRecords = await this.base(PARENT_JOURNEY_TABLE)
+          .select({
+            filterByFormula: `AND({${AIRTABLE_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}', {${AIRTABLE_FIELD_IDS.registered_child}} != '')`,
+          })
+          .all();
 
-      for (const r of legacyRecords) {
-        results.push({ id: r.id, table: 'legacy' });
+        for (const r of legacyRecords) {
+          results.push({ id: r.id, table: 'legacy' });
+        }
+      } catch (error) {
+        console.error('Error fetching legacy registrations:', error);
       }
-    } catch (error) {
-      console.error('Error fetching legacy registrations:', error);
     }
 
     // Check normalized Registrations table using linked record
