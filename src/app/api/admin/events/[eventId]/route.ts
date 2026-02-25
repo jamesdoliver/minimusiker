@@ -8,6 +8,7 @@ import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { simplybookService } from '@/lib/services/simplybookService';
 import { dealTypeToFlags } from '@/lib/utils/dealCalculator';
+import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import {
   triggerDateChangeNotification,
   triggerCancellationNotification,
@@ -320,6 +321,26 @@ export async function PATCH(
         const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
         if (eventRecord) {
           eventRecordId = eventRecord.id;
+        } else {
+          // Auto-create Event for bookings missing one (e.g., pending bookings where creation failed)
+          const schoolName = booking.schoolName || booking.schoolContactName || 'Unknown';
+          const eventDate = booking.startDate || new Date().toISOString().split('T')[0];
+          const isPending = !booking.startDate;
+          const newEventId = generateEventId(schoolName, 'MiniMusiker', booking.startDate || undefined);
+          const newEvent = await airtableService.createEventFromBooking(
+            newEventId,
+            booking.id,
+            schoolName,
+            eventDate,
+            undefined,
+            'MiniMusiker',
+            booking.schoolAddress || undefined,
+            booking.schoolPhone || undefined,
+            isPending ? 'Pending' : undefined,
+            booking.estimatedChildren || undefined
+          );
+          eventRecordId = newEvent.id;
+          console.log(`[PATCH events] Auto-created Event ${newEvent.id} for booking ${eventId}`);
         }
       }
     }
