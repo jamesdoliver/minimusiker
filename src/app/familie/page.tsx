@@ -20,6 +20,7 @@ import { CartDrawer } from '@/components/shop';
 import { ManageChildren } from '@/components/parent';
 import { ParentSession } from '@/lib/types';
 import { ShopProfile, MINIMUSIKERTAG_PROFILE, resolveShopProfile } from '@/lib/config/shopProfiles';
+import { parseOverrides } from '@/lib/utils/eventThresholds';
 
 // Audio access response from /api/parent/audio-access
 interface AudioAccessResponse {
@@ -198,11 +199,26 @@ function ParentPortalContent() {
         );
         if (response.ok) {
           const data = await response.json();
-          setShopProfile(resolveShopProfile({
+          const resolved = resolveShopProfile({
             isMinimusikertag: data.isMinimusikertag,
             isPlus: data.isPlus,
             isSchulsong: data.isSchulsong,
-          }));
+          });
+
+          // Filter out hidden products from the profile
+          const overridesData = data.timelineOverrides ? parseOverrides(data.timelineOverrides) : null;
+          const hiddenProducts = overridesData?.hidden_products || [];
+          if (hiddenProducts.length > 0) {
+            setShopProfile({
+              ...resolved,
+              audioProducts: resolved.audioProducts.filter((p) => !hiddenProducts.includes(p.id)),
+              personalizedClothingProducts: resolved.personalizedClothingProducts.filter((p) => !hiddenProducts.includes(p.id)),
+              standardClothingProducts: resolved.standardClothingProducts.filter((p) => !hiddenProducts.includes(p.id)),
+            });
+          } else {
+            setShopProfile(resolved);
+          }
+
           if (data.timelineOverrides) {
             setTimelineOverrides(data.timelineOverrides);
           }

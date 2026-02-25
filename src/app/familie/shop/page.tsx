@@ -154,7 +154,27 @@ function ShopContent() {
       ? getThreshold('schulsong_clothing_cutoff_days', overrides)
       : getThreshold('personalized_clothing_cutoff_days', overrides);
     const showPersonalized = canOrderPersonalizedClothing(eventDate, cutoffDays);
-    return buildExcludedVariantIds(shopProfile.shopifyVariantMap, showPersonalized);
+    const excluded = buildExcludedVariantIds(shopProfile.shopifyVariantMap, showPersonalized);
+
+    // Also exclude variants for hidden products
+    const hiddenProducts = overrides?.hidden_products || [];
+    if (hiddenProducts.length > 0) {
+      for (const productId of hiddenProducts) {
+        // Direct audio product variant (e.g., 'minicard', 'bluetooth-box')
+        const directVariant = shopProfile.shopifyVariantMap[productId];
+        if (directVariant) {
+          excluded.add(directVariant);
+        }
+        // Clothing variants follow the pattern '{productId}-{standard|personalized}-{size}'
+        for (const [key, gid] of Object.entries(shopProfile.shopifyVariantMap)) {
+          if (key.startsWith(`${productId}-`)) {
+            excluded.add(gid);
+          }
+        }
+      }
+    }
+
+    return excluded;
   }, [shopProfile, eventDate, overrides]);
 
   if (isVerifying || isProfileLoading) {

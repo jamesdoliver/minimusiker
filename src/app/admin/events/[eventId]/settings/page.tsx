@@ -15,6 +15,7 @@ import {
 } from '@/lib/utils/eventThresholds';
 import { EVENT_MILESTONES, Milestone, getMilestoneLabel } from '@/lib/utils/eventTimeline';
 import { getAllTemplates } from '@/lib/config/taskTemplates';
+import { resolveShopProfile, ShopProfile, ClothingProduct } from '@/lib/config/shopProfiles';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -111,6 +112,7 @@ export default function EventSettingsPage() {
   const [overrides, setOverrides] = useState<EventTimelineOverrides>({});
   const [savedOverrides, setSavedOverrides] = useState<EventTimelineOverrides>({});
   const [isSchulsongOnly, setIsSchulsongOnly] = useState(false);
+  const [shopProfile, setShopProfile] = useState<ShopProfile | null>(null);
 
   // Load event data
   useEffect(() => {
@@ -138,8 +140,17 @@ export default function EventSettingsPage() {
             }
           }
           // Determine effective tier: schulsong-only when is_schulsong=true but not plus/minimusikertag
-          const { is_schulsong, is_plus, is_minimusikertag } = eventRecordResult;
+          const { is_schulsong, is_plus, is_minimusikertag, deal_builder_enabled, deal_type, deal_config } = eventRecordResult;
           setIsSchulsongOnly(is_schulsong && !is_plus && !is_minimusikertag);
+
+          // Resolve shop profile for product visibility toggles
+          const parsedDealConfig = deal_config
+            ? (typeof deal_config === 'string' ? JSON.parse(deal_config) : deal_config)
+            : undefined;
+          setShopProfile(resolveShopProfile(
+            { isMinimusikertag: is_minimusikertag, isPlus: is_plus, isSchulsong: is_schulsong },
+            { enabled: deal_builder_enabled, type: deal_type, config: parsedDealConfig }
+          ));
         }
       } catch (err) {
         console.error('Error loading event:', err);
@@ -204,19 +215,71 @@ export default function EventSettingsPage() {
     });
   };
 
-  // Reset all fields
+  // Reset all fields (thresholds only — preserves non-threshold keys)
   const resetAll = () => {
-    setOverrides({});
+    // Preserve non-threshold keys when resetting
+    const preserved: EventTimelineOverrides = {};
+    for (const [key, value] of Object.entries(overrides)) {
+      if (!(key in GLOBAL_DEFAULTS)) {
+        (preserved as Record<string, unknown>)[key] = value;
+      }
+    }
+    setOverrides(preserved);
+  };
+
+  // Toggle product visibility
+  const toggleProductVisibility = (productId: string) => {
+    setOverrides((prev) => {
+      const hiddenProducts = prev.hidden_products || [];
+      const isCurrentlyHidden = hiddenProducts.includes(productId);
+      return {
+        ...prev,
+        hidden_products: isCurrentlyHidden
+          ? hiddenProducts.filter((id) => id !== productId)
+          : [...hiddenProducts, productId],
+      };
+    });
+  };
+
+  // Reset all product visibility to visible
+  const resetAllProducts = () => {
+    setOverrides((prev) => {
+      const next = { ...prev };
+      delete next.hidden_products;
+      return next;
+    });
+  };
+
+  // Deduplicate clothing products (personalized and standard may share IDs)
+  const getUniqueClothingProducts = (profile: ShopProfile): ClothingProduct[] => {
+    const seen = new Set<string>();
+    const unique: ClothingProduct[] = [];
+    for (const p of [...profile.personalizedClothingProducts, ...profile.standardClothingProducts]) {
+      if (!seen.has(p.id)) {
+        seen.add(p.id);
+        unique.push(p);
+      }
+    }
+    return unique;
   };
 
   // Save overrides
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Clean up overrides: remove keys that match global defaults
+      // Clean up overrides: remove threshold keys that match global defaults,
+      // but always preserve non-threshold keys (audio_hidden, hidden_products, etc.)
       const cleanOverrides: EventTimelineOverrides = {};
       for (const [key, value] of Object.entries(overrides)) {
-        if (key in GLOBAL_DEFAULTS && value !== GLOBAL_DEFAULTS[key as ThresholdKey]) {
+        if (key in GLOBAL_DEFAULTS) {
+          // Threshold key — only keep if different from default
+          if (value !== GLOBAL_DEFAULTS[key as ThresholdKey]) {
+            (cleanOverrides as Record<string, unknown>)[key] = value;
+          }
+        } else {
+          // Non-threshold key (audio_hidden, hidden_products, etc.) — always preserve
+          // Skip empty arrays (e.g. hidden_products: []) to avoid clutter
+          if (Array.isArray(value) && value.length === 0) continue;
           (cleanOverrides as Record<string, unknown>)[key] = value;
         }
       }
@@ -321,7 +384,53 @@ export default function EventSettingsPage() {
           ))}
         </SettingsSection>
 
-        {/* Section 3: Task Timeline (Read-only, Phase 2) */}
+        {/* Section 3: Product Visibility Toggles */}
+        {shopProfile && (
+          <SettingsSection title="Produktsichtbarkeit" description="Einzelne Produkte im Elternportal-Shop ein- oder ausblenden">
+            {shopProfile.audioProducts.length > 0 && (
+              <div>
+                <div className="px-6 py-3 bg-gray-50 border-b">
+                  <h3 className="text-sm font-semibold text-gray-700">Audio-Produkte</h3>
+                </div>
+                {shopProfile.audioProducts.map((product) => (
+                  <ProductToggle
+                    key={product.id}
+                    name={product.name}
+                    price={product.price}
+                    isVisible={!(overrides.hidden_products || []).includes(product.id)}
+                    onToggle={() => toggleProductVisibility(product.id)}
+                  />
+                ))}
+              </div>
+            )}
+            <div>
+              <div className="px-6 py-3 bg-gray-50 border-b">
+                <h3 className="text-sm font-semibold text-gray-700">Kleidung</h3>
+              </div>
+              {getUniqueClothingProducts(shopProfile).map((product) => (
+                <ProductToggle
+                  key={product.id}
+                  name={product.name}
+                  price={product.price}
+                  isVisible={!(overrides.hidden_products || []).includes(product.id)}
+                  onToggle={() => toggleProductVisibility(product.id)}
+                />
+              ))}
+            </div>
+            {(overrides.hidden_products?.length ?? 0) > 0 && (
+              <div className="px-6 py-3 border-t">
+                <button
+                  onClick={resetAllProducts}
+                  className="text-sm text-[#5a8a82] hover:text-[#4a7a72] font-medium"
+                >
+                  Alle Produkte wieder einblenden
+                </button>
+              </div>
+            )}
+          </SettingsSection>
+        )}
+
+        {/* Section 4: Task Timeline (Read-only, Phase 2) */}
         <SettingsSection title="Aufgaben-Zeitplan" description="Zeitliche Planung der Event-Aufgaben (Phase 2 - bald konfigurierbar)" locked>
           {getAllTemplates().map((template) => (
             <ReadOnlyField
@@ -336,7 +445,7 @@ export default function EventSettingsPage() {
           ))}
         </SettingsSection>
 
-        {/* Section 4: Milestones (Read-only, Phase 2) */}
+        {/* Section 5: Milestones (Read-only, Phase 2) */}
         <SettingsSection title="Meilensteine" description="Event-Lifecycle-Meilensteine (Phase 2 - bald konfigurierbar)" locked>
           {(Object.keys(EVENT_MILESTONES) as Milestone[]).map((milestone) => (
             <ReadOnlyField
@@ -481,6 +590,43 @@ function ThresholdField({
           = {computeDate(eventDate, field, value)}
         </p>
       )}
+    </div>
+  );
+}
+
+function ProductToggle({
+  name,
+  price,
+  isVisible,
+  onToggle,
+}: {
+  name: string;
+  price: number;
+  isVisible: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="px-6 py-3 flex items-center justify-between gap-4">
+      <div className="flex-1 min-w-0">
+        <span className="text-sm font-medium text-gray-900">{name}</span>
+        <span className="ml-2 text-xs text-gray-500">{price.toFixed(2)} &euro;</span>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={isVisible}
+        onClick={onToggle}
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#5a8a82] focus:ring-offset-2 ${
+          isVisible ? 'bg-[#5a8a82]' : 'bg-gray-200'
+        }`}
+      >
+        <span className="sr-only">{name} {isVisible ? 'sichtbar' : 'ausgeblendet'}</span>
+        <span
+          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+            isVisible ? 'translate-x-5' : 'translate-x-0'
+          }`}
+        />
+      </button>
     </div>
   );
 }

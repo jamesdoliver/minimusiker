@@ -48,5 +48,8 @@ export async function GET(
     is_schulsong: event.is_schulsong ?? false,
     is_plus: event.is_plus ?? false,
     is_minimusikertag: event.is_minimusikertag ?? false,
+    deal_builder_enabled: event.deal_builder_enabled ?? false,
+    deal_type: event.deal_type || null,
+    deal_config: event.deal_config || null,
   });
 }

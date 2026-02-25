@@ -265,6 +265,15 @@ export async function PATCH(
             }
             continue;
           }
+          if (key === 'hidden_products') {
+            if (!Array.isArray(value) || !value.every((v: unknown) => typeof v === 'string')) {
+              return NextResponse.json(
+                { success: false, error: `Invalid value for ${key}: must be an array of strings` },
+                { status: 400 }
+              );
+            }
+            continue;
+          }
           if (typeof value !== 'number' || !isFinite(value as number) || Math.abs(value as number) > 365) {
             return NextResponse.json(
               { success: false, error: `Invalid value for ${key}: must be a finite number between -365 and 365` },
