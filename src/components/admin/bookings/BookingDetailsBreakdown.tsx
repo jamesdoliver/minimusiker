@@ -44,7 +44,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
   const [showAudioReviewModal, setShowAudioReviewModal] = useState(false);
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
-  const [dealExpanded, setDealExpanded] = useState(false);
+  const [dealExpanded, setDealExpanded] = useState(true);
 
   // Admin notes state
   const [notesText, setNotesText] = useState(booking.adminNotes || '');
@@ -295,8 +295,8 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
   const hasDeal = booking.dealBuilderEnabled && booking.dealConfig?.fee_breakdown;
   const feeBreakdown = booking.dealConfig?.fee_breakdown;
 
-  const formatEuro = (cents: number) =>
-    (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+  const formatEuro = (amount: number) =>
+    new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
 
   const dealTypeLabel = (type?: string) => {
     switch (type) {
