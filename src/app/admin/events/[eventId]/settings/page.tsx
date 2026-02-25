@@ -9,6 +9,7 @@ import {
   parseOverrides,
   getThreshold,
   getMilestoneOffset,
+  getDefaultHiddenProducts,
   GLOBAL_DEFAULTS,
   EventTimelineOverrides,
   ThresholdKey,
@@ -113,6 +114,8 @@ export default function EventSettingsPage() {
   const [savedOverrides, setSavedOverrides] = useState<EventTimelineOverrides>({});
   const [isSchulsongOnly, setIsSchulsongOnly] = useState(false);
   const [shopProfile, setShopProfile] = useState<ShopProfile | null>(null);
+  // Tracks whether the admin has explicitly configured hidden_products for this event
+  const [hasExplicitProductConfig, setHasExplicitProductConfig] = useState(false);
 
   // Load event data
   useEffect(() => {
@@ -135,9 +138,24 @@ export default function EventSettingsPage() {
           if (eventRecordResult.timeline_overrides) {
             const parsed = parseOverrides(eventRecordResult.timeline_overrides);
             if (parsed) {
+              // Track whether admin has explicitly configured product visibility
+              const explicitlyConfigured = 'hidden_products' in parsed;
+              setHasExplicitProductConfig(explicitlyConfigured);
+
+              // If not explicitly configured, pre-populate with date-based defaults
+              // so the admin sees the correct current state in the toggles
+              if (!explicitlyConfigured) {
+                parsed.hidden_products = getDefaultHiddenProducts();
+              }
+
               setOverrides(parsed);
               setSavedOverrides(parsed);
             }
+          } else {
+            // No overrides at all — pre-populate with date-based defaults
+            const defaults: EventTimelineOverrides = { hidden_products: getDefaultHiddenProducts() };
+            setOverrides(defaults);
+            setSavedOverrides(defaults);
           }
           // Determine effective tier: schulsong-only when is_schulsong=true but not plus/minimusikertag
           const { is_schulsong, is_plus, is_minimusikertag, deal_builder_enabled, deal_type, deal_config } = eventRecordResult;
@@ -229,6 +247,7 @@ export default function EventSettingsPage() {
 
   // Toggle product visibility
   const toggleProductVisibility = (productId: string) => {
+    setHasExplicitProductConfig(true);
     setOverrides((prev) => {
       const hiddenProducts = prev.hidden_products || [];
       const isCurrentlyHidden = hiddenProducts.includes(productId);
@@ -241,13 +260,13 @@ export default function EventSettingsPage() {
     });
   };
 
-  // Reset all product visibility to visible
+  // Reset all product visibility to visible (explicit override — saves [] to persist "show all")
   const resetAllProducts = () => {
-    setOverrides((prev) => {
-      const next = { ...prev };
-      delete next.hidden_products;
-      return next;
-    });
+    setHasExplicitProductConfig(true);
+    setOverrides((prev) => ({
+      ...prev,
+      hidden_products: [],
+    }));
   };
 
   // Deduplicate clothing products (personalized and standard may share IDs)
@@ -278,8 +297,14 @@ export default function EventSettingsPage() {
           }
         } else {
           // Non-threshold key (audio_hidden, hidden_products, etc.) — always preserve
-          // Skip empty arrays (e.g. hidden_products: []) to avoid clutter
-          if (Array.isArray(value) && value.length === 0) continue;
+          // For hidden_products: keep [] only if admin explicitly configured it
+          // ([] means "show all" vs undefined means "use date-based defaults")
+          if (key === 'hidden_products' && Array.isArray(value) && value.length === 0) {
+            if (hasExplicitProductConfig) {
+              (cleanOverrides as Record<string, unknown>)[key] = value;
+            }
+            continue;
+          }
           (cleanOverrides as Record<string, unknown>)[key] = value;
         }
       }

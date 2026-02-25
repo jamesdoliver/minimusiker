@@ -11,7 +11,7 @@ import CartDrawer from '@/components/shop/CartDrawer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { resolveShopProfile } from '@/lib/config/shopProfiles';
 import { canOrderPersonalizedClothing } from '@/lib/utils/eventTimeline';
-import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
+import { parseOverrides, getThreshold, getEffectiveHiddenProducts } from '@/lib/utils/eventThresholds';
 
 // Child type from session
 interface SessionChild {
@@ -156,8 +156,8 @@ function ShopContent() {
     const showPersonalized = canOrderPersonalizedClothing(eventDate, cutoffDays);
     const excluded = buildExcludedVariantIds(shopProfile.shopifyVariantMap, showPersonalized);
 
-    // Also exclude variants for hidden products
-    const hiddenProducts = overrides?.hidden_products || [];
+    // Also exclude variants for hidden products (uses date-based defaults if not explicitly configured)
+    const hiddenProducts = getEffectiveHiddenProducts(overrides);
     if (hiddenProducts.length > 0) {
       for (const productId of hiddenProducts) {
         // Direct audio product variant (e.g., 'minicard', 'bluetooth-box')

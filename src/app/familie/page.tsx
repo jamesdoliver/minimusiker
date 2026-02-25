@@ -20,7 +20,7 @@ import { CartDrawer } from '@/components/shop';
 import { ManageChildren } from '@/components/parent';
 import { ParentSession } from '@/lib/types';
 import { ShopProfile, MINIMUSIKERTAG_PROFILE, resolveShopProfile } from '@/lib/config/shopProfiles';
-import { parseOverrides } from '@/lib/utils/eventThresholds';
+import { parseOverrides, getEffectiveHiddenProducts } from '@/lib/utils/eventThresholds';
 
 // Audio access response from /api/parent/audio-access
 interface AudioAccessResponse {
@@ -205,9 +205,9 @@ function ParentPortalContent() {
             isSchulsong: data.isSchulsong,
           });
 
-          // Filter out hidden products from the profile
+          // Filter out hidden products from the profile (uses date-based defaults if not explicitly configured)
           const overridesData = data.timelineOverrides ? parseOverrides(data.timelineOverrides) : null;
-          const hiddenProducts = overridesData?.hidden_products || [];
+          const hiddenProducts = getEffectiveHiddenProducts(overridesData);
           if (hiddenProducts.length > 0) {
             setShopProfile({
               ...resolved,
