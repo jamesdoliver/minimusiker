@@ -41,24 +41,61 @@ export function isGrosseEinrichtungOn(config: DealConfig, estimatedChildren?: nu
   return (estimatedChildren ?? 0) > 250;
 }
 
+/** Append gratis items and custom fees (shared across all deal types) */
+function appendSharedItems(items: { label: string; amount: number }[], config: DealConfig): void {
+  const cf = config.custom_fees;
+
+  // Gratis T-Shirts
+  if (config.gratis_tshirts_enabled) {
+    const amount = fee(cf, 'gratis_tshirts', 0);
+    if (amount !== 0) {
+      const qty = config.gratis_tshirts_quantity ?? 0;
+      items.push({ label: `Gratis T-Shirts (x${qty})`, amount });
+    }
+  }
+
+  // Gratis Minicards
+  if (config.gratis_minicards_enabled) {
+    const amount = fee(cf, 'gratis_minicards', 0);
+    if (amount !== 0) {
+      const qty = config.gratis_minicards_quantity ?? 0;
+      items.push({ label: `Gratis Minicards (x${qty})`, amount });
+    }
+  }
+
+  // Additional custom fees
+  if (config.additional_fees) {
+    for (const f of config.additional_fees) {
+      if (f.title || f.amount !== 0) {
+        items.push({ label: f.title || 'Custom Fee', amount: f.amount });
+      }
+    }
+  }
+}
+
 /**
  * Calculate the school-facing fee for a deal.
  *
  * #mimu: starts at €0, surcharges added
  * #mimuSCS: starts at €9,500, surcharges/opt-outs applied
- * #schus / #schusXL: no fee tracking
+ * #schus / #schusXL: returns breakdown only when gratis/custom fees exist
  */
 export function calculateDealFee(
   dealType: DealType,
   config: DealConfig,
   estimatedChildren?: number
 ): FeeBreakdown | null {
-  if (dealType === 'schus' || dealType === 'schus_xl') {
-    return null; // No fee tracking
-  }
-
   const kids = estimatedChildren ?? 0;
   const cf = config.custom_fees;
+
+  if (dealType === 'schus' || dealType === 'schus_xl') {
+    // Show breakdown only if there are gratis or custom fee items
+    const items: { label: string; amount: number }[] = [];
+    appendSharedItems(items, config);
+    if (items.length === 0) return null;
+    const total = items.reduce((sum, i) => sum + i.amount, 0);
+    return { base: 0, items, total };
+  }
 
   if (dealType === 'mimu') {
     const base = config.pauschale_enabled !== false
@@ -88,6 +125,8 @@ export function calculateDealFee(
       items.push({ label: 'kleine Einrichtung', amount: fee(cf, 'under_100_kids', MIMU_DEFAULTS.under_100_kids) });
     }
 
+    appendSharedItems(items, config);
+
     const total = base + items.reduce((sum, i) => sum + i.amount, 0);
     return { base, items, total };
   }
@@ -109,6 +148,8 @@ export function calculateDealFee(
     if (isGrosseEinrichtungOn(config, estimatedChildren)) {
       items.push({ label: 'Grosse Einrichtung', amount: fee(cf, 'over_250_kids', MIMU_SCS_DEFAULTS.over_250_kids) });
     }
+
+    appendSharedItems(items, config);
 
     const total = base + items.reduce((sum, i) => sum + i.amount, 0);
     return { base, items, total };

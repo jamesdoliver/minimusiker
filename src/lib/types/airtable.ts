@@ -718,6 +718,8 @@ export type CustomFees = Partial<{
   standard_song_discount: number;
   no_song_discount: number;
   no_shirts_discount: number;
+  gratis_tshirts: number;        // Gratis T-Shirts fee amount (default 0)
+  gratis_minicards: number;      // Gratis Minicards fee amount (default 0)
 }>;
 
 export interface DealConfig {
@@ -736,6 +738,13 @@ export interface DealConfig {
   cheaper_music?: boolean;                  // kept for backward compat
   // Custom fee overrides (admin-editable)
   custom_fees?: CustomFees;
+  // Gratis items (all deal types)
+  gratis_tshirts_enabled?: boolean;
+  gratis_tshirts_quantity?: number;
+  gratis_minicards_enabled?: boolean;
+  gratis_minicards_quantity?: number;
+  // Custom fees (all deal types)
+  additional_fees?: { title: string; amount: number }[];
   // Calculated (stored for display/reporting)
   calculated_fee?: number;
   fee_breakdown?: {

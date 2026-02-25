@@ -159,6 +159,148 @@ function DealRow({
   );
 }
 
+function GratisDealRow({
+  label,
+  enabled,
+  onToggle,
+  feeKey,
+  customFees,
+  onFeeChange,
+  quantity,
+  onQuantityChange,
+  disabled,
+}: {
+  label: string;
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
+  feeKey: keyof CustomFees;
+  customFees?: CustomFees;
+  onFeeChange: (key: keyof CustomFees, value: number | undefined) => void;
+  quantity: number;
+  onQuantityChange: (qty: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+        <div className="relative flex-shrink-0">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => onToggle(e.target.checked)}
+            disabled={disabled}
+            className="sr-only peer"
+          />
+          <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-green-500 peer-disabled:opacity-50 transition-colors" />
+          <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+        </div>
+        <span className="text-sm text-gray-800 font-medium">{label}</span>
+      </label>
+      <FeeInput
+        feeKey={feeKey}
+        defaultValue={0}
+        customFees={customFees}
+        onChange={onFeeChange}
+        disabled={disabled}
+      />
+      <span className="inline-flex items-center gap-1">
+        <span className="text-xs text-gray-400">Anz:</span>
+        <input
+          type="number"
+          min="0"
+          value={quantity || ''}
+          placeholder="0"
+          onChange={(e) => {
+            const v = parseInt(e.target.value);
+            onQuantityChange(isNaN(v) ? 0 : v);
+          }}
+          disabled={disabled}
+          className="w-16 text-xs px-1.5 py-0.5 rounded border border-gray-200 bg-white text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-400"
+        />
+      </span>
+    </div>
+  );
+}
+
+function CustomFeesSection({
+  fees,
+  onChange,
+  disabled,
+}: {
+  fees: { title: string; amount: number }[];
+  onChange: (fees: { title: string; amount: number }[]) => void;
+  disabled?: boolean;
+}) {
+  function updateFee(index: number, field: 'title' | 'amount', value: string | number) {
+    const next = [...fees];
+    if (field === 'title') {
+      next[index] = { ...next[index], title: value as string };
+    } else {
+      next[index] = { ...next[index], amount: value as number };
+    }
+    onChange(next);
+  }
+
+  function removeFee(index: number) {
+    onChange(fees.filter((_, i) => i !== index));
+  }
+
+  function addFee() {
+    onChange([...fees, { title: '', amount: 0 }]);
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Custom Fees</h4>
+      {fees.map((f, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            type="text"
+            value={f.title}
+            placeholder="Fee title"
+            onChange={(e) => updateFee(i, 'title', e.target.value)}
+            disabled={disabled}
+            className="flex-1 text-sm px-2 py-1 rounded border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+          <span className="inline-flex items-center gap-1">
+            <span className="text-xs text-gray-400">+€</span>
+            <input
+              type="number"
+              step="50"
+              value={f.amount === 0 ? '0' : f.amount || ''}
+              onChange={(e) => {
+                const raw = e.target.value;
+                updateFee(i, 'amount', raw === '' ? 0 : parseFloat(raw) || 0);
+              }}
+              disabled={disabled}
+              className="w-20 text-xs px-1.5 py-0.5 rounded border border-gray-200 bg-white text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-400"
+            />
+          </span>
+          <button
+            type="button"
+            onClick={() => removeFee(i)}
+            disabled={disabled}
+            className="text-gray-400 hover:text-red-500 p-0.5"
+            title="Remove fee"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addFee}
+        disabled={disabled}
+        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+      >
+        + Add Custom Fee
+      </button>
+    </div>
+  );
+}
+
 export default function DealBuilder({
   enabled,
   dealType,
@@ -198,24 +340,33 @@ export default function DealBuilder({
 
   function handleTypeChange(type: DealType) {
     setLocalType(type);
-    // Reset config for the new type with sensible defaults
+    // Preserve gratis and custom fee state across type changes
+    const preserved = {
+      gratis_tshirts_enabled: localConfig.gratis_tshirts_enabled,
+      gratis_tshirts_quantity: localConfig.gratis_tshirts_quantity,
+      gratis_minicards_enabled: localConfig.gratis_minicards_enabled,
+      gratis_minicards_quantity: localConfig.gratis_minicards_quantity,
+      additional_fees: localConfig.additional_fees,
+      custom_fees: localConfig.custom_fees,
+    };
+    // Reset deal-type-specific config with sensible defaults
     if (type === 'mimu') {
       setLocalConfig({
+        ...preserved,
         pauschale_enabled: true,
         music_pricing_enabled: false,
         distance_surcharge: false,
-        // kleine_einrichtung_enabled: undefined → auto from estimatedChildren
       });
     } else if (type === 'mimu_scs') {
       setLocalConfig({
+        ...preserved,
         scs_pauschale_enabled: true,
         scs_song_option: 'schusXL',
         scs_shirts_included: true,
         scs_audio_pricing: 'standard',
-        // grosse_einrichtung_enabled: undefined → auto from estimatedChildren
       });
     } else {
-      setLocalConfig({});
+      setLocalConfig({ ...preserved });
     }
     setIsDirty(true);
   }
@@ -453,6 +604,44 @@ export default function DealBuilder({
                   : 'Schulsong XL (individual song) — clothing shop only, no audio products, no fee tracking.'}
               </p>
             </div>
+          )}
+
+          {/* Gratis Items (all deal types) */}
+          {localType && (
+            <div className="bg-gray-50 rounded-lg p-3 space-y-3">
+              <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Gratis Items</h4>
+              <GratisDealRow
+                label="Gratis T-Shirts"
+                enabled={localConfig.gratis_tshirts_enabled || false}
+                onToggle={(v) => updateConfig({ gratis_tshirts_enabled: v })}
+                feeKey="gratis_tshirts"
+                customFees={localConfig.custom_fees}
+                onFeeChange={handleFeeChange}
+                quantity={localConfig.gratis_tshirts_quantity ?? 0}
+                onQuantityChange={(qty) => updateConfig({ gratis_tshirts_quantity: qty })}
+                disabled={isUpdating}
+              />
+              <GratisDealRow
+                label="Gratis Minicards"
+                enabled={localConfig.gratis_minicards_enabled || false}
+                onToggle={(v) => updateConfig({ gratis_minicards_enabled: v })}
+                feeKey="gratis_minicards"
+                customFees={localConfig.custom_fees}
+                onFeeChange={handleFeeChange}
+                quantity={localConfig.gratis_minicards_quantity ?? 0}
+                onQuantityChange={(qty) => updateConfig({ gratis_minicards_quantity: qty })}
+                disabled={isUpdating}
+              />
+            </div>
+          )}
+
+          {/* Custom Fees (all deal types) */}
+          {localType && (
+            <CustomFeesSection
+              fees={localConfig.additional_fees ?? []}
+              onChange={(fees) => updateConfig({ additional_fees: fees.length > 0 ? fees : undefined })}
+              disabled={isUpdating}
+            />
           )}
 
           {/* Fee Summary */}
