@@ -44,6 +44,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
   const [showAudioReviewModal, setShowAudioReviewModal] = useState(false);
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+  const [dealExpanded, setDealExpanded] = useState(false);
 
   // Admin notes state
   const [notesText, setNotesText] = useState(booking.adminNotes || '');
@@ -290,6 +291,33 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
     }
   };
 
+  // Deal summary helpers
+  const hasDeal = booking.dealBuilderEnabled && booking.dealConfig?.fee_breakdown;
+  const feeBreakdown = booking.dealConfig?.fee_breakdown;
+
+  const formatEuro = (cents: number) =>
+    (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+
+  const dealTypeLabel = (type?: string) => {
+    switch (type) {
+      case 'mimu': return 'mimu';
+      case 'mimu_scs': return 'mimuSCS';
+      case 'schus': return 'schus';
+      case 'schus_xl': return 'schusXL';
+      default: return type || 'deal';
+    }
+  };
+
+  const dealTypeBadgeStyle = (type?: string) => {
+    switch (type) {
+      case 'mimu': return 'bg-blue-100 text-blue-800';
+      case 'mimu_scs': return 'bg-purple-100 text-purple-800';
+      case 'schus': return 'bg-green-100 text-green-800';
+      case 'schus_xl': return 'bg-amber-100 text-amber-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   return (
     <div className="bg-gray-50 px-8 py-6 border-t border-gray-200">
       {/* 3-Column Layout: Information | Notes | Activity Log */}
@@ -410,8 +438,62 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
           </div>
         </div>
 
-        {/* Notes Column */}
+        {/* Center Column: Deal Summary + Notes */}
         <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
+
+          {/* Deal Summary — only when deal is configured */}
+          {hasDeal && feeBreakdown && (
+            <div className="mb-3">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">Deal Summary</h4>
+              <div className="bg-white rounded-lg border border-gray-200 p-3">
+                <button
+                  onClick={() => setDealExpanded(!dealExpanded)}
+                  className="w-full flex justify-between items-center text-left"
+                >
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${dealTypeBadgeStyle(booking.dealType)}`}>
+                    #{dealTypeLabel(booking.dealType)}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-900">
+                      {formatEuro(feeBreakdown.total)}
+                    </span>
+                    <svg
+                      className={`w-4 h-4 text-gray-400 transition-transform ${dealExpanded ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+
+                {dealExpanded && (
+                  <div className="mt-2 pt-2 border-t border-gray-100 space-y-1 text-sm">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Grundgebühr</span>
+                      <span>{formatEuro(feeBreakdown.base)}</span>
+                    </div>
+                    {feeBreakdown.items.map((item, i) => (
+                      <div key={i} className="flex justify-between text-gray-600">
+                        <span>+ {item.label}</span>
+                        <span>{formatEuro(item.amount)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between font-medium text-gray-900 border-t border-gray-100 pt-1">
+                      <span>Gesamt</span>
+                      <span>{formatEuro(feeBreakdown.total)}</span>
+                    </div>
+                    <div className="text-right text-xs text-gray-400">
+                      ({formatEuro(Math.round(feeBreakdown.total / 1.19))} netto)
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
           <h4 className="text-sm font-semibold text-gray-700 mb-3">Notes</h4>
           <div className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col flex-1">
             <textarea

@@ -5907,6 +5907,9 @@ class AirtableService {
           EVENTS_FIELD_IDS.estimated_children,
           EVENTS_FIELD_IDS.audio_pipeline_stage,
           EVENTS_FIELD_IDS.admin_notes,
+          EVENTS_FIELD_IDS.deal_builder_enabled,
+          EVENTS_FIELD_IDS.deal_type,
+          EVENTS_FIELD_IDS.deal_config,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);

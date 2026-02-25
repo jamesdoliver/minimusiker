@@ -58,6 +58,22 @@ export interface BookingWithDetails {
   // Class and song counts
   classCount?: number;
   songCount?: number;
+  // Deal configuration (from linked Event)
+  dealBuilderEnabled?: boolean;
+  dealType?: 'mimu' | 'mimu_scs' | 'schus' | 'schus_xl';
+  dealConfig?: {
+    fee_breakdown?: {
+      base: number;
+      items: { label: string; amount: number }[];
+      total: number;
+    };
+    calculated_fee?: number;
+    gratis_tshirts_enabled?: boolean;
+    gratis_tshirts_quantity?: number;
+    gratis_minicards_enabled?: boolean;
+    gratis_minicards_quantity?: number;
+    additional_fees?: { title: string; amount: number }[];
+  };
 }
 
 // Staff member for dropdown
@@ -213,6 +229,17 @@ export async function GET(request: NextRequest) {
           eventRecordId: event.id,
           audioPipelineStage: event.audio_pipeline_stage,
           adminNotes: event.admin_notes,
+          dealBuilderEnabled: event.deal_builder_enabled,
+          dealType: event.deal_type,
+          dealConfig: event.deal_config ? {
+            fee_breakdown: event.deal_config.fee_breakdown,
+            calculated_fee: event.deal_config.calculated_fee,
+            gratis_tshirts_enabled: event.deal_config.gratis_tshirts_enabled,
+            gratis_tshirts_quantity: event.deal_config.gratis_tshirts_quantity,
+            gratis_minicards_enabled: event.deal_config.gratis_minicards_enabled,
+            gratis_minicards_quantity: event.deal_config.gratis_minicards_quantity,
+            additional_fees: event.deal_config.additional_fees,
+          } : undefined,
         };
       }
 
