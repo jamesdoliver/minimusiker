@@ -484,9 +484,6 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
                       <span>Gesamt</span>
                       <span>{formatEuro(feeBreakdown.total)}</span>
                     </div>
-                    <div className="text-right text-xs text-gray-400">
-                      ({formatEuro(Math.round(feeBreakdown.total / 1.19))} netto)
-                    </div>
                   </div>
                 )}
               </div>

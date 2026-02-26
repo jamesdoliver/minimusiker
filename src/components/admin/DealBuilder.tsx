@@ -661,12 +661,7 @@ export default function DealBuilder({
                 ))}
                 <div className="border-t border-gray-300 pt-1 mt-1 flex justify-between font-semibold text-gray-800">
                   <span>Total</span>
-                  <div className="text-right">
-                    <span>{formatCurrency(feeBreakdown.total)}</span>
-                    <span className="text-xs text-gray-500 font-normal ml-1">
-                      ({formatCurrency(feeBreakdown.total / 1.19)} net)
-                    </span>
-                  </div>
+                  <span>{formatCurrency(feeBreakdown.total)}</span>
                 </div>
               </div>
             </div>
