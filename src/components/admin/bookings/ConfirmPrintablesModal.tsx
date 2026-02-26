@@ -457,7 +457,7 @@ export default function ConfirmPrintablesModal({
       setGenerationResult(newResult);
 
       // If now fully successful, clear saved state and close modal
-      if (newResult.results.failed.length === 0) {
+      if (newResult.results.failed.length === 0 && !newResult.allSkipped) {
         localStorage.removeItem(`${storageKeyPrefix}-editor`);
         localStorage.removeItem(`${storageKeyPrefix}-status`);
         localStorage.removeItem(`${storageKeyPrefix}-step`);
