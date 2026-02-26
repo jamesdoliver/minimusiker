@@ -12,20 +12,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
-import { getPrintableService, PrintableItemConfig, TextElementConfig } from '@/lib/services/printableService';
+import { getPrintableService } from '@/lib/services/printableService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getR2Service, PrintableType, TemplateType } from '@/lib/services/r2Service';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import {
   PrintableItemType,
   TextElement,
-  getPrintableConfig,
-  cssToPdfPosition,
-  cssToPdfSize,
-  hexToRgb,
-  FontFamily,
 } from '@/lib/config/printableTextConfig';
-import { ItemStatus, itemTypeToR2Type } from '@/lib/config/printableShared';
+import { ItemStatus, itemTypeToR2Type, convertItemToPdfConfig } from '@/lib/config/printableShared';
 
 export const dynamic = 'force-dynamic';
 
@@ -153,69 +148,13 @@ export async function POST(request: NextRequest) {
     const confirmedItems = items.filter(item => item.status !== 'skipped');
     const skippedItems = items.filter(item => item.status === 'skipped');
 
-    // Convert confirmed items to PrintableItemConfig format for the service
-    // Transform CSS coordinates to PDF coordinates
-    const itemConfigs: PrintableItemConfig[] = confirmedItems.map(item => {
-      const printableConfig = getPrintableConfig(item.type);
-      const pdfHeight = printableConfig?.pdfDimensions.height || 1000;
-      let scale = item.canvasScale || 1;
-      if (scale < 0.1 || scale > 5.0) {
-        console.warn(`[printables/generate] Clamping canvasScale ${scale} for item ${item.type} to range [0.1, 5.0]`);
-        scale = Math.max(0.1, Math.min(5.0, scale));
-      }
-
-      // Convert text elements from CSS to PDF coordinates
-      const textElementConfigs: TextElementConfig[] = item.textElements.map(element => {
-        // Convert position (CSS top-left origin → PDF bottom-left origin)
-        const pdfPosition = cssToPdfPosition(
-          element.position.x,
-          element.position.y + element.size.height, // Adjust for text box height
-          pdfHeight,
-          scale
-        );
-
-        // Convert size
-        const pdfSize = cssToPdfSize(element.size.width, element.size.height, scale);
-
-        // Convert color from hex to RGB
-        const color = hexToRgb(element.color);
-
-        return {
-          id: element.id,
-          type: element.type,
-          text: element.text,
-          x: pdfPosition.x,
-          y: pdfPosition.y,
-          width: pdfSize.width,
-          height: pdfSize.height,
-          fontSize: element.fontSize / scale, // Convert CSS px to PDF points
-          color,
-          fontFamily: element.fontFamily,  // Pass through element's font choice
-        };
-      });
-
-      // Convert QR position from CSS to PDF coordinates
-      let qrPositionPdf: { x: number; y: number; size: number } | undefined;
-      if (item.qrPosition) {
-        const pdfQrPos = cssToPdfPosition(
-          item.qrPosition.x,
-          item.qrPosition.y + item.qrPosition.size, // Adjust for QR height
-          pdfHeight,
-          scale
-        );
-        qrPositionPdf = {
-          x: pdfQrPos.x,
-          y: pdfQrPos.y,
-          size: item.qrPosition.size / scale,
-        };
-      }
-
-      return {
-        type: itemTypeToR2Type(item.type),
-        textElements: textElementConfigs,
-        qrPosition: qrPositionPdf,
-      };
-    });
+    // Convert confirmed items from CSS editor coordinates to PDF coordinates
+    const itemConfigs = confirmedItems.map(item => convertItemToPdfConfig({
+      type: item.type,
+      textElements: item.textElements,
+      qrPosition: item.qrPosition,
+      canvasScale: item.canvasScale,
+    }));
 
     // Results tracking
     const succeeded: { type: string; key?: string }[] = [];

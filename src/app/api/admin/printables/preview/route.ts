@@ -9,18 +9,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
-import { getPrintableService, PrintableItemConfig, TextElementConfig } from '@/lib/services/printableService';
+import { getPrintableService } from '@/lib/services/printableService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import {
   PrintableItemType,
   TextElement,
-  getPrintableConfig,
-  cssToPdfPosition,
-  cssToPdfSize,
-  hexToRgb,
 } from '@/lib/config/printableTextConfig';
+import { convertItemToPdfConfig } from '@/lib/config/printableShared';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,62 +98,13 @@ export async function POST(request: NextRequest) {
       ? `https://minimusiker.app/e/${accessCode}`
       : undefined;
 
-    // Convert item to PrintableItemConfig format
-    const printableConfig = getPrintableConfig(item.type);
-    const pdfHeight = printableConfig?.pdfDimensions.height || 1000;
-    let scale = item.canvasScale || 1;
-    if (scale < 0.1 || scale > 5.0) {
-      console.warn(`[printables/preview] Clamping canvasScale ${scale} for item ${item.type} to range [0.1, 5.0]`);
-      scale = Math.max(0.1, Math.min(5.0, scale));
-    }
-
-    // Convert text elements from CSS to PDF coordinates
-    const textElementConfigs: TextElementConfig[] = item.textElements.map(element => {
-      const pdfPosition = cssToPdfPosition(
-        element.position.x,
-        element.position.y + element.size.height,
-        pdfHeight,
-        scale
-      );
-
-      const pdfSize = cssToPdfSize(element.size.width, element.size.height, scale);
-      const color = hexToRgb(element.color);
-
-      return {
-        id: element.id,
-        type: element.type,
-        text: element.text,
-        x: pdfPosition.x,
-        y: pdfPosition.y,
-        width: pdfSize.width,
-        height: pdfSize.height,
-        fontSize: element.fontSize / scale,
-        color,
-        fontFamily: element.fontFamily,
-      };
-    });
-
-    // Convert QR position from CSS to PDF coordinates
-    let qrPositionPdf: { x: number; y: number; size: number } | undefined;
-    if (item.qrPosition) {
-      const pdfQrPos = cssToPdfPosition(
-        item.qrPosition.x,
-        item.qrPosition.y + item.qrPosition.size,
-        pdfHeight,
-        scale
-      );
-      qrPositionPdf = {
-        x: pdfQrPos.x,
-        y: pdfQrPos.y,
-        size: item.qrPosition.size / scale,
-      };
-    }
-
-    const itemConfig: PrintableItemConfig = {
+    // Convert item from CSS editor coordinates to PDF coordinates
+    const itemConfig = convertItemToPdfConfig({
       type: item.type,
-      textElements: textElementConfigs,
-      qrPosition: qrPositionPdf,
-    };
+      textElements: item.textElements,
+      qrPosition: item.qrPosition,
+      canvasScale: item.canvasScale,
+    });
 
     // Generate single printable using the service
     const result = await printableService.generateSinglePrintablePreview(
