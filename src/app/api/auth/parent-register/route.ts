@@ -81,15 +81,21 @@ export async function POST(request: NextRequest) {
       classId: string;
       className?: string;
     }> = [];
+    let dedupSkipped = false;
 
-    try {
-      existingChildren = await getAirtableService().getChildrenByParentEmailForEvent(
-        sanitizedData.parentEmail,
-        sanitizedData.eventId
-      );
-    } catch (error) {
-      console.error('[parent-register] Failed to fetch existing children, proceeding without dedup:', error);
-      // Fall through - will create all submitted children (same as before)
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        existingChildren = await getAirtableService().getChildrenByParentEmailForEvent(
+          sanitizedData.parentEmail,
+          sanitizedData.eventId
+        );
+        break; // Success — exit retry loop
+      } catch (error) {
+        if (attempt === 2) {
+          console.warn('[parent-register] Dedup lookup failed after 2 attempts, proceeding without dedup:', error);
+          dedupSkipped = true;
+        }
+      }
     }
 
     const existingNames = new Set(
@@ -196,6 +202,10 @@ export async function POST(request: NextRequest) {
     const createdRecords = await getAirtableService().createBulkParentJourneys(
       recordsToCreate
     );
+
+    if (dedupSkipped) {
+      console.warn(`[parent-register] DEDUP_SKIPPED: email=${sanitizedData.parentEmail}, eventId=${sanitizedData.eventId}, children=${newChildren.map(c => c.childName).join(',')}`);
+    }
 
     // Step 5: Generate session data
     // Use the canonical booking_id from the validated event

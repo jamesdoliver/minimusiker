@@ -41,7 +41,9 @@
       "noClasses": {
         "title": "Registration not yet available",
         "message": "This event is not yet set up for parent registration.",
-        "suggestion": "Please check back later or contact your school."
+        "suggestion": "Please check back later or contact your school.",
+        "searchSchool": "Search for your school",
+        "contactHint": "Classes may not be set up yet. Please try again later or contact your school."
       },
       "fetchError": {
         "title": "Error loading",
@@ -52,6 +54,16 @@
         "title": "Connection error",
         "message": "We are having trouble connecting to our servers.",
         "suggestion": "Please check your internet connection and try again."
+      },
+      "serviceUnavailable": {
+        "title": "Service temporarily unavailable",
+        "message": "Our servers are undergoing maintenance.",
+        "suggestion": "Please try again in a few minutes."
+      },
+      "serverError": {
+        "title": "Something went wrong",
+        "message": "An unexpected error occurred on our end.",
+        "suggestion": "Please try again. If the problem persists, contact your school."
       },
       "retry": "Retry"
     },
@@ -115,7 +127,14 @@
       "privacyLabel": "I accept the",
       "privacyLink": "Privacy Policy",
       "termsRequired": "You must accept the Terms and Conditions to continue",
-      "privacyRequired": "You must accept the Privacy Policy to continue"
+      "privacyRequired": "You must accept the Privacy Policy to continue",
+      "successTitle": "You're registered!",
+      "successMessage": "Your registration is complete.",
+      "successChildrenLabel": "Registered children:",
+      "successSchoolLabel": "School:",
+      "successClassLabel": "Class:",
+      "redirectingToPortal": "Redirecting to your portal...",
+      "goToPortalManual": "Go to portal"
     },
     "childInput": {
       "remove": "Remove",
@@ -312,7 +331,14 @@
       "knownParent": "Welcome back, {name}!",
       "prefillMessage": "We found your previous registration. Your information has been pre-filled.",
       "selectChildren": "Select which children to register:",
-      "addNewChild": "Add a new child"
+      "addNewChild": "Add a new child",
+      "loginFailed": "Login failed. Please try again.",
+      "genericError": "An error occurred. Please try again.",
+      "registeredChildren": "Registered children:",
+      "redirecting": "Redirecting...",
+      "registerAnotherChild": "Register another child",
+      "useDifferentEmail": "Use a different email",
+      "back": "Back"
     }
   }
 }

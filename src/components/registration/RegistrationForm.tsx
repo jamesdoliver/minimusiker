@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import ChildInputRow from './ChildInputRow';
@@ -33,6 +33,43 @@ interface RegistrationFormProps {
   isKnownParent?: boolean;
 }
 
+// SessionStorage helpers for form persistence
+function getStorageKey(eventId: string, classId: string): string {
+  return `mm-reg-${eventId}-${classId}`;
+}
+
+interface SavedFormData {
+  parentFirstName: string;
+  parentPhone?: string;
+  children: Array<{ childName: string; gradeLevel?: string }>;
+}
+
+function saveFormToSession(key: string, data: SavedFormData): void {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // iOS private browsing or quota exceeded — ignore
+  }
+}
+
+function loadFormFromSession(key: string): SavedFormData | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as SavedFormData;
+  } catch {
+    return null;
+  }
+}
+
+function clearFormSession(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
 export default function RegistrationForm({
   eventId,
   classId,
@@ -57,12 +94,42 @@ export default function RegistrationForm({
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
+  // Success screen state (Fix 5+10)
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [registeredChildNames, setRegisteredChildNames] = useState<string[]>([]);
+  const [showManualPortalLink, setShowManualPortalLink] = useState(false);
+  const redirectUrlRef = useRef<string>('/familie');
+
+  const storageKey = getStorageKey(eventId, classId);
+
   const [formData, setFormData] = useState<Omit<RegistrationData, 'eventId' | 'classId'>>({
     parentEmail: initialEmail,
     parentFirstName: initialFirstName,
     parentPhone: initialPhone,
     children: [{ childName: '', gradeLevel: '' }],
   });
+
+  // Restore saved form data after mount (client-only — avoids hydration mismatch)
+  useEffect(() => {
+    const saved = loadFormFromSession(storageKey);
+    if (saved) {
+      setFormData(prev => ({
+        ...prev,
+        parentFirstName: saved.parentFirstName || prev.parentFirstName,
+        parentPhone: saved.parentPhone || prev.parentPhone,
+        children: saved.children.length > 0 ? saved.children : prev.children,
+      }));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — only on mount
+
+  // Save form data to sessionStorage on change (non-sensitive fields only)
+  useEffect(() => {
+    saveFormToSession(storageKey, {
+      parentFirstName: formData.parentFirstName,
+      parentPhone: formData.parentPhone,
+      children: formData.children,
+    });
+  }, [storageKey, formData.parentFirstName, formData.parentPhone, formData.children]);
 
   const handleAddChild = () => {
     setFormData({
@@ -209,11 +276,23 @@ export default function RegistrationForm({
         throw new Error(result.error || 'Registration failed');
       }
 
-      // Success! Redirect to parent portal (session cookie is set by API)
-      // Note: Don't reset submissionInFlight on success - page redirects anyway
+      // Success! Show confirmation screen then redirect
+      clearFormSession(storageKey);
+      const url = result.data.redirectUrl || '/familie';
+      redirectUrlRef.current = url;
+      setRegisteredChildNames(formData.children.map(c => c.childName));
+      setIsSuccess(true);
+      setIsSubmitting(false);
+
+      // Redirect after 2s (gives time to read confirmation)
       setTimeout(() => {
-        router.push(result.data.redirectUrl || '/familie');
-      }, 1500);
+        router.push(url);
+      }, 2000);
+
+      // Show manual link after 5s in case redirect fails
+      setTimeout(() => {
+        setShowManualPortalLink(true);
+      }, 5000);
     } catch (err) {
       console.error('Registration error:', err);
       setError(err instanceof Error ? err.message : 'Failed to register. Please try again.');
@@ -221,6 +300,60 @@ export default function RegistrationForm({
       setIsSubmitting(false);
     }
   };
+
+  // Success confirmation screen (Fix 5+10)
+  if (isSuccess) {
+    return (
+      <div className="bg-white shadow rounded-lg p-8 text-center space-y-6">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('successTitle')}</h2>
+          <p className="text-gray-600">{t('successMessage')}</p>
+        </div>
+
+        <div className="bg-gray-50 rounded-lg p-4 text-left space-y-2">
+          <p className="text-sm font-medium text-gray-700">{t('successChildrenLabel')}</p>
+          <ul className="space-y-1">
+            {registeredChildNames.map((name, idx) => (
+              <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
+                <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                {name}
+              </li>
+            ))}
+          </ul>
+          <div className="pt-2 border-t border-gray-200 mt-2 space-y-1">
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">{t('successSchoolLabel')}</span> {schoolName}
+            </p>
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">{t('successClassLabel')}</span> {className}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-2 text-gray-500">
+          <LoadingSpinner size="sm" />
+          <p className="text-sm">{t('redirectingToPortal')}</p>
+        </div>
+
+        {showManualPortalLink && (
+          <a
+            href={redirectUrlRef.current}
+            className="inline-block px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium"
+          >
+            {t('goToPortalManual')}
+          </a>
+        )}
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -381,13 +514,13 @@ export default function RegistrationForm({
       {/* Legal Consent Section */}
       <div className="space-y-4">
         {/* Terms Checkbox */}
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 min-h-[44px] py-2">
           <input
             type="checkbox"
             id="terms"
             checked={termsAccepted}
             onChange={handleTermsChange}
-            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+            className="mt-0.5 h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
           />
           <label htmlFor="terms" className="text-sm text-gray-700 cursor-pointer">
             {t('termsLabel')}{' '}
@@ -406,13 +539,13 @@ export default function RegistrationForm({
         )}
 
         {/* Privacy Checkbox */}
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 min-h-[44px] py-2">
           <input
             type="checkbox"
             id="privacy"
             checked={privacyAccepted}
             onChange={handlePrivacyChange}
-            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+            className="mt-0.5 h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
           />
           <label htmlFor="privacy" className="text-sm text-gray-700 cursor-pointer">
             {t('privacyLabel')}{' '}

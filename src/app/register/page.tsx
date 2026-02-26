@@ -40,6 +40,7 @@ function RegistrationPageContent() {
   const tErrors = useTranslations('registration.errors');
   const tEventInfo = useTranslations('registration.eventInfo');
   const tStepper = useTranslations('registration.stepper');
+  const tEmailCheck = useTranslations('parentPortal.emailCheck');
   const locale = useLocale();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +90,10 @@ function RegistrationPageContent() {
           if (!response.ok) {
             if (response.status === 404) {
               setError('event_not_found');
+            } else if (response.status === 503) {
+              setError('service_unavailable');
+            } else if (response.status >= 500) {
+              setError('server_error');
             } else {
               setError('fetch_error');
             }
@@ -124,6 +129,20 @@ function RegistrationPageContent() {
           const classResponse = await fetch(
             `/api/airtable/school-events?bookingId=${encodeURIComponent(urlEventId)}`
           );
+          if (!classResponse.ok) {
+            if (classResponse.status === 404) {
+              setError('event_not_found');
+            } else if (classResponse.status === 503) {
+              setError('service_unavailable');
+            } else if (classResponse.status >= 500) {
+              setError('server_error');
+            } else {
+              setError('fetch_error');
+            }
+            setIsLoading(false);
+            return;
+          }
+
           const classData = await classResponse.json();
 
           if (!classData.success) {
@@ -312,11 +331,16 @@ function RegistrationPageContent() {
 
   // Handler for going back from email step to class selection (discovery/QR flow)
   const handleEmailStepBack = () => {
-    setShowEmailStep(false);
-    setEventDetails(null);
-    // For QR flow with multiple classes, go back to class selection
-    // For discovery mode, go back to class selection
-    if (isQrFlow || isDiscoveryMode) {
+    if (isQrFlow && !isDiscoveryMode) {
+      // Single-class QR: just reset email state, keep eventDetails intact
+      setVerifiedEmail('');
+      setParentData(null);
+      setExistingChildren([]);
+      setShowEmailStep(true);
+    } else {
+      // Multi-class QR or discovery: go back to class picker
+      setShowEmailStep(false);
+      setEventDetails(null);
       setCurrentStep('class');
     }
   };
@@ -358,6 +382,8 @@ function RegistrationPageContent() {
       no_classes: 'noClasses',
       fetch_error: 'fetchError',
       network_error: 'networkError',
+      service_unavailable: 'serviceUnavailable',
+      server_error: 'serverError',
     };
 
     const errorKey = errorKeyMap[error] || 'fetchError';
@@ -385,13 +411,24 @@ function RegistrationPageContent() {
           </h2>
           <p className="text-gray-600 mb-4">{tErrors(`${errorKey}.message`)}</p>
           <p className="text-sm text-gray-500 mb-6">{tErrors(`${errorKey}.suggestion`)}</p>
-          {error === 'network_error' && (
+          {(error === 'network_error' || error === 'fetch_error' || error === 'server_error') && (
             <button
               onClick={() => window.location.reload()}
               className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
             >
               {tErrors('retry')}
             </button>
+          )}
+          {error === 'no_classes' && (
+            <div className="space-y-3">
+              <button
+                onClick={handleSwitchSchool}
+                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors"
+              >
+                {tErrors('noClasses.searchSchool')}
+              </button>
+              <p className="text-xs text-gray-400">{tErrors('noClasses.contactHint')}</p>
+            </div>
           )}
         </div>
       </div>
@@ -623,7 +660,7 @@ function RegistrationPageContent() {
                     onClick={handleEmailBack}
                     className="text-sm text-gray-500 hover:text-gray-700"
                   >
-                    ← Use a different email
+                    &larr; {tEmailCheck('useDifferentEmail')}
                   </button>
                 </div>
               )}

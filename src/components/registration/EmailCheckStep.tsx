@@ -110,12 +110,12 @@ export default function EmailCheckStep({
       if (response.ok) {
         router.push('/familie');
       } else {
-        setError('Login fehlgeschlagen. Bitte versuche es erneut.');
+        setError(t('loginFailed'));
         setIsRedirecting(false);
       }
     } catch (err) {
       console.error('Portal redirect login error:', err);
-      setError('Ein Fehler ist aufgetreten. Bitte versuche es erneut.');
+      setError(t('genericError'));
       setIsRedirecting(false);
     }
   };
@@ -146,7 +146,7 @@ export default function EmailCheckStep({
         {/* Show registered children */}
         {checkResult.childrenForEvent && checkResult.childrenForEvent.length > 0 && (
           <div className="bg-gray-50 rounded-lg p-4">
-            <p className="text-sm font-medium text-gray-700 mb-2">Registered children:</p>
+            <p className="text-sm font-medium text-gray-700 mb-2">{t('registeredChildren')}</p>
             <ul className="space-y-1">
               {checkResult.childrenForEvent.map((child, idx) => (
                 <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
@@ -174,13 +174,13 @@ export default function EmailCheckStep({
             className="w-full px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isRedirecting && <LoadingSpinner size="sm" />}
-            {isRedirecting ? 'Weiterleitung...' : t('goToPortal')}
+            {isRedirecting ? t('redirecting') : t('goToPortal')}
           </button>
           <button
             onClick={handleContinueAnyway}
             className="w-full px-6 py-3 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
           >
-            Register another child
+            {t('registerAnotherChild')}
           </button>
         </div>
 
@@ -190,7 +190,7 @@ export default function EmailCheckStep({
               onClick={onBack}
               className="text-sm text-gray-500 hover:text-gray-700"
             >
-              ← Use a different email
+              &larr; {t('useDifferentEmail')}
             </button>
           </div>
         )}
@@ -249,7 +249,7 @@ export default function EmailCheckStep({
             onClick={onBack}
             className="text-sm text-gray-500 hover:text-gray-700"
           >
-            ← Back
+            &larr; {t('back')}
           </button>
         </div>
       )}

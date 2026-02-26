@@ -41,7 +41,9 @@
       "noClasses": {
         "title": "Registrierung noch nicht möglich",
         "message": "Diese Veranstaltung ist noch nicht für die Elternregistrierung eingerichtet.",
-        "suggestion": "Bitte schauen Sie später noch einmal vorbei oder kontaktieren Sie Ihre Schule."
+        "suggestion": "Bitte schauen Sie später noch einmal vorbei oder kontaktieren Sie Ihre Schule.",
+        "searchSchool": "Nach deiner Schule suchen",
+        "contactHint": "Die Klassen sind möglicherweise noch nicht eingerichtet. Bitte versuche es später erneut oder kontaktiere deine Schule."
       },
       "fetchError": {
         "title": "Fehler beim Laden",
@@ -52,6 +54,16 @@
         "title": "Verbindungsfehler",
         "message": "Wir haben Probleme, eine Verbindung zu unseren Servern herzustellen.",
         "suggestion": "Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut."
+      },
+      "serviceUnavailable": {
+        "title": "Dienst vorübergehend nicht verfügbar",
+        "message": "Unsere Server werden gerade gewartet.",
+        "suggestion": "Bitte versuche es in einigen Minuten erneut."
+      },
+      "serverError": {
+        "title": "Etwas ist schiefgelaufen",
+        "message": "Ein unerwarteter Fehler ist aufgetreten.",
+        "suggestion": "Bitte versuche es erneut. Wenn das Problem weiterhin besteht, kontaktiere deine Schule."
       },
       "retry": "Erneut versuchen"
     },
@@ -115,7 +127,14 @@
       "privacyLabel": "Ich akzeptiere die",
       "privacyLink": "Datenschutzerklärung",
       "termsRequired": "Sie müssen den AGB zustimmen, um fortzufahren",
-      "privacyRequired": "Sie müssen der Datenschutzerklärung zustimmen, um fortzufahren"
+      "privacyRequired": "Sie müssen der Datenschutzerklärung zustimmen, um fortzufahren",
+      "successTitle": "Du bist registriert!",
+      "successMessage": "Deine Registrierung ist abgeschlossen.",
+      "successChildrenLabel": "Registrierte Kinder:",
+      "successSchoolLabel": "Schule:",
+      "successClassLabel": "Klasse:",
+      "redirectingToPortal": "Weiterleitung zum Portal...",
+      "goToPortalManual": "Zum Portal"
     },
     "childInput": {
       "remove": "Entfernen",
@@ -312,7 +331,14 @@
       "knownParent": "Willkommen zurück, {name}!",
       "prefillMessage": "Wir haben Ihre vorherige Registrierung gefunden. Ihre Daten wurden vorausgefüllt.",
       "selectChildren": "Wählen Sie, welche Kinder registriert werden sollen:",
-      "addNewChild": "Neues Kind hinzufügen"
+      "addNewChild": "Neues Kind hinzufügen",
+      "loginFailed": "Login fehlgeschlagen. Bitte versuche es erneut.",
+      "genericError": "Ein Fehler ist aufgetreten. Bitte versuche es erneut.",
+      "registeredChildren": "Registrierte Kinder:",
+      "redirecting": "Weiterleitung...",
+      "registerAnotherChild": "Weiteres Kind registrieren",
+      "useDifferentEmail": "Andere E-Mail verwenden",
+      "back": "Zurück"
     }
   }
 }
