@@ -380,7 +380,7 @@ export default function ConfirmPrintablesModal({
         localStorage.removeItem(`${storageKeyPrefix}-status`);
         localStorage.removeItem(`${storageKeyPrefix}-step`);
         setTimeout(() => {
-          onClose();
+          handleClose();
         }, 1500);
       }
     } catch (error) {
@@ -461,7 +461,7 @@ export default function ConfirmPrintablesModal({
         localStorage.removeItem(`${storageKeyPrefix}-status`);
         localStorage.removeItem(`${storageKeyPrefix}-step`);
         setTimeout(() => {
-          onClose();
+          handleClose();
         }, 1500);
       }
     } catch (error) {
