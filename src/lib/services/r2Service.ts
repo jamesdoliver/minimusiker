@@ -1873,33 +1873,26 @@ class R2Service {
       'minicard', 'cd-jacket',
     ];
 
-    const status: Record<string, 'confirmed' | 'skipped' | 'pending'> = {};
+    // Check all types in parallel (2 HEAD requests per type: PDF + skipped placeholder)
+    const statusEntries = await Promise.all(
+      allTypes.map(async (printableType): Promise<[PrintableType, 'confirmed' | 'skipped' | 'pending']> => {
+        const pdfKey = this.getPrintableKey(eventId, printableType);
+        const baseFilename = PRINTABLE_FILENAMES[printableType].replace('.pdf', '');
+        const skippedKey = `${this.getPrintablePath(eventId, printableType)}${baseFilename}-skipped.json`;
 
-    for (const printableType of allTypes) {
-      // Check if PDF exists (confirmed)
-      const pdfKey = this.getPrintableKey(eventId, printableType);
-      const pdfExists = await this.fileExistsInAssetsBucket(pdfKey);
+        // Run both checks in parallel
+        const [pdfExists, skippedExists] = await Promise.all([
+          this.fileExistsInAssetsBucket(pdfKey),
+          this.fileExistsInAssetsBucket(skippedKey),
+        ]);
 
-      if (pdfExists) {
-        status[printableType] = 'confirmed';
-        continue;
-      }
+        if (pdfExists) return [printableType, 'confirmed'];
+        if (skippedExists) return [printableType, 'skipped'];
+        return [printableType, 'pending'];
+      })
+    );
 
-      // Check if skipped placeholder exists
-      const baseFilename = PRINTABLE_FILENAMES[printableType].replace('.pdf', '');
-      const skippedKey = `${this.getPrintablePath(eventId, printableType)}${baseFilename}-skipped.json`;
-      const skippedExists = await this.fileExistsInAssetsBucket(skippedKey);
-
-      if (skippedExists) {
-        status[printableType] = 'skipped';
-        continue;
-      }
-
-      // Neither exists - pending
-      status[printableType] = 'pending';
-    }
-
-    return status as Record<PrintableType, 'confirmed' | 'skipped' | 'pending'>;
+    return Object.fromEntries(statusEntries) as Record<PrintableType, 'confirmed' | 'skipped' | 'pending'>;
   }
 
   /**
