@@ -17,34 +17,9 @@ import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getR2Service, PrintableType } from '@/lib/services/r2Service';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { PrintableItemType } from '@/lib/config/printableTextConfig';
+import { r2TypeToItemType } from '@/lib/config/printableShared';
 
 export const dynamic = 'force-dynamic';
-
-// Map from R2 PrintableType to UI PrintableItemType
-const r2TypeToItemType: Partial<Record<PrintableType, PrintableItemType>> = {
-  'tshirt-print': 'tshirt',
-  'hoodie-print': 'hoodie',
-};
-
-// Convert R2 status to UI status format
-function convertStatus(
-  r2Status: Record<PrintableType, 'confirmed' | 'skipped' | 'pending'>
-): Record<PrintableItemType, 'confirmed' | 'skipped' | 'pending'> {
-  const result: Partial<Record<PrintableItemType, 'confirmed' | 'skipped' | 'pending'>> = {};
-
-  for (const [r2Type, status] of Object.entries(r2Status)) {
-    // Check if this type needs mapping
-    const mappedType = r2TypeToItemType[r2Type as PrintableType];
-    if (mappedType) {
-      result[mappedType] = status;
-    } else {
-      // Types like flyer1, button, etc. are the same in both systems
-      result[r2Type as PrintableItemType] = status;
-    }
-  }
-
-  return result as Record<PrintableItemType, 'confirmed' | 'skipped' | 'pending'>;
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -88,7 +63,10 @@ export async function GET(request: NextRequest) {
     const r2Status = await r2Service.getPrintablesStatus(eventId);
 
     // Convert from R2 types to UI types
-    const status = convertStatus(r2Status);
+    const status: Partial<Record<PrintableItemType, 'confirmed' | 'skipped' | 'pending'>> = {};
+    for (const [r2Type, s] of Object.entries(r2Status)) {
+      status[r2TypeToItemType(r2Type as PrintableType)] = s;
+    }
 
     return NextResponse.json({
       eventId,

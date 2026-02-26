@@ -25,21 +25,9 @@ import {
   hexToRgb,
   FontFamily,
 } from '@/lib/config/printableTextConfig';
+import { ItemStatus, itemTypeToR2Type } from '@/lib/config/printableShared';
 
 export const dynamic = 'force-dynamic';
-
-// Item status type
-type ItemStatus = 'pending' | 'confirmed' | 'skipped';
-
-// Map UI PrintableItemType to R2 PrintableType
-// Most types are the same, but tshirt/hoodie differ
-function itemTypeToR2Type(itemType: PrintableItemType): PrintableType {
-  const mapping: Partial<Record<PrintableItemType, PrintableType>> = {
-    'tshirt': 'tshirt-print',
-    'hoodie': 'hoodie-print',
-  };
-  return (mapping[itemType] || itemType) as PrintableType;
-}
 
 // Request body type - Phase 4 with multiple text elements
 interface GeneratePrintablesRequest {

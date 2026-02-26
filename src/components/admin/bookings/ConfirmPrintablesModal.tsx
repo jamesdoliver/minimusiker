@@ -10,9 +10,7 @@ import {
   initializeEditorState,
 } from '@/lib/config/printableTextConfig';
 import PrintableEditor from './PrintableEditor';
-
-// Item status type for the confirmation workflow
-type ItemStatus = 'pending' | 'confirmed' | 'skipped';
+import { ItemStatus } from '@/lib/config/printableShared';
 
 interface ConfirmPrintablesModalProps {
   isOpen: boolean;
