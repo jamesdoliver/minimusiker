@@ -2399,26 +2399,36 @@ class R2Service {
    */
   async deleteByPrefix(prefix: string): Promise<{ deleted: number }> {
     try {
-      const listCommand = new ListObjectsV2Command({
-        Bucket: this.assetsBucketName,
-        Prefix: prefix,
-      });
+      let totalDeleted = 0;
+      let continuationToken: string | undefined;
 
-      const listResult = await this.client.send(listCommand);
-      const objects = listResult.Contents || [];
+      do {
+        const listCommand = new ListObjectsV2Command({
+          Bucket: this.assetsBucketName,
+          Prefix: prefix,
+          ...(continuationToken ? { ContinuationToken: continuationToken } : {}),
+        });
 
-      if (objects.length === 0) return { deleted: 0 };
+        const listResult = await this.client.send(listCommand);
+        const objects = listResult.Contents || [];
 
-      const deleteCommand = new DeleteObjectsCommand({
-        Bucket: this.assetsBucketName,
-        Delete: {
-          Objects: objects.map(obj => ({ Key: obj.Key })),
-          Quiet: true,
-        },
-      });
+        if (objects.length > 0) {
+          const deleteCommand = new DeleteObjectsCommand({
+            Bucket: this.assetsBucketName,
+            Delete: {
+              Objects: objects.map(obj => ({ Key: obj.Key })),
+              Quiet: true,
+            },
+          });
 
-      await this.client.send(deleteCommand);
-      return { deleted: objects.length };
+          await this.client.send(deleteCommand);
+          totalDeleted += objects.length;
+        }
+
+        continuationToken = listResult.IsTruncated ? listResult.NextContinuationToken : undefined;
+      } while (continuationToken);
+
+      return { deleted: totalDeleted };
     } catch (error) {
       console.error(`[R2Service] Error deleting by prefix ${prefix}:`, error);
       return { deleted: 0 };
