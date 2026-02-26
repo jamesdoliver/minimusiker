@@ -431,17 +431,23 @@ export default function ConfirmPrintablesModal({
         throw new Error(result.error || 'Retry failed');
       }
 
-      // Merge results with previous successful items
+      // Merge results, deduplicating by type (retry results take precedence)
+      const retryTypes = new Set([
+        ...result.results.succeeded.map((r: GenerationResultItem) => r.type),
+        ...result.results.failed.map((r: GenerationResultItem) => r.type),
+        ...result.results.skipped.map((r: { type: string }) => r.type),
+      ]);
+
       const newResult: GenerationResult = {
         ...result,
         results: {
           succeeded: [
-            ...generationResult.results.succeeded,
+            ...generationResult.results.succeeded.filter(r => !retryTypes.has(r.type)),
             ...result.results.succeeded,
           ],
           failed: result.results.failed,
           skipped: [
-            ...generationResult.results.skipped,
+            ...generationResult.results.skipped.filter(r => !retryTypes.has(r.type)),
             ...result.results.skipped,
           ],
         },
