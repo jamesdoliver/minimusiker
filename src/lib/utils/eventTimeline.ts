@@ -299,6 +299,19 @@ export function canOrderPersonalizedClothing(
 }
 
 /**
+ * Determine if event should only show standard (non-personalized) merch.
+ * Override wins; otherwise auto-calculate from is_under_100.
+ */
+export function computeStandardMerchOnly(
+  override?: 'force-standard' | 'force-personalized',
+  isUnder100?: boolean
+): boolean {
+  if (override === 'force-standard') return true;
+  if (override === 'force-personalized') return false;
+  return isUnder100 === true;
+}
+
+/**
  * Get countdown to personalized product deadline
  * Returns null if deadline has passed
  */

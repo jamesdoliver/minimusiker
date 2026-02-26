@@ -563,6 +563,7 @@ export const EVENTS_FIELD_IDS = {
   // Under-100-kids flag and estimated children count
   is_under_100: 'fldcvcHcGfIkOUPFD',           // Checkbox - true when estimated children < 100
   estimated_children: 'fldjnXCnyfeA1KSeX',       // Number - estimated kids (copied from SchoolBooking)
+  standard_merch_override: 'fldSW7jEo0flf9g0J', // Single Select: force-standard | force-personalized (empty = auto from is_under_100)
   // Deal Builder fields
   deal_builder_enabled: 'fld19LJoYvr3ZVKpc',  // Checkbox - master toggle for Deal Builder
   deal_type: 'fldJNjJnyIPOMmb9y',                        // Single Select: mimu, mimu_scs, schus, schus_xl
@@ -802,6 +803,7 @@ export interface Event {
   // Under-100-kids flag and estimated children count
   is_under_100?: boolean;                         // Auto-calculated: estimatedChildren < 100
   estimated_children?: number;                    // Estimated kids attending (from booking)
+  standard_merch_override?: 'force-standard' | 'force-personalized'; // Override standard-merch-only gate (empty = auto from is_under_100)
   // Deal Builder fields
   deal_builder_enabled?: boolean;                 // Master toggle — when true, Deal Builder controls this event
   deal_type?: DealType;                           // Selected deal type

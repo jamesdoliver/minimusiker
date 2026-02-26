@@ -187,6 +187,7 @@ export default function BookingsTable({ bookings, onEventDeleted, onNotesUpdate,
                         isKita={booking.isKita}
                         isSchulsong={booking.isSchulsong}
                         isMinimusikertag={booking.isMinimusikertag}
+                        isStandardMerchOnly={booking.isStandardMerchOnly}
                       />
                     </td>
                     <td className="px-6 py-4">

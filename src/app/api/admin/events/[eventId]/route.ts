@@ -118,6 +118,8 @@ export async function GET(
       dealType?: DealType | null;
       dealConfig?: DealConfig | null;
       estimatedChildren?: number;
+      isUnder100?: boolean;
+      standardMerchOverride?: 'force-standard' | 'force-personalized';
     } = {};
 
     try {
@@ -151,6 +153,8 @@ export async function GET(
             dealType: eventRecord.deal_type || null,
             dealConfig: eventRecord.deal_config || null,
             estimatedChildren: eventRecord.estimated_children,
+            isUnder100: eventRecord.is_under_100,
+            standardMerchOverride: eventRecord.standard_merch_override,
           };
         }
       }
@@ -214,10 +218,11 @@ export async function PATCH(
       body.deal_builder_enabled !== undefined ||
       body.deal_type !== undefined ||
       body.deal_config !== undefined;
+    const hasStandardMerchOverride = body.standard_merch_override !== undefined;
 
-    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate && !hasChildrenUpdate && !hasDealUpdate) {
+    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate && !hasChildrenUpdate && !hasDealUpdate && !hasStandardMerchOverride) {
       return NextResponse.json(
-        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children, deal_builder_enabled, deal_type, deal_config' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children, deal_builder_enabled, deal_type, deal_config, standard_merch_override' },
         { status: 400 }
       );
     }
@@ -579,7 +584,7 @@ export async function PATCH(
 
     // Handle status and event type toggle updates
     let updatedEvent = existingEvent;
-    if (hasStatusUpdate || hasEventTypeUpdates || hasChildrenUpdate) {
+    if (hasStatusUpdate || hasEventTypeUpdates || hasChildrenUpdate || hasStandardMerchOverride) {
       const fieldUpdates: {
         status?: 'Confirmed' | 'On Hold' | 'Cancelled' | null;
         is_plus?: boolean;
@@ -588,6 +593,7 @@ export async function PATCH(
         is_minimusikertag?: boolean;
         is_under_100?: boolean;
         estimated_children?: number;
+        standard_merch_override?: 'force-standard' | 'force-personalized' | null;
       } = {};
 
       if (hasStatusUpdate) {
@@ -618,6 +624,21 @@ export async function PATCH(
       if (hasChildrenUpdate) {
         fieldUpdates.estimated_children = body.estimated_children;
         fieldUpdates.is_under_100 = body.estimated_children < 100;
+      }
+
+      // Handle standard merch override (null/auto = auto, based on is_under_100)
+      if (hasStandardMerchOverride) {
+        const val = body.standard_merch_override;
+        if (val === null || val === 'auto') {
+          fieldUpdates.standard_merch_override = null; // Clear → auto mode
+        } else if (val === 'force-standard' || val === 'force-personalized') {
+          fieldUpdates.standard_merch_override = val;
+        } else {
+          return NextResponse.json(
+            { success: false, error: 'Invalid standard_merch_override. Expected: auto, force-standard, force-personalized, or null' },
+            { status: 400 }
+          );
+        }
       }
 
       updatedEvent = await airtableService.updateEventFields(eventRecordId, fieldUpdates);

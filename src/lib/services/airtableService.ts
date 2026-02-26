@@ -74,6 +74,17 @@ import {
 // Single table name in Airtable
 export const TABLE_NAME = 'parent_journey_table';
 
+/** Extract message from any thrown value, including Airtable SDK errors which don't extend Error */
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object') {
+    const e = error as Record<string, any>;
+    if (e.message) return `${e.message}${e.error ? ` (${e.error})` : ''}${e.statusCode ? ` [${e.statusCode}]` : ''}`;
+    if (e.error) return String(e.error);
+  }
+  return String(error);
+}
+
 class AirtableService {
   private base: Airtable.Base;
   private static instance: AirtableService;
@@ -5327,13 +5338,13 @@ class AirtableService {
         eventFields[EVENTS_FIELD_IDS.is_under_100] = estimatedChildren < 100;
       }
 
-      const record = await this.base(EVENTS_TABLE_ID).create(eventFields);
+      const record = await this.base(EVENTS_TABLE_ID).create(eventFields, { typecast: true });
       console.log(`Created Event record: ${record.id} with event_id: ${eventId}`);
 
       return this.transformEventRecord(record);
     } catch (error) {
       console.error('Error creating Event from booking:', error);
-      throw new Error(`Failed to create Event: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`Failed to create Event: ${extractErrorMessage(error)}`);
     }
   }
 
@@ -5342,9 +5353,8 @@ class AirtableService {
    */
   async getEventByEventId(eventId: string): Promise<Event | null> {
     try {
-      // Note: Airtable formulas use field names, not field IDs
       const records = await this.base(EVENTS_TABLE_ID).select({
-        filterByFormula: `{event_id} = "${eventId}"`,
+        filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = "${eventId}"`,
         maxRecords: 1,
       }).firstPage();
 
@@ -5553,6 +5563,7 @@ class AirtableService {
       is_minimusikertag?: boolean;
       is_under_100?: boolean;
       estimated_children?: number;
+      standard_merch_override?: 'force-standard' | 'force-personalized' | null;
       deal_builder_enabled?: boolean;
       deal_type?: string | null;
       deal_config?: string;
@@ -5581,6 +5592,9 @@ class AirtableService {
       }
       if (updates.estimated_children !== undefined) {
         updateFields[EVENTS_FIELD_IDS.estimated_children] = updates.estimated_children;
+      }
+      if (updates.standard_merch_override !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.standard_merch_override] = updates.standard_merch_override;
       }
       if (updates.deal_builder_enabled !== undefined) {
         updateFields[EVENTS_FIELD_IDS.deal_builder_enabled] = updates.deal_builder_enabled;
@@ -5850,6 +5864,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.is_minimusikertag,
           EVENTS_FIELD_IDS.is_under_100,
           EVENTS_FIELD_IDS.estimated_children,
+          EVENTS_FIELD_IDS.standard_merch_override,
           EVENTS_FIELD_IDS.audio_pipeline_stage,
           EVENTS_FIELD_IDS.admin_notes,
         ],
@@ -5905,6 +5920,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.is_minimusikertag,
           EVENTS_FIELD_IDS.is_under_100,
           EVENTS_FIELD_IDS.estimated_children,
+          EVENTS_FIELD_IDS.standard_merch_override,
           EVENTS_FIELD_IDS.audio_pipeline_stage,
           EVENTS_FIELD_IDS.admin_notes,
           EVENTS_FIELD_IDS.deal_builder_enabled,
@@ -6080,6 +6096,7 @@ class AirtableService {
       // Under-100-kids flag and estimated children
       is_under_100: record.get('is_under_100') as boolean | undefined,
       estimated_children: record.get('estimated_children') as number | undefined,
+      standard_merch_override: record.get('standard_merch_override') as Event['standard_merch_override'] | undefined,
       // Deal Builder fields
       deal_builder_enabled: record.get('deal_builder_enabled') as boolean | undefined,
       deal_type: record.get('deal_type') as Event['deal_type'] | undefined,

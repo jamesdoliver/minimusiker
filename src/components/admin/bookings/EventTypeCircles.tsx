@@ -7,6 +7,7 @@ interface EventTypeCirclesProps {
   isKita?: boolean;
   isSchulsong?: boolean;
   isMinimusikertag?: boolean;
+  isStandardMerchOnly?: boolean;
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -28,6 +29,7 @@ export default function EventTypeCircles({
   isKita = false,
   isSchulsong = false,
   isMinimusikertag = true,
+  isStandardMerchOnly = false,
   size = 'md',
 }: EventTypeCirclesProps) {
   const [hoveredCircle, setHoveredCircle] = useState<number | null>(null);
@@ -72,6 +74,16 @@ export default function EventTypeCircles({
       bgColor: '#fdba74', // orange-300
       textColor: '#9a3412', // orange-800
       label: 'Schulsong',
+    });
+  }
+
+  // Circle 5: Shows 'St' if standard merch only (<100 kids or admin override)
+  if (isStandardMerchOnly) {
+    circles.push({
+      letter: 'St',
+      bgColor: '#d1d5db', // gray-300
+      textColor: '#374151', // gray-700
+      label: 'Standard Merch Only',
     });
   }
 

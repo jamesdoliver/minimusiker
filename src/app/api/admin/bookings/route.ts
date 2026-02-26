@@ -5,6 +5,7 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { SchoolBooking, SecondaryContact, Event, TEAMS_REGIONEN_TABLE_ID, SCHOOL_BOOKINGS_TABLE_ID, SCHOOL_BOOKINGS_FIELD_IDS, EVENTS_TABLE_ID, EVENTS_FIELD_IDS } from '@/lib/types/airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
+import { computeStandardMerchOnly } from '@/lib/utils/eventTimeline';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { triggerNewBookingNotification } from '@/lib/services/notificationService';
@@ -39,6 +40,7 @@ export interface BookingWithDetails {
   isKita?: boolean;              // Shows 'K' circle (or derived from event_type)
   isSchulsong?: boolean;         // Shows 'S' circle
   isMinimusikertag?: boolean;    // true = full event, false = schulsong-only
+  isStandardMerchOnly?: boolean; // true = standard merch only (<100 kids or admin override)
   eventType?: string;            // Original event_type for backwards compatibility
   // Staff assignment from linked Event
   assignedStaff?: string[];      // Array of Personen record IDs
@@ -223,6 +225,7 @@ export async function GET(request: NextRequest) {
           isKita: event.is_kita || isKitaFromEventType,
           isSchulsong: event.is_schulsong,
           isMinimusikertag: event.is_minimusikertag === true,
+          isStandardMerchOnly: computeStandardMerchOnly(event.standard_merch_override, event.is_under_100),
           eventType: event.event_type,
           assignedStaff: event.assigned_staff,
           assignedStaffNames: event.assigned_staff?.map(id => staffMap.get(id)).filter(Boolean) as string[],

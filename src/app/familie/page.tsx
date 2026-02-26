@@ -97,6 +97,7 @@ function ParentPortalContent() {
   const [shopProfile, setShopProfile] = useState<ShopProfile>(MINIMUSIKERTAG_PROFILE);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [timelineOverrides, setTimelineOverrides] = useState<string | null>(null);
+  const [isStandardMerchOnly, setIsStandardMerchOnly] = useState(false);
 
   useEffect(() => {
     verifySessionAndLoadData();
@@ -222,6 +223,7 @@ function ParentPortalContent() {
           if (data.timelineOverrides) {
             setTimelineOverrides(data.timelineOverrides);
           }
+          setIsStandardMerchOnly(data.isStandardMerchOnly === true);
         }
       } catch (err) {
         console.error('Error fetching schulsong status:', err);
@@ -523,6 +525,7 @@ function ParentPortalContent() {
             children={children}
             shopProfile={shopProfile}
             timelineOverrides={timelineOverrides}
+            isStandardMerchOnly={isStandardMerchOnly}
           />
         </section>
 

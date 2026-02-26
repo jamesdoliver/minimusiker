@@ -46,6 +46,7 @@ interface ProductSelectorProps {
   shopProfile: ShopProfile;
   onCheckout?: (selection: ProductSelection, total: number) => void;
   timelineOverrides?: string | null;
+  isStandardMerchOnly?: boolean;
 }
 
 const COMBO_DISCOUNT_PERCENT = 10;
@@ -286,6 +287,7 @@ export default function ProductSelector({
   shopProfile,
   onCheckout,
   timelineOverrides,
+  isStandardMerchOnly = false,
 }: ProductSelectorProps) {
   const t = useTranslations('productSelector');
   const [selection, setSelection] = useState<ProductSelection>({
@@ -303,7 +305,10 @@ export default function ProductSelector({
   const cutoffDays = isSchulsongOnly
     ? getThreshold('schulsong_clothing_cutoff_days', overrides)
     : getThreshold('personalized_clothing_cutoff_days', overrides);
-  const showPersonalized = canOrderPersonalizedClothing(eventDate, cutoffDays);
+  // Standard merch gate: under-100-kid schools only see standard clothing
+  const showPersonalized = isStandardMerchOnly
+    ? false
+    : canOrderPersonalizedClothing(eventDate, cutoffDays);
 
   // Select the appropriate clothing products based on time until event
   const activeClothingProducts = useMemo(

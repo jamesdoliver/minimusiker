@@ -167,6 +167,8 @@ export default function EventDetailPage() {
   const [dealType, setDealType] = useState<DealType | null>(null);
   const [dealConfig, setDealConfig] = useState<DealConfig>({});
   const [estimatedChildren, setEstimatedChildren] = useState<number | undefined>(undefined);
+  const [isUnder100, setIsUnder100] = useState(false);
+  const [standardMerchOverride, setStandardMerchOverride] = useState<'auto' | 'force-standard' | 'force-personalized'>('auto');
   const [isUpdatingDeal, setIsUpdatingDeal] = useState(false);
 
   // Refresh teacher state
@@ -214,6 +216,8 @@ export default function EventDetailPage() {
       setDealType(data.data?.dealType || null);
       setDealConfig(data.data?.dealConfig || {});
       setEstimatedChildren(data.data?.estimatedChildren);
+      setIsUnder100(data.data?.isUnder100 || false);
+      setStandardMerchOverride(data.data?.standardMerchOverride || 'auto');
     } catch (err) {
       console.error('Error fetching event detail:', err);
       setError(err instanceof Error ? err.message : 'Failed to load event details');
@@ -1000,6 +1004,74 @@ export default function EventDetailPage() {
                   {isUpdatingToggles === 'is_schulsong' && <LoadingSpinner size="sm" />}
                 </label>
               </div>
+            </div>
+
+            {/* Standard Merch Override */}
+            <div className="mt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Standard Merch Gate</h3>
+              <div className="flex items-center gap-3">
+                <div
+                  className={`inline-flex rounded-lg p-0.5 ${isUpdatingToggles === 'standard_merch' ? 'opacity-50 pointer-events-none' : ''}`}
+                  style={{ backgroundColor: '#e5e7eb' }}
+                >
+                  {([
+                    { value: 'auto' as const, label: 'Auto' },
+                    { value: 'force-standard' as const, label: 'Standard Only' },
+                    { value: 'force-personalized' as const, label: 'Personalized' },
+                  ]).map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      disabled={isUpdatingToggles === 'standard_merch'}
+                      onClick={async () => {
+                        setIsUpdatingToggles('standard_merch');
+                        try {
+                          const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ standard_merch_override: option.value === 'auto' ? null : option.value }),
+                          });
+                          if (!response.ok) throw new Error('Failed to update');
+                          setStandardMerchOverride(option.value);
+                          toast.success(`Standard Merch: ${option.label}`);
+                        } catch {
+                          toast.error('Failed to update standard merch override');
+                        } finally {
+                          setIsUpdatingToggles(null);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+                      style={standardMerchOverride === option.value ? {
+                        backgroundColor: '#d1d5db',
+                        color: '#374151',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                      } : {
+                        backgroundColor: 'transparent',
+                        color: '#6b7280',
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {isUpdatingToggles === 'standard_merch' && <LoadingSpinner size="sm" />}
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                  (standardMerchOverride === 'force-standard' || (standardMerchOverride === 'auto' && isUnder100))
+                    ? 'bg-gray-200 text-gray-700'
+                    : 'bg-green-100 text-green-700'
+                }`}>
+                  {standardMerchOverride === 'auto'
+                    ? (isUnder100 ? 'Standard only (<100 Kinder)' : 'Personalisiert erlaubt')
+                    : standardMerchOverride === 'force-standard'
+                    ? 'Override: Standard only'
+                    : 'Override: Personalisiert'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {estimatedChildren !== undefined
+                  ? `${estimatedChildren} geschätzte Kinder (Auto-Schwelle: <100 = Standard only)`
+                  : 'Keine geschätzte Kinderzahl gesetzt'}
+              </p>
             </div>
 
             {/* Deal Builder */}

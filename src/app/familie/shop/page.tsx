@@ -56,6 +56,7 @@ function ShopContent() {
   const [timelineOverridesJson, setTimelineOverridesJson] = useState<string | null>(null);
   const [shopProfile, setShopProfile] = useState<ReturnType<typeof resolveShopProfile> | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isStandardMerchOnly, setIsStandardMerchOnly] = useState(false);
 
   const { products, isLoading, error } = useProducts({
     tagFilter: 'minimusiker-shop',
@@ -130,6 +131,7 @@ function ShopContent() {
             }
           ));
           setEventDate(data.eventDate || null);
+          setIsStandardMerchOnly(data.isStandardMerchOnly === true);
           if (data.timelineOverrides) {
             setTimelineOverridesJson(data.timelineOverrides);
           }
@@ -153,7 +155,10 @@ function ShopContent() {
     const cutoffDays = isSchulsongOnly
       ? getThreshold('schulsong_clothing_cutoff_days', overrides)
       : getThreshold('personalized_clothing_cutoff_days', overrides);
-    const showPersonalized = canOrderPersonalizedClothing(eventDate, cutoffDays);
+    // Standard merch gate: under-100-kid schools only see standard clothing
+    const showPersonalized = isStandardMerchOnly
+      ? false
+      : canOrderPersonalizedClothing(eventDate, cutoffDays);
     const excluded = buildExcludedVariantIds(shopProfile.shopifyVariantMap, showPersonalized);
 
     // Also exclude variants for hidden products (uses date-based defaults if not explicitly configured)
@@ -175,7 +180,7 @@ function ShopContent() {
     }
 
     return excluded;
-  }, [shopProfile, eventDate, overrides]);
+  }, [shopProfile, eventDate, overrides, isStandardMerchOnly]);
 
   if (isVerifying || isProfileLoading) {
     return (

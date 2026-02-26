@@ -3,6 +3,7 @@ import { verifyParentSession } from '@/lib/auth/verifyParentSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
+import { computeStandardMerchOnly } from '@/lib/utils/eventTimeline';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +58,8 @@ export async function GET(request: NextRequest) {
     const dealBuilderEnabled = event?.deal_builder_enabled === true;
     const dealType = event?.deal_type || null;
     const dealConfig = event?.deal_config || null;
+    // Standard merch gate: <100 kids = standard only (unless admin overrides)
+    const standardMerchOnly = computeStandardMerchOnly(event?.standard_merch_override, event?.is_under_100);
 
     // Schulsong visibility is controlled by schulsong_released_at (set when admin approves)
     const releasedAt = event?.schulsong_released_at ? new Date(event.schulsong_released_at) : null;
@@ -73,6 +76,7 @@ export async function GET(request: NextRequest) {
         dealBuilderEnabled,
         dealType,
         dealConfig,
+        isStandardMerchOnly: standardMerchOnly,
       });
     }
 
@@ -90,6 +94,7 @@ export async function GET(request: NextRequest) {
         dealBuilderEnabled,
         dealType,
         dealConfig,
+        isStandardMerchOnly: standardMerchOnly,
         hasAudio: false,
       });
     }
@@ -126,6 +131,7 @@ export async function GET(request: NextRequest) {
         dealBuilderEnabled,
         dealType,
         dealConfig,
+        isStandardMerchOnly: standardMerchOnly,
         hasAudio: false,
       });
     }
@@ -142,6 +148,7 @@ export async function GET(request: NextRequest) {
         dealBuilderEnabled,
         dealType,
         dealConfig,
+        isStandardMerchOnly: standardMerchOnly,
         hasAudio: false,
         notYetVisible: true,
         visibleAfter: releasedAt?.toISOString(),
@@ -158,6 +165,7 @@ export async function GET(request: NextRequest) {
       dealBuilderEnabled,
       dealType,
       dealConfig,
+      isStandardMerchOnly: standardMerchOnly,
       hasAudio: true,
       audioUrl,
       downloadUrl,
