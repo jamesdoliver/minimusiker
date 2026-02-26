@@ -122,26 +122,6 @@ export interface PrintableEditorState {
   canvasScale?: number;  // Scale factor used during editing (CSS pixels per PDF point)
 }
 
-/**
- * Legacy editor state for backwards compatibility
- * @deprecated Use PrintableEditorState with textElements array
- */
-export interface LegacyEditorState {
-  text: string;
-  textPosition: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  fontSize: number;
-  qrPosition?: {
-    x: number;
-    y: number;
-    size: number;
-  };
-}
-
 // Default text color (black)
 const DEFAULT_TEXT_COLOR = { r: 0, g: 0, b: 0 };
 

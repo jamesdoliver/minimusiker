@@ -889,11 +889,7 @@ export default function ConfirmPrintablesModal({
               ) : (
                 <button
                   onClick={handleConfirmAndNext}
-                  className={`inline-flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-colors ${
-                    currentItemStatus === 'confirmed'
-                      ? 'bg-[#F4A261] text-white hover:bg-[#E07B3A]'
-                      : 'bg-[#F4A261] text-white hover:bg-[#E07B3A]'
-                  }`}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-colors bg-[#F4A261] text-white hover:bg-[#E07B3A]"
                 >
                   {currentItemStatus === 'confirmed' ? 'Update' : 'Confirm'}
                 </button>
