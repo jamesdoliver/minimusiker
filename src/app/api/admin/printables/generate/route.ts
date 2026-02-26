@@ -203,9 +203,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine success status
-    const anySucceeded = succeeded.length > 0 || skipped.length > 0;
-    const allSucceeded = failed.length === 0;
-    const partialSuccess = anySucceeded && !allSucceeded;
+    const anyGenerated = succeeded.length > 0;
+    const allSkipped = succeeded.length === 0 && failed.length === 0 && skipped.length > 0;
+    const allSucceeded = anyGenerated && failed.length === 0;
+    const partialSuccess = anyGenerated && failed.length > 0;
 
     // Log generation status
     console.log(`[printables/generate] Generated ${succeeded.length} PDFs, skipped ${skipped.length}, failed ${failed.length} for event ${eventId}`);
@@ -220,8 +221,9 @@ export async function POST(request: NextRequest) {
 
     // Return improved response structure
     return NextResponse.json({
-      success: anySucceeded,
+      success: allSucceeded || allSkipped,
       partialSuccess,
+      allSkipped,
       eventId,
       accessCode: accessCode || null,
       qrCodeIncluded: !!qrCodeUrl,

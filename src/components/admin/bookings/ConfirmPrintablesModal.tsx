@@ -39,6 +39,7 @@ interface GenerationResultItem {
 interface GenerationResult {
   success: boolean;
   partialSuccess: boolean;
+  allSkipped?: boolean;
   eventId: string;
   audioFolderCreated: boolean;
   results: {
@@ -374,7 +375,7 @@ export default function ConfirmPrintablesModal({
       }
 
       // If fully successful (no failures), clear saved state and close modal after short delay
-      if (result.success && !result.partialSuccess) {
+      if (result.success && !result.partialSuccess && !result.allSkipped) {
         localStorage.removeItem(`${storageKeyPrefix}-editor`);
         localStorage.removeItem(`${storageKeyPrefix}-status`);
         localStorage.removeItem(`${storageKeyPrefix}-step`);
@@ -653,9 +654,14 @@ export default function ConfirmPrintablesModal({
                     Partial Success
                   </span>
                 )}
-                {generationResult.success && !generationResult.partialSuccess && (
+                {generationResult.success && !generationResult.partialSuccess && !generationResult.allSkipped && (
                   <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">
                     All Succeeded
+                  </span>
+                )}
+                {generationResult.allSkipped && (
+                  <span className="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-full">
+                    All Skipped
                   </span>
                 )}
               </div>
@@ -731,8 +737,11 @@ export default function ConfirmPrintablesModal({
               )}
 
               {/* Close button for full success */}
-              {generationResult.success && !generationResult.partialSuccess && (
+              {generationResult.success && !generationResult.partialSuccess && !generationResult.allSkipped && (
                 <p className="text-sm text-green-600">All printables generated successfully. Closing...</p>
+              )}
+              {generationResult.allSkipped && (
+                <p className="text-sm text-amber-600">All items were skipped. No PDFs generated.</p>
               )}
             </div>
           </div>
