@@ -123,6 +123,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Clean up old previews for this event+type before uploading new one
+    try {
+      const oldPreviewPrefix = `previews/${eventId}/${item.type}_`;
+      await r2Service.deleteByPrefix(oldPreviewPrefix);
+    } catch (cleanupError) {
+      // Non-fatal — log and continue with upload
+      console.warn('[printables/preview] Failed to clean up old previews:', cleanupError);
+    }
+
     // Upload to R2 with a preview prefix (temporary storage)
     const timestamp = Date.now();
     const previewKey = `previews/${eventId}/${item.type}_${timestamp}.pdf`;

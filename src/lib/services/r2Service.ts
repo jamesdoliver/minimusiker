@@ -10,6 +10,8 @@ import {
   UploadPartCommand,
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -2388,6 +2390,38 @@ class R2Service {
     } catch (error) {
       console.error('Error getting file buffer from assets bucket:', error);
       return null;
+    }
+  }
+
+  /**
+   * Delete all objects matching a key prefix.
+   * Used for cleanup of temporary files like previews.
+   */
+  async deleteByPrefix(prefix: string): Promise<{ deleted: number }> {
+    try {
+      const listCommand = new ListObjectsV2Command({
+        Bucket: this.assetsBucketName,
+        Prefix: prefix,
+      });
+
+      const listResult = await this.client.send(listCommand);
+      const objects = listResult.Contents || [];
+
+      if (objects.length === 0) return { deleted: 0 };
+
+      const deleteCommand = new DeleteObjectsCommand({
+        Bucket: this.assetsBucketName,
+        Delete: {
+          Objects: objects.map(obj => ({ Key: obj.Key })),
+          Quiet: true,
+        },
+      });
+
+      await this.client.send(deleteCommand);
+      return { deleted: objects.length };
+    } catch (error) {
+      console.error(`[R2Service] Error deleting by prefix ${prefix}:`, error);
+      return { deleted: 0 };
     }
   }
 }
