@@ -169,11 +169,11 @@ export default function ConfirmPrintablesModal({
       setHealthCheck(null);
       setHealthError(null);
 
-      // Run health check
-      checkHealth();
-
-      // Load existing printable status from R2
-      loadPrintablesStatus();
+      // Run health check, then load existing printable status from R2
+      (async () => {
+        await checkHealth();
+        await loadPrintablesStatus();
+      })();
     }
   }, [isOpen, booking.schoolName]);
 
