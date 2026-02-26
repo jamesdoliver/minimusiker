@@ -41,6 +41,10 @@ import {
   type ImagePlacement,
   type QrCodePlacement,
 } from '../config/printableConfig';
+import type { TextElementConfig, PrintableItemConfig } from '../config/printableShared';
+
+// Re-export shared types so existing consumers don't break
+export type { TextElementConfig, PrintableItemConfig } from '../config/printableShared';
 
 // Result type for generation operations
 export interface GenerationResult {
@@ -50,30 +54,6 @@ export interface GenerationResult {
   error?: string;
 }
 
-// Config for a single text element (Phase 4)
-export interface TextElementConfig {
-  id: string;
-  type: 'headline' | 'subline' | 'calendar' | 'custom';
-  text: string;
-  x: number;        // PDF coordinates
-  y: number;        // PDF coordinates
-  width: number;    // PDF points
-  height: number;   // PDF points
-  fontSize: number; // PDF points
-  color: { r: number; g: number; b: number }; // RGB 0-1
-  fontFamily?: 'fredoka' | 'springwood-display';  // Optional font override
-}
-
-// Config for each printable item from the editor (Phase 4)
-export interface PrintableItemConfig {
-  type: string;
-  textElements: TextElementConfig[];  // Array of text elements
-  qrPosition?: {
-    x: number;
-    y: number;
-    size: number;
-  };
-}
 
 // Result type for batch generation
 export interface BatchGenerationResult {
