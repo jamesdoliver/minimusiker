@@ -163,6 +163,16 @@ export default function ConfirmPrintablesModal({
         setItemsStatus(initialStatus);
       }
 
+      // One-time cleanup: remove old-format localStorage keys (before env-scoping was added)
+      try {
+        const oldPrefix = `printables-editor-${booking.code}`;
+        localStorage.removeItem(`${oldPrefix}-editor`);
+        localStorage.removeItem(`${oldPrefix}-status`);
+        localStorage.removeItem(`${oldPrefix}-step`);
+      } catch {
+        // Ignore cleanup errors
+      }
+
       setIsGenerating(false);
       setGenerationError(null);
       setGenerationResult(null);
