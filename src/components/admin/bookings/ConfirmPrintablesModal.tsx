@@ -108,7 +108,8 @@ export default function ConfirmPrintablesModal({
   const stepSetByUser = useRef(false);
 
   // localStorage key prefix for persisting editor state across sessions
-  const storageKeyPrefix = `printables-editor-${booking.code}`;
+  const envPrefix = process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.NODE_ENV || 'dev';
+  const storageKeyPrefix = `printables-${envPrefix}-${booking.code}`;
 
   // Current item config
   const currentItem = PRINTABLE_ITEMS[currentStep];
