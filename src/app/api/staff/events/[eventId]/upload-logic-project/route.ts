@@ -144,6 +144,13 @@ export async function PUT(
       status: 'ready',
     });
 
+    // Auto-assign engineer based on project type
+    try {
+      await getAirtableService().autoAssignEngineerForUpload(eventId, projectType === 'schulsong');
+    } catch (error) {
+      console.error('Error auto-assigning engineer:', error);
+    }
+
     // Notify the appropriate engineer for this specific upload type
     notifyEngineerOfUpload(eventId, projectType as 'schulsong' | 'minimusiker').catch(err =>
       console.error('Engineer notification error:', err)
