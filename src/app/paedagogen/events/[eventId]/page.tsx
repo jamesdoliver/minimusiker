@@ -1205,6 +1205,8 @@ export default function TeacherEventDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAddClass, setShowAddClass] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showCreateChoir, setShowCreateChoir] = useState(false);
+  const [showCreateTeacherSong, setShowCreateTeacherSong] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAlbumLayoutModal, setShowAlbumLayoutModal] = useState(false);
 
@@ -1276,6 +1278,9 @@ export default function TeacherEventDetailPage() {
   };
 
   const isEditable = event?.status !== 'completed';
+
+  const choirs = collections.filter(c => c.classType === 'choir');
+  const teacherSongs = collections.filter(c => c.classType === 'teacher_song');
 
   if (isLoading) {
     return (
@@ -1430,13 +1435,33 @@ export default function TeacherEventDetailPage() {
               <div className="flex gap-2 flex-wrap justify-end">
                 <button
                   onClick={() => setShowCreateGroup(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
-                  title="Gruppe, Chor oder Lehrerlied hinzufügen"
+                  className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                  title="Gruppe erstellen"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                   Gruppe
+                </button>
+                <button
+                  onClick={() => setShowCreateChoir(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+                  title="Chor erstellen"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                  </svg>
+                  Chor
+                </button>
+                <button
+                  onClick={() => setShowCreateTeacherSong(true)}
+                  className="flex items-center gap-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+                  title="Lehrerlied erstellen"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                  </svg>
+                  Lehrerlied
                 </button>
                 <button
                   onClick={() => setShowAddClass(true)}
@@ -1526,17 +1551,50 @@ export default function TeacherEventDetailPage() {
           </div>
         )}
 
-        {/* Collections Section (Choir + Teacher Songs) */}
-        {collections.length > 0 && (
+        {/* Chor Section */}
+        {choirs.length > 0 && (
           <div className="mt-8">
             <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Sammlungen</h2>
+              <h2 className="text-xl font-semibold text-gray-900">
+                Chor
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  ({choirs.length} {choirs.length === 1 ? 'Chor' : 'Chöre'})
+                </span>
+              </h2>
               <span className="px-2 py-0.5 text-xs bg-teal-100 text-teal-700 rounded-full font-medium">
                 Sichtbar für alle Eltern
               </span>
             </div>
             <div className="space-y-4">
-              {collections.map((collection) => (
+              {choirs.map((collection) => (
+                <CollectionCard
+                  key={collection.classId}
+                  collection={collection}
+                  eventId={event.eventId}
+                  isEditable={isEditable}
+                  onCollectionUpdated={handleRefresh}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Lehrerlied Section */}
+        {teacherSongs.length > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center gap-3 mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Lehrerlied
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  ({teacherSongs.length} {teacherSongs.length === 1 ? 'Lehrerlied' : 'Lehrerlieder'})
+                </span>
+              </h2>
+              <span className="px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full font-medium">
+                Sichtbar für alle Eltern
+              </span>
+            </div>
+            <div className="space-y-4">
+              {teacherSongs.map((collection) => (
                 <CollectionCard
                   key={collection.classId}
                   collection={collection}
@@ -1558,7 +1616,7 @@ export default function TeacherEventDetailPage() {
           />
         )}
 
-        {/* Unified Add Modal (Group, Choir, Teacher Song) */}
+        {/* Unified Add Modal (Group) */}
         {showCreateGroup && (
           <UnifiedAddModal
             eventId={event.eventId}
@@ -1568,6 +1626,38 @@ export default function TeacherEventDetailPage() {
             onClose={() => setShowCreateGroup(false)}
             onSuccess={handleRefresh}
             apiBasePath="/api/teacher"
+            initialTab="group"
+            hideTabBar
+          />
+        )}
+
+        {/* Unified Add Modal (Choir) */}
+        {showCreateChoir && (
+          <UnifiedAddModal
+            eventId={event.eventId}
+            availableClasses={event.classes
+              .filter(c => !c.isDefault)
+              .map(c => ({ classId: c.classId, className: c.className }))}
+            onClose={() => setShowCreateChoir(false)}
+            onSuccess={handleRefresh}
+            apiBasePath="/api/teacher"
+            initialTab="choir"
+            hideTabBar
+          />
+        )}
+
+        {/* Unified Add Modal (Teacher Song) */}
+        {showCreateTeacherSong && (
+          <UnifiedAddModal
+            eventId={event.eventId}
+            availableClasses={event.classes
+              .filter(c => !c.isDefault)
+              .map(c => ({ classId: c.classId, className: c.className }))}
+            onClose={() => setShowCreateTeacherSong(false)}
+            onSuccess={handleRefresh}
+            apiBasePath="/api/teacher"
+            initialTab="teacher_song"
+            hideTabBar
           />
         )}
 
