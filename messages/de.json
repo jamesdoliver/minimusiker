@@ -174,9 +174,9 @@
   },
   "productSelector": {
     "title": "So gelangt ihr an die Aufnahmen",
-    "subtitle": "Wähle den für euch passenden Tonträger mit allen Liedern des Minimusikertags. Für den passenden Look kannst du auch ein T-Shirt oder Hoodie bestellen.",
+    "subtitle": "Wähle den für euch passenden Tonträger mit allen Liedern des Minimusikertags. Für den passenden Look kannst du auch ein T-Shirt oder Hoodie bestellen.\n\nMit deinem Kauf erhältst du ein besonderes Erinnerungsstück und trägst gleichzeitig dazu bei, dieses Projekt an der Einrichtung deines Kindes möglich zu machen. Vielen Dank dafür!",
     "titleSchulsongOnly": "Sichert euch jetzt die limitierten Schul-Shirts und Schul-Hoodies der {schoolName}!",
-    "chooseAudio": "Wählen Sie Ihr Audio",
+    "chooseAudio": "Wähle dein Audio-Format",
     "required": "(Erforderlich)",
     "addClothing": "Kleidung hinzufügen",
     "optional": "(Optional)",
