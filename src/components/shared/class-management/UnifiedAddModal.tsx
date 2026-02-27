@@ -14,6 +14,7 @@ interface UnifiedAddModalProps {
   onSuccess: () => void;
   apiBasePath: string; // '/api/teacher' or '/api/admin'
   initialTab?: 'group' | 'choir' | 'teacher_song';
+  hideTabBar?: boolean;
 }
 
 type TabType = 'group' | 'choir' | 'teacher_song';
@@ -49,6 +50,7 @@ export default function UnifiedAddModal({
   onSuccess,
   apiBasePath,
   initialTab = 'group',
+  hideTabBar = false,
 }: UnifiedAddModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [name, setName] = useState('');
@@ -202,7 +204,9 @@ export default function UnifiedAddModal({
       <div className="bg-white rounded-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Gruppe erstellen</h3>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {hideTabBar ? currentConfig.buttonText : 'Gruppe erstellen'}
+          </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -211,18 +215,20 @@ export default function UnifiedAddModal({
         </div>
 
         {/* Segmented Tabs */}
-        <div className="flex rounded-lg bg-gray-100 p-1 gap-1 mb-6">
-          {(Object.keys(TAB_CONFIG) as TabType[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${getTabButtonClasses(tab)}`}
-            >
-              {TAB_CONFIG[tab].label}
-            </button>
-          ))}
-        </div>
+        {!hideTabBar && (
+          <div className="flex rounded-lg bg-gray-100 p-1 gap-1 mb-6">
+            {(Object.keys(TAB_CONFIG) as TabType[]).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${getTabButtonClasses(tab)}`}
+              >
+                {TAB_CONFIG[tab].label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Help Text Box */}
         <div className={`border rounded-lg p-3 mb-4 ${getHelpBoxClasses()}`}>
