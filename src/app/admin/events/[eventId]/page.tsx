@@ -126,6 +126,8 @@ export default function EventDetailPage() {
   const [showAddGroup, setShowAddGroup] = useState(false);
   const [showEditGroup, setShowEditGroup] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<ClassGroup | null>(null);
+  const [showCreateChoir, setShowCreateChoir] = useState(false);
+  const [showCreateTeacherSong, setShowCreateTeacherSong] = useState(false);
 
   // Collection management state (Choir and Teacher Song)
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -261,6 +263,10 @@ export default function EventDetailPage() {
       console.error('Error fetching collections:', err);
     }
   };
+
+  // Derived filtered arrays for Chor and Lehrerlied sections
+  const choirs = collections.filter(c => c.classType === 'choir');
+  const teacherSongs = collections.filter(c => c.classType === 'teacher_song');
 
   // Collection management handlers
   const toggleCollectionExpanded = (classId: string) => {
@@ -1668,20 +1674,43 @@ export default function EventDetailPage() {
         )}
       </div>
 
-      {/* Collections Section (Choir and Teacher Song) */}
-      {collections.length > 0 && (
+      {/* Chor Section */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-900">
-            Sammlungen
-            <span className="ml-2 text-sm font-normal text-gray-500">
-              ({collections.length} {collections.length === 1 ? 'Sammlung' : 'Sammlungen'})
-            </span>
+            Chor
+            {choirs.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                ({choirs.length} {choirs.length === 1 ? 'Chor' : 'Chöre'})
+              </span>
+            )}
           </h2>
+          <button
+            onClick={() => setShowCreateChoir(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Chor erstellen
+          </button>
         </div>
 
-        <div className="space-y-4">
-            {collections.map((collection) => {
+        {choirs.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-teal-100 p-8 text-center">
+            <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Keine Chöre</h3>
+            <p className="text-gray-600 text-sm">
+              Chöre sind für alle Eltern sichtbar, unabhängig von der Klasse.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {choirs.map((collection) => {
               const isExpanded = expandedCollections.has(collection.classId);
               const songs = collection.songs || [];
               const isChoir = collection.classType === 'choir';
@@ -1861,8 +1890,227 @@ export default function EventDetailPage() {
               );
             })}
           </div>
+        )}
+      </div>
+
+      {/* Lehrerlied Section */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Lehrerlied
+            {teacherSongs.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                ({teacherSongs.length} {teacherSongs.length === 1 ? 'Lehrerlied' : 'Lehrerlieder'})
+              </span>
+            )}
+          </h2>
+          <button
+            onClick={() => setShowCreateTeacherSong(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Lehrerlied erstellen
+          </button>
         </div>
-      )}
+
+        {teacherSongs.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-amber-100 p-8 text-center">
+            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Keine Lehrerlieder</h3>
+            <p className="text-gray-600 text-sm">
+              Lehrerlieder sind für alle Eltern sichtbar, unabhängig von der Klasse.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {teacherSongs.map((collection) => {
+              const isExpanded = expandedCollections.has(collection.classId);
+              const songs = collection.songs || [];
+              const isChoir = collection.classType === 'choir';
+
+              return (
+                <div
+                  key={collection.classId}
+                  className={`bg-white rounded-xl shadow-sm border ${
+                    isChoir ? 'border-teal-200' : 'border-amber-200'
+                  } overflow-hidden group`}
+                >
+                  {/* Collection Header - Clickable to expand */}
+                  <button
+                    onClick={() => toggleCollectionExpanded(collection.classId)}
+                    className={`w-full px-5 py-4 flex items-center justify-between ${
+                      isChoir ? 'hover:bg-teal-50/50' : 'hover:bg-amber-50/50'
+                    } transition-colors`}
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      {/* Collection Icon */}
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          isChoir ? 'bg-teal-100' : 'bg-amber-100'
+                        }`}
+                      >
+                        <svg
+                          className={`w-4 h-4 ${isChoir ? 'text-teal-600' : 'text-amber-600'}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                          />
+                        </svg>
+                      </div>
+
+                      {/* Collection Info */}
+                      <div className="text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{collection.className}</span>
+                          <span
+                            className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                              isChoir
+                                ? 'bg-teal-100 text-teal-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            {isChoir ? 'Chor' : 'Lehrerlied'}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {songs.length} {songs.length === 1 ? 'Lied' : 'Lieder'}
+                          {collection.audioStatus?.hasPreview && (
+                            <span className="ml-2 text-green-600">Audio bereit</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expand/Collapse Icon */}
+                    <svg
+                      className={`w-5 h-5 text-gray-400 transition-transform ${
+                        isExpanded ? 'rotate-180' : ''
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Expanded Content - Songs List */}
+                  {isExpanded && (
+                    <div
+                      className={`border-t px-5 py-4 ${
+                        isChoir ? 'border-teal-100 bg-teal-50/30' : 'border-amber-100 bg-amber-50/30'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-medium text-gray-700">Lieder</h4>
+                        <button
+                          onClick={() => handleAddSongToCollection(collection.classId)}
+                          className={`text-sm font-medium flex items-center gap-1 ${
+                            isChoir
+                              ? 'text-teal-600 hover:text-teal-700'
+                              : 'text-amber-600 hover:text-amber-700'
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Lied hinzufügen
+                        </button>
+                      </div>
+
+                      {songs.length === 0 ? (
+                        <div className="text-center py-6 text-gray-500">
+                          <svg
+                            className="w-8 h-8 mx-auto mb-2 text-gray-300"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"
+                            />
+                          </svg>
+                          <p className="text-sm">Noch keine Lieder</p>
+                          <button
+                            onClick={() => handleAddSongToCollection(collection.classId)}
+                            className={`mt-2 text-sm ${
+                              isChoir
+                                ? 'text-teal-600 hover:text-teal-700'
+                                : 'text-amber-600 hover:text-amber-700'
+                            }`}
+                          >
+                            Erstes Lied hinzufügen
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {songs.map((song) => (
+                            <div
+                              key={song.id}
+                              className="flex items-center justify-between p-3 bg-white rounded-lg group hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-gray-900 truncate">{song.title}</div>
+                                {song.artist && (
+                                  <div className="text-sm text-gray-500 truncate">{song.artist}</div>
+                                )}
+                                {song.notes && (
+                                  <div className="text-xs text-gray-400 mt-1 truncate">{song.notes}</div>
+                                )}
+                              </div>
+
+                              {/* Song actions */}
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleEditSong(song)}
+                                  className={`p-1.5 text-gray-400 rounded transition-colors ${
+                                    isChoir
+                                      ? 'hover:text-teal-600 hover:bg-teal-50'
+                                      : 'hover:text-amber-600 hover:bg-amber-50'
+                                  }`}
+                                  title="Lied bearbeiten"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSong(song)}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Lied löschen"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Activity Timeline */}
       <div className="mt-8">
@@ -1953,6 +2201,44 @@ export default function EventDetailPage() {
             fetchCollections();
           }}
           apiBasePath="/api/admin"
+          initialTab="group"
+          hideTabBar
+        />
+      )}
+
+      {showCreateChoir && event?.classes && (
+        <UnifiedAddModal
+          eventId={eventId}
+          availableClasses={event.classes.map((c: any) => ({
+            classId: c.classId,
+            className: c.className,
+          }))}
+          onClose={() => setShowCreateChoir(false)}
+          onSuccess={() => {
+            setShowCreateChoir(false);
+            fetchCollections();
+          }}
+          apiBasePath="/api/admin"
+          initialTab="choir"
+          hideTabBar
+        />
+      )}
+
+      {showCreateTeacherSong && event?.classes && (
+        <UnifiedAddModal
+          eventId={eventId}
+          availableClasses={event.classes.map((c: any) => ({
+            classId: c.classId,
+            className: c.className,
+          }))}
+          onClose={() => setShowCreateTeacherSong(false)}
+          onSuccess={() => {
+            setShowCreateTeacherSong(false);
+            fetchCollections();
+          }}
+          apiBasePath="/api/admin"
+          initialTab="teacher_song"
+          hideTabBar
         />
       )}
 
