@@ -200,11 +200,18 @@ function ParentPortalContent() {
         );
         if (response.ok) {
           const data = await response.json();
-          const resolved = resolveShopProfile({
-            isMinimusikertag: data.isMinimusikertag,
-            isPlus: data.isPlus,
-            isSchulsong: data.isSchulsong,
-          });
+          const resolved = resolveShopProfile(
+            {
+              isMinimusikertag: data.isMinimusikertag,
+              isPlus: data.isPlus,
+              isSchulsong: data.isSchulsong,
+            },
+            {
+              enabled: data.dealBuilderEnabled,
+              type: data.dealType,
+              config: data.dealConfig,
+            }
+          );
 
           // Filter out hidden products from the profile (uses date-based defaults if not explicitly configured)
           const overridesData = data.timelineOverrides ? parseOverrides(data.timelineOverrides) : null;

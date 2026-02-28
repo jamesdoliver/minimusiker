@@ -171,14 +171,14 @@ export function dealTypeToFlags(dealType: DealType, config: DealConfig): {
   switch (dealType) {
     case 'mimu':
       return {
-        is_minimusikertag: !(config.music_pricing_enabled ?? config.cheaper_music),
+        is_minimusikertag: true, // Always true — PLUS is a pricing tier, not a different event type
         is_plus: (config.music_pricing_enabled ?? config.cheaper_music) === true,
         is_kita: false,
         is_schulsong: true,
       };
     case 'mimu_scs':
       return {
-        is_minimusikertag: config.scs_audio_pricing !== 'plus',
+        is_minimusikertag: true, // Always true — SCS is a pricing arrangement, not a different event type
         is_plus: config.scs_audio_pricing === 'plus',
         is_kita: false,
         is_schulsong: config.scs_song_option !== 'none',
