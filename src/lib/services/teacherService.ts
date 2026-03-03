@@ -3303,9 +3303,28 @@ class TeacherService {
       const songs = await this.getSongsByEventId(eventId);
 
       // Get all classes for this event to map class names
+      // Classes may have legacy_booking_id set to either the canonical event_id
+      // or the SimplyBook ID, so look up the event record to find both identifiers
+      let classFilterFormula = `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`;
+
+      if (this.useNormalizedTables()) {
+        this.ensureNormalizedTablesInitialized();
+        const eventRecords = await this.eventsTable!.select({
+          filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}')`,
+          maxRecords: 1,
+        }).firstPage();
+
+        if (eventRecords.length > 0) {
+          const evtLegacyId = eventRecords[0].fields[EVENTS_FIELD_IDS.legacy_booking_id] as string | undefined;
+          if (evtLegacyId && evtLegacyId !== eventId) {
+            classFilterFormula = `OR({${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${evtLegacyId.replace(/'/g, "\\'")}')`;
+          }
+        }
+      }
+
       const classRecords = await this.base(CLASSES_TABLE_ID)
         .select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}' `,
+          filterByFormula: classFilterFormula,
           returnFieldsByFieldId: true,
         })
         .all();
