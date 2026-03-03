@@ -624,10 +624,25 @@ class TeacherService {
       // This handles the case where songs have the correct linked record but a different text event_id.
       if (this.useNormalizedTables()) {
         this.ensureNormalizedTablesInitialized();
-        const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+        // Try event_id OR legacy_booking_id
+        let eventRecords = await this.eventsTable!.select({
+          filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}')`,
           maxRecords: 1,
         }).firstPage();
+
+        // SimplyBook ID fallback (numeric IDs)
+        if (eventRecords.length === 0 && /^\d+$/.test(eventId)) {
+          const booking = await getAirtableService().getSchoolBookingBySimplybookId(eventId);
+          if (booking) {
+            const eventRecord = await getAirtableService().getEventBySchoolBookingId(booking.id);
+            if (eventRecord) {
+              eventRecords = await this.eventsTable!.select({
+                filterByFormula: `RECORD_ID() = '${eventRecord.id}'`,
+                maxRecords: 1,
+              }).firstPage();
+            }
+          }
+        }
 
         if (eventRecords.length > 0) {
           const eventRecordId = eventRecords[0].id;
