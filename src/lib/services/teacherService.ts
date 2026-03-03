@@ -646,6 +646,26 @@ class TeacherService {
 
         if (eventRecords.length > 0) {
           const eventRecordId = eventRecords[0].id;
+
+          // Try re-querying by the event's canonical event_id (songs store text event_id, which may differ from the input)
+          const canonicalEventId = eventRecords[0].fields[EVENTS_FIELD_IDS.event_id] as string;
+          if (canonicalEventId && canonicalEventId !== eventId) {
+            const canonicalRecords = await this.base(SONGS_TABLE)
+              .select({
+                filterByFormula: `{event_id} = '${canonicalEventId.replace(/'/g, "\\'")}'`,
+                sort: [
+                  { field: 'class_id', direction: 'asc' },
+                  { field: 'order', direction: 'asc' },
+                ],
+              })
+              .all();
+
+            if (canonicalRecords.length > 0) {
+              console.warn(`[getSongsByEventId] Found ${canonicalRecords.length} songs via canonical event_id '${canonicalEventId}' for input '${eventId}'`);
+              return canonicalRecords.map((record) => this.transformSongRecord(record));
+            }
+          }
+
           const linkedRecords = await this.base(SONGS_TABLE)
             .select({
               filterByFormula: `{${SONGS_LINKED_FIELD_IDS.event_link}} = '${eventRecordId}'`,

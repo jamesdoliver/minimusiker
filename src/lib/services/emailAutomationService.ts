@@ -249,7 +249,7 @@ export async function getTeacherRecipientsForEvent(
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
     const eventLink = eventData.accessCode
       ? `${baseUrl}/e/${eventData.accessCode}`
-      : `${baseUrl}/parent`;
+      : `${baseUrl}/familie`;
 
     // PRIORITY 1: Use linked teachers from Events.teachers
     if (event?.teachers && event.teachers.length > 0) {
@@ -371,7 +371,7 @@ export async function getParentRecipientsForEvent(
           const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
           const eventLink = eventData.accessCode
             ? `${baseUrl}/e/${eventData.accessCode}`
-            : `${baseUrl}/parent`;
+            : `${baseUrl}/familie`;
           recipients.push({
             email: parent.parent_email,
             name: parent.parent_first_name,
@@ -512,7 +512,7 @@ export async function sendAutomatedEmail(
   const fullData: TemplateData = {
     school_name: '',
     event_date: '',
-    event_link: `${baseUrl}/parent`,
+    event_link: `${baseUrl}/familie`,
     ...recipient.templateData,
     teacher_portal_link: `${baseUrl}/paedagogen-login`,
     parent_portal_link: `${baseUrl}/familie`,
@@ -764,10 +764,12 @@ export async function processSchulsongReleaseEmails(
   const allEvents = await airtable.getAllEvents();
   const now = new Date();
 
-  // Filter: schulsong + approved + released_at in the past
+  // Filter: pure schulsong-tier events + approved + released_at in the past
+  // Use getEventTier() to respect the hierarchy: PLUS > Minimusikertag > Schulsong
+  // This prevents MiniMusiker events (which have is_schulsong=true) from receiving SchulSong release emails
   const eligible = allEvents.filter(
     (e) =>
-      e.is_schulsong &&
+      getEventTier({ isMinimusikertag: e.is_minimusikertag, isPlus: e.is_plus, isSchulsong: e.is_schulsong }) === 'schulsong' &&
       e.status !== 'Cancelled' && e.status !== 'Deleted' &&
       e.admin_approval_status === 'approved' &&
       e.schulsong_released_at &&
@@ -897,7 +899,7 @@ export async function sendTestEmail(
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
         const eventLink = event.access_code
           ? `${baseUrl}/e/${event.access_code}`
-          : `${baseUrl}/parent`;
+          : `${baseUrl}/familie`;
         templateData = {
           school_name: event.school_name || '',
           event_date: formatDateGerman(event.event_date || ''),

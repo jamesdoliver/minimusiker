@@ -256,7 +256,7 @@ export async function notifyEngineerOfUpload(
         })
       : '';
 
-    const engineerPortalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.minimusiker.de'}/engineer/events/${eventId}`;
+    const engineerPortalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app'}/engineer/events/${eventId}`;
 
     const emailData = {
       engineerName: engineer.staff_name,

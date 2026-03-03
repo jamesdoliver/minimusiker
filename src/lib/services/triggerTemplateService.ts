@@ -416,7 +416,7 @@ export function getSampleVariables(slug: string): Record<string, string> {
   const samples: Record<string, Record<string, string>> = {
     teacher_magic_link: {
       teacherName: 'Frau Müller',
-      magicLinkUrl: 'https://app.minimusiker.de/lehrer/login?token=sample-token-123',
+      magicLinkUrl: 'https://minimusiker.app/lehrer/login?token=sample-token-123',
     },
     new_booking_notification: {
       schoolName: 'Grundschule Sonnenschein',
@@ -449,7 +449,7 @@ export function getSampleVariables(slug: string): Record<string, string> {
     schulsong_teacher_approved: {
       schoolName: 'Grundschule Sonnenschein',
       eventDate: 'Montag, 15. März 2025',
-      adminUrl: 'https://app.minimusiker.de/admin/bookings',
+      adminUrl: 'https://minimusiker.app/admin/bookings',
     },
     parent_welcome: {
       parentName: 'Anna',
@@ -473,14 +473,14 @@ export function getSampleVariables(slug: string): Record<string, string> {
       contactPerson: 'Herr Schmidt',
       contactEmail: 'schmidt@schule.de',
       contactPhone: '0171 1234567',
-      staffPortalUrl: 'https://app.minimusiker.de/staff',
+      staffPortalUrl: 'https://minimusiker.app/staff',
     },
     engineer_audio_uploaded: {
       engineerName: 'Max',
       schoolName: 'Grundschule Sonnenschein',
       eventDate: 'Montag, 15. März 2025',
       eventId: 'evt_example_123',
-      engineerPortalUrl: 'https://app.minimusiker.de/engineer',
+      engineerPortalUrl: 'https://minimusiker.app/engineer',
     },
     schulsong_audio_release: {
       schoolName: 'Grundschule Sonnenschein',
@@ -499,14 +499,14 @@ export function getSampleVariables(slug: string): Record<string, string> {
       schoolName: 'Grundschule Sonnenschein',
       eventDate: 'Montag, 15. März 2025',
       eventId: 'evt_example_123',
-      engineerPortalUrl: 'https://app.minimusiker.de/engineer',
+      engineerPortalUrl: 'https://minimusiker.app/engineer',
     },
     engineer_minimusiker_uploaded: {
       engineerName: 'Max',
       schoolName: 'Grundschule Sonnenschein',
       eventDate: 'Montag, 15. März 2025',
       eventId: 'evt_example_123',
-      engineerPortalUrl: 'https://app.minimusiker.de/engineer',
+      engineerPortalUrl: 'https://minimusiker.app/engineer',
     },
   };
 

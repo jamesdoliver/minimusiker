@@ -85,7 +85,8 @@ export async function GET(
     // Enhance classes with songs data
     if (eventDetail.classes && eventDetail.classes.length > 0) {
       const teacherService = getTeacherService();
-      const allSongs = await teacherService.getSongsByEventId(eventId);
+      const resolvedEventId = eventDetail.eventId || eventId;
+      const allSongs = await teacherService.getSongsByEventId(resolvedEventId);
 
       // Group songs by classId
       const songsByClass = allSongs.reduce((acc, song) => {
@@ -553,7 +554,7 @@ export async function PATCH(
                       contactPerson,
                       contactEmail,
                       contactPhone: schoolPhone,
-                      staffPortalUrl: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://minimusiker.app'}/staff`,
+                      staffPortalUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app'}/staff`,
                     }
                   );
                   emailSentToNewStaff = emailResult.success;

@@ -286,7 +286,7 @@ export async function sendSchulsongTeacherApprovedNotification(
 ): Promise<SendEmailResult> {
   if (recipients.length === 0) return { success: true, messageId: 'no-recipients' };
 
-  const adminUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://app.minimusiker.de'}/admin/bookings`;
+  const adminUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app'}/admin/bookings`;
   return sendTriggerEmail(recipients, 'schulsong_teacher_approved', {
     schoolName: data.schoolName,
     eventDate: formatDateGerman(data.eventDate),

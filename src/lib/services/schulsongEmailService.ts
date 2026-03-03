@@ -214,7 +214,7 @@ export async function sendSchulsongParentReleaseEmailForEvent(
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
   const eventLink = event.access_code
     ? `${baseUrl}/e/${event.access_code}`
-    : `${baseUrl}/parent`;
+    : `${baseUrl}/familie`;
 
   let sent = 0;
   let skipped = 0;

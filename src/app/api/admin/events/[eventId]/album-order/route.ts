@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService, AlbumTrackUpdate } from '@/lib/services/teacherService';
+import { getAirtableService } from '@/lib/services/airtableService';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +22,13 @@ export async function GET(
     const eventId = decodeURIComponent(params.eventId);
     const teacherService = getTeacherService();
 
-    console.log(`[admin/album-order] GET eventId="${eventId}"`);
-    const tracks = await teacherService.getAlbumTracksData(eventId);
+    // Resolve canonical event_id (handles SimplyBook IDs like "1724")
+    const airtableService = getAirtableService();
+    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const resolvedEventId = eventDetail?.eventId || eventId;
+
+    console.log(`[admin/album-order] GET eventId="${eventId}" resolvedEventId="${resolvedEventId}"`);
+    const tracks = await teacherService.getAlbumTracksData(resolvedEventId);
     console.log(`[admin/album-order] GET returning ${tracks.length} tracks:`, tracks.map(t => `${t.albumOrder}. ${t.songTitle} (${t.songId})`));
 
     return NextResponse.json({
@@ -60,6 +66,11 @@ export async function PUT(
     const eventId = decodeURIComponent(params.eventId);
     const teacherService = getTeacherService();
 
+    // Resolve canonical event_id (handles SimplyBook IDs like "1724")
+    const airtableService = getAirtableService();
+    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const resolvedEventId = eventDetail?.eventId || eventId;
+
     const body = await request.json();
     const { tracks } = body as { tracks: AlbumTrackUpdate[] };
 
@@ -70,8 +81,8 @@ export async function PUT(
       );
     }
 
-    console.log(`[admin/album-order] PUT eventId="${eventId}", ${tracks.length} tracks:`, tracks.map(t => `${t.albumOrder}. ${t.songId}`));
-    await teacherService.updateAlbumOrderData(eventId, tracks);
+    console.log(`[admin/album-order] PUT eventId="${eventId}" resolvedEventId="${resolvedEventId}", ${tracks.length} tracks:`, tracks.map(t => `${t.albumOrder}. ${t.songId}`));
+    await teacherService.updateAlbumOrderData(resolvedEventId, tracks);
     console.log(`[admin/album-order] PUT completed successfully`);
 
     return NextResponse.json({

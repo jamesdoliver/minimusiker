@@ -76,7 +76,7 @@ function buildTriggerVariables(
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
   const eventLink = event.access_code
     ? `${baseUrl}/e/${event.access_code}`
-    : `${baseUrl}/parent`;
+    : `${baseUrl}/familie`;
 
   switch (slug) {
     case 'schulsong_audio_release':

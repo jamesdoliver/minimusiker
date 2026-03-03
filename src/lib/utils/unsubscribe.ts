@@ -7,7 +7,7 @@
 
 import crypto from 'crypto';
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.minimusiker.de';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
 
 function getSecret(): string {
   const secret = process.env.UNSUBSCRIBE_SECRET;

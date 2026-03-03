@@ -28,8 +28,13 @@ export async function GET(
     const typeParam = searchParams.get('type');
     const type = typeParam === 'choir' || typeParam === 'teacher_song' ? typeParam : undefined;
 
+    // Resolve canonical event_id
+    const airtableService = getAirtableService();
+    const eventDetail = await airtableService.getSchoolEventDetail(eventId);
+    const resolvedEventId = eventDetail?.eventId || eventId;
+
     // Get collections
-    const collections = await teacherService.getCollectionsForEvent(eventId, type);
+    const collections = await teacherService.getCollectionsForEvent(resolvedEventId, type);
 
     return NextResponse.json({
       success: true,
