@@ -616,8 +616,39 @@ class TeacherService {
         })
         .all();
 
+      // Some songs may have event_id set to the SimplyBook ID instead of
+      // the canonical format (e.g. group songs created via old flow).
+      // Look up the SimplyBook ID and merge any additional songs found.
       if (records.length > 0) {
-        return records.map((record) => this.transformSongRecord(record));
+        let allRecords = [...records];
+
+        const airtable = getAirtableService();
+        const evtRecord = await airtable.getEventByEventId(eventId);
+        if (evtRecord?.simplybook_booking?.[0]) {
+          const schoolBooking = await airtable.getSchoolBookingById(evtRecord.simplybook_booking[0]);
+          if (schoolBooking?.simplybookId && schoolBooking.simplybookId !== eventId) {
+            const extraRecords = await this.base(SONGS_TABLE)
+              .select({
+                filterByFormula: `{event_id} = '${schoolBooking.simplybookId.replace(/'/g, "\\'")}'`,
+                sort: [
+                  { field: 'class_id', direction: 'asc' },
+                  { field: 'order', direction: 'asc' },
+                ],
+              })
+              .all();
+
+            if (extraRecords.length > 0) {
+              const existingIds = new Set(records.map(r => r.id));
+              const newRecords = extraRecords.filter(r => !existingIds.has(r.id));
+              if (newRecords.length > 0) {
+                console.warn(`[getSongsByEventId] Found ${newRecords.length} additional songs via SimplyBook ID '${schoolBooking.simplybookId}' for event '${eventId}'`);
+                allRecords = [...allRecords, ...newRecords];
+              }
+            }
+          }
+        }
+
+        return allRecords.map((record) => this.transformSongRecord(record));
       }
 
       // Fallback: resolve eventId to Airtable record ID and query by linked event_link field.
@@ -1835,12 +1866,25 @@ class TeacherService {
     type?: 'choir' | 'teacher_song'
   ): Promise<TeacherClassView[]> {
     try {
+      // Classes may have legacy_booking_id set to either the canonical event_id
+      // or the SimplyBook ID, so look up the linked SchoolBooking to find both
+      let legacyMatch = `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`;
+
+      const airtable = getAirtableService();
+      const eventRecord = await airtable.getEventByEventId(eventId);
+      if (eventRecord?.simplybook_booking?.[0]) {
+        const schoolBooking = await airtable.getSchoolBookingById(eventRecord.simplybook_booking[0]);
+        if (schoolBooking?.simplybookId && schoolBooking.simplybookId !== eventId) {
+          legacyMatch = `OR({${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${schoolBooking.simplybookId.replace(/'/g, "\\'")}')`;
+        }
+      }
+
       // Build filter formula - get collections by class_type
       let filterFormula: string;
       if (type) {
-        filterFormula = `AND({${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${CLASSES_FIELD_IDS.class_type}} = '${type}')`;
+        filterFormula = `AND(${legacyMatch}, {${CLASSES_FIELD_IDS.class_type}} = '${type}')`;
       } else {
-        filterFormula = `AND({${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}', OR({${CLASSES_FIELD_IDS.class_type}} = 'choir', {${CLASSES_FIELD_IDS.class_type}} = 'teacher_song'))`;
+        filterFormula = `AND(${legacyMatch}, OR({${CLASSES_FIELD_IDS.class_type}} = 'choir', {${CLASSES_FIELD_IDS.class_type}} = 'teacher_song'))`;
       }
 
       const classRecords = await this.base(CLASSES_TABLE_ID)
