@@ -6351,6 +6351,7 @@ class AirtableService {
         is_schulsong: record.fields[EVENTS_FIELD_IDS.is_schulsong] as boolean | undefined,
         is_minimusikertag: record.fields[EVENTS_FIELD_IDS.is_minimusikertag] as boolean | undefined,
         status: record.fields[EVENTS_FIELD_IDS.status] as Event['status'] | undefined,
+        timeline_overrides: record.fields[EVENTS_FIELD_IDS.timeline_overrides] as string | undefined,
       }));
     } catch (error) {
       console.error('Error fetching all events:', error);

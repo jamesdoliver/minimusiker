@@ -21,6 +21,8 @@ export interface EventTimelineOverrides {
   full_release_days?: number;
   // Audio visibility kill-switch (admin can hide all audio from parent portal)
   audio_hidden?: boolean;
+  // Communications pause: when true, all automated timeline emails are suppressed for this event
+  communications_paused?: boolean;
   // Per-product visibility: product IDs hidden from the parent portal shop
   hidden_products?: string[];
   // Phase 2 (stored but not wired yet)
@@ -30,7 +32,7 @@ export interface EventTimelineOverrides {
   task_offsets?: Partial<Record<string, number>>;
 }
 
-export type ThresholdKey = keyof Omit<EventTimelineOverrides, 'milestones' | 'task_offsets' | 'audio_hidden' | 'hidden_products'>;
+export type ThresholdKey = keyof Omit<EventTimelineOverrides, 'milestones' | 'task_offsets' | 'audio_hidden' | 'communications_paused' | 'hidden_products'>;
 
 export const GLOBAL_DEFAULTS: Record<ThresholdKey, number> = {
   early_bird_deadline_days: 19,

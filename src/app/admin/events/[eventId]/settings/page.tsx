@@ -305,6 +305,8 @@ export default function EventSettingsPage() {
             }
             continue;
           }
+          // Omit communications_paused when false to keep JSON clean
+          if (key === 'communications_paused' && !value) continue;
           (cleanOverrides as Record<string, unknown>)[key] = value;
         }
       }
@@ -371,6 +373,51 @@ export default function EventSettingsPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        {/* Section 0: Communication Pause */}
+        <div className="bg-white rounded-xl border shadow-sm">
+          <div className="px-6 py-4 border-b">
+            <h2 className="text-lg font-semibold text-gray-900">Kommunikation</h2>
+            <p className="text-sm text-gray-500 mt-1">Automatische E-Mails für dieses Event steuern</p>
+          </div>
+          {overrides.communications_paused && (
+            <div className="px-6 py-3 bg-amber-50 border-b border-amber-200">
+              <div className="flex items-center gap-2 text-amber-800">
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <span className="text-sm font-medium">Alle automatischen E-Mails sind für dieses Event pausiert.</span>
+              </div>
+            </div>
+          )}
+          <div className="px-6 py-4 flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-medium text-gray-900">Kommunikation pausieren</span>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Alle automatischen Timeline-E-Mails werden unterdrückt. Elternportal und Shop bleiben erreichbar.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!!overrides.communications_paused}
+              onClick={() => setOverrides((prev) => ({
+                ...prev,
+                communications_paused: !prev.communications_paused,
+              }))}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#5a8a82] focus:ring-offset-2 ${
+                overrides.communications_paused ? 'bg-amber-500' : 'bg-gray-200'
+              }`}
+            >
+              <span className="sr-only">Kommunikation pausieren</span>
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  overrides.communications_paused ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
         {/* Section 1: Order Deadlines */}
         <SettingsSection title="Bestellfristen" description="Zeitfenster für Bestellungen und Frühbucher-Rabatte">
           {ORDER_DEADLINE_FIELDS.map((field) => (

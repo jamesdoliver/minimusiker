@@ -21,6 +21,7 @@ import {
   EventTier,
 } from '@/lib/types/email-automation';
 import { Event, Class, Parent, Registration, EVENTS_TABLE_ID, EVENTS_FIELD_IDS, ORDERS_TABLE_ID, ORDERS_FIELD_IDS } from '@/lib/types/airtable';
+import { parseOverrides } from '@/lib/utils/eventThresholds';
 
 // Constants
 const RATE_LIMIT_DELAY_MS = 500; // 500ms delay between emails to respect Resend rate limits
@@ -192,6 +193,9 @@ export async function getEventsHittingThreshold(
       if (!event.event_date) continue;
       // Skip cancelled or deleted events — no further communication
       if (event.status === 'Cancelled' || event.status === 'Deleted') continue;
+      // Skip events with communications paused
+      const overrides = parseOverrides(event.timeline_overrides);
+      if (overrides?.communications_paused) continue;
 
       // Compare dates (normalize to YYYY-MM-DD)
       const eventDateStr = event.event_date.split('T')[0];
@@ -771,6 +775,7 @@ export async function processSchulsongReleaseEmails(
     (e) =>
       getEventTier({ isMinimusikertag: e.is_minimusikertag, isPlus: e.is_plus, isSchulsong: e.is_schulsong }) === 'schulsong' &&
       e.status !== 'Cancelled' && e.status !== 'Deleted' &&
+      !parseOverrides(e.timeline_overrides)?.communications_paused &&
       e.admin_approval_status === 'approved' &&
       e.schulsong_released_at &&
       new Date(e.schulsong_released_at) <= now
