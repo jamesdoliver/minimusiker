@@ -192,24 +192,35 @@ export async function POST(request: Request) {
       // ========================================
       // Phase 3b: Auto-create default "Alle Kinder" class
       // This ensures parents can register even if teacher hasn't set up classes yet
+      // Retries once on failure to handle transient Airtable errors
       // ========================================
       if (eventRecord) {
-        try {
-          const teacherService = getTeacherService();
-          const defaultClass = await teacherService.createDefaultClass({
-            eventId,
-            eventRecordId: eventRecord.id,
-            schoolName: booking.client_name || booking.client || '',
-            bookingDate: mappedData.bookingDate,
-            estimatedChildren: mappedData.numberOfChildren,
-          });
+        let classCreated = false;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const teacherService = getTeacherService();
+            const defaultClass = await teacherService.createDefaultClass({
+              eventId,
+              eventRecordId: eventRecord.id,
+              schoolName: booking.client_name || booking.client || '',
+              bookingDate: mappedData.bookingDate,
+              estimatedChildren: mappedData.numberOfChildren,
+            });
 
-          if (defaultClass) {
-            console.log(`Created default "Alle Kinder" class: ${defaultClass.classId}`);
+            if (defaultClass) {
+              console.log(`Created default "Alle Kinder" class: ${defaultClass.classId}`);
+            }
+            classCreated = true;
+            break;
+          } catch (defaultClassError) {
+            console.error(`Error creating default class (attempt ${attempt}/2):`, defaultClassError);
+            if (attempt < 2) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
           }
-        } catch (defaultClassError) {
-          // Don't fail webhook - event was created successfully
-          console.error('Error creating default class:', defaultClassError);
+        }
+        if (!classCreated) {
+          console.error(`CRITICAL: Failed to create default "Alle Kinder" class after 2 attempts for event: ${eventId}`);
         }
       }
     } catch (eventError) {

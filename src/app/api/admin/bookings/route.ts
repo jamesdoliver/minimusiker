@@ -433,23 +433,34 @@ export async function POST(request: NextRequest) {
         console.warn('Failed to initialize R2 structure for manual booking:', initResult.error);
       }
 
-      // Create default "Alle Kinder" class
+      // Create default "Alle Kinder" class (retry once on transient failure)
       if (eventRecord) {
-        try {
-          const teacherService = getTeacherService();
-          const defaultClass = await teacherService.createDefaultClass({
-            eventId,
-            eventRecordId: eventRecord.id,
-            schoolName,
-            bookingDate: eventDate || new Date().toISOString().split('T')[0],
-            estimatedChildren,
-          });
+        let classCreated = false;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const teacherService = getTeacherService();
+            const defaultClass = await teacherService.createDefaultClass({
+              eventId,
+              eventRecordId: eventRecord.id,
+              schoolName,
+              bookingDate: eventDate || new Date().toISOString().split('T')[0],
+              estimatedChildren,
+            });
 
-          if (defaultClass) {
-            console.log(`Created default "Alle Kinder" class for manual booking: ${defaultClass.classId}`);
+            if (defaultClass) {
+              console.log(`Created default "Alle Kinder" class for manual booking: ${defaultClass.classId}`);
+            }
+            classCreated = true;
+            break;
+          } catch (defaultClassError) {
+            console.error(`Error creating default class for manual booking (attempt ${attempt}/2):`, defaultClassError);
+            if (attempt < 2) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
           }
-        } catch (defaultClassError) {
-          console.error('Error creating default class for manual booking:', defaultClassError);
+        }
+        if (!classCreated) {
+          console.error(`CRITICAL: Failed to create default "Alle Kinder" class after 2 attempts for manual booking event: ${eventId}`);
         }
       }
       // If created from a lead conversion, link the lead and store call notes

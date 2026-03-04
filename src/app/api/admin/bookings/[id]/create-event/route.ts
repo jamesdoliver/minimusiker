@@ -79,21 +79,34 @@ export async function POST(
       console.warn(`[CreateEvent] R2 init failed for ${eventId}:`, initResult.error);
     }
 
-    // 6. Create default "Alle Kinder" class
-    try {
-      const teacherService = getTeacherService();
-      const defaultClass = await teacherService.createDefaultClass({
-        eventId,
-        eventRecordId: eventRecord.id,
-        schoolName,
-        bookingDate: eventDate,
-        estimatedChildren: booking.estimatedChildren || 0,
-      });
-      if (defaultClass) {
-        console.log(`[CreateEvent] Created default class ${defaultClass.classId} for ${eventId}`);
+    // 6. Create default "Alle Kinder" class (retry once on transient failure)
+    {
+      let classCreated = false;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const teacherService = getTeacherService();
+          const defaultClass = await teacherService.createDefaultClass({
+            eventId,
+            eventRecordId: eventRecord.id,
+            schoolName,
+            bookingDate: eventDate,
+            estimatedChildren: booking.estimatedChildren || 0,
+          });
+          if (defaultClass) {
+            console.log(`[CreateEvent] Created default class ${defaultClass.classId} for ${eventId}`);
+          }
+          classCreated = true;
+          break;
+        } catch (classError) {
+          console.error(`[CreateEvent] Error creating default class (attempt ${attempt}/2):`, classError);
+          if (attempt < 2) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
       }
-    } catch (classError) {
-      console.error('[CreateEvent] Error creating default class:', classError);
+      if (!classCreated) {
+        console.error(`[CreateEvent] CRITICAL: Failed to create default class after 2 attempts for ${eventId}`);
+      }
     }
 
     return NextResponse.json({
