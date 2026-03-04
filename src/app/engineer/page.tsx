@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { EngineerEventSummary, EngineerMixingStatus } from '@/lib/types/engineer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import AudioStatusBadge from '@/components/shared/AudioStatusBadge';
+import { deriveStageFromSimple } from '@/lib/utils/audioStatusHelpers';
 import { useEngineerEvents } from '@/lib/hooks/useEngineerEvents';
 
 type StatusFilter = 'all' | 'pending' | 'in-progress' | 'completed';
@@ -261,32 +263,16 @@ export default function EngineerPortal() {
                   </div>
                 </div>
 
-                {/* Audio status indicators */}
-                <div className="mt-4 pt-4 border-t border-gray-100 flex gap-3">
-                  <div
-                    className={`flex items-center gap-1.5 text-xs ${
-                      event.hasPreview ? 'text-green-600' : 'text-gray-400'
-                    }`}
-                  >
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        event.hasPreview ? 'bg-green-500' : 'bg-gray-300'
-                      }`}
-                    />
-                    Preview
-                  </div>
-                  <div
-                    className={`flex items-center gap-1.5 text-xs ${
-                      event.hasFinal ? 'text-green-600' : 'text-gray-400'
-                    }`}
-                  >
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        event.hasFinal ? 'bg-green-500' : 'bg-gray-300'
-                      }`}
-                    />
-                    Final
-                  </div>
+                {/* Audio status indicator */}
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <AudioStatusBadge
+                    variant="dot"
+                    stage={deriveStageFromSimple({
+                      hasRawAudio: event.rawAudioCount > 0,
+                      hasPreview: event.hasPreview,
+                      hasFinal: event.hasFinal,
+                    })}
+                  />
                 </div>
               </Link>
             ))}

@@ -4114,6 +4114,8 @@ class AirtableService {
     eventType: string;
     classCount: number;
     assignedEngineerIds: string[];
+    simplybookBookingRecordIds: string[];
+    legacyBookingId?: string;
   }[]> {
     this.ensureNormalizedTablesInitialized();
 
@@ -4140,6 +4142,8 @@ class AirtableService {
             eventType: record.fields[EVENTS_FIELD_IDS.event_type] as string,
             classCount: linkedClassIds.length,
             assignedEngineerIds: (record.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[]) || [],
+            simplybookBookingRecordIds: (record.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[]) || [],
+            legacyBookingId: record.fields[EVENTS_FIELD_IDS.legacy_booking_id] as string | undefined,
           };
         });
     } catch (error) {

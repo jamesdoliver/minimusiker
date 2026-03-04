@@ -5,6 +5,20 @@
  */
 
 /**
+ * Audio lifecycle stage — from no audio through to admin-approved final
+ */
+export type AudioStage = 'none' | 'raw' | 'preview' | 'final' | 'approved';
+
+/**
+ * Summarized audio status for display components
+ */
+export interface AudioStatusSummary {
+  stage: AudioStage;
+  counts?: { total: number; raw: number; preview: number; final: number; approved: number };
+  audioHidden?: boolean;
+}
+
+/**
  * Approval status for individual tracks
  */
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';

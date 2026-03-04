@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { SchoolEventDetail, TeamStaffMember } from '@/lib/types/airtable';
 import AlbumLayoutModal from '@/components/shared/AlbumLayoutModal';
+import AudioStatusBadge from '@/components/shared/AudioStatusBadge';
+import { deriveStageFromSimple } from '@/lib/utils/audioStatusHelpers';
 
 // Extended type that includes booking info from API fallback
 interface EventDetailWithBooking extends SchoolEventDetail {
@@ -1774,8 +1776,10 @@ export default function EventDetailPage() {
                         </div>
                         <div className="text-sm text-gray-500">
                           {songs.length} {songs.length === 1 ? 'Lied' : 'Lieder'}
-                          {collection.audioStatus?.hasPreview && (
-                            <span className="ml-2 text-green-600">Audio bereit</span>
+                          {collection.audioStatus && (
+                            <span className="ml-2">
+                              <AudioStatusBadge variant="compact" stage={deriveStageFromSimple(collection.audioStatus)} />
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1993,8 +1997,10 @@ export default function EventDetailPage() {
                         </div>
                         <div className="text-sm text-gray-500">
                           {songs.length} {songs.length === 1 ? 'Lied' : 'Lieder'}
-                          {collection.audioStatus?.hasPreview && (
-                            <span className="ml-2 text-green-600">Audio bereit</span>
+                          {collection.audioStatus && (
+                            <span className="ml-2">
+                              <AudioStatusBadge variant="compact" stage={deriveStageFromSimple(collection.audioStatus)} />
+                            </span>
                           )}
                         </div>
                       </div>

@@ -928,19 +928,56 @@ class TeacherService {
   async getAudioFilesByEventId(eventId: string): Promise<AudioFile[]> {
     if (this.useNormalizedTables()) {
       this.ensureNormalizedTablesInitialized();
-      // NEW: Use linked record field (event_link)
+      // Use linked record field (event_link) with fallback ID resolution
+      // matching getSongsByEventId() logic: legacy_booking_id, SimplyBook ID, canonical re-query
       try {
-        // First, find the Events record by event_id field
-        const eventRecords = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+        // First, find the Events record by event_id OR legacy_booking_id
+        let eventRecords = await this.eventsTable!.select({
+          filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}')`,
           maxRecords: 1,
         }).firstPage();
+
+        // SimplyBook ID fallback (numeric IDs)
+        if (eventRecords.length === 0 && /^\d+$/.test(eventId)) {
+          const booking = await getAirtableService().getSchoolBookingBySimplybookId(eventId);
+          if (booking) {
+            const eventRecord = await getAirtableService().getEventBySchoolBookingId(booking.id);
+            if (eventRecord) {
+              eventRecords = await this.eventsTable!.select({
+                filterByFormula: `RECORD_ID() = '${eventRecord.id}'`,
+                maxRecords: 1,
+              }).firstPage();
+            }
+          }
+        }
 
         if (eventRecords.length === 0) return [];
 
         const eventRecordId = eventRecords[0].id;
 
-        // Query AudioFiles by linked record (event_link) AND by text event_id field,
+        // Determine all text event_id variants to search for
+        const canonicalEventId = eventRecords[0].fields[EVENTS_FIELD_IDS.event_id] as string;
+        const textIds = new Set<string>([eventId]);
+        if (canonicalEventId && canonicalEventId !== eventId) {
+          textIds.add(canonicalEventId);
+        }
+
+        // Also add SimplyBook ID if available
+        const simplybookLinks = eventRecords[0].fields[EVENTS_FIELD_IDS.simplybook_booking] as string[] | undefined;
+        if (simplybookLinks?.[0]) {
+          const schoolBooking = await getAirtableService().getSchoolBookingById(simplybookLinks[0]);
+          if (schoolBooking?.simplybookId) {
+            textIds.add(schoolBooking.simplybookId);
+          }
+        }
+
+        // Build text field query for all variant IDs
+        const textIdArray = Array.from(textIds);
+        const textFilter = textIdArray.length === 1
+          ? `{event_id} = '${textIdArray[0].replace(/'/g, "\\'")}'`
+          : `OR(${textIdArray.map(id => `{event_id} = '${id.replace(/'/g, "\\'")}'`).join(',')})`;
+
+        // Query AudioFiles by linked record (event_link) AND by text event_id field(s),
         // then merge results. Some records (e.g. Logic Pro projects) may only have
         // the text event_id set without event_link, so we need both queries.
         const [linkRecords, textRecords] = await Promise.all([
@@ -952,7 +989,7 @@ class TeacherService {
             .all(),
           this.base(AUDIO_FILES_TABLE)
             .select({
-              filterByFormula: `{event_id} = '${eventId.replace(/'/g, "\\'")}'`,
+              filterByFormula: textFilter,
               sort: [{ field: 'uploaded_at', direction: 'desc' }],
             })
             .all(),
@@ -968,7 +1005,7 @@ class TeacherService {
         return [];
       }
     } else {
-      // LEGACY: Use text field (event_id)
+      // LEGACY: Use text field (event_id) with fallback resolution
       try {
         const records = await this.base(AUDIO_FILES_TABLE)
           .select({
@@ -977,7 +1014,44 @@ class TeacherService {
           })
           .all();
 
-        return records.map((record) => this.transformAudioFileRecord(record));
+        if (records.length > 0) {
+          return records.map((record) => this.transformAudioFileRecord(record));
+        }
+
+        // Fallback: resolve via Events table (canonical ID + SimplyBook)
+        const airtable = getAirtableService();
+        const evtRecord = await airtable.getEventByEventId(eventId);
+        if (evtRecord) {
+          const canonicalId = evtRecord.event_id;
+          if (canonicalId && canonicalId !== eventId) {
+            const fallbackRecords = await this.base(AUDIO_FILES_TABLE)
+              .select({
+                filterByFormula: `{event_id} = '${canonicalId.replace(/'/g, "\\'")}'`,
+                sort: [{ field: 'uploaded_at', direction: 'desc' }],
+              })
+              .all();
+            if (fallbackRecords.length > 0) {
+              return fallbackRecords.map((record) => this.transformAudioFileRecord(record));
+            }
+          }
+          // Try SimplyBook ID
+          if (evtRecord.simplybook_booking?.[0]) {
+            const schoolBooking = await airtable.getSchoolBookingById(evtRecord.simplybook_booking[0]);
+            if (schoolBooking?.simplybookId && schoolBooking.simplybookId !== eventId) {
+              const sbRecords = await this.base(AUDIO_FILES_TABLE)
+                .select({
+                  filterByFormula: `{event_id} = '${schoolBooking.simplybookId.replace(/'/g, "\\'")}'`,
+                  sort: [{ field: 'uploaded_at', direction: 'desc' }],
+                })
+                .all();
+              if (sbRecords.length > 0) {
+                return sbRecords.map((record) => this.transformAudioFileRecord(record));
+              }
+            }
+          }
+        }
+
+        return [];
       } catch (error) {
         console.error('Error getting audio files by event ID:', error);
         return [];
@@ -1914,9 +1988,9 @@ class TeacherService {
           numChildren: 0,
           songs: classSongs,
           audioStatus: {
-            hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
-            hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
-            hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+            hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status !== 'error'),
+            hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status !== 'error'),
+            hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status !== 'error'),
           },
           classType,
         });
@@ -2018,9 +2092,9 @@ class TeacherService {
         // Get audio files for this group
         const audioFiles = await this.getAudioFilesByClassId(group.groupId);
         group.audioStatus = {
-          hasRawAudio: audioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
-          hasPreview: audioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
-          hasFinal: audioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+          hasRawAudio: audioFiles.some((a) => a.type === 'raw' && a.status !== 'error'),
+          hasPreview: audioFiles.some((a) => a.type === 'preview' && a.status !== 'error'),
+          hasFinal: audioFiles.some((a) => a.type === 'final' && a.status !== 'error'),
         };
 
         // Populate member classes details
@@ -2104,9 +2178,9 @@ class TeacherService {
       group.songs = await this.getSongsByClassId(groupId);
       const audioFiles = await this.getAudioFilesByClassId(groupId);
       group.audioStatus = {
-        hasRawAudio: audioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
-        hasPreview: audioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
-        hasFinal: audioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+        hasRawAudio: audioFiles.some((a) => a.type === 'raw' && a.status !== 'error'),
+        hasPreview: audioFiles.some((a) => a.type === 'preview' && a.status !== 'error'),
+        hasFinal: audioFiles.some((a) => a.type === 'final' && a.status !== 'error'),
       };
 
       return group;
@@ -2563,9 +2637,9 @@ class TeacherService {
             numChildren,
             songs: classSongs,
             audioStatus: {
-              hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
-              hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
-              hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+              hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status !== 'error'),
+              hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status !== 'error'),
+              hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status !== 'error'),
             },
             isDefault,
             classType,
@@ -2697,9 +2771,9 @@ class TeacherService {
             numChildren,
             songs: classSongs,
             audioStatus: {
-              hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
-              hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
-              hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+              hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status !== 'error'),
+              hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status !== 'error'),
+              hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status !== 'error'),
             },
             isDefault,
             classType,
@@ -2810,9 +2884,9 @@ class TeacherService {
             numChildren,
             songs: classSongs,
             audioStatus: {
-              hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status === 'ready'),
-              hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status === 'ready'),
-              hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status === 'ready'),
+              hasRawAudio: classAudioFiles.some((a) => a.type === 'raw' && a.status !== 'error'),
+              hasPreview: classAudioFiles.some((a) => a.type === 'preview' && a.status !== 'error'),
+              hasFinal: classAudioFiles.some((a) => a.type === 'final' && a.status !== 'error'),
             },
             isDefault,
             classType,

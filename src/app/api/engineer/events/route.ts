@@ -32,17 +32,52 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Batch audio file query: single OR formula for all event IDs
+    // Build expanded ID set: canonical eventId + legacyBookingId + simplybookId
+    // Audio files may be stored under any of these variant IDs
     const teacherService = getTeacherService();
-    const eventIds = events.map((e) => e.eventId);
-    const allAudioFiles = await teacherService.batchGetAudioFilesByEventIds(eventIds);
+    const canonicalIds = events.map((e) => e.eventId);
+    const allVariantIds = new Set<string>(canonicalIds);
 
-    // Group audio files by event_id
+    // Map variant IDs back to canonical eventId for grouping
+    const variantToCanonical = new Map<string, string>();
+    for (const event of events) {
+      variantToCanonical.set(event.eventId, event.eventId);
+      if (event.legacyBookingId && event.legacyBookingId !== event.eventId) {
+        allVariantIds.add(event.legacyBookingId);
+        variantToCanonical.set(event.legacyBookingId, event.eventId);
+      }
+    }
+
+    // Batch-resolve SchoolBooking records to get simplybookId values
+    const bookingRecordIds = events
+      .filter((e) => e.simplybookBookingRecordIds.length > 0)
+      .map((e) => ({ eventId: e.eventId, bookingRecordId: e.simplybookBookingRecordIds[0] }));
+
+    if (bookingRecordIds.length > 0) {
+      const airtable = getAirtableService();
+      await Promise.all(
+        bookingRecordIds.map(async ({ eventId, bookingRecordId }) => {
+          const booking = await airtable.getSchoolBookingById(bookingRecordId);
+          if (booking?.simplybookId && booking.simplybookId !== eventId) {
+            allVariantIds.add(booking.simplybookId);
+            variantToCanonical.set(booking.simplybookId, eventId);
+          }
+        })
+      );
+    }
+
+    // Batch audio file query: single OR formula for all variant IDs
+    const allAudioFiles = await teacherService.batchGetAudioFilesByEventIds(
+      Array.from(allVariantIds)
+    );
+
+    // Group audio files by canonical event_id
     const audioByEvent = new Map<string, typeof allAudioFiles>();
     for (const file of allAudioFiles) {
-      const existing = audioByEvent.get(file.eventId) || [];
+      const canonical = variantToCanonical.get(file.eventId) || file.eventId;
+      const existing = audioByEvent.get(canonical) || [];
       existing.push(file);
-      audioByEvent.set(file.eventId, existing);
+      audioByEvent.set(canonical, existing);
     }
 
     // Build response with mixing status

@@ -10,6 +10,8 @@ import AlbumLayoutModal from '@/components/shared/AlbumLayoutModal';
 import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModal';
 import SchulsongApprovalSection from '@/components/teacher/SchulsongApprovalSection';
 import SchulClothingOrder from '@/components/shared/SchulClothingOrder';
+import AudioStatusBadge from '@/components/shared/AudioStatusBadge';
+import { deriveStageFromSimple } from '@/lib/utils/audioStatusHelpers';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'Datum unbekannt';
@@ -695,18 +697,8 @@ function CollectionCard({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Audio Status Badges */}
-          <div className="flex gap-1">
-            {collection.audioStatus.hasRawAudio && (
-              <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">Raw</span>
-            )}
-            {collection.audioStatus.hasPreview && (
-              <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded">Vorschau</span>
-            )}
-            {collection.audioStatus.hasFinal && (
-              <span className="px-2 py-0.5 text-xs bg-green-100 text-green-600 rounded">Final</span>
-            )}
-          </div>
+          {/* Audio Status Badge */}
+          <AudioStatusBadge variant="badge" stage={deriveStageFromSimple(collection.audioStatus)} />
           {/* Delete button */}
           {isEditable && (
             <button
@@ -869,18 +861,8 @@ function GroupCard({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Audio Status Badges */}
-          <div className="flex gap-1">
-            {group.audioStatus.hasRawAudio && (
-              <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">Raw</span>
-            )}
-            {group.audioStatus.hasPreview && (
-              <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded">Vorschau</span>
-            )}
-            {group.audioStatus.hasFinal && (
-              <span className="px-2 py-0.5 text-xs bg-green-100 text-green-600 rounded">Final</span>
-            )}
-          </div>
+          {/* Audio Status Badge */}
+          <AudioStatusBadge variant="badge" stage={deriveStageFromSimple(group.audioStatus)} />
           {/* Delete button */}
           {isEditable && (
             <button

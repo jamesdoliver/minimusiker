@@ -8,10 +8,11 @@ import RefreshBookingModal from './RefreshBookingModal';
 import OrderOverviewModal from './OrderOverviewModal';
 import EditBookingModal from './EditBookingModal';
 import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfirmModal';
-import StatusLight from './StatusLight';
 import AudioReviewModal from './AudioReviewModal';
 import EventActivityTimeline from '@/components/admin/EventActivityTimeline';
+import AudioStatusBadge from '@/components/shared/AudioStatusBadge';
 import { AudioStatusData } from '@/lib/types/audio-status';
+import { deriveSummaryFromRich } from '@/lib/utils/audioStatusHelpers';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
 
@@ -535,14 +536,10 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
           ) : audioStatus ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
-                <StatusLight
-                  label="Staff Upload"
-                  isComplete={audioStatus.staffUploadComplete}
-                />
-                <StatusLight
-                  label="Mix Master"
-                  isComplete={audioStatus.mixMasterUploadComplete}
-                />
+                {(() => {
+                  const summary = deriveSummaryFromRich(audioStatus);
+                  return <AudioStatusBadge variant="summary" stage={summary.stage} summary={summary} />;
+                })()}
                 {/* Audio visibility toggle */}
                 <button
                   onClick={handleToggleAudioVisibility}
