@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getEarlyBirdTargets, CampaignRecipient } from '@/lib/services/campaignService';
 import { sendCampaignEmail } from '@/lib/services/resendService';
 import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { parseOverrides } from '@/lib/utils/eventThresholds';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,8 +113,35 @@ export async function POST(request: NextRequest) {
     console.log(`Early bird reminder campaign started (dryRun: ${isDryRun})`);
     console.log(`Target access codes: ${TARGET_ACCESS_CODES.join(', ')}`);
 
+    // Filter out access codes whose events have communications_paused
+    const allEvents = await getAirtableService().getAllEvents();
+    const pausedAccessCodes = new Set<number>();
+    for (const event of allEvents) {
+      if (event.access_code && parseOverrides(event.timeline_overrides)?.communications_paused) {
+        pausedAccessCodes.add(event.access_code);
+      }
+    }
+
+    const activeCodes = TARGET_ACCESS_CODES.filter(code => {
+      if (pausedAccessCodes.has(code)) {
+        console.log(`[Campaign] Skipping access code ${code} — communications paused`);
+        return false;
+      }
+      return true;
+    });
+
+    if (activeCodes.length === 0) {
+      return NextResponse.json({
+        success: true,
+        mode: isDryRun ? 'dry-run' : 'live',
+        message: 'All target events have communications paused — no emails to send',
+        totalRecipients: 0,
+        recipients: [],
+      });
+    }
+
     // Get recipients
-    let recipients = await getEarlyBirdTargets(TARGET_ACCESS_CODES);
+    let recipients = await getEarlyBirdTargets(activeCodes);
 
     // Filter by specific emails if provided (for retrying failed sends)
     if (emailFilter) {

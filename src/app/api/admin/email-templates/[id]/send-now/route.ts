@@ -19,6 +19,7 @@ import {
   sleep,
 } from '@/lib/services/emailAutomationService';
 import { EventThresholdMatch, EventTier } from '@/lib/types/email-automation';
+import { parseOverrides } from '@/lib/utils/eventThresholds';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,7 @@ interface PreviewEvent {
   eventDate: string;
   skipped: boolean;
   skipReason?: string;
+  communicationsPaused?: boolean;
   recipients: PreviewEventRecipients;
 }
 
@@ -183,11 +185,14 @@ export async function POST(
           }
         }
 
+        const isPaused = !!parseOverrides(event.timeline_overrides)?.communications_paused;
+
         previewEvents.push({
           eventId: event.event_id,
           schoolName: event.school_name,
           eventDate: event.event_date,
           skipped: false,
+          communicationsPaused: isPaused,
           recipients: eventRecipients,
         });
       }
@@ -214,6 +219,7 @@ export async function POST(
     let sent = 0;
     let failed = 0;
     let skipped = 0;
+    const pausedEventIds: string[] = [];
     const details: Array<{ eventId: string; email: string; status: string; error?: string }> = [];
 
     for (const eventId of eventIds) {
@@ -222,6 +228,11 @@ export async function POST(
         details.push({ eventId, email: '', status: 'failed', error: 'Event not found' });
         failed++;
         continue;
+      }
+
+      // Track paused events (admin override — still sends, but warns in response)
+      if (parseOverrides(event.timeline_overrides)?.communications_paused) {
+        pausedEventIds.push(event.event_id);
       }
 
       const eventDate = new Date(event.event_date);
@@ -278,6 +289,7 @@ export async function POST(
       success: true,
       data: {
         summary: { sent, failed, skipped },
+        pausedEventIds: pausedEventIds.length > 0 ? pausedEventIds : undefined,
         details,
       },
     });

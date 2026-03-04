@@ -133,7 +133,8 @@ export default function BookingsTable({ bookings, onEventDeleted, onNotesUpdate,
               const isExpanded = expandedRows.has(booking.id);
               const isEven = index % 2 === 0;
               // Apply reduced opacity for completed bookings
-              const isCompleted = getComputedStatus?.(booking) === 'completed';
+              const computedStatus = getComputedStatus?.(booking);
+              const isCompleted = computedStatus === 'completed';
 
               return (
                 <Fragment key={booking.id}>
@@ -191,7 +192,12 @@ export default function BookingsTable({ bookings, onEventDeleted, onNotesUpdate,
                       />
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">{formatDate(booking.bookingDate)}</div>
+                      <div className={`text-sm ${computedStatus === 'pending' ? 'text-amber-700 italic' : 'text-gray-900'}`}>
+                        {formatDate(booking.bookingDate)}
+                        {computedStatus === 'pending' && (
+                          <span className="ml-1 text-xs font-normal text-amber-500">(vorl&auml;ufig)</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                   {isExpanded && (

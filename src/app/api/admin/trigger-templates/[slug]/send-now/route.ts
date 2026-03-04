@@ -152,6 +152,7 @@ export async function GET(
       eventRecordId: e.id,
       schoolName: e.school_name,
       eventDate: e.event_date,
+      communicationsPaused: !!parseOverrides(e.timeline_overrides)?.communications_paused,
     }));
 
     return NextResponse.json({ success: true, data: { events } });
@@ -232,6 +233,7 @@ export async function POST(
           eventId: event.event_id,
           schoolName: event.school_name,
           eventDate: event.event_date,
+          communicationsPaused: !!parseOverrides(event.timeline_overrides)?.communications_paused,
           recipients: recipients.map((r) => ({ email: r.email, name: r.name || '' })),
         });
       }
@@ -251,6 +253,7 @@ export async function POST(
     let sent = 0;
     let failed = 0;
     let skipped = 0;
+    const pausedEventIds: string[] = [];
     const details: Array<{
       eventId: string;
       email: string;
@@ -259,6 +262,10 @@ export async function POST(
     }> = [];
 
     for (const event of selectedEvents) {
+      // Track paused events (admin override — still sends, but warns in response)
+      if (parseOverrides(event.timeline_overrides)?.communications_paused) {
+        pausedEventIds.push(event.event_id);
+      }
       const eventData = eventToThresholdMatch(event);
       const recipients = entry.sendNow.recipientResolver === 'event_teacher'
         ? await getTeacherRecipientsForEvent(event.event_id, event.id, eventData)
@@ -356,7 +363,13 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      data: { sent, failed, skipped, details },
+      data: {
+        sent,
+        failed,
+        skipped,
+        pausedEventIds: pausedEventIds.length > 0 ? pausedEventIds : undefined,
+        details,
+      },
     });
   } catch (error) {
     console.error('Error in send-now:', error);

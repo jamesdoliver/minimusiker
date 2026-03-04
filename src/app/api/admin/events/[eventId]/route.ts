@@ -9,6 +9,7 @@ import { getTeacherService } from '@/lib/services/teacherService';
 import { simplybookService } from '@/lib/services/simplybookService';
 import { dealTypeToFlags } from '@/lib/utils/dealCalculator';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
+import { parseOverrides } from '@/lib/utils/eventThresholds';
 import {
   triggerDateChangeNotification,
   triggerCancellationNotification,
@@ -705,6 +706,44 @@ export async function PATCH(
       await base(EVENTS_TABLE_ID).update(eventRecordId, {
         [EVENTS_FIELD_IDS.timeline_overrides]: body.timeline_overrides || '',
       });
+    }
+
+    // Auto-toggle communications_paused when status changes to/from Pending
+    // Runs AFTER hasOverridesUpdate so the flag is merged into whatever was just written
+    if (hasStatusUpdate) {
+      const oldStatus = existingEvent?.status;
+      const newStatus = body.status;
+      const changingToPending = newStatus === 'Pending' && oldStatus !== 'Pending';
+      const changingFromPending = oldStatus === 'Pending' && newStatus !== 'Pending';
+
+      if (changingToPending || changingFromPending) {
+        try {
+          // Read from admin-provided overrides if present, else from existing event
+          const overridesSource = hasOverridesUpdate
+            ? body.timeline_overrides
+            : existingEvent?.timeline_overrides;
+          const currentOverrides = parseOverrides(overridesSource) || {};
+
+          if (changingToPending) {
+            currentOverrides.communications_paused = true;
+          } else {
+            delete currentOverrides.communications_paused;
+          }
+
+          const overridesJson = Object.keys(currentOverrides).length > 0
+            ? JSON.stringify(currentOverrides)
+            : '';
+
+          const base = airtableService['base'];
+          await base(EVENTS_TABLE_ID).update(eventRecordId, {
+            [EVENTS_FIELD_IDS.timeline_overrides]: overridesJson,
+          });
+
+          console.log(`[Status] Auto-${changingToPending ? 'enabled' : 'disabled'} communications_paused for event ${eventId}`);
+        } catch (pauseError) {
+          console.warn('Could not auto-toggle communications_paused:', pauseError);
+        }
+      }
     }
 
     // Handle deal builder updates
