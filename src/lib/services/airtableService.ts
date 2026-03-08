@@ -50,6 +50,13 @@ import {
   isRegistrableClassType,
   SONGS_LINKED_FIELD_IDS,
   CalendarEntry,
+  // Schulsong
+  Schulsong,
+  CreateSchulsongInput,
+  UpdateSchulsongInput,
+  SCHULSONG_TABLE_ID,
+  SCHULSONG_FIELD_IDS,
+  SchulsongProduktionStatus,
 } from '@/lib/types/airtable';
 import { SONGS_TABLE_ID } from '@/lib/types/teacher';
 import { ManualCost } from '@/lib/types/analytics';
@@ -4781,6 +4788,45 @@ class AirtableService {
     }
   }
 
+  async searchEinrichtungen(query: string): Promise<{ id: string; name: string }[]> {
+    try {
+      const escapedQuery = query.replace(/'/g, "\\'");
+      const records = await this.base(EINRICHTUNGEN_TABLE_ID)
+        .select({
+          filterByFormula: `FIND(LOWER("${escapedQuery}"), LOWER({${EINRICHTUNGEN_FIELD_IDS.customer_name}}))`,
+          maxRecords: 20,
+          fields: [EINRICHTUNGEN_FIELD_IDS.customer_name],
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      return records.map(r => ({
+        id: r.id,
+        name: (r.fields[EINRICHTUNGEN_FIELD_IDS.customer_name] as string) || '',
+      }));
+    } catch (error) {
+      console.error('Error searching Einrichtungen:', error);
+      return [];
+    }
+  }
+
+  async createEinrichtungMinimal(data: {
+    customerName: string;
+    plz?: string;
+    ort?: string;
+    type?: string;
+  }): Promise<{ id: string; name: string }> {
+    const fields: Record<string, string> = {
+      [EINRICHTUNGEN_FIELD_IDS.customer_name]: data.customerName,
+    };
+    if (data.plz) fields[EINRICHTUNGEN_FIELD_IDS.plz] = data.plz;
+    if (data.ort) fields[EINRICHTUNGEN_FIELD_IDS.ort] = data.ort;
+    if (data.type) fields[EINRICHTUNGEN_FIELD_IDS.type] = data.type;
+
+    const record = await this.base(EINRICHTUNGEN_TABLE_ID).create(fields);
+    return { id: record.id, name: data.customerName };
+  }
+
   /**
    * Find Einrichtung for a teacher by searching SchoolBookings linkage or name match
    * @param teacherEmail - The teacher's email
@@ -7624,6 +7670,214 @@ class AirtableService {
     } catch (error) {
       console.error('Error fetching calendar bookings:', error);
       throw new Error(`Failed to fetch calendar bookings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // ==================== SCHULSONG CRUD ====================
+
+  private transformSchulsongRecord(record: any): Schulsong {
+    const fields = record.fields;
+    const F = SCHULSONG_FIELD_IDS;
+
+    const einrichtungenArr = fields[F.einrichtungen] as string[] | undefined;
+    const projekteArr = fields[F.projekte] as string[] | undefined;
+
+    return {
+      id: record.id,
+      schulsongLabel: fields[F.schulsong] as string | undefined,
+      schulsongId: fields[F.schulsong_id] as string | undefined,
+      autoId: fields[F.id_auto] as number | undefined,
+      idEinrichtung: fields[F.id_einrichtung]?.[0] as string | undefined,
+      einrichtungenId: einrichtungenArr?.[0],
+      projekteId: projekteArr?.[0],
+      songName: fields[F.song_name] as string | undefined,
+      songtext: fields[F.songtext] as string | undefined,
+      songtextGoogleDocUrl: fields[F.songtext_google_doc_url] as string | undefined,
+      feedback: fields[F.feedback] as string | undefined,
+      schulsongTyp: fields[F.schulsong_typ] as Schulsong['schulsongTyp'],
+      poolsongAuswahl: fields[F.poolsong_auswahl] as Schulsong['poolsongAuswahl'],
+      statusBooking: fields[F.status_booking] as Schulsong['statusBooking'],
+      statusProduktion: fields[F.status_produktion] as Schulsong['statusProduktion'],
+      gebuchtAm: fields[F.gebucht_am] as string | undefined,
+      aufnahmetagDatum: fields[F.aufnahmetag_datum] as string | undefined,
+      streamingLink: fields[F.streaming_link] as string | undefined,
+      layoutUrl: fields[F.layout_url] as string | undefined,
+      playbackUrl: fields[F.playback_url] as string | undefined,
+      songUrl: fields[F.song_url] as string | undefined,
+      notenUrl: fields[F.noten_url] as string | undefined,
+      textUrl: fields[F.text_url] as string | undefined,
+      materialUrl: fields[F.material_url] as string | undefined,
+      instrumentalUrl: fields[F.instrumental_url] as string | undefined,
+      leadUrl: fields[F.lead_url] as string | undefined,
+      backingsUrl: fields[F.backings_url] as string | undefined,
+      notenKonfig: fields[F.noten_konfig] as boolean | undefined,
+      uebematerialKonfig: fields[F.uebematerial_konfig] as boolean | undefined,
+      streamingKonfig: fields[F.streaming_konfig] as boolean | undefined,
+      cdKonfig: fields[F.cd_konfig] as number | undefined,
+      aufnahmetagKonfig: fields[F.aufnahmetag_konfig] as boolean | undefined,
+      miniKonfig: fields[F.mini_konfig] as boolean | undefined,
+      createdAt: record.createdTime || '',
+    };
+  }
+
+  async getAllSchulsongs(): Promise<Schulsong[]> {
+    try {
+      const allRecords = await this.base(SCHULSONG_TABLE_ID)
+        .select({
+          pageSize: 100,
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      return allRecords.map((record) => this.transformSchulsongRecord(record));
+    } catch (error) {
+      console.error('Error fetching all schulsongs:', error);
+      throw new Error(`Failed to fetch all schulsongs: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getSchulsongById(id: string): Promise<Schulsong | null> {
+    try {
+      const records = await this.base(SCHULSONG_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${id}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (records.length === 0) return null;
+      return this.transformSchulsongRecord(records[0]);
+    } catch (error) {
+      console.error('Error fetching schulsong by id:', error);
+      throw new Error(`Failed to fetch schulsong: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async createSchulsong(data: CreateSchulsongInput): Promise<Schulsong> {
+    try {
+      const F = SCHULSONG_FIELD_IDS;
+      const fields: Record<string, any> = {
+        [F.song_name]: data.songName,
+        [F.einrichtungen]: [data.einrichtungenId],
+      };
+
+      if (data.schulsongTyp !== undefined) fields[F.schulsong_typ] = data.schulsongTyp;
+      if (data.statusBooking !== undefined) fields[F.status_booking] = data.statusBooking;
+      if (data.statusProduktion !== undefined) fields[F.status_produktion] = data.statusProduktion;
+      if (data.songtext !== undefined) fields[F.songtext] = data.songtext;
+      if (data.songtextGoogleDocUrl !== undefined) fields[F.songtext_google_doc_url] = data.songtextGoogleDocUrl;
+      if (data.feedback !== undefined) fields[F.feedback] = data.feedback;
+      if (data.poolsongAuswahl !== undefined) fields[F.poolsong_auswahl] = data.poolsongAuswahl;
+      if (data.gebuchtAm !== undefined) fields[F.gebucht_am] = data.gebuchtAm;
+      if (data.aufnahmetagDatum !== undefined) fields[F.aufnahmetag_datum] = data.aufnahmetagDatum;
+      if (data.projekteId !== undefined) fields[F.projekte] = [data.projekteId];
+      // URLs
+      if (data.streamingLink !== undefined) fields[F.streaming_link] = data.streamingLink;
+      if (data.layoutUrl !== undefined) fields[F.layout_url] = data.layoutUrl;
+      if (data.playbackUrl !== undefined) fields[F.playback_url] = data.playbackUrl;
+      if (data.songUrl !== undefined) fields[F.song_url] = data.songUrl;
+      if (data.notenUrl !== undefined) fields[F.noten_url] = data.notenUrl;
+      if (data.textUrl !== undefined) fields[F.text_url] = data.textUrl;
+      if (data.materialUrl !== undefined) fields[F.material_url] = data.materialUrl;
+      if (data.instrumentalUrl !== undefined) fields[F.instrumental_url] = data.instrumentalUrl;
+      if (data.leadUrl !== undefined) fields[F.lead_url] = data.leadUrl;
+      if (data.backingsUrl !== undefined) fields[F.backings_url] = data.backingsUrl;
+      // Config flags
+      if (data.notenKonfig !== undefined) fields[F.noten_konfig] = data.notenKonfig;
+      if (data.uebematerialKonfig !== undefined) fields[F.uebematerial_konfig] = data.uebematerialKonfig;
+      if (data.streamingKonfig !== undefined) fields[F.streaming_konfig] = data.streamingKonfig;
+      if (data.cdKonfig !== undefined) fields[F.cd_konfig] = data.cdKonfig;
+      if (data.aufnahmetagKonfig !== undefined) fields[F.aufnahmetag_konfig] = data.aufnahmetagKonfig;
+      if (data.miniKonfig !== undefined) fields[F.mini_konfig] = data.miniKonfig;
+
+      const record = await this.base(SCHULSONG_TABLE_ID).create(fields);
+
+      // Re-fetch with field IDs for consistent transform
+      const refetchedRecords = await this.base(SCHULSONG_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${record.id}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      return refetchedRecords.length > 0
+        ? this.transformSchulsongRecord(refetchedRecords[0])
+        : this.transformSchulsongRecord(record);
+    } catch (error) {
+      console.error('Error creating schulsong:', error);
+      throw new Error(`Failed to create schulsong: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async updateSchulsong(id: string, data: UpdateSchulsongInput): Promise<Schulsong> {
+    try {
+      const F = SCHULSONG_FIELD_IDS;
+      const fields: Record<string, any> = {};
+
+      if (data.songName !== undefined) fields[F.song_name] = data.songName;
+      if (data.einrichtungenId !== undefined) {
+        fields[F.einrichtungen] = data.einrichtungenId ? [data.einrichtungenId] : [];
+      }
+      if (data.schulsongTyp !== undefined) fields[F.schulsong_typ] = data.schulsongTyp;
+      if (data.statusBooking !== undefined) fields[F.status_booking] = data.statusBooking;
+      if (data.statusProduktion !== undefined) fields[F.status_produktion] = data.statusProduktion;
+      if (data.songtext !== undefined) fields[F.songtext] = data.songtext;
+      if (data.songtextGoogleDocUrl !== undefined) fields[F.songtext_google_doc_url] = data.songtextGoogleDocUrl;
+      if (data.feedback !== undefined) fields[F.feedback] = data.feedback;
+      if (data.poolsongAuswahl !== undefined) fields[F.poolsong_auswahl] = data.poolsongAuswahl;
+      if (data.gebuchtAm !== undefined) fields[F.gebucht_am] = data.gebuchtAm;
+      if (data.aufnahmetagDatum !== undefined) fields[F.aufnahmetag_datum] = data.aufnahmetagDatum;
+      if (data.projekteId !== undefined) {
+        fields[F.projekte] = data.projekteId ? [data.projekteId] : [];
+      }
+      // URLs
+      if (data.streamingLink !== undefined) fields[F.streaming_link] = data.streamingLink;
+      if (data.layoutUrl !== undefined) fields[F.layout_url] = data.layoutUrl;
+      if (data.playbackUrl !== undefined) fields[F.playback_url] = data.playbackUrl;
+      if (data.songUrl !== undefined) fields[F.song_url] = data.songUrl;
+      if (data.notenUrl !== undefined) fields[F.noten_url] = data.notenUrl;
+      if (data.textUrl !== undefined) fields[F.text_url] = data.textUrl;
+      if (data.materialUrl !== undefined) fields[F.material_url] = data.materialUrl;
+      if (data.instrumentalUrl !== undefined) fields[F.instrumental_url] = data.instrumentalUrl;
+      if (data.leadUrl !== undefined) fields[F.lead_url] = data.leadUrl;
+      if (data.backingsUrl !== undefined) fields[F.backings_url] = data.backingsUrl;
+      // Config flags
+      if (data.notenKonfig !== undefined) fields[F.noten_konfig] = data.notenKonfig;
+      if (data.uebematerialKonfig !== undefined) fields[F.uebematerial_konfig] = data.uebematerialKonfig;
+      if (data.streamingKonfig !== undefined) fields[F.streaming_konfig] = data.streamingKonfig;
+      if (data.cdKonfig !== undefined) fields[F.cd_konfig] = data.cdKonfig;
+      if (data.aufnahmetagKonfig !== undefined) fields[F.aufnahmetag_konfig] = data.aufnahmetagKonfig;
+      if (data.miniKonfig !== undefined) fields[F.mini_konfig] = data.miniKonfig;
+
+      await this.base(SCHULSONG_TABLE_ID).update(id, fields);
+
+      // Re-fetch for consistency
+      const refetchedRecords = await this.base(SCHULSONG_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${id}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (refetchedRecords.length === 0) {
+        throw new Error(`Schulsong ${id} not found after update`);
+      }
+      return this.transformSchulsongRecord(refetchedRecords[0]);
+    } catch (error) {
+      console.error('Error updating schulsong:', error);
+      throw new Error(`Failed to update schulsong: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async deleteSchulsong(id: string): Promise<void> {
+    try {
+      await this.base(SCHULSONG_TABLE_ID).destroy(id);
+    } catch (error) {
+      console.error('Error deleting schulsong:', error);
+      throw new Error(`Failed to delete schulsong: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }

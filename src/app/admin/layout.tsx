@@ -16,6 +16,7 @@ const navigation = [
   { name: 'Upload', href: '/admin/upload', icon: '📤' },
   { name: 'Analytics', href: '/admin/analytics', icon: '📈' },
   { name: 'Stock', href: '/admin/stock', icon: '📦' },
+  { name: 'Schulsong', href: '/admin/schulsong', icon: '🎵' },
 ];
 
 export default function AdminLayout({

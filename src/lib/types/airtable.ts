@@ -1148,6 +1148,178 @@ export interface Lead {
   updatedAt: string;
 }
 
+// ==================== SCHULSONG ====================
+export const SCHULSONG_TABLE_ID = 'tbl87zlzyGXrs1qSu';
+
+export const SCHULSONG_FIELD_IDS = {
+  // Identity (formula/auto - read-only)
+  schulsong: 'fldf4CRcybBE0nLS9',           // Formula: primary field
+  schulsong_id: 'fldOskaqxwfFaslyg',         // Formula: S0042 format
+  id_auto: 'fldTwcdFekMhcw84S',             // AutoNumber
+  id_einrichtung: 'fldR7NOVQ4ybT1oYN',      // Lookup from Einrichtungen
+  erstellt_von: 'fldf5YGHayDBfYu6p',        // CreatedBy (read-only)
+
+  // Linked records
+  einrichtungen: 'fldq49WMhpw2BWqDh',       // Link to Einrichtungen (prefers single)
+  projekte: 'fldR6Eo6VN1Wo8z25',            // Link to Projekte (prefers single)
+
+  // Song content
+  song_name: 'fld6B0GMcTtuTjb2Z',           // Single Line Text
+  songtext: 'fldMMzXkmJj9VQxCq',            // Rich Text
+  songtext_google_doc_url: 'fldeduqgkwOXBdDIr', // URL
+  feedback: 'flddQIloEmh1rTAQN',            // Multiline Text
+
+  // Song type & selection
+  schulsong_typ: 'fldRR4OGnMhpVHQTT',       // Single Select: Poolsong / Exklusivsong
+  poolsong_auswahl: 'fldIUct8uhFOyQSbb',    // Single Select: Song #1-#10
+
+  // Statuses
+  status_booking: 'fld0aCEJ15fpa3EuF',      // Single Select: Anfrage / Buchung
+  status_produktion: 'fldnUHH5YsslOfgoU',   // Single Select: 11 stages
+  gebucht_am: 'fldlB0kBiwi0S45cE',          // Date
+  aufnahmetag_datum: 'fldOY8JWHBAXwoLz6', // Date
+
+  // Asset URLs
+  streaming_link: 'fldblxAytqSZ6uONe',
+  layout_url: 'fldgvkYx1gERCkbaV',
+  playback_url: 'fldXiF1iYZ2iYSjDV',
+  song_url: 'fldHZTYOfCsEVFP3x',
+  noten_url: 'fldjhNZVAcMUUNVmW',
+  text_url: 'fld41Zqdzkbc3R50Q',
+  material_url: 'fldzN1HF3VTfaDno0',
+  instrumental_url: 'fldVyACQJY03HJXdH',
+  lead_url: 'fldstNoUmEDjDMsY9',
+  backings_url: 'fldO4p85FpljXNpxJ',
+
+  // Configuration flags
+  noten_konfig: 'fldHdqDx4y8GXtc2Z',        // Checkbox
+  uebematerial_konfig: 'fldv4tL0v48lhBswi',  // Checkbox
+  streaming_konfig: 'fld7axUbiWsNlq0NT',     // Checkbox
+  cd_konfig: 'fldMFb2om3Kaq6aOE',            // Number
+  aufnahmetag_konfig: 'fldrFVpYosn3B1LJm',   // Checkbox
+  mini_konfig: 'fldTicnX9Na59t8eC',          // Checkbox
+} as const;
+
+export type SchulsongTyp = 'Poolsong' | 'Exklusivsong';
+export type SchulsongBookingStatus = 'Anfrage' | 'Buchung';
+export type SchulsongProduktionStatus =
+  | 'Warte auf Fragebogen'
+  | 'ToDo: Texten'
+  | 'ToDo: Songwriting'
+  | 'ToDo: Studioarbeit'
+  | 'Warte auf Feedback'
+  | 'Song final'
+  | 'Warte auf Aufnahmetag'
+  | 'kann produziert werden'
+  | 'Warte auf finales GO'
+  | 'FINAL'
+  | 'abgeschlossen';
+
+export type PoolsongAuswahl =
+  | 'Song #1' | 'Song #2' | 'Song #3' | 'Song #4' | 'Song #5'
+  | 'Song #6' | 'Song #7' | 'Song #8' | 'Song #9' | 'Song #10';
+
+export const SCHULSONG_PRODUKTION_STAGES: SchulsongProduktionStatus[] = [
+  'Warte auf Fragebogen',
+  'ToDo: Texten',
+  'ToDo: Songwriting',
+  'ToDo: Studioarbeit',
+  'Warte auf Feedback',
+  'Song final',
+  'Warte auf Aufnahmetag',
+  'kann produziert werden',
+  'Warte auf finales GO',
+  'FINAL',
+  'abgeschlossen',
+];
+
+export interface Schulsong {
+  id: string;
+  // Identity (read-only)
+  schulsongLabel?: string;       // Primary formula field
+  schulsongId?: string;          // S0042 format
+  autoId?: number;
+  idEinrichtung?: string;        // Lookup
+  einrichtungName?: string;      // Resolved from einrichtungenId
+
+  // Linked records
+  einrichtungenId?: string;
+  projekteId?: string;
+
+  // Song content
+  songName?: string;
+  songtext?: string;
+  songtextGoogleDocUrl?: string;
+  feedback?: string;
+
+  // Song type & selection
+  schulsongTyp?: SchulsongTyp;
+  poolsongAuswahl?: PoolsongAuswahl;
+
+  // Statuses
+  statusBooking?: SchulsongBookingStatus;
+  statusProduktion?: SchulsongProduktionStatus;
+  gebuchtAm?: string;
+  aufnahmetagDatum?: string;
+
+  // Asset URLs
+  streamingLink?: string;
+  layoutUrl?: string;
+  playbackUrl?: string;
+  songUrl?: string;
+  notenUrl?: string;
+  textUrl?: string;
+  materialUrl?: string;
+  instrumentalUrl?: string;
+  leadUrl?: string;
+  backingsUrl?: string;
+
+  // Configuration flags
+  notenKonfig?: boolean;
+  uebematerialKonfig?: boolean;
+  streamingKonfig?: boolean;
+  cdKonfig?: number;
+  aufnahmetagKonfig?: boolean;
+  miniKonfig?: boolean;
+
+  createdAt: string;
+}
+
+export interface CreateSchulsongInput {
+  songName: string;
+  einrichtungenId: string;
+  schulsongTyp?: SchulsongTyp;
+  statusBooking?: SchulsongBookingStatus;
+  statusProduktion?: SchulsongProduktionStatus;
+  songtext?: string;
+  songtextGoogleDocUrl?: string;
+  feedback?: string;
+  poolsongAuswahl?: PoolsongAuswahl;
+  gebuchtAm?: string;
+  aufnahmetagDatum?: string;
+  projekteId?: string;
+  // URLs
+  streamingLink?: string;
+  layoutUrl?: string;
+  playbackUrl?: string;
+  songUrl?: string;
+  notenUrl?: string;
+  textUrl?: string;
+  materialUrl?: string;
+  instrumentalUrl?: string;
+  leadUrl?: string;
+  backingsUrl?: string;
+  // Config flags
+  notenKonfig?: boolean;
+  uebematerialKonfig?: boolean;
+  streamingKonfig?: boolean;
+  cdKonfig?: number;
+  aufnahmetagKonfig?: boolean;
+  miniKonfig?: boolean;
+}
+
+export type UpdateSchulsongInput = Partial<CreateSchulsongInput>;
+
 export interface CalendarEntry {
   bookingId: string;
   date: string; // YYYY-MM-DD
