@@ -723,13 +723,14 @@ class TaskService {
     const base = this.airtable.getBase();
     const table = base(TASKS_TABLE_ID);
 
-    // Fetch pending tasks with deadlines in the date range
+    // Fetch pending tasks with deadlines in the date range (inclusive bounds).
+    // IS_AFTER / IS_BEFORE are exclusive, so shift by 1 day to include boundary dates.
     const records = await table
       .select({
         filterByFormula: `AND(
           {${TASKS_FIELD_IDS.status}} = 'pending',
-          IS_AFTER({${TASKS_FIELD_IDS.deadline}}, '${dateFrom}'),
-          IS_BEFORE({${TASKS_FIELD_IDS.deadline}}, '${dateTo}')
+          IS_AFTER({${TASKS_FIELD_IDS.deadline}}, DATEADD('${dateFrom}', -1, 'days')),
+          IS_BEFORE({${TASKS_FIELD_IDS.deadline}}, DATEADD('${dateTo}', 1, 'days'))
         )`,
       })
       .all();
