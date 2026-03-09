@@ -38,7 +38,11 @@ import {
   GUESSTIMATE_ORDERS_TABLE_ID,
   GUESSTIMATE_ORDERS_FIELD_IDS,
   EVENTS_FIELD_IDS,
+  ORDERS_FIELD_IDS,
+  type ShopifyOrderLineItem,
 } from '@/lib/types/airtable';
+import { getOrdersByEventRecordId } from './ordersHelper';
+import { classifyVariant } from '@/lib/config/variantClassification';
 
 /**
  * TaskService - Handles task generation, retrieval, and completion
@@ -1001,6 +1005,44 @@ class TaskService {
       updatedCount: updatedTasks.length,
       tasks: updatedTasks,
     };
+  }
+
+  /**
+   * Get the total CD quantity ordered for an event.
+   *
+   * Fetches all orders linked to the event, parses their line_items JSON,
+   * and sums quantities of items classified as 'audio' (CD variants).
+   */
+  async getCdQuantityForEvent(eventRecordId: string): Promise<number> {
+    const orders = await getOrdersByEventRecordId(eventRecordId);
+
+    let totalCdQuantity = 0;
+
+    for (const order of orders) {
+      // Only count paid orders
+      const paymentStatus = order.get(ORDERS_FIELD_IDS.payment_status) as string | undefined;
+      if (paymentStatus !== 'paid') continue;
+
+      const lineItemsRaw = order.get(ORDERS_FIELD_IDS.line_items) as string | undefined;
+      if (!lineItemsRaw) continue;
+
+      let lineItems: ShopifyOrderLineItem[];
+      try {
+        lineItems = JSON.parse(lineItemsRaw);
+      } catch {
+        console.warn(`[getCdQuantityForEvent] Failed to parse line_items for order ${order.id}`);
+        continue;
+      }
+
+      for (const item of lineItems) {
+        const category = classifyVariant(String(item.variant_id));
+        if (category === 'audio') {
+          totalCdQuantity += item.quantity;
+        }
+      }
+    }
+
+    return totalCdQuantity;
   }
 }
 
