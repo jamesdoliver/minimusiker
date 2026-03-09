@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Airtable from 'airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { EINRICHTUNGEN_TABLE_ID, EINRICHTUNGEN_FIELD_IDS } from '@/lib/types/airtable';
+import { EINRICHTUNGEN_TABLE_ID, EINRICHTUNGEN_FIELD_IDS, EVENTS_TABLE_ID, EVENTS_FIELD_IDS } from '@/lib/types/airtable';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +33,33 @@ async function fetchEinrichtungNames(ids: string[]): Promise<Map<string, string>
   return nameMap;
 }
 
+async function fetchEventCodes(ids: string[]): Promise<Map<string, string>> {
+  const codeMap = new Map<string, string>();
+  const uniqueIds = [...new Set(ids.filter(Boolean))];
+
+  if (uniqueIds.length === 0) return codeMap;
+
+  const filterFormula = `OR(${uniqueIds.map(id => `RECORD_ID()='${id}'`).join(',')})`;
+
+  const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID!);
+  const records = await base(EVENTS_TABLE_ID)
+    .select({
+      filterByFormula: filterFormula,
+      fields: [EVENTS_FIELD_IDS.event_id],
+      returnFieldsByFieldId: true,
+    })
+    .all();
+
+  for (const record of records) {
+    const eventCode = record.fields[EVENTS_FIELD_IDS.event_id] as string | undefined;
+    if (eventCode) {
+      codeMap.set(record.id, eventCode);
+    }
+  }
+
+  return codeMap;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const admin = verifyAdminSession(request);
@@ -47,9 +74,14 @@ export async function GET(request: NextRequest) {
     const einrichtungIds = schulsongs.map(s => s.einrichtungenId).filter(Boolean) as string[];
     const einrichtungNames = await fetchEinrichtungNames(einrichtungIds);
 
+    // Resolve Event codes in a single batch call
+    const eventIds = schulsongs.map(s => s.eventId).filter(Boolean) as string[];
+    const eventCodes = await fetchEventCodes(eventIds);
+
     const enrichedSchulsongs = schulsongs.map(s => ({
       ...s,
       einrichtungName: s.einrichtungenId ? einrichtungNames.get(s.einrichtungenId) : undefined,
+      eventCode: s.eventId ? eventCodes.get(s.eventId) : undefined,
     }));
 
     return NextResponse.json({

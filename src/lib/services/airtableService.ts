@@ -60,6 +60,7 @@ import {
 } from '@/lib/types/airtable';
 import { SONGS_TABLE_ID } from '@/lib/types/teacher';
 import { ManualCost } from '@/lib/types/analytics';
+import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import {
   TeacherResource,
   TEACHER_RESOURCES_TABLE_ID,
@@ -5304,7 +5305,9 @@ class AirtableService {
     schoolAddress?: string,
     schoolPhone?: string,
     eventStatus?: string,
-    estimatedChildren?: number
+    estimatedChildren?: number,
+    isSchulsong?: boolean,
+    isMinimusikertag?: boolean
   ): Promise<Event> {
     this.ensureNormalizedTablesInitialized();
 
@@ -5386,6 +5389,14 @@ class AirtableService {
       if (estimatedChildren !== undefined) {
         eventFields[EVENTS_FIELD_IDS.estimated_children] = estimatedChildren;
         eventFields[EVENTS_FIELD_IDS.is_under_100] = estimatedChildren < 100;
+      }
+
+      // Set schulsong / minimusikertag flags if provided
+      if (isSchulsong !== undefined) {
+        eventFields[EVENTS_FIELD_IDS.is_schulsong] = isSchulsong;
+      }
+      if (isMinimusikertag !== undefined) {
+        eventFields[EVENTS_FIELD_IDS.is_minimusikertag] = isMinimusikertag;
       }
 
       const record = await this.base(EVENTS_TABLE_ID).create(eventFields, { typecast: true });
@@ -7681,6 +7692,7 @@ class AirtableService {
 
     const einrichtungenArr = fields[F.einrichtungen] as string[] | undefined;
     const projekteArr = fields[F.projekte] as string[] | undefined;
+    const eventArr = fields[F.event] as string[] | undefined;
 
     return {
       id: record.id,
@@ -7690,6 +7702,7 @@ class AirtableService {
       idEinrichtung: fields[F.id_einrichtung]?.[0] as string | undefined,
       einrichtungenId: einrichtungenArr?.[0],
       projekteId: projekteArr?.[0],
+      eventId: eventArr?.[0],
       songName: fields[F.song_name] as string | undefined,
       songtext: fields[F.songtext] as string | undefined,
       songtextGoogleDocUrl: fields[F.songtext_google_doc_url] as string | undefined,
@@ -7772,6 +7785,7 @@ class AirtableService {
       if (data.gebuchtAm !== undefined) fields[F.gebucht_am] = data.gebuchtAm;
       if (data.aufnahmetagDatum !== undefined) fields[F.aufnahmetag_datum] = data.aufnahmetagDatum;
       if (data.projekteId !== undefined) fields[F.projekte] = [data.projekteId];
+      if (data.eventId !== undefined) fields[F.event] = [data.eventId];
       // URLs
       if (data.streamingLink !== undefined) fields[F.streaming_link] = data.streamingLink;
       if (data.layoutUrl !== undefined) fields[F.layout_url] = data.layoutUrl;
@@ -7832,6 +7846,9 @@ class AirtableService {
       if (data.projekteId !== undefined) {
         fields[F.projekte] = data.projekteId ? [data.projekteId] : [];
       }
+      if (data.eventId !== undefined) {
+        fields[F.event] = data.eventId ? [data.eventId] : [];
+      }
       // URLs
       if (data.streamingLink !== undefined) fields[F.streaming_link] = data.streamingLink;
       if (data.layoutUrl !== undefined) fields[F.layout_url] = data.layoutUrl;
@@ -7879,6 +7896,182 @@ class AirtableService {
       console.error('Error deleting schulsong:', error);
       throw new Error(`Failed to delete schulsong: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Get a Schulsong by its linked Event record ID
+   */
+  async getSchulsongByEventId(eventRecordId: string): Promise<Schulsong | null> {
+    try {
+      const F = SCHULSONG_FIELD_IDS;
+      const records = await this.base(SCHULSONG_TABLE_ID)
+        .select({
+          filterByFormula: `FIND('${eventRecordId}', ARRAYJOIN({${F.event}}))`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (records.length === 0) return null;
+      return this.transformSchulsongRecord(records[0]);
+    } catch (error) {
+      console.error('Error fetching schulsong by event ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create a full Event + SchoolBooking chain from a Schulsong (forward flow).
+   * Called when admin sets "Buchung mit RD" and picks a recording date.
+   */
+  async createEventFromSchulsong(
+    schulsongId: string,
+    schoolName: string,
+    einrichtungId: string,
+    eventDate: string
+  ): Promise<{ event: Event; bookingCode: string }> {
+    const crypto = await import('crypto');
+
+    // Generate manual booking code and discount code
+    const bookingCode = `M-${crypto.randomBytes(3).toString('hex')}`;
+    const discountCode = `meh1${crypto.randomBytes(4).toString('hex').slice(0, 5)}`;
+
+    // Create SchoolBooking record (minimal: school name, date, status=confirmed)
+    const bookingFields: Record<string, any> = {
+      [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id]: bookingCode,
+      [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_hash]: discountCode,
+      [SCHOOL_BOOKINGS_FIELD_IDS.school_name]: schoolName,
+      [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status]: 'confirmed',
+      [SCHOOL_BOOKINGS_FIELD_IDS.start_date]: eventDate,
+      [SCHOOL_BOOKINGS_FIELD_IDS.end_date]: eventDate,
+    };
+
+    const bookingRecord = await this.base(SCHOOL_BOOKINGS_TABLE_ID).create(bookingFields);
+    console.log(`Created SchoolBooking for Schulsong: ${bookingRecord.id} (code: ${bookingCode})`);
+
+    // Generate event ID and create Event record
+    const eventId = generateEventId(schoolName, 'Schulsong', eventDate);
+    const eventRecord = await this.createEventFromBooking(
+      eventId,
+      bookingRecord.id,
+      schoolName,
+      eventDate,
+      undefined, // no staff
+      'Schulsong',
+      undefined, // address
+      undefined, // phone
+      undefined, // status
+      undefined, // estimatedChildren
+      true,      // isSchulsong
+      false      // isMinimusikertag
+    );
+    console.log(`Created Event for Schulsong: ${eventRecord.id} (event_id: ${eventId})`);
+
+    // Auto-assign engineers for schulsong
+    try {
+      await this.ensureDefaultEngineers(eventRecord.id, true);
+    } catch (err) {
+      console.warn('Could not assign default engineers for schulsong event:', err);
+    }
+
+    // Initialize R2 folder structure
+    try {
+      const { getR2Service } = await import('@/lib/services/r2Service');
+      const r2Service = getR2Service();
+      await r2Service.initializeEventStructure(eventId);
+      console.log(`Initialized R2 structure for schulsong event: ${eventId}`);
+    } catch (err) {
+      console.warn('Could not initialize R2 structure for schulsong event:', err);
+    }
+
+    // Create default "Alle Kinder" class (retry once)
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const { getTeacherService } = await import('@/lib/services/teacherService');
+        const teacherService = getTeacherService();
+        await teacherService.createDefaultClass({
+          eventId,
+          eventRecordId: eventRecord.id,
+          schoolName,
+          bookingDate: eventDate,
+          estimatedChildren: 0,
+        });
+        console.log(`Created default "Alle Kinder" class for schulsong event: ${eventId}`);
+        break;
+      } catch (err) {
+        console.error(`Error creating default class for schulsong (attempt ${attempt}/2):`, err);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+
+    // Link Schulsong to Event
+    await this.updateSchulsong(schulsongId, { eventId: eventRecord.id });
+    console.log(`Linked Schulsong ${schulsongId} to Event ${eventRecord.id}`);
+
+    return { event: eventRecord, bookingCode };
+  }
+
+  /**
+   * Create a Schulsong record from an existing Event (reverse flow).
+   * Called when admin toggles is_schulsong on an Event.
+   */
+  async createSchulsongFromEvent(eventRecordId: string): Promise<Schulsong> {
+    // Fetch the event
+    const event = await this.getEventById(eventRecordId);
+    if (!event) {
+      throw new Error(`Event ${eventRecordId} not found`);
+    }
+
+    const schoolName = event.school_name || 'Unknown School';
+
+    // Try to resolve Einrichtung from Event's linked SchoolBooking
+    let einrichtungId: string | undefined;
+    if (event.simplybook_booking?.[0]) {
+      const booking = await this.getSchoolBookingById(event.simplybook_booking[0]);
+      if (booking) {
+        // Search Einrichtung by school name
+        const einrichtungen = await this.base(EINRICHTUNGEN_TABLE_ID)
+          .select({
+            filterByFormula: `{${EINRICHTUNGEN_FIELD_IDS.customer_name}} = '${schoolName.replace(/'/g, "\\'")}'`,
+            maxRecords: 1,
+            returnFieldsByFieldId: true,
+          })
+          .firstPage();
+        if (einrichtungen.length > 0) {
+          einrichtungId = einrichtungen[0].id;
+        }
+      }
+    }
+
+    // If no Einrichtung found, search by name directly
+    if (!einrichtungId) {
+      const einrichtungen = await this.base(EINRICHTUNGEN_TABLE_ID)
+        .select({
+          filterByFormula: `{${EINRICHTUNGEN_FIELD_IDS.customer_name}} = '${schoolName.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+      if (einrichtungen.length > 0) {
+        einrichtungId = einrichtungen[0].id;
+      }
+    }
+
+    if (!einrichtungId) {
+      throw new Error(`Could not find Einrichtung for school "${schoolName}". Create one first.`);
+    }
+
+    // Create Schulsong record
+    const schulsong = await this.createSchulsong({
+      songName: `${schoolName} Schulsong`,
+      einrichtungenId: einrichtungId,
+      statusBooking: 'Buchung mit RD',
+      aufnahmetagDatum: event.event_date || undefined,
+      eventId: eventRecordId,
+    });
+
+    console.log(`Created Schulsong ${schulsong.id} from Event ${eventRecordId}`);
+    return schulsong;
   }
 }
 

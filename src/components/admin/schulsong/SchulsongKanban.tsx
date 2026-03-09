@@ -35,7 +35,7 @@ function BookingStatusDot({ status }: { status?: string }) {
     <span
       className={cn(
         'inline-block w-2 h-2 rounded-full',
-        status === 'Buchung' ? 'bg-green-500' : 'bg-yellow-500'
+        status === 'Buchung mit RD' ? 'bg-blue-500' : status === 'Buchung' ? 'bg-green-500' : 'bg-yellow-500'
       )}
       title={status}
     />

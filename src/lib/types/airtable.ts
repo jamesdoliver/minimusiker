@@ -1162,6 +1162,7 @@ export const SCHULSONG_FIELD_IDS = {
   // Linked records
   einrichtungen: 'fldq49WMhpw2BWqDh',       // Link to Einrichtungen (prefers single)
   projekte: 'fldR6Eo6VN1Wo8z25',            // Link to Projekte (prefers single)
+  event: 'fldhxJiDsJVkhNFAN',        // Link to Events (prefers single)
 
   // Song content
   song_name: 'fld6B0GMcTtuTjb2Z',           // Single Line Text
@@ -1201,7 +1202,7 @@ export const SCHULSONG_FIELD_IDS = {
 } as const;
 
 export type SchulsongTyp = 'Poolsong' | 'Exklusivsong';
-export type SchulsongBookingStatus = 'Anfrage' | 'Buchung';
+export type SchulsongBookingStatus = 'Anfrage' | 'Buchung' | 'Buchung mit RD';
 export type SchulsongProduktionStatus =
   | 'Warte auf Fragebogen'
   | 'ToDo: Texten'
@@ -1245,6 +1246,8 @@ export interface Schulsong {
   // Linked records
   einrichtungenId?: string;
   projekteId?: string;
+  eventId?: string;              // Linked Event record ID
+  eventCode?: string;            // Resolved event_id string (e.g. evt_xxx) — enriched by API
 
   // Song content
   songName?: string;
@@ -1298,6 +1301,7 @@ export interface CreateSchulsongInput {
   gebuchtAm?: string;
   aufnahmetagDatum?: string;
   projekteId?: string;
+  eventId?: string;
   // URLs
   streamingLink?: string;
   layoutUrl?: string;

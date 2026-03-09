@@ -652,6 +652,19 @@ export async function PATCH(
         } catch (engineerError) {
           console.warn('Could not update engineer assignments:', engineerError);
         }
+
+        // Reverse flow: auto-create linked Schulsong when is_schulsong is toggled on
+        if (body.is_schulsong === true) {
+          try {
+            const existingSchulsong = await airtableService.getSchulsongByEventId(eventRecordId);
+            if (!existingSchulsong) {
+              await airtableService.createSchulsongFromEvent(eventRecordId);
+              console.log(`Auto-created Schulsong for event ${eventRecordId}`);
+            }
+          } catch (schulsongError) {
+            console.warn('Could not auto-create Schulsong from event:', schulsongError);
+          }
+        }
       }
 
       // Send cancellation notification if status changed to Cancelled

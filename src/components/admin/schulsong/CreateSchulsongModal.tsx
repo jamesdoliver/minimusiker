@@ -292,6 +292,7 @@ export default function CreateSchulsongModal({ onClose, onCreate }: CreateSchuls
               <option value="">—</option>
               <option value="Anfrage">Anfrage</option>
               <option value="Buchung">Buchung</option>
+              <option value="Buchung mit RD">Buchung mit RD</option>
             </select>
           </div>
 

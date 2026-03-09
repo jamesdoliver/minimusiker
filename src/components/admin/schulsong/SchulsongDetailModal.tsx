@@ -62,6 +62,53 @@ export default function SchulsongDetailModal({
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Event creation flow
+  const [showCreateEventDialog, setShowCreateEventDialog] = useState(false);
+  const [pendingDate, setPendingDate] = useState('');
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [linkedEventCode, setLinkedEventCode] = useState(schulsong.eventCode || '');
+
+  const hasLinkedEvent = !!(schulsong.eventId || linkedEventCode);
+
+  const handleAufnahmetagChange = (newDate: string) => {
+    // If status is "Buchung mit RD" and no linked event yet, trigger event creation dialog
+    if (form.statusBooking === 'Buchung mit RD' && !hasLinkedEvent && newDate) {
+      setPendingDate(newDate);
+      setShowCreateEventDialog(true);
+    } else {
+      setForm(f => ({ ...f, aufnahmetagDatum: newDate }));
+    }
+  };
+
+  const handleConfirmCreateEvent = async () => {
+    setCreatingEvent(true);
+    try {
+      const res = await fetch(`/api/admin/schulsong/${schulsong.id}/create-event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aufnahmetagDatum: pendingDate }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setForm(f => ({ ...f, aufnahmetagDatum: pendingDate }));
+        setLinkedEventCode(data.eventCode);
+        setShowCreateEventDialog(false);
+      } else {
+        alert(`Fehler: ${data.error}`);
+      }
+    } catch (err) {
+      alert('Fehler beim Erstellen des Events');
+      console.error(err);
+    } finally {
+      setCreatingEvent(false);
+    }
+  };
+
+  const handleCancelCreateEvent = () => {
+    setShowCreateEventDialog(false);
+    setPendingDate('');
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -169,6 +216,13 @@ export default function SchulsongDetailModal({
 
           {/* Status */}
           <Section title="Status">
+            {/* Linked Event display */}
+            {linkedEventCode && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-md text-sm text-green-800">
+                Event: {linkedEventCode}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <Field label="Booking Status">
                 <select
@@ -179,6 +233,7 @@ export default function SchulsongDetailModal({
                   <option value="">—</option>
                   <option value="Anfrage">Anfrage</option>
                   <option value="Buchung">Buchung</option>
+                  <option value="Buchung mit RD">Buchung mit RD</option>
                 </select>
               </Field>
               <Field label="Produktion Status">
@@ -205,8 +260,9 @@ export default function SchulsongDetailModal({
                 <input
                   type="date"
                   value={form.aufnahmetagDatum}
-                  onChange={(e) => setForm(f => ({ ...f, aufnahmetagDatum: e.target.value }))}
-                  className="input-field"
+                  onChange={(e) => handleAufnahmetagChange(e.target.value)}
+                  disabled={form.statusBooking !== 'Buchung mit RD' && !form.aufnahmetagDatum}
+                  className={cn('input-field', form.statusBooking !== 'Buchung mit RD' && !form.aufnahmetagDatum && 'opacity-50 cursor-not-allowed')}
                 />
               </Field>
             </div>
@@ -347,6 +403,42 @@ export default function SchulsongDetailModal({
           </div>
         </div>
       </div>
+
+      {/* Create Event Confirmation Dialog */}
+      {showCreateEventDialog && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
+          onClick={handleCancelCreateEvent}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-gray-900 mb-2">Aufnahmetag-Event erstellen?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Dies erstellt einen Aufnahmetag-Event f&uuml;r{' '}
+              <strong>{schulsong.einrichtungName || schulsong.songName || 'diese Schule'}</strong>{' '}
+              am <strong>{pendingDate}</strong>. Fortfahren?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleCancelCreateEvent}
+                disabled={creatingEvent}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleConfirmCreateEvent}
+                disabled={creatingEvent}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              >
+                {creatingEvent ? 'Erstelle...' : 'Event erstellen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .input-field {
