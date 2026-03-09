@@ -1,6 +1,7 @@
 import Airtable from 'airtable';
 import { getAirtableService } from './airtableService';
 import { getR2Service } from './r2Service';
+import { getFulfillmentService, type WelleFulfillmentSummary } from './fulfillmentService';
 import {
   Task,
   TaskWithEventDetails,
@@ -235,7 +236,7 @@ class TaskService {
     completionData: TaskCompletionData,
     adminEmail: string,
     goEnrichment?: { order_ids?: string; contains?: GuesstimateOrderItem[] }
-  ): Promise<{ task: Task; goId?: string; shippingTaskId?: string }> {
+  ): Promise<{ task: Task; goId?: string; shippingTaskId?: string; fulfillmentSummary?: WelleFulfillmentSummary }> {
     const base = this.airtable.getBase();
     const table = base(TASKS_TABLE_ID);
 
@@ -246,6 +247,14 @@ class TaskService {
     // Guard against double-completion
     if (task.status === 'completed') {
       throw new Error('Task is already completed');
+    }
+
+    // Handle orchestrated completion for shipment_welle_1 / shipment_welle_2 tasks
+    if (
+      task.template_id === 'shipment_welle_1' ||
+      task.template_id === 'shipment_welle_2'
+    ) {
+      return this.completeWelleTask(task, taskId, adminEmail, completionData);
     }
 
     const template = getTemplateById(task.template_id);
@@ -316,6 +325,59 @@ class TaskService {
       task: this.transformTaskRecord(updatedRecord),
       goId,
       shippingTaskId,
+    };
+  }
+
+  /**
+   * Handle orchestrated completion for Welle 1 / Welle 2 shipment tasks.
+   *
+   * Calls the FulfillmentService to batch-fulfill Shopify orders, then:
+   * - If ALL orders succeeded: marks the task as completed with the summary
+   * - If ANY orders failed: throws an error with the summary so the UI can display it
+   */
+  private async completeWelleTask(
+    task: Task,
+    taskId: string,
+    adminEmail: string,
+    completionData: TaskCompletionData,
+  ): Promise<{ task: Task; fulfillmentSummary: WelleFulfillmentSummary }> {
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+
+    const welle: 'Welle 1' | 'Welle 2' =
+      task.template_id === 'shipment_welle_1' ? 'Welle 1' : 'Welle 2';
+
+    const fulfillmentService = getFulfillmentService();
+    const summary = await fulfillmentService.fulfillWelle(task.event_id, welle);
+
+    // If any orders failed, throw with the summary attached so the UI can display details
+    if (summary.failed > 0) {
+      const error = new Error(
+        `${welle} fulfillment partially failed: ${summary.succeeded}/${summary.total} succeeded, ${summary.failed} failed`,
+      );
+      // Attach the summary to the error for the API layer to extract
+      (error as Error & { fulfillmentSummary: WelleFulfillmentSummary }).fulfillmentSummary = summary;
+      throw error;
+    }
+
+    // All orders succeeded -- mark task as completed
+    const mergedCompletionData = {
+      ...completionData,
+      fulfillment_summary: summary,
+    };
+
+    await table.update(taskId, {
+      [TASKS_FIELD_IDS.status]: 'completed',
+      [TASKS_FIELD_IDS.completed_at]: new Date().toISOString(),
+      [TASKS_FIELD_IDS.completed_by]: adminEmail,
+      [TASKS_FIELD_IDS.completion_data]: JSON.stringify(mergedCompletionData),
+    } as Partial<Airtable.FieldSet>);
+
+    // Refetch the updated task
+    const updatedRecord = await table.find(taskId);
+    return {
+      task: this.transformTaskRecord(updatedRecord),
+      fulfillmentSummary: summary,
     };
   }
 
