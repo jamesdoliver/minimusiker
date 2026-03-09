@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import shopifyService from '@/lib/services/shopifyService';
 import { CheckoutLineItem, CheckoutCustomAttributes } from '@/lib/types/shop';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 
 export const dynamic = 'force-dynamic';
-// Note: EARLY_BIRD_DEADLINE_DAYS was previously used here but is no longer needed
-// Early-bird discount now applies before event day (daysUntilEvent > 0)
 
 interface CheckoutRequest {
   lineItems: CheckoutLineItem[];
@@ -74,19 +73,38 @@ export async function POST(request: NextRequest) {
         const airtable = getAirtableService();
         const event = await airtable.getEventByEventId(customAttributes.eventId);
 
-        // Early-bird discount only applies BEFORE the event day
-        if (event?.event_date) {
+        // Detect schulsong-only events (no audio products → no early-bird discount)
+        const isSchulsongOnly = event?.deal_builder_enabled
+          ? (event.deal_type === 'schus' || event.deal_type === 'schus_xl')
+          : (event?.is_schulsong === true && event?.is_minimusikertag !== true);
+
+        // Early-bird discount: must be within deadline window AND not schulsong-only
+        if (event?.event_date && !isSchulsongOnly) {
           const eventDate = new Date(event.event_date);
-          const daysUntilEvent = Math.ceil(
-            (eventDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-          );
-          if (daysUntilEvent > 0) {
+          const overrides = parseOverrides(event.timeline_overrides);
+          const earlyBirdDays = getThreshold('early_bird_deadline_days', overrides);
+          const deadline = new Date(eventDate);
+          deadline.setDate(deadline.getDate() - earlyBirdDays);
+          deadline.setHours(23, 59, 59, 999);
+
+          if (Date.now() < deadline.getTime()) {
             discountCodes.push('EARLYBIRD10');
             console.log('[create-checkout] Early-bird discount applied:', {
               eventDate: event.event_date,
-              daysUntilEvent,
+              earlyBirdDeadline: deadline.toISOString(),
+              earlyBirdDays,
+            });
+          } else {
+            console.log('[create-checkout] Early-bird deadline passed:', {
+              eventDate: event.event_date,
+              earlyBirdDeadline: deadline.toISOString(),
+              earlyBirdDays,
             });
           }
+        } else if (isSchulsongOnly) {
+          console.log('[create-checkout] Skipping early-bird discount for schulsong-only event:', {
+            eventId: customAttributes.eventId,
+          });
         }
 
         // Backfill schoolName from Event record if missing from request

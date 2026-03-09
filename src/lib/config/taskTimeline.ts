@@ -32,12 +32,16 @@ export interface TaskTimelineEntry {
   id: string;
   /** Category prefix for UI grouping */
   prefix: TaskPrefix;
-  /** Human-readable label shown in the matrix column header */
-  label: string;
+  /** Short name shown in the matrix column header */
+  name: string;
+  /** Full display name in "Prefix: Name" format, e.g. "Ship: Poster" */
+  displayName: string;
+  /** Human-readable description of what this task involves */
+  description: string;
   /** Days relative to event date (negative = before, positive = after) */
-  timeline_offset: number;
+  offset: number;
   /** How this task is completed */
-  completion_type: TaskCompletionType;
+  completion: TaskCompletionType;
   /** Whether completing this task should create a GuesstimateOrder record */
   creates_go_id: boolean;
 }
@@ -55,89 +59,111 @@ export const TASK_TIMELINE: readonly TaskTimelineEntry[] = [
   {
     id: 'ship_poster',
     prefix: 'Ship',
-    label: 'Poster',
-    timeline_offset: -45,
-    completion_type: 'monetary',
+    name: 'Poster',
+    displayName: 'Ship: Poster',
+    description: 'Order and ship poster to school',
+    offset: -45,
+    completion: 'monetary',
     creates_go_id: true,
   },
   {
     id: 'ship_flyer_1',
     prefix: 'Ship',
-    label: 'Flyer 1',
-    timeline_offset: -43,
-    completion_type: 'monetary',
+    name: 'Flyer 1',
+    displayName: 'Ship: Flyer 1',
+    description: 'Order and ship first flyer batch',
+    offset: -43,
+    completion: 'monetary',
     creates_go_id: true,
   },
   {
     id: 'order_schul_clothing',
     prefix: 'Order',
-    label: 'Schul Clothing',
-    timeline_offset: -18,
-    completion_type: 'monetary',
+    name: 'Schul Clothing',
+    displayName: 'Order: Schul Clothing',
+    description: 'Place school-branded clothing order with supplier',
+    offset: -18,
+    completion: 'monetary',
     creates_go_id: true,
   },
   {
     id: 'ship_flyer_2',
     prefix: 'Ship',
-    label: 'Flyer 2',
-    timeline_offset: -18,
-    completion_type: 'monetary',
+    name: 'Flyer 2',
+    displayName: 'Ship: Flyer 2',
+    description: 'Order and ship second flyer batch',
+    offset: -18,
+    completion: 'monetary',
     creates_go_id: true,
   },
   {
     id: 'ship_flyer_3',
     prefix: 'Ship',
-    label: 'Flyer 3',
-    timeline_offset: -10,
-    completion_type: 'monetary',
+    name: 'Flyer 3',
+    displayName: 'Ship: Flyer 3',
+    description: 'Order and ship third flyer batch',
+    offset: -10,
+    completion: 'monetary',
     creates_go_id: true,
   },
   {
     id: 'shipment_welle_1',
     prefix: 'Shipment',
-    label: 'Welle 1',
-    timeline_offset: -9,
-    completion_type: 'orchestrated',
+    name: 'Welle 1',
+    displayName: 'Shipment: Welle 1',
+    description: 'Batch ship clothing items to customers. Mixed orders partially fulfilled.',
+    offset: -9,
+    completion: 'orchestrated',
     creates_go_id: false,
   },
   {
     id: 'order_minicard',
     prefix: 'Order',
-    label: 'Minicard',
-    timeline_offset: 5,
-    completion_type: 'monetary',
+    name: 'Minicard',
+    displayName: 'Order: Minicard',
+    description: 'Order minicards after event',
+    offset: 5,
+    completion: 'monetary',
     creates_go_id: true,
   },
   {
     id: 'order_schul_clothing_2',
     prefix: 'Order',
-    label: 'Schul Clothing 2',
-    timeline_offset: 7,
-    completion_type: 'monetary',
+    name: 'Schul Clothing 2',
+    displayName: 'Order: Schul Clothing 2',
+    description: 'Second school clothing order for late/additional orders. Cutoff for school-specific clothing.',
+    offset: 7,
+    completion: 'monetary',
     creates_go_id: true,
   },
   {
     id: 'audio_master_cd',
     prefix: 'Audio',
-    label: 'Master CD',
-    timeline_offset: 11,
-    completion_type: 'tracklist',
+    name: 'Master CD',
+    displayName: 'Audio: Master CD',
+    description: 'Assemble mastered audio in album order for CD production',
+    offset: 11,
+    completion: 'tracklist',
     creates_go_id: false,
   },
   {
     id: 'audio_cd_production',
     prefix: 'Audio',
-    label: 'CD Production',
-    timeline_offset: 12,
-    completion_type: 'quantity_checkbox',
+    name: 'CD Production',
+    displayName: 'Audio: CD Production',
+    description: 'Produce CDs in-house based on order quantity',
+    offset: 12,
+    completion: 'quantity_checkbox',
     creates_go_id: false,
   },
   {
     id: 'shipment_welle_2',
     prefix: 'Shipment',
-    label: 'Welle 2',
-    timeline_offset: 14,
-    completion_type: 'orchestrated',
+    name: 'Welle 2',
+    displayName: 'Shipment: Welle 2',
+    description: 'Ship remaining audio items to customers. Completes mixed order fulfillment.',
+    offset: 14,
+    completion: 'orchestrated',
     creates_go_id: false,
   },
 ] as const;
@@ -146,7 +172,7 @@ export const TASK_TIMELINE: readonly TaskTimelineEntry[] = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Ordered list of all task IDs (chronological by timeline offset) */
+/** Ordered list of all task IDs (chronological by offset) */
 export const TASK_TIMELINE_ORDER: readonly string[] = TASK_TIMELINE.map(
   (entry) => entry.id
 );
@@ -167,15 +193,15 @@ export function getTimelineEntriesByPrefix(
 
 /**
  * Calculate the concrete deadline for a task given an event date.
- * Returns a Date with time set to midnight UTC.
+ * Returns a Date with time set to midnight.
  */
 export function calculateDeadline(
   eventDate: Date | string,
-  timelineOffset: number
+  offset: number
 ): Date {
   const base = typeof eventDate === 'string' ? new Date(eventDate) : new Date(eventDate);
   base.setHours(0, 0, 0, 0);
-  base.setDate(base.getDate() + timelineOffset);
+  base.setDate(base.getDate() + offset);
   return base;
 }
 
