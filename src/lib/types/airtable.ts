@@ -668,6 +668,7 @@ export const ORDERS_FIELD_IDS = {
   updated_at: 'fldXyxRPkMSztS8Ff',         // Last update timestamp
   refund_amount: 'flddqjKgaydkFL5HG',      // Amount refunded (EUR)
   cancel_reason: 'fld768qHuCqNujx8c',      // Shopify cancel reason
+  shipment_wave: 'fldTODO_REPLACE_AFTER_AIRTABLE_CREATION', // TODO: Replace with actual field ID after creating in Airtable
 } as const;
 
 // SchulClothingOrders Table — SCS t-shirt size tracking (one order per event)
@@ -914,6 +915,7 @@ export interface ShopifyOrder {
   digital_delivered: boolean;                    // Has digital content been delivered?
   refund_amount?: number;                        // Amount refunded (EUR)
   cancel_reason?: string;                        // Shopify cancel reason
+  shipment_wave?: 'Welle 1' | 'Welle 2' | 'Both' | 'Rolling';
   created_at: string;                            // Record creation timestamp
   updated_at: string;                            // Last update timestamp
 }
