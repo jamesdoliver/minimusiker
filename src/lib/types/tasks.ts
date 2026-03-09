@@ -191,3 +191,59 @@ export interface CreateGuesstimateOrderInput {
   order_amount?: number;
   contains?: GuesstimateOrderItem[];
 }
+
+// ---------------------------------------------------------------------------
+// NEW Task Matrix Types (v2 — used by the redesigned task timeline)
+// ---------------------------------------------------------------------------
+
+/** Category prefix for the new task timeline */
+export type NewTaskPrefix = 'Ship' | 'Order' | 'Shipment' | 'Audio';
+
+/** Completion mode for the new task timeline */
+export type NewTaskCompletionType =
+  | 'monetary'
+  | 'orchestrated'
+  | 'tracklist'
+  | 'quantity_checkbox';
+
+/** Visual status of a cell in the task matrix grid */
+export type TaskCellStatus = 'white' | 'yellow' | 'red' | 'green' | 'grey';
+
+/** A single cell in the task matrix (one task for one event) */
+export interface TaskMatrixCell {
+  /** The task's unique id from the timeline config, e.g. "ship_poster" */
+  taskId: string;
+  /** The task template id (matches TaskTimelineEntry.id) */
+  templateId: string;
+  /** Current task status */
+  status: TaskStatus;
+  /** Computed cell colour for the matrix UI */
+  cellStatus: TaskCellStatus;
+  /** ISO date string of the task deadline */
+  deadline: string;
+  /** Days until (positive) or since (negative) the deadline */
+  daysUntilDue: number;
+  /** ISO date string when the task was completed (if applicable) */
+  completedAt?: string;
+}
+
+/** One row in the task matrix — represents a single event */
+export interface TaskMatrixRow {
+  /** Airtable Event record ID (e.g. "recXXX") */
+  eventId: string;
+  /** The event's Airtable record ID (same as eventId, kept explicit for clarity) */
+  eventRecordId: string;
+  /** School name for display */
+  schoolName: string;
+  /** ISO date string of the event */
+  eventDate: string;
+  /** Number of completed tasks for this event */
+  completedCount: number;
+  /** Total number of tasks for this event */
+  totalCount: number;
+  /** Map of task id -> cell data */
+  cells: Record<string, TaskMatrixCell>;
+}
+
+/** Shipment wave grouping */
+export type ShipmentWave = 'Welle 1' | 'Welle 2' | 'Both' | 'Rolling';
