@@ -13,6 +13,9 @@ import {
   GuesstimateOrderItem,
   CreateGuesstimateOrderInput,
   TaskFilterTab,
+  TaskMatrixRow,
+  TaskMatrixCell,
+  TaskCellStatus,
 } from '@/lib/types/tasks';
 import {
   PAPER_ORDER_TEMPLATES,
@@ -22,6 +25,12 @@ import {
   calculateUrgencyScore,
   calculateDeadline,
 } from '@/lib/config/taskTemplates';
+import {
+  TASK_TIMELINE,
+  calculateDeadline as calculateDeadlineV2,
+  type TaskPrefix,
+  type TaskCompletionType as TimelineCompletionType,
+} from '@/lib/config/taskTimeline';
 import {
   TASKS_TABLE_ID,
   TASKS_FIELD_IDS,
@@ -462,6 +471,288 @@ class TaskService {
 
     // Generate signed URL (1 hour expiry)
     return this.r2.generateSignedUrlForAssetsBucket(task.r2_file_path, 3600);
+  }
+
+  // ============================================================
+  // V2 Task Generation & Matrix Methods
+  // ============================================================
+
+  /**
+   * Map a timeline prefix to the existing TaskType values used in Airtable.
+   */
+  private mapPrefixToTaskType(prefix: TaskPrefix, taskId: string): TaskType {
+    switch (prefix) {
+      case 'Ship':
+        return 'paper_order';
+      case 'Order':
+        return 'clothing_order';
+      case 'Shipment':
+        return 'shipping';
+      case 'Audio':
+        return taskId.startsWith('audio_master') ? 'cd_master' : 'cd_production';
+    }
+  }
+
+  /**
+   * Map a timeline completion type to the existing TaskCompletionType used in Airtable.
+   */
+  private mapCompletionType(completion: TimelineCompletionType): Task['completion_type'] {
+    switch (completion) {
+      case 'monetary':
+        return 'monetary';
+      case 'orchestrated':
+        return 'checkbox';
+      case 'tracklist':
+        return 'submit_only';
+      case 'quantity_checkbox':
+        return 'checkbox';
+    }
+  }
+
+  /**
+   * Generate all 11 tasks for an event using the new TASK_TIMELINE config.
+   * This is the v2 replacement for generateTasksForEvent().
+   */
+  async generateTasksForEventV2(eventId: string): Promise<Task[]> {
+    // Get event details to calculate deadlines
+    const event = await this.airtable.getEventById(eventId);
+    if (!event) {
+      throw new Error(`Event not found: ${eventId}`);
+    }
+
+    const eventDate = new Date(event.event_date);
+    const createdTasks: Task[] = [];
+
+    for (const entry of TASK_TIMELINE) {
+      const deadline = calculateDeadlineV2(eventDate, entry.offset);
+
+      const taskInput: CreateTaskInput = {
+        event_id: eventId,
+        template_id: entry.id,
+        task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
+        task_name: entry.displayName,
+        description: entry.description,
+        completion_type: this.mapCompletionType(entry.completion),
+        timeline_offset: entry.offset,
+        deadline: deadline.toISOString(),
+        status: 'pending',
+      };
+
+      const task = await this.createTask(taskInput);
+      createdTasks.push(task);
+    }
+
+    return createdTasks;
+  }
+
+  /**
+   * Get a task matrix: one row per event, one cell per timeline task.
+   * Used by the matrix view in the admin portal.
+   */
+  async getTaskMatrix(filters?: {
+    dateFrom?: string;
+    dateTo?: string;
+    search?: string;
+  }): Promise<TaskMatrixRow[]> {
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+
+    // Fetch all non-cancelled tasks
+    const records = await table
+      .select({
+        filterByFormula: `{${TASKS_FIELD_IDS.status}} != 'cancelled'`,
+      })
+      .all();
+
+    // Transform all records to Task objects
+    const allTasks = records.map((record) => this.transformTaskRecord(record));
+
+    // Collect unique event IDs
+    const eventIds = new Set<string>();
+    for (const task of allTasks) {
+      if (task.event_id) {
+        eventIds.add(task.event_id);
+      }
+    }
+
+    // Fetch event details for all unique events
+    const eventDetailsMap = new Map<
+      string,
+      { schoolName: string; eventDate: string }
+    >();
+    for (const eid of eventIds) {
+      const event = await this.airtable.getEventById(eid);
+      if (event) {
+        eventDetailsMap.set(eid, {
+          schoolName: event.school_name,
+          eventDate: event.event_date,
+        });
+      }
+    }
+
+    // Group tasks by event_id
+    const tasksByEvent = new Map<string, Task[]>();
+    for (const task of allTasks) {
+      if (!task.event_id) continue;
+      const existing = tasksByEvent.get(task.event_id) || [];
+      existing.push(task);
+      tasksByEvent.set(task.event_id, existing);
+    }
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    // Build matrix rows
+    const rows: TaskMatrixRow[] = [];
+
+    for (const [eventId, tasks] of tasksByEvent.entries()) {
+      const eventDetail = eventDetailsMap.get(eventId);
+      if (!eventDetail) continue;
+
+      const cells: Record<string, TaskMatrixCell> = {};
+      let completedCount = 0;
+      let totalCount = 0;
+
+      for (const task of tasks) {
+        totalCount++;
+        if (task.status === 'completed') {
+          completedCount++;
+        }
+
+        const deadlineDate = new Date(task.deadline);
+        deadlineDate.setHours(0, 0, 0, 0);
+        const diffMs = deadlineDate.getTime() - now.getTime();
+        const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        // Determine cell status
+        let cellStatus: TaskCellStatus;
+        if (task.status === 'completed') {
+          cellStatus = 'green';
+        } else if (task.status === 'cancelled') {
+          cellStatus = 'grey';
+        } else if (daysUntilDue < 0) {
+          // Deadline has passed and task is pending
+          cellStatus = 'red';
+        } else if (daysUntilDue <= 3) {
+          // Deadline within 3 days and task is pending
+          cellStatus = 'yellow';
+        } else {
+          cellStatus = 'white';
+        }
+
+        cells[task.template_id] = {
+          taskId: task.id,
+          templateId: task.template_id,
+          status: task.status,
+          cellStatus,
+          deadline: task.deadline,
+          daysUntilDue,
+          completedAt: task.completed_at,
+        };
+      }
+
+      rows.push({
+        eventId,
+        eventRecordId: eventId,
+        schoolName: eventDetail.schoolName,
+        eventDate: eventDetail.eventDate,
+        completedCount,
+        totalCount,
+        cells,
+      });
+    }
+
+    // Apply filters
+    let filteredRows = rows;
+
+    if (filters?.dateFrom) {
+      const from = new Date(filters.dateFrom);
+      filteredRows = filteredRows.filter(
+        (row) => new Date(row.eventDate) >= from
+      );
+    }
+
+    if (filters?.dateTo) {
+      const to = new Date(filters.dateTo);
+      filteredRows = filteredRows.filter(
+        (row) => new Date(row.eventDate) <= to
+      );
+    }
+
+    if (filters?.search) {
+      const searchLower = filters.search.toLowerCase();
+      filteredRows = filteredRows.filter((row) =>
+        row.schoolName.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Sort: most urgent first (events with most red/yellow cells at top)
+    filteredRows.sort((a, b) => {
+      const urgencyCount = (row: TaskMatrixRow): number => {
+        let count = 0;
+        for (const cell of Object.values(row.cells)) {
+          if (cell.cellStatus === 'red') count += 2; // Red is more urgent
+          if (cell.cellStatus === 'yellow') count += 1;
+        }
+        return count;
+      };
+
+      const urgA = urgencyCount(a);
+      const urgB = urgencyCount(b);
+
+      // Higher urgency count = more urgent = should come first
+      if (urgA !== urgB) {
+        return urgB - urgA;
+      }
+
+      // Tie-break: earlier event date first
+      return new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime();
+    });
+
+    return filteredRows;
+  }
+
+  /**
+   * Get pending tasks grouped by deadline date within a date range.
+   * Used by the calendar/date view in the admin portal.
+   */
+  async getTasksByDate(
+    dateFrom: string,
+    dateTo: string
+  ): Promise<Record<string, TaskWithEventDetails[]>> {
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+
+    // Fetch pending tasks with deadlines in the date range
+    const records = await table
+      .select({
+        filterByFormula: `AND(
+          {${TASKS_FIELD_IDS.status}} = 'pending',
+          IS_AFTER({${TASKS_FIELD_IDS.deadline}}, '${dateFrom}'),
+          IS_BEFORE({${TASKS_FIELD_IDS.deadline}}, '${dateTo}')
+        )`,
+      })
+      .all();
+
+    // Enrich with event details (reuse existing enrichment pattern)
+    const enrichedTasks = await Promise.all(
+      records.map((record) => this.enrichTaskWithEventDetails(record))
+    );
+
+    // Group by deadline date (YYYY-MM-DD)
+    const grouped: Record<string, TaskWithEventDetails[]> = {};
+
+    for (const task of enrichedTasks) {
+      // task.deadline could be an ISO string or a YYYY-MM-DD string
+      const dateKey = task.deadline.split('T')[0];
+
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(task);
+    }
+
+    return grouped;
   }
 
   // ============================================================
