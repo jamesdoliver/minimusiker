@@ -9,6 +9,7 @@ import {
 } from '@/lib/utils/shopifyWebhook';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { tokenManager } from '@/lib/services/shopifyTokenManager';
+import { computeShipmentWave } from '@/lib/config/variantClassification';
 import {
   ORDERS_TABLE_ID,
   ORDERS_FIELD_IDS,
@@ -220,6 +221,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Compute shipment wave based on variant classification
+    const shipmentWave = computeShipmentWave(lineItems.map(item => ({
+      variant_id: item.variant_id,
+      quantity: item.quantity,
+    })));
+    if (shipmentWave) {
+      console.log('[orders-paid] Computed shipment wave:', shipmentWave);
+    }
+
     const orderData = {
       [ORDERS_FIELD_IDS.order_id]: order.admin_graphql_api_id,
       [ORDERS_FIELD_IDS.order_number]: order.name,
@@ -239,6 +249,7 @@ export async function POST(request: NextRequest) {
       [ORDERS_FIELD_IDS.digital_delivered]: false,
       [ORDERS_FIELD_IDS.created_at]: new Date().toISOString(),
       [ORDERS_FIELD_IDS.updated_at]: new Date().toISOString(),
+      ...(shipmentWave ? { [ORDERS_FIELD_IDS.shipment_wave]: shipmentWave } : {}),
     };
 
     // Store order in Airtable
