@@ -4,6 +4,7 @@ import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { generateAudioDisplayName } from '@/lib/utils/audioFilename';
+import { triggerSchulsongNewVersionNotification } from '@/lib/services/notificationService';
 
 export const dynamic = 'force-dynamic';
 
@@ -212,7 +213,43 @@ export async function PUT(
       });
     }
 
-    // Note: Email notifications removed - will be configured separately via publish toggle
+    // If this is a schulsong final upload, handle re-upload notifications
+    if (isSchulsong && type === 'final') {
+      // Find and reset any old rejected schulsong files for this event
+      const allEventFiles = await teacherService.getAudioFilesByEventId(eventId);
+      const oldRejectedFiles = allEventFiles.filter(
+        (f) => f.isSchulsong && f.type === 'final' && f.id !== audioFile.id &&
+               (f.approvalStatus === 'rejected' || f.teacherApprovedAt)
+      );
+      for (const oldFile of oldRejectedFiles) {
+        // Clear old file's approval status and teacher approval
+        await teacherService.updateAudioFileApprovalStatus(oldFile.id, 'pending', '');
+        if (oldFile.teacherApprovedAt) {
+          await teacherService.clearTeacherApprovedAt(oldFile.id);
+        }
+      }
+
+      // Notify teacher that a new version is available
+      const airtableService = getAirtableService();
+      const event = await airtableService.getEventByEventId(eventId);
+      if (event) {
+        // Look up teacher email via linked SchoolBooking
+        const bookingRecordId = event.simplybook_booking?.[0];
+        if (bookingRecordId) {
+          const booking = await airtableService.getSchoolBookingById(bookingRecordId);
+          if (booking?.schoolContactEmail) {
+            triggerSchulsongNewVersionNotification({
+              eventId,
+              schoolName: event.school_name,
+              eventDate: event.event_date,
+              teacherEmail: booking.schoolContactEmail,
+            }).catch((err) => {
+              console.error('[upload-mixed] Failed to send teacher schulsong notification:', err);
+            });
+          }
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,
