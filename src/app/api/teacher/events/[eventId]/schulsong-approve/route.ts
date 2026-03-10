@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { triggerSchulsongTeacherApprovedNotification } from '@/lib/services/notificationService';
+import { triggerSchulsongTeacherApprovedNotification, triggerSchulsongTeacherActionNotification } from '@/lib/services/notificationService';
 import { computeSchulsongReleaseDate } from '@/lib/utils/schulsongRelease';
 
 export const dynamic = 'force-dynamic';
@@ -35,10 +35,12 @@ export async function POST(
     }
 
     const eventId = decodeURIComponent(params.eventId);
+    const body = await request.json().catch(() => ({}));
+    const notes = body.notes as string | undefined;
     const teacherService = getTeacherService();
 
     // Approve the schulsong
-    const result = await teacherService.approveSchulsongAsTeacher(eventId);
+    const result = await teacherService.approveSchulsongAsTeacher(eventId, notes);
 
     // Auto-schedule release for next working day 7am Berlin
     // (skip if already released — don't override an admin instant release)
@@ -55,6 +57,17 @@ export async function POST(
         eventId,
       }).catch((err) => {
         console.error('[schulsong-approve] Failed to send notification:', err);
+      });
+
+      // Notify engineer of teacher's decision (fire-and-forget)
+      triggerSchulsongTeacherActionNotification({
+        schoolName: event.school_name,
+        eventDate: event.event_date,
+        eventId,
+        action: 'approved',
+        teacherNotes: notes,
+      }).catch((err) => {
+        console.error('[schulsong-approve] Failed to send engineer notification:', err);
       });
     }
 
