@@ -6,7 +6,7 @@ interface SchulsongApprovalSectionProps {
   eventId: string;
 }
 
-type SchulsongStatus = 'waiting' | 'ready_for_approval' | 'approved';
+type SchulsongStatus = 'waiting' | 'ready_for_approval' | 'approved' | 'rejected';
 
 interface SchulsongStatusResponse {
   success: boolean;
@@ -15,6 +15,7 @@ interface SchulsongStatusResponse {
   audioUrl?: string;
   teacherApprovedAt?: string;
   availableToParentsAt?: string;
+  rejectionComment?: string;
   error?: string;
 }
 
@@ -27,6 +28,9 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
   const [isApproving, setIsApproving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSchulsong, setHasSchulsong] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectionComment, setRejectionComment] = useState<string | null>(null);
 
   // Audio player state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -56,6 +60,7 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
       setAudioUrl(data.audioUrl || null);
       setTeacherApprovedAt(data.teacherApprovedAt || null);
       setAvailableToParentsAt(data.availableToParentsAt || null);
+      setRejectionComment(data.rejectionComment || null);
     } catch (err) {
       console.error('Error fetching schulsong status:', err);
       setError(err instanceof Error ? err.message : 'Failed to load schulsong status');
@@ -73,6 +78,8 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
 
       const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/schulsong-approve`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: notes || undefined }),
       });
       const data = await response.json();
 
@@ -83,11 +90,41 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
       // Update state with the approval
       setStatus('approved');
       setTeacherApprovedAt(data.approvedAt);
+      setNotes('');
     } catch (err) {
       console.error('Error approving schulsong:', err);
       setError(err instanceof Error ? err.message : 'Failed to approve schulsong');
     } finally {
       setIsApproving(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (isRejecting) return;
+
+    try {
+      setIsRejecting(true);
+      setError(null);
+
+      const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/schulsong-reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: notes || undefined }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reject schulsong');
+      }
+
+      setStatus('rejected');
+      setRejectionComment(notes || null);
+      setNotes('');
+    } catch (err) {
+      console.error('Error rejecting schulsong:', err);
+      setError(err instanceof Error ? err.message : 'Failed to reject schulsong');
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -288,19 +325,52 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
             </div>
           )}
 
+          {/* Notes Textarea */}
+          <div>
+            <label htmlFor="schulsong-notes" className="block text-sm font-medium text-gray-700 mb-1">
+              Anmerkungen zum Schulsong (optional)
+            </label>
+            <textarea
+              id="schulsong-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="z.B. Lautstärke anpassen, Tempo ändern..."
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+            />
+          </div>
+
           {/* Approval Instructions */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-sm text-yellow-800">
-              Bitte hören Sie sich den Schulsong an und geben Sie ihn frei, damit er nach Prüfung
-              für die Eltern verfügbar wird.
+              Bitte hören Sie sich den Schulsong an. Sie können ihn freigeben oder Änderungen anfordern.
             </p>
           </div>
 
-          {/* Approve Button */}
-          <div className="flex justify-end">
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={handleReject}
+              disabled={isRejecting || isApproving}
+              className="inline-flex items-center gap-2 px-5 py-3 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRejecting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                  Wird gesendet...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Änderungen gewünscht
+                </>
+              )}
+            </button>
             <button
               onClick={handleApprove}
-              disabled={isApproving}
+              disabled={isApproving || isRejecting}
               className="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isApproving ? (
@@ -318,6 +388,32 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
               )}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* State: Rejected — waiting for new version */}
+      {status === 'rejected' && (
+        <div className="space-y-4">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-orange-100 flex items-center justify-center">
+              <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-gray-700 font-medium">
+              Ihre Anmerkungen wurden an den Tontechniker weitergeleitet.
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
+              Sie werden per E-Mail benachrichtigt, sobald eine neue Version bereitsteht.
+            </p>
+          </div>
+
+          {rejectionComment && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <p className="text-xs font-medium text-gray-500 mb-1">Ihre Anmerkungen:</p>
+              <p className="text-sm text-gray-700">{rejectionComment}</p>
+            </div>
+          )}
         </div>
       )}
 
