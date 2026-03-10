@@ -563,7 +563,82 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     availableVariables: ['engineerName', 'schoolName', 'eventDate', 'eventId', 'engineerPortalUrl'],
   },
 
-  // ─── 12. Schulsong Audio Release (Teacher) ─────────────────────────
+  // ─── 12. Schulsong Teacher Action (Engineer) ───────────────────────
+  {
+    slug: 'schulsong_teacher_action',
+    name: 'Schulsong Lehrer-Rückmeldung (Engineer)',
+    description: 'Wird an den Engineer gesendet, wenn ein Lehrer den Schulsong freigibt oder ablehnt.',
+    recipientType: 'engineer',
+    triggerEventKey: 'teacher:schulsong_action',
+    defaultSubject: 'Schulsong {{action}}: {{schoolName}} – {{eventDate}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{engineerName}},
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Der Schulsong für die <strong>{{schoolName}}</strong> ({{eventDate}}) wurde von der Lehrkraft <strong>{{action}}</strong>.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px; background-color: #f7f7f7; border-radius: 8px;">
+  <tr>
+    <td style="padding: 16px;">
+      <p style="margin: 0 0 4px 0; color: #2F4858; font-size: 14px; font-weight: 600;">Anmerkungen der Lehrkraft:</p>
+      <p style="margin: 0; color: #4a5568; font-size: 14px; line-height: 1.6;">{{teacherNotes}}</p>
+    </td>
+  </tr>
+</table>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td align="center" style="padding: 8px 0;">
+      <a href="{{adminUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #1e3a4c; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+        Im Admin-Bereich ansehen
+      </a>
+    </td>
+  </tr>
+</table>`,
+    availableVariables: ['engineerName', 'schoolName', 'eventDate', 'action', 'teacherNotes', 'adminUrl'],
+  },
+
+  // ─── 13. Schulsong New Version (Teacher) ──────────────────────────
+  {
+    slug: 'schulsong_new_version',
+    name: 'Neue Schulsong-Version (Lehrer)',
+    description: 'Wird an den Lehrer gesendet, wenn eine neue Version des Schulsongs nach Ablehnung hochgeladen wurde.',
+    recipientType: 'teacher',
+    triggerEventKey: 'engineer:schulsong_reupload',
+    defaultSubject: 'Neuer Schulsong bereit zur Freigabe – {{schoolName}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Neuer Schulsong bereit
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Der Schulsong für die <strong>{{schoolName}}</strong> ({{eventDate}}) wurde basierend auf Ihren Anmerkungen überarbeitet und steht zur Freigabe bereit.
+</p>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bitte besuchen Sie das Pädagogen-Portal, um die neue Version anzuhören und freizugeben:
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td align="center" style="padding: 8px 0 32px 0;">
+      <a href="{{teacherPortalUrl}}"
+         style="display: inline-block; background-color: #d85a6a; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 2px 4px rgba(216, 90, 106, 0.3);">
+        Zum Pädagogen-Portal
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Falls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:<br>
+  <a href="{{teacherPortalUrl}}" style="color: #d85a6a; word-break: break-all;">{{teacherPortalUrl}}</a>
+</p>`,
+    availableVariables: ['schoolName', 'eventDate', 'teacherPortalUrl'],
+  },
+
+  // ─── 14. Schulsong Audio Release (Teacher) ─────────────────────────
   {
     slug: 'schulsong_audio_release',
     name: 'Schulsong: Audio freigegeben',
