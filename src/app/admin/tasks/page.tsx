@@ -341,6 +341,76 @@ export default function AdminTasks() {
           <TaskMatrix
             rows={matrixRows}
             isLoading={isMatrixLoading}
+            onTaskAction={async (action, eventId, templateId, taskId, data) => {
+              try {
+                if (action === 'complete') {
+                  if (taskId) {
+                    await fetch(`/api/admin/tasks/${taskId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ completion_data: {} }),
+                    });
+                  } else {
+                    await fetch('/api/admin/tasks/matrix/complete', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ eventId, templateId, completion_data: {} }),
+                    });
+                  }
+                } else if (action === 'skip') {
+                  if (taskId) {
+                    await fetch(`/api/admin/tasks/${taskId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ status: 'skipped' }),
+                    });
+                  } else {
+                    await fetch('/api/admin/tasks/matrix/complete', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ eventId, templateId, status: 'skipped' }),
+                    });
+                  }
+                } else if (action === 'partial') {
+                  const notes = (data?.notes as string) || '';
+                  if (taskId) {
+                    await fetch(`/api/admin/tasks/${taskId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ status: 'partial', completion_data: { notes } }),
+                    });
+                  } else {
+                    await fetch('/api/admin/tasks/matrix/complete', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ eventId, templateId, status: 'partial', completion_data: { notes } }),
+                    });
+                  }
+                } else if (action === 'revert') {
+                  if (taskId) {
+                    await fetch(`/api/admin/tasks/${taskId}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ status: 'pending' }),
+                    });
+                  }
+                  // Virtual cells can't be reverted (they're always pending)
+                }
+                await fetchMatrixRows();
+              } catch (err) {
+                console.error('Error performing task action:', err);
+                setError(
+                  err instanceof Error ? err.message : 'Failed to perform task action'
+                );
+              }
+            }}
           />
         </div>
       )}

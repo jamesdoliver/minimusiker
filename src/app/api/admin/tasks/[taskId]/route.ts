@@ -82,6 +82,46 @@ export async function PATCH(
       });
     }
 
+    // Handle skip
+    if (body.status === 'skipped') {
+      const task = await taskService.skipTask(taskId, adminEmail);
+      return NextResponse.json({
+        success: true,
+        data: { task },
+        message: 'Task skipped successfully.',
+      });
+    }
+
+    // Handle partial completion
+    if (body.status === 'partial') {
+      if (!body.completion_data?.notes) {
+        return NextResponse.json(
+          { success: false, error: 'Notes are required for partial completion' },
+          { status: 400 },
+        );
+      }
+      const task = await taskService.partialCompleteTask(
+        taskId,
+        body.completion_data,
+        adminEmail,
+      );
+      return NextResponse.json({
+        success: true,
+        data: { task },
+        message: 'Task partially completed.',
+      });
+    }
+
+    // Handle revert to pending
+    if (body.status === 'pending') {
+      const task = await taskService.revertTask(taskId, adminEmail);
+      return NextResponse.json({
+        success: true,
+        data: { task },
+        message: 'Task reverted to pending.',
+      });
+    }
+
     // Handle completion
     const completionData: TaskCompletionData = body.completion_data || {};
     const result = await taskService.completeTask(taskId, completionData, adminEmail);

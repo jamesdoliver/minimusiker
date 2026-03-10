@@ -5750,6 +5750,41 @@ class AirtableService {
   }
 
   /**
+   * Get all Confirmed events (for task matrix — shows every event regardless of task records)
+   */
+  async getConfirmedEvents(): Promise<Event[]> {
+    try {
+      const records = await this.base(EVENTS_TABLE_ID).select({
+        returnFieldsByFieldId: true,
+        filterByFormula: `{${EVENTS_FIELD_IDS.status}} = 'Confirmed'`,
+      }).all();
+
+      return records.map((record) => ({
+        id: record.id,
+        event_id: (record.fields[EVENTS_FIELD_IDS.event_id] as string) || '',
+        school_name: (record.fields[EVENTS_FIELD_IDS.school_name] as string) || '',
+        event_date: (record.fields[EVENTS_FIELD_IDS.event_date] as string) || '',
+        event_type: record.fields[EVENTS_FIELD_IDS.event_type] as string | undefined,
+        assigned_staff: record.fields[EVENTS_FIELD_IDS.assigned_staff] as string[] | undefined,
+        assigned_engineer: record.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[] | undefined,
+        created_at: (record.fields[EVENTS_FIELD_IDS.created_at] as string) || '',
+        legacy_booking_id: record.fields[EVENTS_FIELD_IDS.legacy_booking_id] as string | undefined,
+        simplybook_booking: record.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[] | undefined,
+        access_code: record.fields[EVENTS_FIELD_IDS.access_code] as number | undefined,
+        is_kita: record.fields[EVENTS_FIELD_IDS.is_kita] as boolean | undefined,
+        is_plus: record.fields[EVENTS_FIELD_IDS.is_plus] as boolean | undefined,
+        is_schulsong: record.fields[EVENTS_FIELD_IDS.is_schulsong] as boolean | undefined,
+        is_minimusikertag: record.fields[EVENTS_FIELD_IDS.is_minimusikertag] as boolean | undefined,
+        status: record.fields[EVENTS_FIELD_IDS.status] as Event['status'] | undefined,
+        timeline_overrides: record.fields[EVENTS_FIELD_IDS.timeline_overrides] as string | undefined,
+      }));
+    } catch (error) {
+      console.error('Error fetching confirmed events:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get an Event by its Airtable record ID
    */
   async getEventById(recordId: string): Promise<Event | null> {

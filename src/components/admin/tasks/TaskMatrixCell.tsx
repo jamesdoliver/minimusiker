@@ -10,6 +10,7 @@ const CELL_STATUS_STYLES: Record<TaskMatrixCellType['cellStatus'], string> = {
   red: 'bg-red-100 border border-red-400',
   green: 'bg-green-100 border border-green-400',
   grey: 'bg-gray-100 border border-gray-300',
+  orange: 'bg-orange-100 border border-orange-400',
 };
 
 interface TaskMatrixCellProps {
@@ -49,6 +50,12 @@ export default function TaskMatrixCell({
             d="M5 13l4 4L19 7"
           />
         </svg>
+      )}
+      {cell.cellStatus === 'orange' && (
+        <span className="text-orange-600 text-xs font-bold">~</span>
+      )}
+      {cell.cellStatus === 'grey' && cell.status === 'skipped' && (
+        <span className="text-gray-400 text-xs font-bold">&mdash;</span>
       )}
     </button>
   );

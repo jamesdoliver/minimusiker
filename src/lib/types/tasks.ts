@@ -13,7 +13,7 @@ export type TaskType =
 export type TaskCompletionType = 'monetary' | 'checkbox' | 'submit_only';
 
 // Task status
-export type TaskStatus = 'pending' | 'completed' | 'cancelled';
+export type TaskStatus = 'pending' | 'completed' | 'cancelled' | 'skipped' | 'partial';
 
 // Base Task interface (Airtable record)
 export interface Task {
@@ -207,12 +207,12 @@ export type NewTaskCompletionType =
   | 'quantity_checkbox';
 
 /** Visual status of a cell in the task matrix grid */
-export type TaskCellStatus = 'white' | 'yellow' | 'red' | 'green' | 'grey';
+export type TaskCellStatus = 'white' | 'yellow' | 'red' | 'green' | 'grey' | 'orange';
 
 /** A single cell in the task matrix (one task for one event) */
 export interface TaskMatrixCell {
-  /** The task's unique id from the timeline config, e.g. "ship_poster" */
-  taskId: string;
+  /** The task's unique id from the timeline config, e.g. "ship_poster" — null for virtual cells */
+  taskId: string | null;
   /** The task template id (matches TaskTimelineEntry.id) */
   templateId: string;
   /** Current task status */
@@ -237,10 +237,6 @@ export interface TaskMatrixRow {
   schoolName: string;
   /** ISO date string of the event */
   eventDate: string;
-  /** Number of completed tasks for this event */
-  completedCount: number;
-  /** Total number of tasks for this event */
-  totalCount: number;
   /** Map of task id -> cell data */
   cells: Record<string, TaskMatrixCell>;
 }

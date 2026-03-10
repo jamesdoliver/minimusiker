@@ -12,6 +12,7 @@ const navigation = [
   { name: 'Bookings', href: '/admin/bookings', icon: '📋' },
   { name: 'Leads', href: '/admin/leads', icon: '🎯' },
   { name: 'Tasks', href: '/admin/tasks', icon: '✅' },
+  { name: 'Orders', href: '/admin/orders', icon: '🛍️' },
   { name: 'Emails', href: '/admin/emails', icon: '📧' },
   { name: 'Upload', href: '/admin/upload', icon: '📤' },
   { name: 'Analytics', href: '/admin/analytics', icon: '📈' },
@@ -124,7 +125,7 @@ export default function AdminLayout({
                 href={item.href}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
-                  pathname === item.href
+                  item.href === '/admin' ? pathname === '/admin' : pathname.startsWith(item.href)
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
                   'group flex items-center px-3 py-3 text-base font-medium rounded-md'
@@ -175,7 +176,7 @@ export default function AdminLayout({
                       key={item.name}
                       href={item.href}
                       className={cn(
-                        pathname === item.href
+                        item.href === '/admin' ? pathname === '/admin' : pathname.startsWith(item.href)
                           ? 'bg-gray-100 text-gray-900'
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
                         'group flex items-center px-2 py-2 text-sm font-medium rounded-md'

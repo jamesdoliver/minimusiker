@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
-import type { TaskWithEventDetails } from '@/lib/types/tasks';
-import TaskDateGroup from './TaskDateGroup';
+import type { TaskWithEventDetails, TaskMatrixCell as TaskMatrixCellType } from '@/lib/types/tasks';
+import TaskDateGroup, { getTaskCellStatus } from './TaskDateGroup';
+import TaskMatrixPopover from './TaskMatrixPopover';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -11,8 +12,9 @@ import TaskDateGroup from './TaskDateGroup';
 
 type ViewMode = 'week' | 'month';
 
-interface TaskDateViewProps {
-  onTaskAction?: (action: string, task: TaskWithEventDetails) => void;
+interface PopoverState {
+  task: TaskWithEventDetails;
+  anchorRect: DOMRect;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,13 +89,15 @@ function SkeletonGroup() {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function TaskDateView({ onTaskAction }: TaskDateViewProps) {
+export default function TaskDateView() {
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
   const [tasksByDate, setTasksByDate] = useState<
     Record<string, TaskWithEventDetails[]>
   >({});
   const [isLoading, setIsLoading] = useState(true);
+  const [popover, setPopover] = useState<PopoverState | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Compute the date range based on viewMode + currentDate
   const { dateFrom, dateTo } = useMemo(() => {
@@ -182,12 +186,114 @@ export default function TaskDateView({ onTaskAction }: TaskDateViewProps) {
     setCurrentDate(new Date());
   };
 
-  // Default handler that logs if no external handler provided
+  // Handle task row click — open popover
   const handleTaskAction = useCallback(
-    (action: string, task: TaskWithEventDetails) => {
-      onTaskAction?.(action, task);
+    (action: string, task: TaskWithEventDetails, anchorEl?: HTMLElement) => {
+      if (action === 'open_detail' && anchorEl) {
+        const rect = anchorEl.getBoundingClientRect();
+        setPopover({ task, anchorRect: rect });
+      }
     },
-    [onTaskAction],
+    [],
+  );
+
+  // Convert TaskWithEventDetails to TaskMatrixCell for the popover
+  const popoverCell: TaskMatrixCellType | null = useMemo(() => {
+    if (!popover) return null;
+    const task = popover.task;
+    return {
+      taskId: task.id.startsWith('virtual_') ? null : task.id,
+      templateId: task.template_id,
+      status: task.status,
+      cellStatus: getTaskCellStatus(task),
+      deadline: task.deadline,
+      daysUntilDue: task.days_until_due,
+      completedAt: task.completed_at,
+    };
+  }, [popover]);
+
+  // Handle popover actions
+  const handlePopoverAction = useCallback(
+    async (action: string, data?: Record<string, unknown>) => {
+      if (!popover) return;
+      const task = popover.task;
+      const isVirtual = task.id.startsWith('virtual_');
+      const taskId = isVirtual ? null : task.id;
+      const eventId = task.event_id;
+      const templateId = task.template_id;
+
+      setPopover(null);
+      setActionError(null);
+
+      try {
+        if (action === 'complete') {
+          if (taskId) {
+            await fetch(`/api/admin/tasks/${taskId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ completion_data: {} }),
+            });
+          } else {
+            await fetch('/api/admin/tasks/matrix/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ eventId, templateId, completion_data: {} }),
+            });
+          }
+        } else if (action === 'skip') {
+          if (taskId) {
+            await fetch(`/api/admin/tasks/${taskId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ status: 'skipped' }),
+            });
+          } else {
+            await fetch('/api/admin/tasks/matrix/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ eventId, templateId, status: 'skipped' }),
+            });
+          }
+        } else if (action === 'partial') {
+          const notes = (data?.notes as string) || '';
+          if (taskId) {
+            await fetch(`/api/admin/tasks/${taskId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ status: 'partial', completion_data: { notes } }),
+            });
+          } else {
+            await fetch('/api/admin/tasks/matrix/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ eventId, templateId, status: 'partial', completion_data: { notes } }),
+            });
+          }
+        } else if (action === 'revert') {
+          if (taskId) {
+            await fetch(`/api/admin/tasks/${taskId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ status: 'pending' }),
+            });
+          }
+        }
+        await fetchTasks();
+      } catch (err) {
+        console.error('Error performing task action:', err);
+        setActionError(
+          err instanceof Error ? err.message : 'Failed to perform task action',
+        );
+      }
+    },
+    [popover, fetchTasks],
   );
 
   // Total task count for the period
@@ -198,6 +304,20 @@ export default function TaskDateView({ onTaskAction }: TaskDateViewProps) {
 
   return (
     <div className="space-y-4">
+      {/* Error banner */}
+      {actionError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 flex items-center justify-between">
+          <p className="text-sm text-red-600">{actionError}</p>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="text-red-400 hover:text-red-600 text-xs font-medium"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* ------------------------------------------------------------------ */}
       {/* Toolbar: view toggle, navigation, range label */}
       {/* ------------------------------------------------------------------ */}
@@ -318,6 +438,18 @@ export default function TaskDateView({ onTaskAction }: TaskDateViewProps) {
             />
           ))}
         </div>
+      )}
+
+      {/* Popover (rendered at root level for correct z-index stacking) */}
+      {popover && popoverCell && (
+        <TaskMatrixPopover
+          cell={popoverCell}
+          templateId={popover.task.template_id}
+          eventId={popover.task.event_id}
+          anchorRect={popover.anchorRect}
+          onClose={() => setPopover(null)}
+          onAction={handlePopoverAction}
+        />
       )}
     </div>
   );

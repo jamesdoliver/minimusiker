@@ -23,6 +23,7 @@ interface TaskMatrixProps {
     eventId: string,
     templateId: string,
     taskId: string | null,
+    data?: Record<string, unknown>,
   ) => void;
 }
 
@@ -45,12 +46,7 @@ function SkeletonRow() {
         <div className="space-y-1.5">
           <div className="h-4 w-32 bg-gray-200 rounded" />
           <div className="h-3 w-20 bg-gray-100 rounded" />
-          <div className="h-2 w-24 bg-gray-100 rounded-full" />
         </div>
-      </td>
-      {/* Progress cell */}
-      <td className="px-2 py-2 whitespace-nowrap sticky left-[180px] bg-white z-10 border-r border-gray-200">
-        <div className="h-4 w-10 bg-gray-200 rounded mx-auto" />
       </td>
       {/* Task cells */}
       {TASK_TIMELINE_ORDER.map((id) => (
@@ -89,9 +85,9 @@ export default function TaskMatrix({
 
   // Handle popover action
   const handlePopoverAction = useCallback(
-    (action: string) => {
+    (action: string, data?: Record<string, unknown>) => {
       if (!popover) return;
-      onTaskAction?.(action, popover.eventId, popover.templateId, popover.cell.taskId);
+      onTaskAction?.(action, popover.eventId, popover.templateId, popover.cell.taskId, data);
       setPopover(null);
     },
     [popover, onTaskAction],
@@ -107,12 +103,8 @@ export default function TaskMatrix({
           <thead>
             <tr className="bg-gray-50">
               {/* Sticky event-info column header */}
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20 min-w-[180px]">
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20 min-w-[180px] border-r border-gray-200">
                 Event
-              </th>
-              {/* Sticky progress column header */}
-              <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-[180px] bg-gray-50 z-20 border-r border-gray-200 min-w-[60px]">
-                Done
               </th>
               {/* One column per task in the timeline */}
               {TASK_TIMELINE.map((entry) => {
@@ -160,7 +152,7 @@ export default function TaskMatrix({
             ) : rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={2 + TASK_TIMELINE_ORDER.length}
+                  colSpan={1 + TASK_TIMELINE_ORDER.length}
                   className="px-6 py-12 text-center text-sm text-gray-500"
                 >
                   No events found
@@ -168,20 +160,13 @@ export default function TaskMatrix({
               </tr>
             ) : (
               rows.map((row) => {
-                const progressPct =
-                  row.totalCount > 0
-                    ? Math.round(
-                        (row.completedCount / row.totalCount) * 100,
-                      )
-                    : 0;
-
                 return (
                   <tr
                     key={row.eventId}
                     className="hover:bg-gray-50/50 transition-colors"
                   >
                     {/* Sticky event info */}
-                    <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-white z-10 group-hover:bg-gray-50 min-w-[180px]">
+                    <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-white z-10 group-hover:bg-gray-50 min-w-[180px] border-r border-gray-200">
                       <p className="text-sm font-medium text-gray-900 truncate max-w-[160px]">
                         {row.schoolName}
                       </p>
@@ -192,28 +177,6 @@ export default function TaskMatrix({
                           year: 'numeric',
                         })}
                       </p>
-                    </td>
-
-                    {/* Sticky progress */}
-                    <td className="px-2 py-2 whitespace-nowrap sticky left-[180px] bg-white z-10 border-r border-gray-200 min-w-[60px]">
-                      <div className="flex flex-col items-center gap-1">
-                        <span className="text-xs font-medium text-gray-700">
-                          {row.completedCount}/{row.totalCount}
-                        </span>
-                        <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className={cn(
-                              'h-full rounded-full transition-all',
-                              progressPct === 100
-                                ? 'bg-green-500'
-                                : progressPct >= 50
-                                  ? 'bg-blue-500'
-                                  : 'bg-gray-400',
-                            )}
-                            style={{ width: `${progressPct}%` }}
-                          />
-                        </div>
-                      </div>
                     </td>
 
                     {/* Task cells */}

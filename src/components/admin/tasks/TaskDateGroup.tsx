@@ -11,7 +11,7 @@ import { getTimelineEntry, PREFIX_STYLES } from '@/lib/config/taskTimeline';
 interface TaskDateGroupProps {
   date: string;
   tasks: TaskWithEventDetails[];
-  onTaskAction: (action: string, task: TaskWithEventDetails) => void;
+  onTaskAction: (action: string, task: TaskWithEventDetails, anchorEl?: HTMLElement) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,8 +41,10 @@ function formatDateLabel(dateStr: string): string {
 }
 
 /** Derive a cell-style status colour for a task */
-function getTaskCellStatus(task: TaskWithEventDetails): TaskCellStatus {
+export function getTaskCellStatus(task: TaskWithEventDetails): TaskCellStatus {
   if (task.status === 'completed') return 'green';
+  if (task.status === 'skipped') return 'grey';
+  if (task.status === 'partial') return 'orange';
   if (task.is_overdue) return 'red';
   if (task.days_until_due <= 3) return 'yellow';
   return 'white';
@@ -55,6 +57,7 @@ const STATUS_DOT_STYLES: Record<TaskCellStatus, string> = {
   yellow: 'bg-yellow-400',
   white: 'bg-gray-300',
   grey: 'bg-gray-400',
+  orange: 'bg-orange-400',
 };
 
 // ---------------------------------------------------------------------------
@@ -113,13 +116,15 @@ export default function TaskDateGroup({
             <button
               key={task.id}
               type="button"
-              onClick={() => onTaskAction('open_detail', task)}
+              onClick={(e) => onTaskAction('open_detail', task, e.currentTarget)}
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors',
                 'hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1',
                 cellStatus === 'red'
                   ? 'border-red-200 bg-red-50/50'
-                  : 'border-gray-200 bg-white',
+                  : cellStatus === 'orange'
+                    ? 'border-orange-200 bg-orange-50/50'
+                    : 'border-gray-200 bg-white',
               )}
             >
               {/* Status dot */}
@@ -145,8 +150,15 @@ export default function TaskDateGroup({
                 {task.school_name}
               </span>
 
+              {/* Partial indicator */}
+              {task.status === 'partial' && (
+                <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                  Partial
+                </span>
+              )}
+
               {/* Overdue indicator */}
-              {task.is_overdue && task.status !== 'completed' && (
+              {task.is_overdue && task.status === 'pending' && (
                 <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200">
                   <svg
                     className="w-3 h-3"

@@ -52,6 +52,37 @@ class TaskService {
   private r2 = getR2Service();
 
   /**
+   * Fetch a single task record by ID using returnFieldsByFieldId.
+   * .find() doesn't support returnFieldsByFieldId, so we use .select() with RECORD_ID() filter.
+   */
+  private async findTaskRecord(table: Airtable.Table<Airtable.FieldSet>, taskId: string) {
+    const records = await table
+      .select({
+        returnFieldsByFieldId: true,
+        filterByFormula: `RECORD_ID() = '${taskId}'`,
+        maxRecords: 1,
+      })
+      .firstPage();
+    if (records.length === 0) throw new Error(`Task not found: ${taskId}`);
+    return records[0];
+  }
+
+  /**
+   * Fetch a single GO record by ID using returnFieldsByFieldId.
+   */
+  private async findGoRecord(table: Airtable.Table<Airtable.FieldSet>, goId: string) {
+    const records = await table
+      .select({
+        returnFieldsByFieldId: true,
+        filterByFormula: `RECORD_ID() = '${goId}'`,
+        maxRecords: 1,
+      })
+      .firstPage();
+    if (records.length === 0) throw new Error(`GuesstimateOrder not found: ${goId}`);
+    return records[0];
+  }
+
+  /**
    * Generate all tasks for a new event
    * Called when a SimplyBook booking is confirmed
    */
@@ -131,7 +162,9 @@ class TaskService {
       }),
     });
 
-    return this.transformTaskRecord(record);
+    // Re-fetch with returnFieldsByFieldId for consistent field ID mapping
+    const refetched = await this.findTaskRecord(table, record.id);
+    return this.transformTaskRecord(refetched);
   }
 
   /**
@@ -171,6 +204,7 @@ class TaskService {
     // Fetch all tasks to calculate counts
     const allRecords = await table
       .select({
+        returnFieldsByFieldId: true,
         filterByFormula: options.status
           ? `{${TASKS_FIELD_IDS.status}} = '${options.status}'`
           : '',
@@ -197,7 +231,7 @@ class TaskService {
 
     // Fetch filtered tasks
     const filteredRecords = filterFormula
-      ? await table.select({ filterByFormula: filterFormula }).all()
+      ? await table.select({ returnFieldsByFieldId: true, filterByFormula: filterFormula }).all()
       : allRecords;
 
     // Transform to TaskWithEventDetails
@@ -224,8 +258,16 @@ class TaskService {
     const table = base(TASKS_TABLE_ID);
 
     try {
-      const record = await table.find(taskId);
-      return this.enrichTaskWithEventDetails(record);
+      // .find() doesn't support returnFieldsByFieldId, so use .select() with RECORD_ID() filter
+      const records = await table
+        .select({
+          returnFieldsByFieldId: true,
+          filterByFormula: `RECORD_ID() = '${taskId}'`,
+          maxRecords: 1,
+        })
+        .firstPage();
+      if (records.length === 0) return null;
+      return this.enrichTaskWithEventDetails(records[0]);
     } catch {
       return null;
     }
@@ -245,7 +287,7 @@ class TaskService {
     const table = base(TASKS_TABLE_ID);
 
     // Get the task first
-    const record = await table.find(taskId);
+    const record = await this.findTaskRecord(table, taskId);
     const task = this.transformTaskRecord(record);
 
     // Guard against double-completion
@@ -324,7 +366,7 @@ class TaskService {
     }
 
     // Refetch the updated task
-    const updatedRecord = await table.find(taskId);
+    const updatedRecord = await this.findTaskRecord(table, taskId);
     return {
       task: this.transformTaskRecord(updatedRecord),
       goId,
@@ -378,7 +420,7 @@ class TaskService {
     } as Partial<Airtable.FieldSet>);
 
     // Refetch the updated task
-    const updatedRecord = await table.find(taskId);
+    const updatedRecord = await this.findTaskRecord(table, taskId);
     return {
       task: this.transformTaskRecord(updatedRecord),
       fulfillmentSummary: summary,
@@ -398,8 +440,171 @@ class TaskService {
       [TASKS_FIELD_IDS.completed_at]: new Date().toISOString(),
     } as Partial<Airtable.FieldSet>);
 
-    const updatedRecord = await table.find(taskId);
+    const updatedRecord = await this.findTaskRecord(table, taskId);
     return this.transformTaskRecord(updatedRecord);
+  }
+
+  /**
+   * Skip a task (mark as not applicable)
+   */
+  async skipTask(taskId: string, adminEmail: string): Promise<Task> {
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+
+    await table.update(taskId, {
+      [TASKS_FIELD_IDS.status]: 'skipped',
+      [TASKS_FIELD_IDS.completed_by]: adminEmail,
+      [TASKS_FIELD_IDS.completed_at]: new Date().toISOString(),
+    } as Partial<Airtable.FieldSet>);
+
+    const updatedRecord = await this.findTaskRecord(table, taskId);
+    return this.transformTaskRecord(updatedRecord);
+  }
+
+  /**
+   * Partially complete a task (requires notes)
+   */
+  async partialCompleteTask(
+    taskId: string,
+    completionData: TaskCompletionData,
+    adminEmail: string,
+  ): Promise<Task> {
+    if (!completionData.notes) {
+      throw new Error('Notes are required for partial completion');
+    }
+
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+
+    await table.update(taskId, {
+      [TASKS_FIELD_IDS.status]: 'partial',
+      [TASKS_FIELD_IDS.completed_by]: adminEmail,
+      [TASKS_FIELD_IDS.completed_at]: new Date().toISOString(),
+      [TASKS_FIELD_IDS.completion_data]: JSON.stringify(completionData),
+    } as Partial<Airtable.FieldSet>);
+
+    const updatedRecord = await this.findTaskRecord(table, taskId);
+    return this.transformTaskRecord(updatedRecord);
+  }
+
+  /**
+   * Revert a completed/skipped/partial task back to pending
+   */
+  async revertTask(taskId: string, adminEmail: string): Promise<Task> {
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+
+    // Verify the task is in a revertible state
+    const record = await this.findTaskRecord(table, taskId);
+    const task = this.transformTaskRecord(record);
+    if (!['completed', 'skipped', 'partial'].includes(task.status)) {
+      throw new Error(`Cannot revert task with status: ${task.status}`);
+    }
+
+    // Airtable REST API accepts null to clear fields; cast via unknown
+    // because the Airtable SDK FieldSet type doesn't include null.
+    await table.update(taskId, {
+      [TASKS_FIELD_IDS.status]: 'pending',
+      [TASKS_FIELD_IDS.completed_by]: null,
+      [TASKS_FIELD_IDS.completed_at]: null,
+      [TASKS_FIELD_IDS.completion_data]: null,
+    } as unknown as Partial<Airtable.FieldSet>);
+
+    const updatedRecord = await this.findTaskRecord(table, taskId);
+    return this.transformTaskRecord(updatedRecord);
+  }
+
+  /**
+   * Create a task record from TASK_TIMELINE config and immediately skip it.
+   * Used for virtual cells that have no Airtable record yet.
+   */
+  async createAndSkipTask(
+    eventId: string,
+    templateId: string,
+    adminEmail: string,
+  ): Promise<Task> {
+    const entry = TASK_TIMELINE.find((e) => e.id === templateId);
+    if (!entry) throw new Error(`Unknown template: ${templateId}`);
+
+    const event = await this.airtable.getEventById(eventId);
+    if (!event) throw new Error(`Event not found: ${eventId}`);
+
+    // Check for existing task record (race condition guard)
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+    const existing = await table
+      .select({
+        returnFieldsByFieldId: true,
+        filterByFormula: `AND({${TASKS_FIELD_IDS.event_id}} = '${event.event_id}', {${TASKS_FIELD_IDS.template_id}} = '${templateId}')`,
+        maxRecords: 1,
+      })
+      .firstPage();
+
+    if (existing.length > 0) {
+      return this.skipTask(existing[0].id, adminEmail);
+    }
+
+    const deadline = calculateDeadlineV2(event.event_date, entry.offset);
+    const newTask = await this.createTask({
+      event_id: eventId,
+      template_id: entry.id,
+      task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
+      task_name: entry.displayName,
+      description: entry.description,
+      completion_type: this.mapCompletionType(entry.completion),
+      timeline_offset: entry.offset,
+      deadline: deadline.toISOString(),
+      status: 'pending',
+    });
+
+    return this.skipTask(newTask.id, adminEmail);
+  }
+
+  /**
+   * Create a task record from TASK_TIMELINE config and immediately partially complete it.
+   * Used for virtual cells that have no Airtable record yet.
+   */
+  async createAndPartialTask(
+    eventId: string,
+    templateId: string,
+    completionData: TaskCompletionData,
+    adminEmail: string,
+  ): Promise<Task> {
+    const entry = TASK_TIMELINE.find((e) => e.id === templateId);
+    if (!entry) throw new Error(`Unknown template: ${templateId}`);
+
+    const event = await this.airtable.getEventById(eventId);
+    if (!event) throw new Error(`Event not found: ${eventId}`);
+
+    // Check for existing task record (race condition guard)
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+    const existing = await table
+      .select({
+        returnFieldsByFieldId: true,
+        filterByFormula: `AND({${TASKS_FIELD_IDS.event_id}} = '${event.event_id}', {${TASKS_FIELD_IDS.template_id}} = '${templateId}')`,
+        maxRecords: 1,
+      })
+      .firstPage();
+
+    if (existing.length > 0) {
+      return this.partialCompleteTask(existing[0].id, completionData, adminEmail);
+    }
+
+    const deadline = calculateDeadlineV2(event.event_date, entry.offset);
+    const newTask = await this.createTask({
+      event_id: eventId,
+      template_id: entry.id,
+      task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
+      task_name: entry.displayName,
+      description: entry.description,
+      completion_type: this.mapCompletionType(entry.completion),
+      timeline_offset: entry.offset,
+      deadline: deadline.toISOString(),
+      status: 'pending',
+    });
+
+    return this.partialCompleteTask(newTask.id, completionData, adminEmail);
   }
 
   /**
@@ -425,7 +630,9 @@ class TaskService {
 
     const record = await table.create(fields as Partial<Airtable.FieldSet>);
 
-    return this.transformGuesstimateOrderRecord(record as Airtable.Record<Airtable.FieldSet>);
+    // Re-fetch with returnFieldsByFieldId for consistent field ID mapping
+    const refetched = await this.findGoRecord(table, record.id);
+    return this.transformGuesstimateOrderRecord(refetched);
   }
 
   /**
@@ -445,7 +652,9 @@ class TaskService {
       filters.push(`{${GUESSTIMATE_ORDERS_FIELD_IDS.date_completed}} = BLANK()`);
     }
 
-    const selectOptions: { filterByFormula?: string } = {};
+    const selectOptions: { filterByFormula?: string; returnFieldsByFieldId: boolean } = {
+      returnFieldsByFieldId: true,
+    };
     if (filters.length > 0) {
       selectOptions.filterByFormula = filters.length === 1
         ? filters[0]
@@ -464,7 +673,7 @@ class TaskService {
     const table = base(GUESSTIMATE_ORDERS_TABLE_ID);
 
     try {
-      const record = await table.find(goId);
+      const record = await this.findGoRecord(table, goId);
       return this.transformGuesstimateOrderRecord(record);
     } catch {
       return null;
@@ -522,7 +731,7 @@ class TaskService {
       [GUESSTIMATE_ORDERS_FIELD_IDS.date_completed]: new Date().toISOString().split('T')[0],
     });
 
-    const updatedRecord = await table.find(goId);
+    const updatedRecord = await this.findGoRecord(table, goId);
     return this.transformGuesstimateOrderRecord(updatedRecord);
   }
 
@@ -612,8 +821,69 @@ class TaskService {
   }
 
   /**
-   * Get a task matrix: one row per event, one cell per timeline task.
-   * Used by the matrix view in the admin portal.
+   * Create a task record from TASK_TIMELINE config and immediately complete it.
+   * Used for virtual cells that have no Airtable record yet.
+   */
+  async createAndCompleteTask(
+    eventId: string,
+    templateId: string,
+    completionData: TaskCompletionData,
+    adminEmail: string,
+  ): Promise<{ task: Task; goId?: string; shippingTaskId?: string }> {
+    // Find the TASK_TIMELINE entry
+    const entry = TASK_TIMELINE.find((e) => e.id === templateId);
+    if (!entry) {
+      throw new Error(`Unknown template: ${templateId}`);
+    }
+
+    // Fetch event to compute deadline
+    const event = await this.airtable.getEventById(eventId);
+    if (!event) {
+      throw new Error(`Event not found: ${eventId}`);
+    }
+
+    // Check for existing task record (race condition guard)
+    const base = this.airtable.getBase();
+    const table = base(TASKS_TABLE_ID);
+    const existing = await table
+      .select({
+        returnFieldsByFieldId: true,
+        filterByFormula: `AND({${TASKS_FIELD_IDS.event_id}} = '${event.event_id}', {${TASKS_FIELD_IDS.template_id}} = '${templateId}')`,
+        maxRecords: 1,
+      })
+      .firstPage();
+
+    if (existing.length > 0) {
+      const existingTask = this.transformTaskRecord(existing[0]);
+      if (existingTask.status === 'completed') {
+        throw new Error('Task is already completed');
+      }
+      // Task exists but not completed — complete it via normal flow
+      return this.completeTask(existingTask.id, completionData, adminEmail);
+    }
+
+    // Create the task record
+    const deadline = calculateDeadlineV2(event.event_date, entry.offset);
+    const newTask = await this.createTask({
+      event_id: eventId,
+      template_id: entry.id,
+      task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
+      task_name: entry.displayName,
+      description: entry.description,
+      completion_type: this.mapCompletionType(entry.completion),
+      timeline_offset: entry.offset,
+      deadline: deadline.toISOString(),
+      status: 'pending',
+    });
+
+    // Complete it
+    return this.completeTask(newTask.id, completionData, adminEmail);
+  }
+
+  /**
+   * Get a task matrix: one row per Confirmed event, one cell per timeline task.
+   * Event-driven: shows ALL confirmed events with virtual cells computed from
+   * TASK_TIMELINE, overlaying any real task records on top.
    */
   async getTaskMatrix(filters?: {
     dateFrom?: string;
@@ -623,112 +893,118 @@ class TaskService {
     const base = this.airtable.getBase();
     const table = base(TASKS_TABLE_ID);
 
-    // Fetch all non-cancelled tasks
-    const records = await table
-      .select({
-        filterByFormula: `{${TASKS_FIELD_IDS.status}} != 'cancelled'`,
-      })
-      .all();
+    // 1. Parallel fetch: confirmed events + all non-cancelled tasks
+    const [confirmedEvents, taskRecords] = await Promise.all([
+      this.airtable.getConfirmedEvents(),
+      table
+        .select({
+          returnFieldsByFieldId: true,
+          filterByFormula: `{${TASKS_FIELD_IDS.status}} != 'cancelled'`,
+        })
+        .all(),
+    ]);
 
-    // Transform all records to Task objects
-    const allTasks = records.map((record) => this.transformTaskRecord(record));
-
-    // Collect unique event IDs
-    const eventIds = new Set<string>();
-    for (const task of allTasks) {
-      if (task.event_id) {
-        eventIds.add(task.event_id);
-      }
-    }
-
-    // Fetch event details for all unique events
-    const eventDetailsMap = new Map<
-      string,
-      { schoolName: string; eventDate: string }
-    >();
-    for (const eid of eventIds) {
-      const event = await this.airtable.getEventById(eid);
-      if (event) {
-        eventDetailsMap.set(eid, {
-          schoolName: event.school_name,
-          eventDate: event.event_date,
-        });
-      }
-    }
-
-    // Group tasks by event_id
-    const tasksByEvent = new Map<string, Task[]>();
-    for (const task of allTasks) {
+    // 2. Index tasks by event_id → template_id for O(1) lookup
+    const taskIndex = new Map<string, Map<string, Task>>();
+    for (const record of taskRecords) {
+      const task = this.transformTaskRecord(record);
       if (!task.event_id) continue;
-      const existing = tasksByEvent.get(task.event_id) || [];
-      existing.push(task);
-      tasksByEvent.set(task.event_id, existing);
+      let eventMap = taskIndex.get(task.event_id);
+      if (!eventMap) {
+        eventMap = new Map();
+        taskIndex.set(task.event_id, eventMap);
+      }
+      // If duplicate task records for same event+template, prefer completed > pending
+      const existing = eventMap.get(task.template_id);
+      if (!existing || (task.status === 'completed' && existing.status !== 'completed')) {
+        eventMap.set(task.template_id, task);
+      }
     }
 
     const now = new Date();
     now.setHours(0, 0, 0, 0);
 
-    // Build matrix rows
+    // 3. Build rows from events (not tasks)
     const rows: TaskMatrixRow[] = [];
 
-    for (const [eventId, tasks] of tasksByEvent.entries()) {
-      const eventDetail = eventDetailsMap.get(eventId);
-      if (!eventDetail) continue;
+    for (const event of confirmedEvents) {
+      // Skip events without event_date (can't compute deadlines)
+      if (!event.event_date) continue;
 
+      const eventTaskMap = taskIndex.get(event.id);
       const cells: Record<string, TaskMatrixCell> = {};
-      let completedCount = 0;
-      let totalCount = 0;
 
-      for (const task of tasks) {
-        totalCount++;
-        if (task.status === 'completed') {
-          completedCount++;
-        }
+      for (const entry of TASK_TIMELINE) {
+        const realTask = eventTaskMap?.get(entry.id);
 
-        const deadlineDate = new Date(task.deadline);
-        deadlineDate.setHours(0, 0, 0, 0);
-        const diffMs = deadlineDate.getTime() - now.getTime();
-        const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        if (realTask) {
+          // Real task record exists — use its data
+          const deadlineDate = new Date(realTask.deadline);
+          deadlineDate.setHours(0, 0, 0, 0);
+          const diffMs = deadlineDate.getTime() - now.getTime();
+          const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-        // Determine cell status
-        let cellStatus: TaskCellStatus;
-        if (task.status === 'completed') {
-          cellStatus = 'green';
-        } else if (task.status === 'cancelled') {
-          cellStatus = 'grey';
-        } else if (daysUntilDue < 0) {
-          // Deadline has passed and task is pending
-          cellStatus = 'red';
-        } else if (daysUntilDue <= 3) {
-          // Deadline within 3 days and task is pending
-          cellStatus = 'yellow';
+          let cellStatus: TaskCellStatus;
+          if (realTask.status === 'completed') {
+            cellStatus = 'green';
+          } else if (realTask.status === 'cancelled' || realTask.status === 'skipped') {
+            cellStatus = 'grey';
+          } else if (realTask.status === 'partial') {
+            cellStatus = 'orange';
+          } else if (daysUntilDue < 0) {
+            cellStatus = 'red';
+          } else if (daysUntilDue <= 3) {
+            cellStatus = 'yellow';
+          } else {
+            cellStatus = 'white';
+          }
+
+          cells[entry.id] = {
+            taskId: realTask.id,
+            templateId: entry.id,
+            status: realTask.status,
+            cellStatus,
+            deadline: realTask.deadline,
+            daysUntilDue,
+            completedAt: realTask.completed_at,
+          };
         } else {
-          cellStatus = 'white';
-        }
+          // Virtual cell — compute from TASK_TIMELINE config
+          const deadline = calculateDeadlineV2(event.event_date, entry.offset);
+          deadline.setHours(0, 0, 0, 0);
+          const diffMs = deadline.getTime() - now.getTime();
+          const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-        cells[task.template_id] = {
-          taskId: task.id,
-          templateId: task.template_id,
-          status: task.status,
-          cellStatus,
-          deadline: task.deadline,
-          daysUntilDue,
-          completedAt: task.completed_at,
-        };
+          let cellStatus: TaskCellStatus;
+          if (daysUntilDue < 0) {
+            cellStatus = 'red';
+          } else if (daysUntilDue <= 3) {
+            cellStatus = 'yellow';
+          } else {
+            cellStatus = 'white';
+          }
+
+          cells[entry.id] = {
+            taskId: null,
+            templateId: entry.id,
+            status: 'pending',
+            cellStatus,
+            deadline: deadline.toISOString(),
+            daysUntilDue,
+          };
+        }
       }
 
       rows.push({
-        eventId,
-        eventRecordId: eventId,
-        schoolName: eventDetail.schoolName,
-        eventDate: eventDetail.eventDate,
-        completedCount,
-        totalCount,
+        eventId: event.id,
+        eventRecordId: event.id,
+        schoolName: event.school_name,
+        eventDate: event.event_date,
         cells,
       });
     }
 
-    // Apply filters
+    // 4. Apply filters
     let filteredRows = rows;
 
     if (filters?.dateFrom) {
@@ -752,12 +1028,12 @@ class TaskService {
       );
     }
 
-    // Sort: most urgent first (events with most red/yellow cells at top)
+    // 5. Sort: most urgent first (events with most red/yellow cells at top)
     filteredRows.sort((a, b) => {
       const urgencyCount = (row: TaskMatrixRow): number => {
         let count = 0;
         for (const cell of Object.values(row.cells)) {
-          if (cell.cellStatus === 'red') count += 2; // Red is more urgent
+          if (cell.cellStatus === 'red') count += 2;
           if (cell.cellStatus === 'yellow') count += 1;
         }
         return count;
@@ -766,12 +1042,10 @@ class TaskService {
       const urgA = urgencyCount(a);
       const urgB = urgencyCount(b);
 
-      // Higher urgency count = more urgent = should come first
       if (urgA !== urgB) {
         return urgB - urgA;
       }
 
-      // Tie-break: earlier event date first
       return new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime();
     });
 
@@ -780,7 +1054,8 @@ class TaskService {
 
   /**
    * Get pending tasks grouped by deadline date within a date range.
-   * Used by the calendar/date view in the admin portal.
+   * Event-driven: computes virtual tasks from TASK_TIMELINE for all Confirmed
+   * events, overlaying real task records on top.
    */
   async getTasksByDate(
     dateFrom: string,
@@ -789,34 +1064,104 @@ class TaskService {
     const base = this.airtable.getBase();
     const table = base(TASKS_TABLE_ID);
 
-    // Fetch pending tasks with deadlines in the date range (inclusive bounds).
-    // IS_AFTER / IS_BEFORE are exclusive, so shift by 1 day to include boundary dates.
-    const records = await table
-      .select({
-        filterByFormula: `AND(
-          {${TASKS_FIELD_IDS.status}} = 'pending',
-          IS_AFTER({${TASKS_FIELD_IDS.deadline}}, DATEADD('${dateFrom}', -1, 'days')),
-          IS_BEFORE({${TASKS_FIELD_IDS.deadline}}, DATEADD('${dateTo}', 1, 'days'))
-        )`,
-      })
-      .all();
+    // 1. Parallel fetch: confirmed events + all non-cancelled tasks
+    const [confirmedEvents, taskRecords] = await Promise.all([
+      this.airtable.getConfirmedEvents(),
+      table
+        .select({
+          returnFieldsByFieldId: true,
+          filterByFormula: `{${TASKS_FIELD_IDS.status}} != 'cancelled'`,
+        })
+        .all(),
+    ]);
 
-    // Enrich with event details (reuse existing enrichment pattern)
-    const enrichedTasks = await Promise.all(
-      records.map((record) => this.enrichTaskWithEventDetails(record))
-    );
+    // 2. Index tasks by event_id → template_id
+    const taskIndex = new Map<string, Map<string, Task>>();
+    for (const record of taskRecords) {
+      const task = this.transformTaskRecord(record);
+      if (!task.event_id) continue;
+      let eventMap = taskIndex.get(task.event_id);
+      if (!eventMap) {
+        eventMap = new Map();
+        taskIndex.set(task.event_id, eventMap);
+      }
+      const existing = eventMap.get(task.template_id);
+      if (!existing || (task.status === 'completed' && existing.status !== 'completed')) {
+        eventMap.set(task.template_id, task);
+      }
+    }
 
-    // Group by deadline date (YYYY-MM-DD)
+    const fromDate = new Date(dateFrom);
+    fromDate.setHours(0, 0, 0, 0);
+    const toDate = new Date(dateTo);
+    toDate.setHours(0, 0, 0, 0);
+
+    // 3. Build grouped results from events
     const grouped: Record<string, TaskWithEventDetails[]> = {};
 
-    for (const task of enrichedTasks) {
-      // task.deadline could be an ISO string or a YYYY-MM-DD string
-      const dateKey = task.deadline.split('T')[0];
+    for (const event of confirmedEvents) {
+      if (!event.event_date) continue;
 
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
+      const eventTaskMap = taskIndex.get(event.id);
+
+      for (const entry of TASK_TIMELINE) {
+        const deadline = calculateDeadlineV2(event.event_date, entry.offset);
+        deadline.setHours(0, 0, 0, 0);
+
+        // Filter to date range
+        if (deadline < fromDate || deadline > toDate) continue;
+
+        const realTask = eventTaskMap?.get(entry.id);
+
+        // Skip completed and skipped tasks (this view shows pending + partial)
+        if (realTask?.status === 'completed' || realTask?.status === 'skipped') continue;
+
+        const deadlineStr = deadline.toISOString();
+        const dateKey = deadlineStr.split('T')[0];
+        const { urgencyScore, daysUntilDue, isOverdue } = calculateUrgencyScore(deadline);
+
+        let taskDetails: TaskWithEventDetails;
+
+        if (realTask) {
+          // Real pending task — use its data enriched with event details
+          taskDetails = {
+            ...realTask,
+            school_name: event.school_name,
+            event_date: event.event_date,
+            event_type: event.event_type,
+            urgency_score: urgencyScore,
+            days_until_due: daysUntilDue,
+            is_overdue: isOverdue,
+          };
+        } else {
+          // Virtual task — construct from TASK_TIMELINE config
+          taskDetails = {
+            id: `virtual_${event.id}_${entry.id}`,
+            task_id: `virtual_${event.id}_${entry.id}`,
+            template_id: entry.id,
+            event_id: event.id,
+            task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
+            task_name: entry.displayName,
+            description: entry.description,
+            completion_type: this.mapCompletionType(entry.completion),
+            timeline_offset: entry.offset,
+            deadline: deadlineStr,
+            status: 'pending',
+            created_at: '',
+            school_name: event.school_name,
+            event_date: event.event_date,
+            event_type: event.event_type,
+            urgency_score: urgencyScore,
+            days_until_due: daysUntilDue,
+            is_overdue: isOverdue,
+          };
+        }
+
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
+        }
+        grouped[dateKey].push(taskDetails);
       }
-      grouped[dateKey].push(task);
     }
 
     return grouped;
@@ -968,6 +1313,7 @@ class TaskService {
     const sanitizedEventId = eventRecordId.replace(/'/g, "\\'");
     const records = await table
       .select({
+        returnFieldsByFieldId: true,
         filterByFormula: `AND(
           SEARCH('${sanitizedEventId}', ARRAYJOIN({${TASKS_FIELD_IDS.event_id}})),
           {${TASKS_FIELD_IDS.status}} = 'pending'

@@ -21,6 +21,7 @@ const STATUS_DOT_STYLES: Record<TaskCellStatus, string> = {
   yellow: 'bg-yellow-400',
   red: 'bg-red-500',
   grey: 'bg-gray-300',
+  orange: 'bg-orange-400',
 };
 
 const STATUS_LABELS: Record<TaskCellStatus, string> = {
@@ -29,6 +30,7 @@ const STATUS_LABELS: Record<TaskCellStatus, string> = {
   yellow: 'Due soon',
   red: 'Overdue',
   grey: 'N/A',
+  orange: 'Partial',
 };
 
 // ---------------------------------------------------------------------------
@@ -42,7 +44,8 @@ const STATUS_LABELS: Record<TaskCellStatus, string> = {
 function deriveCellStatus(task: TaskWithEventDetails | undefined): TaskCellStatus {
   if (!task) return 'grey';
   if (task.status === 'completed') return 'green';
-  if (task.status === 'cancelled') return 'grey';
+  if (task.status === 'cancelled' || task.status === 'skipped') return 'grey';
+  if (task.status === 'partial') return 'orange';
   if (task.is_overdue) return 'red';
   if (task.days_until_due <= 3) return 'yellow';
   return 'white';

@@ -3,6 +3,7 @@ import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
+import { triggerSchulsongNewVersionNotification } from '@/lib/services/notificationService';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,6 +145,29 @@ export async function PUT(
       await r2Service.deleteFile(oldR2Key).catch(err => {
         console.error(`Failed to delete old R2 file ${oldR2Key}:`, err);
       });
+    }
+
+    // If this is a schulsong replacement, reset approval status and notify teacher
+    if (audioFile.isSchulsong) {
+      // Reset approval status from 'rejected' to 'pending'
+      await teacherService.updateAudioFileApprovalStatus(audioFileId, 'pending', '');
+
+      // Look up school contact email for teacher notification
+      const event = await airtableService.getEventByEventId(resolvedEventId);
+      const bookingRecordId = event?.simplybook_booking?.[0];
+      if (bookingRecordId) {
+        const booking = await airtableService.getSchoolBookingById(bookingRecordId);
+        if (booking?.schoolContactEmail) {
+          triggerSchulsongNewVersionNotification({
+            eventId: resolvedEventId,
+            schoolName: event.school_name,
+            eventDate: event.event_date,
+            teacherEmail: booking.schoolContactEmail,
+          }).catch((err) => {
+            console.error('[replace-audio] Failed to send teacher notification:', err);
+          });
+        }
+      }
     }
 
     return NextResponse.json({
