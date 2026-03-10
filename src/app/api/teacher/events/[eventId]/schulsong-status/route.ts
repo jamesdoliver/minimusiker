@@ -10,9 +10,10 @@ export const dynamic = 'force-dynamic';
  * Get schulsong status for teacher portal
  *
  * Returns the current state of the schulsong approval workflow:
- * - waiting: No final schulsong file OR admin hasn't approved
- * - ready_for_approval: Final file exists, admin approved, teacher hasn't approved
+ * - waiting: No final schulsong file yet
+ * - ready_for_approval: Final file exists, teacher hasn't approved yet
  * - approved: Teacher has approved (teacherApprovedAt is set)
+ * - rejected: Teacher rejected, waiting for engineer to upload new version
  */
 export async function GET(
   request: NextRequest,
