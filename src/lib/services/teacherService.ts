@@ -1269,7 +1269,7 @@ class TeacherService {
    */
   async updateAudioFileApprovalStatus(
     audioFileId: string,
-    status: 'approved' | 'rejected',
+    status: 'pending' | 'approved' | 'rejected',
     comment?: string
   ): Promise<AudioFile> {
     try {
@@ -3657,10 +3657,11 @@ class TeacherService {
    */
   async getSchulsongStatusForTeacher(eventId: string): Promise<{
     hasSchulsong: boolean;
-    status: 'waiting' | 'ready_for_approval' | 'approved';
+    status: 'waiting' | 'ready_for_approval' | 'approved' | 'rejected';
     audioUrl?: string;
     teacherApprovedAt?: string;
     availableToParentsAt?: string;
+    rejectionComment?: string;
   }> {
     try {
       // Get event to check if schulsong feature is enabled
@@ -3687,6 +3688,15 @@ class TeacherService {
         return {
           hasSchulsong: true,
           status: 'waiting',
+        };
+      }
+
+      // If teacher rejected -> show rejected state
+      if (schulsongFile.approvalStatus === 'rejected' && !schulsongFile.teacherApprovedAt) {
+        return {
+          hasSchulsong: true,
+          status: 'rejected',
+          rejectionComment: schulsongFile.rejectionComment,
         };
       }
 
@@ -3717,7 +3727,7 @@ class TeacherService {
    * Teacher approves the schulsong
    * Sets teacher_approved_at timestamp on the schulsong audio file
    */
-  async approveSchulsongAsTeacher(eventId: string): Promise<{ approvedAt: string }> {
+  async approveSchulsongAsTeacher(eventId: string, notes?: string): Promise<{ approvedAt: string }> {
     try {
       // Get event to verify schulsong feature is enabled
       const event = await getAirtableService().getEventByEventId(eventId);
@@ -3747,11 +3757,55 @@ class TeacherService {
         [AUDIO_FILES_FIELD_IDS.teacher_approved_at]: approvedAt,
       });
 
+      // Store teacher notes if provided
+      if (notes) {
+        await this.base(AUDIO_FILES_TABLE).update(schulsongFile.id, {
+          [AUDIO_FILES_FIELD_IDS.rejection_comment]: notes,
+        });
+      }
+
       console.log(`[approveSchulsongAsTeacher] Teacher approved schulsong for event ${eventId}`);
       return { approvedAt };
     } catch (error) {
       console.error('Error approving schulsong as teacher:', error);
       throw new Error(`Failed to approve schulsong: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Teacher rejects the schulsong with optional notes
+   * Sets approval_status to 'rejected', stores notes, clears teacher_approved_at
+   */
+  async rejectSchulsongAsTeacher(eventId: string, notes?: string): Promise<{ rejectedAt: string }> {
+    try {
+      const event = await getAirtableService().getEventByEventId(eventId);
+
+      if (!event?.is_schulsong) {
+        throw new Error('Event does not have schulsong feature enabled');
+      }
+
+      const allFiles = await this.getAudioFilesByEventId(eventId);
+      const schulsongFile = allFiles.find(
+        (f) => f.isSchulsong && f.type === 'final' && f.status === 'ready'
+      );
+
+      if (!schulsongFile) {
+        throw new Error('No schulsong audio file found');
+      }
+
+      const rejectedAt = new Date().toISOString();
+
+      // Update approval status and rejection comment
+      await this.updateAudioFileApprovalStatus(schulsongFile.id, 'rejected', notes || '');
+
+      // Clear teacher_approved_at so status reverts
+      await this.clearTeacherApprovedAt(schulsongFile.id);
+
+      console.log(`[rejectSchulsongAsTeacher] Teacher rejected schulsong for event ${eventId}`);
+      return { rejectedAt };
+    } catch (error) {
+      console.error('Error rejecting schulsong as teacher:', error);
+      throw new Error(`Failed to reject schulsong: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }
