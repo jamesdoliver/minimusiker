@@ -295,6 +295,57 @@ export async function sendSchulsongTeacherApprovedNotification(
 }
 
 // ============================================================================
+// SCHULSONG TEACHER REVIEW NOTIFICATIONS
+// ============================================================================
+
+export interface SchulsongTeacherActionData {
+  schoolName: string;
+  eventDate: string;
+  eventId: string;
+  action: 'approved' | 'rejected';
+  teacherNotes?: string;
+}
+
+export interface SchulsongNewVersionData {
+  schoolName: string;
+  eventDate: string;
+  teacherPortalUrl: string;
+}
+
+/**
+ * Send notification to engineer when teacher approves or rejects schulsong
+ */
+export async function sendSchulsongTeacherActionEmail(
+  engineerEmail: string,
+  engineerName: string,
+  data: SchulsongTeacherActionData
+): Promise<SendEmailResult> {
+  const adminUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app'}/admin/bookings`;
+  return sendTriggerEmail(engineerEmail, 'schulsong_teacher_action', {
+    engineerName,
+    schoolName: data.schoolName,
+    eventDate: formatDateGerman(data.eventDate),
+    action: data.action === 'approved' ? 'freigegeben' : 'abgelehnt',
+    teacherNotes: data.teacherNotes || 'Keine Anmerkungen',
+    adminUrl,
+  }, `Schulsong teacher ${data.action}`);
+}
+
+/**
+ * Send notification to teacher when a new schulsong version is uploaded
+ */
+export async function sendSchulsongNewVersionEmail(
+  teacherEmail: string,
+  data: SchulsongNewVersionData
+): Promise<SendEmailResult> {
+  return sendTriggerEmail(teacherEmail, 'schulsong_new_version', {
+    schoolName: data.schoolName,
+    eventDate: formatDateGerman(data.eventDate),
+    teacherPortalUrl: data.teacherPortalUrl,
+  }, 'Schulsong new version');
+}
+
+// ============================================================================
 // MIGRATED BREVO EMAILS — Parent Welcome, Staff Booking Alert, Staff Reassignment
 // ============================================================================
 

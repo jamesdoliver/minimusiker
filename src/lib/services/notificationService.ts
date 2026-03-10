@@ -214,6 +214,81 @@ export async function triggerSchulsongTeacherApprovedNotification(
 }
 
 /**
+ * Notify engineer (Micha) when teacher approves or rejects schulsong
+ * Looks up engineer via ENGINEER_MICHA_ID env var -> Personen table
+ */
+export async function triggerSchulsongTeacherActionNotification(
+  data: { schoolName: string; eventDate: string; eventId: string; action: 'approved' | 'rejected'; teacherNotes?: string }
+): Promise<{ sent: boolean; error?: string }> {
+  try {
+    const engineerId = process.env.ENGINEER_MICHA_ID;
+    if (!engineerId) {
+      console.warn('[NotificationService] ENGINEER_MICHA_ID not configured');
+      return { sent: false, error: 'ENGINEER_MICHA_ID not configured' };
+    }
+
+    const airtable = getAirtableService();
+    const engineer = await airtable.getPersonById(engineerId);
+    if (!engineer || !engineer.email) {
+      console.warn(`[NotificationService] Engineer ${engineerId} has no email`);
+      return { sent: false, error: 'Engineer email not found' };
+    }
+
+    const { sendSchulsongTeacherActionEmail } = await import('./resendService');
+    const result = await sendSchulsongTeacherActionEmail(engineer.email, engineer.staff_name, {
+      schoolName: data.schoolName,
+      eventDate: data.eventDate,
+      eventId: data.eventId,
+      action: data.action,
+      teacherNotes: data.teacherNotes,
+    });
+
+    if (result.success) {
+      console.log(`[NotificationService] Schulsong teacher ${data.action} notification sent to ${engineer.email}`);
+      return { sent: true };
+    } else {
+      console.error('[NotificationService] Failed to send schulsong teacher action notification:', result.error);
+      return { sent: false, error: result.error };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[NotificationService] Error in triggerSchulsongTeacherActionNotification:', error);
+    return { sent: false, error: errorMessage };
+  }
+}
+
+/**
+ * Notify teacher when engineer uploads a new schulsong version after rejection
+ * Teacher email comes from the event's school_contact_email
+ */
+export async function triggerSchulsongNewVersionNotification(
+  data: { eventId: string; schoolName: string; eventDate: string; teacherEmail: string }
+): Promise<{ sent: boolean; error?: string }> {
+  try {
+    const teacherPortalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app'}/paedagogen`;
+
+    const { sendSchulsongNewVersionEmail } = await import('./resendService');
+    const result = await sendSchulsongNewVersionEmail(data.teacherEmail, {
+      schoolName: data.schoolName,
+      eventDate: data.eventDate,
+      teacherPortalUrl,
+    });
+
+    if (result.success) {
+      console.log(`[NotificationService] Schulsong new version notification sent to ${data.teacherEmail}`);
+      return { sent: true };
+    } else {
+      console.error('[NotificationService] Failed to send schulsong new version notification:', result.error);
+      return { sent: false, error: result.error };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[NotificationService] Error in triggerSchulsongNewVersionNotification:', error);
+    return { sent: false, error: errorMessage };
+  }
+}
+
+/**
  * Notify the appropriate engineer when a Logic Project is uploaded.
  * - Schulsong upload -> notifies Micha (ENGINEER_MICHA_ID)
  * - Minimusiker upload -> notifies Jakob (ENGINEER_JAKOB_ID)
