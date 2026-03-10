@@ -213,20 +213,15 @@ export async function PUT(
       });
     }
 
-    // If this is a schulsong final upload, handle re-upload notifications
+    // If this is a schulsong final upload, clean up old files and notify teacher
     if (isSchulsong && type === 'final') {
-      // Find and reset any old rejected schulsong files for this event
+      // Un-mark any old schulsong final files so only the new upload is the active one
       const allEventFiles = await teacherService.getAudioFilesByEventId(eventId);
-      const oldRejectedFiles = allEventFiles.filter(
-        (f) => f.isSchulsong && f.type === 'final' && f.id !== audioFile.id &&
-               (f.approvalStatus === 'rejected' || f.teacherApprovedAt)
+      const oldSchulsongFiles = allEventFiles.filter(
+        (f) => f.isSchulsong && f.type === 'final' && f.id !== audioFile.id
       );
-      for (const oldFile of oldRejectedFiles) {
-        // Clear old file's approval status and teacher approval
-        await teacherService.updateAudioFileApprovalStatus(oldFile.id, 'pending', '');
-        if (oldFile.teacherApprovedAt) {
-          await teacherService.clearTeacherApprovedAt(oldFile.id);
-        }
+      for (const oldFile of oldSchulsongFiles) {
+        await teacherService.updateAudioFile(oldFile.id, { isSchulsong: false });
       }
 
       // Notify teacher that a new version is available
