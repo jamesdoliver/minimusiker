@@ -3751,18 +3751,15 @@ class TeacherService {
         return { approvedAt: schulsongFile.teacherApprovedAt };
       }
 
-      // Set teacher_approved_at timestamp
+      // Set teacher_approved_at timestamp (and notes if provided) in single call
       const approvedAt = new Date().toISOString();
-      await this.base(AUDIO_FILES_TABLE).update(schulsongFile.id, {
+      const updateData: Record<string, string> = {
         [AUDIO_FILES_FIELD_IDS.teacher_approved_at]: approvedAt,
-      });
-
-      // Store teacher notes if provided
+      };
       if (notes) {
-        await this.base(AUDIO_FILES_TABLE).update(schulsongFile.id, {
-          [AUDIO_FILES_FIELD_IDS.rejection_comment]: notes,
-        });
+        updateData[AUDIO_FILES_FIELD_IDS.rejection_comment] = notes;
       }
+      await this.base(AUDIO_FILES_TABLE).update(schulsongFile.id, updateData);
 
       console.log(`[approveSchulsongAsTeacher] Teacher approved schulsong for event ${eventId}`);
       return { approvedAt };
