@@ -36,6 +36,12 @@
     },
     "src/app/api/audio/process/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/staff/events/[eventId]/upload-logic-project/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/api/staff/events/[eventId]/upload-logic-project/multipart/route.ts": {
+      "maxDuration": 120
     }
   },
   "headers": [

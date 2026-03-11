@@ -172,12 +172,16 @@ export async function PUT(
       console.error('Error auto-assigning engineer:', error);
     }
 
-    // Notify the appropriate engineer for this specific upload type
+    // Non-critical post-upload operations — must not fail the upload response
+    // The file is already assembled in R2 and the audio record is created above.
     notifyEngineerOfUpload(eventId, projectType as 'schulsong' | 'minimusiker').catch(err =>
       console.error('Engineer notification error:', err)
     );
-    // Update pipeline stage when any project is uploaded
-    await getAirtableService().updateEventAudioPipelineStage(eventId, 'staff_uploaded');
+    try {
+      await getAirtableService().updateEventAudioPipelineStage(eventId, 'staff_uploaded');
+    } catch (error) {
+      console.error('Error updating pipeline stage (upload still succeeded):', error);
+    }
 
     return NextResponse.json({
       success: true,
