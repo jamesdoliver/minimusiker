@@ -7,7 +7,7 @@
 /**
  * Audio lifecycle stage — from no audio through to admin-approved final
  */
-export type AudioStage = 'none' | 'raw' | 'preview' | 'final' | 'approved';
+export type AudioStage = 'none' | 'staff_uploaded' | 'raw' | 'preview' | 'final' | 'approved';
 
 /**
  * Summarized audio status for display components

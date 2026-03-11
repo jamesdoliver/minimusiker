@@ -311,11 +311,16 @@ export default function EngineerPortal() {
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <AudioStatusBadge
                     variant="dot"
-                    stage={deriveStageFromSimple({
-                      hasRawAudio: event.rawAudioCount > 0,
-                      hasPreview: event.hasPreview,
-                      hasFinal: event.hasFinal,
-                    })}
+                    stage={(() => {
+                      const fileStage = deriveStageFromSimple({
+                        hasRawAudio: event.rawAudioCount > 0,
+                        hasPreview: event.hasPreview,
+                        hasFinal: event.hasFinal,
+                      });
+                      if (fileStage !== 'none') return fileStage;
+                      if (event.audioPipelineStage === 'staff_uploaded') return 'staff_uploaded';
+                      return 'none';
+                    })()}
                   />
                 </div>
               </Link>

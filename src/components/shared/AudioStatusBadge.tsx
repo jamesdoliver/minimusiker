@@ -9,6 +9,12 @@ const stageConfig: Record<AudioStage, { label: string; className: string; dotCol
     dotColor: 'bg-gray-300',
     textColor: 'text-gray-500',
   },
+  staff_uploaded: {
+    label: 'Staff Uploaded',
+    className: 'bg-amber-100 text-amber-700 border-amber-200',
+    dotColor: 'bg-amber-400',
+    textColor: 'text-amber-700',
+  },
   raw: {
     label: 'Roh',
     className: 'bg-amber-100 text-amber-700 border-amber-200',
