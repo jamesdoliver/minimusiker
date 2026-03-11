@@ -36,6 +36,7 @@ export interface EngineerEventSummary {
   hasPreview: boolean;
   hasFinal: boolean;
   mixingStatus: EngineerMixingStatus;
+  audioPipelineStage?: 'not_started' | 'staff_uploaded' | 'finals_submitted';
 }
 
 /**

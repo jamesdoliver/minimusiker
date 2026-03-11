@@ -105,6 +105,7 @@ export async function GET(request: NextRequest) {
         hasPreview,
         hasFinal,
         mixingStatus,
+        audioPipelineStage: event.audioPipelineStage as EngineerEventSummary['audioPipelineStage'],
       };
     });
 

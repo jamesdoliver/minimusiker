@@ -77,6 +77,15 @@ export default function EngineerPortal() {
     return counts;
   }, [events]);
 
+  // Events ready to mix: staff uploaded but not yet completed
+  const readyToMix = useMemo(() => {
+    return events.filter(
+      (event) =>
+        event.audioPipelineStage === 'staff_uploaded' &&
+        event.mixingStatus !== 'completed'
+    );
+  }, [events]);
+
   // Filter events
   const filteredEvents = useMemo(() => {
     let result = events;
@@ -165,6 +174,41 @@ export default function EngineerPortal() {
               ? `${events.length} ${events.length === 1 ? 'project' : 'projects'} to mix`
               : `Showing ${filteredEvents.length} of ${events.length} projects`}
           </p>
+        </div>
+
+        {/* Ready To Mix priority section */}
+        <div className="mb-6 bg-amber-50 border border-amber-200 border-l-4 border-l-amber-400 rounded-lg overflow-hidden">
+          <div className="px-5 py-3 flex items-center justify-between border-b border-amber-100">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-amber-900">Ready To Mix</h3>
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-200 text-amber-800">
+                {readyToMix.length}
+              </span>
+            </div>
+          </div>
+          {readyToMix.length === 0 ? (
+            <div className="px-5 py-3">
+              <p className="text-sm text-amber-700/70">No projects waiting to be mixed right now.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-amber-100">
+              {readyToMix.map((event) => (
+                <Link
+                  key={event.eventId}
+                  href={`/engineer/events/${encodeURIComponent(event.eventId)}`}
+                  className="flex items-center justify-between px-5 py-2.5 hover:bg-amber-100/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="font-medium text-gray-900 truncate">{event.schoolName}</span>
+                    <span className="px-1.5 py-0.5 text-xs rounded bg-amber-100 text-amber-700 capitalize flex-shrink-0">
+                      {event.eventType}
+                    </span>
+                  </div>
+                  <span className="text-sm text-gray-500 flex-shrink-0 ml-4">{formatDate(event.eventDate)}</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Status filter tabs */}
