@@ -227,19 +227,20 @@ export default function TaskDateView() {
 
       try {
         if (action === 'complete') {
+          const completionData = (data?.completion_data as Record<string, unknown>) || {};
           if (taskId) {
             await fetch(`/api/admin/tasks/${taskId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
-              body: JSON.stringify({ completion_data: {} }),
+              body: JSON.stringify({ completion_data: completionData }),
             });
           } else {
             await fetch('/api/admin/tasks/matrix/complete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'include',
-              body: JSON.stringify({ eventId, templateId, completion_data: {} }),
+              body: JSON.stringify({ eventId, templateId, completion_data: completionData }),
             });
           }
         } else if (action === 'skip') {
