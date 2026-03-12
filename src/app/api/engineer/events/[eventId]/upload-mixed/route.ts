@@ -224,8 +224,11 @@ export async function PUT(
         await teacherService.updateAudioFile(oldFile.id, { isSchulsong: false });
       }
 
-      // Notify teacher that a new version is available
+      // Clear any previous release state so teacher re-approval can schedule a new release
       const airtableService = getAirtableService();
+      await airtableService.setSchulsongReleasedAt(eventId, '');
+
+      // Notify teacher that a new version is available
       const event = await airtableService.getEventByEventId(eventId);
       if (event) {
         // Look up teacher email via linked SchoolBooking

@@ -3952,6 +3952,9 @@ class AirtableService {
       };
       if (releasedAt) {
         updates[EVENTS_FIELD_IDS.admin_approval_status] = 'approved';
+      } else {
+        // Reset admin approval when clearing the release date (re-upload or rejection)
+        updates[EVENTS_FIELD_IDS.admin_approval_status] = 'pending';
       }
       await this.base(EVENTS_TABLE_ID).update(events[0].id, updates);
 
