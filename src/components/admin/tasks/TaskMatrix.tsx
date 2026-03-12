@@ -10,6 +10,7 @@ import {
 } from '@/lib/config/taskTimeline';
 import TaskMatrixCell from './TaskMatrixCell';
 import TaskMatrixPopover from './TaskMatrixPopover';
+import MasterCdModal from './MasterCdModal';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +33,12 @@ interface PopoverState {
   templateId: string;
   eventId: string;
   anchorRect: DOMRect;
+}
+
+interface ModalState {
+  cell: TaskMatrixCellType;
+  templateId: string;
+  eventId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,8 +75,9 @@ export default function TaskMatrix({
   onTaskAction,
 }: TaskMatrixProps) {
   const [popover, setPopover] = useState<PopoverState | null>(null);
+  const [modal, setModal] = useState<ModalState | null>(null);
 
-  // Handle cell click — open popover
+  // Handle cell click — open modal for Master CD, popover for others
   const handleCellClick = useCallback(
     (
       cell: TaskMatrixCellType,
@@ -77,8 +85,12 @@ export default function TaskMatrix({
       eventId: string,
       anchorEl: HTMLElement,
     ) => {
-      const rect = anchorEl.getBoundingClientRect();
-      setPopover({ cell, templateId, eventId, anchorRect: rect });
+      if (templateId === 'audio_master_cd') {
+        setModal({ cell, templateId, eventId });
+      } else {
+        const rect = anchorEl.getBoundingClientRect();
+        setPopover({ cell, templateId, eventId, anchorRect: rect });
+      }
     },
     [],
   );
@@ -91,6 +103,15 @@ export default function TaskMatrix({
       setPopover(null);
     },
     [popover, onTaskAction],
+  );
+
+  // Handle modal action
+  const handleModalAction = useCallback(
+    (action: string, data?: Record<string, unknown>) => {
+      if (!modal) return;
+      onTaskAction?.(action, modal.eventId, modal.templateId, modal.cell.taskId, data);
+    },
+    [modal, onTaskAction],
   );
 
   return (
@@ -226,6 +247,17 @@ export default function TaskMatrix({
           anchorRect={popover.anchorRect}
           onClose={() => setPopover(null)}
           onAction={handlePopoverAction}
+        />
+      )}
+
+      {/* Master CD Modal */}
+      {modal && (
+        <MasterCdModal
+          cell={modal.cell}
+          templateId={modal.templateId}
+          eventId={modal.eventId}
+          onClose={() => setModal(null)}
+          onAction={handleModalAction}
         />
       )}
     </div>

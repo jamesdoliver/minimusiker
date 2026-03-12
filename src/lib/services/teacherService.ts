@@ -828,6 +828,19 @@ class TeacherService {
   }
 
   /**
+   * Exclude songs from the album by setting album_order to 0.
+   * Songs with album_order = 0 are hidden from the Master CD tracklist
+   * but remain in the teacher's class setlist.
+   */
+  async excludeSongsFromAlbum(songIds: string[]): Promise<void> {
+    for (const songId of songIds) {
+      await this.base(SONGS_TABLE).update(songId, {
+        [SONGS_FIELD_IDS.album_order]: 0,
+      } as Airtable.FieldSet);
+    }
+  }
+
+  /**
    * Delete a song
    */
   async deleteSong(songId: string): Promise<void> {

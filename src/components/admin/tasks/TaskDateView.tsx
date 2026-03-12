@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import type { TaskWithEventDetails, TaskMatrixCell as TaskMatrixCellType } from '@/lib/types/tasks';
 import TaskDateGroup, { getTaskCellStatus } from './TaskDateGroup';
 import TaskMatrixPopover from './TaskMatrixPopover';
+import MasterCdModal from './MasterCdModal';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,6 +98,7 @@ export default function TaskDateView() {
   >({});
   const [isLoading, setIsLoading] = useState(true);
   const [popover, setPopover] = useState<PopoverState | null>(null);
+  const [masterCdModal, setMasterCdModal] = useState<TaskWithEventDetails | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Compute the date range based on viewMode + currentDate
@@ -186,12 +188,16 @@ export default function TaskDateView() {
     setCurrentDate(new Date());
   };
 
-  // Handle task row click — open popover
+  // Handle task row click — open modal for Master CD, popover for others
   const handleTaskAction = useCallback(
     (action: string, task: TaskWithEventDetails, anchorEl?: HTMLElement) => {
-      if (action === 'open_detail' && anchorEl) {
-        const rect = anchorEl.getBoundingClientRect();
-        setPopover({ task, anchorRect: rect });
+      if (action === 'open_detail') {
+        if (task.template_id === 'audio_master_cd') {
+          setMasterCdModal(task);
+        } else if (anchorEl) {
+          const rect = anchorEl.getBoundingClientRect();
+          setPopover({ task, anchorRect: rect });
+        }
       }
     },
     [],
@@ -211,6 +217,105 @@ export default function TaskDateView() {
       completedAt: task.completed_at,
     };
   }, [popover]);
+
+  // Convert masterCdModal task to TaskMatrixCell
+  const masterCdModalCell: TaskMatrixCellType | null = useMemo(() => {
+    if (!masterCdModal) return null;
+    return {
+      taskId: masterCdModal.id.startsWith('virtual_') ? null : masterCdModal.id,
+      templateId: masterCdModal.template_id,
+      status: masterCdModal.status,
+      cellStatus: getTaskCellStatus(masterCdModal),
+      deadline: masterCdModal.deadline,
+      daysUntilDue: masterCdModal.days_until_due,
+      completedAt: masterCdModal.completed_at,
+    };
+  }, [masterCdModal]);
+
+  // Handle Master CD modal actions
+  const handleMasterCdAction = useCallback(
+    async (action: string, data?: Record<string, unknown>) => {
+      if (!masterCdModal) return;
+      const task = masterCdModal;
+      const isVirtual = task.id.startsWith('virtual_');
+      const taskId = isVirtual ? null : task.id;
+      const eventId = task.event_id;
+      const templateId = task.template_id;
+
+      setActionError(null);
+
+      try {
+        if (action === 'complete') {
+          const completionData = (data?.completion_data as Record<string, unknown>) || {};
+          if (taskId) {
+            await fetch(`/api/admin/tasks/${taskId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ completion_data: completionData }),
+            });
+          } else {
+            await fetch('/api/admin/tasks/matrix/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ eventId, templateId, completion_data: completionData }),
+            });
+          }
+        } else if (action === 'skip') {
+          if (taskId) {
+            await fetch(`/api/admin/tasks/${taskId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ status: 'skipped' }),
+            });
+          } else {
+            await fetch('/api/admin/tasks/matrix/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ eventId, templateId, status: 'skipped' }),
+            });
+          }
+        } else if (action === 'partial') {
+          const notes = (data?.notes as string) || '';
+          if (taskId) {
+            await fetch(`/api/admin/tasks/${taskId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ status: 'partial', completion_data: { notes } }),
+            });
+          } else {
+            await fetch('/api/admin/tasks/matrix/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ eventId, templateId, status: 'partial', completion_data: { notes } }),
+            });
+          }
+        } else if (action === 'revert') {
+          if (taskId) {
+            await fetch(`/api/admin/tasks/${taskId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ status: 'pending' }),
+            });
+          }
+        }
+        setMasterCdModal(null);
+        await fetchTasks();
+      } catch (err) {
+        console.error('Error performing task action:', err);
+        setActionError(
+          err instanceof Error ? err.message : 'Failed to perform task action',
+        );
+      }
+    },
+    [masterCdModal, fetchTasks],
+  );
 
   // Handle popover actions
   const handlePopoverAction = useCallback(
@@ -450,6 +555,17 @@ export default function TaskDateView() {
           anchorRect={popover.anchorRect}
           onClose={() => setPopover(null)}
           onAction={handlePopoverAction}
+        />
+      )}
+
+      {/* Master CD Modal */}
+      {masterCdModal && masterCdModalCell && (
+        <MasterCdModal
+          cell={masterCdModalCell}
+          templateId={masterCdModal.template_id}
+          eventId={masterCdModal.event_id}
+          onClose={() => setMasterCdModal(null)}
+          onAction={handleMasterCdAction}
         />
       )}
     </div>

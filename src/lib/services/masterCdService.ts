@@ -62,8 +62,9 @@ class MasterCdService {
    * 8. Build MasterCdData
    */
   async getTracklist(eventId: string): Promise<MasterCdData> {
-    // 1. Fetch songs for the event
-    const songs = await this.teacherService.getSongsByEventId(eventId);
+    // 1. Fetch songs for the event, excluding songs removed from album (albumOrder === 0)
+    const allSongs = await this.teacherService.getSongsByEventId(eventId);
+    const songs = allSongs.filter((s) => s.albumOrder !== 0);
 
     // 2. Sort by album_order (fallback to song order, then index)
     const sortedSongs = [...songs].sort((a, b) => {

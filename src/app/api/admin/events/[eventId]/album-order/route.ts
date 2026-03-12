@@ -72,7 +72,7 @@ export async function PUT(
     const resolvedEventId = eventDetail?.eventId || eventId;
 
     const body = await request.json();
-    const { tracks } = body as { tracks: AlbumTrackUpdate[] };
+    const { tracks, removedSongIds } = body as { tracks: AlbumTrackUpdate[]; removedSongIds?: string[] };
 
     if (!tracks || !Array.isArray(tracks)) {
       return NextResponse.json(
@@ -83,6 +83,13 @@ export async function PUT(
 
     console.log(`[admin/album-order] PUT eventId="${eventId}" resolvedEventId="${resolvedEventId}", ${tracks.length} tracks:`, tracks.map(t => `${t.albumOrder}. ${t.songId}`));
     await teacherService.updateAlbumOrderData(resolvedEventId, tracks);
+
+    // Exclude removed songs from album (set album_order to 0)
+    if (removedSongIds && removedSongIds.length > 0) {
+      console.log(`[admin/album-order] Excluding ${removedSongIds.length} songs from album`);
+      await teacherService.excludeSongsFromAlbum(removedSongIds);
+    }
+
     console.log(`[admin/album-order] PUT completed successfully`);
 
     return NextResponse.json({
