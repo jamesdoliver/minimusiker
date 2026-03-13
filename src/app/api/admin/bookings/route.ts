@@ -352,7 +352,7 @@ export async function POST(request: NextRequest) {
     const eventDate = body.eventDate || '';
 
     // Determine cost category based on estimated children
-    const estimatedChildren = body.estimatedChildren || 0;
+    const estimatedChildren = body.estimatedChildren ?? 0;
     const costCategory = estimatedChildren > 150 ? '>150 children' : '<150 children';
 
     // Initialize Airtable
@@ -506,7 +506,7 @@ export async function POST(request: NextRequest) {
         contactEmail: contactEmail.trim(),
         contactPhone: body.phone || '',
         eventDate: eventDate || '',
-        estimatedChildren: body.estimatedChildren || undefined,
+        estimatedChildren: body.estimatedChildren ?? undefined,
         region: body.regionName || '',
         address: body.address || '',
         city: body.city || '',
