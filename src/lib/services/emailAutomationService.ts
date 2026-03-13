@@ -644,8 +644,10 @@ export async function processEmailAutomation(
       return result;
     }
 
-    // Filter to only templates matching the current hour
-    const templates = allTemplates.filter(t => t.triggerHour === hour);
+    // Filter to only TIMELINE templates matching the current hour.
+    // Trigger templates (event-driven) must never be processed by the cron —
+    // they have triggerHour=0 which would incorrectly fire them at midnight.
+    const templates = allTemplates.filter(t => t.templateType !== 'trigger' && t.triggerHour === hour);
 
     console.log(`[Email Automation] Hour ${hour} (Berlin) — ${templates.length}/${allTemplates.length} active templates match`);
 

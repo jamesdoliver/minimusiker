@@ -210,7 +210,7 @@ export async function seedMissingTriggerTemplates(): Promise<{ seeded: string[];
         // determines actual routing. Map unsupported types to 'teacher'.
         audience: [entry.recipientType === 'parent' ? 'parent' : 'teacher'] as ('teacher' | 'parent' | 'non-buyers')[],
         triggerDays: 0,
-        triggerHour: 0,
+        triggerHour: -1,  // Sentinel: trigger templates are event-driven, not cron-driven
         subject: entry.defaultSubject,
         bodyHtml: entry.defaultBodyHtml,
         active: true,
