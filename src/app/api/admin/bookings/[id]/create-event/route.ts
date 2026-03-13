@@ -65,7 +65,7 @@ export async function POST(
       booking.schoolAddress || undefined,
       booking.schoolPhone || undefined,
       isPending ? 'Pending' : undefined,
-      booking.estimatedChildren || undefined
+      booking.estimatedChildren ?? undefined
     );
 
     console.log(`[CreateEvent] Created Event record ${eventRecord.id} for booking ${bookingId}`);

@@ -217,7 +217,7 @@ export async function PATCH(
             booking.schoolAddress || body.school_address || undefined,
             booking.schoolPhone || body.school_phone || undefined,
             undefined, // confirmed status (default)
-            booking.estimatedChildren || undefined
+            booking.estimatedChildren ?? undefined
           );
           console.log(`[EditBooking] Created Event ${eventRecord.id} for promoted booking ${bookingId}`);
           eventCreated = true;

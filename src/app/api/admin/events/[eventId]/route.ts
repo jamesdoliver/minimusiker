@@ -353,7 +353,7 @@ export async function PATCH(
             booking.schoolAddress || undefined,
             booking.schoolPhone || undefined,
             isPending ? 'Pending' : undefined,
-            booking.estimatedChildren || undefined
+            booking.estimatedChildren ?? undefined
           );
           eventRecordId = newEvent.id;
           console.log(`[PATCH events] Auto-created Event ${newEvent.id} for booking ${eventId}`);
