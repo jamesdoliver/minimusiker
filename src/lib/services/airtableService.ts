@@ -7989,6 +7989,17 @@ class AirtableService {
     const bookingRecord = await this.base(SCHOOL_BOOKINGS_TABLE_ID).create(bookingFields);
     console.log(`Created SchoolBooking for Schulsong: ${bookingRecord.id} (code: ${bookingCode})`);
 
+    // Fetch estimated children from Einrichtung
+    let estimatedChildren: number | undefined;
+    if (einrichtungId) {
+      try {
+        const einrichtung = await this.getEinrichtungById(einrichtungId);
+        estimatedChildren = einrichtung?.numberOfChildren ?? undefined;
+      } catch (err) {
+        console.warn('Could not fetch Einrichtung for estimated children:', err);
+      }
+    }
+
     // Generate event ID and create Event record
     const eventId = generateEventId(schoolName, 'Schulsong', eventDate);
     const eventRecord = await this.createEventFromBooking(
@@ -8001,7 +8012,7 @@ class AirtableService {
       undefined, // address
       undefined, // phone
       undefined, // status
-      undefined, // estimatedChildren
+      estimatedChildren,
       true,      // isSchulsong
       false      // isMinimusikertag
     );
