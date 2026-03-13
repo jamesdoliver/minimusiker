@@ -408,13 +408,25 @@ async function handleBookingChange(payload: SimplybookWebhookPayload) {
 
     console.log('[SimplyBook] Updated booking record:', existingRecord.id);
 
+    // Propagate estimated_children + is_under_100 to linked Event
+    const airtableService = getAirtableService();
+    const linkedEvent = await airtableService.getEventByBookingRecordId(existingRecord.id);
+    if (linkedEvent) {
+      try {
+        await airtableService.updateEventFields(linkedEvent.id, {
+          estimated_children: mappedData.numberOfChildren,
+          is_under_100: mappedData.numberOfChildren < 100,
+        });
+        console.log(`[SimplyBook] Synced estimated_children=${mappedData.numberOfChildren} to Event ${linkedEvent.id}`);
+      } catch (err) {
+        console.error('[SimplyBook] Failed to sync estimated_children to Event:', err);
+      }
+    }
+
     // Ensure teacher exists for updated contact email
     if (mappedData.contactEmail) {
       try {
         const teacherService = getTeacherService();
-        const airtableService = getAirtableService();
-        // Try to find the linked Event for this booking
-        const linkedEvent = await airtableService.getEventByBookingRecordId(existingRecord.id);
         const teacher = await teacherService.findOrCreateTeacher({
           email: mappedData.contactEmail,
           name: mappedData.contactPerson || mappedData.schoolName,
