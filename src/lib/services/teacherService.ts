@@ -2848,9 +2848,7 @@ class TeacherService {
       }
 
       // Process events from Teachers.linked_events that aren't already included
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
+      // No date filter — invited teachers should see past events (same as primary teachers)
       for (const linkedEvent of linkedEvents) {
         const eventId = linkedEvent.event_id;
 
@@ -2858,11 +2856,6 @@ class TeacherService {
         if (processedEventIds.has(eventId)) continue;
         if (schoolBookingIds.has(eventId)) continue;
         if (legacyEventIds.has(eventId)) continue;
-
-        // Apply date filter - only future/current events
-        const eventDate = new Date(linkedEvent.event_date);
-        eventDate.setHours(0, 0, 0, 0);
-        if (eventDate < today) continue;
 
         const actualEventDate = linkedEvent.event_date;
         const actualSchoolName = linkedEvent.school_name;
