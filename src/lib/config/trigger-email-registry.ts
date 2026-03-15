@@ -291,6 +291,58 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     availableVariables: ['schoolName', 'eventDate', 'adminUrl'],
   },
 
+  // ─── 5b. Schulsong Teacher Rejected (Admin) ────────────────────────
+  {
+    slug: 'schulsong_teacher_rejected',
+    name: 'Schulsong Ablehnung',
+    description: 'Wird an Admins gesendet, wenn ein Lehrer den Schulsong im Portal ablehnt.',
+    recipientType: 'admin',
+    triggerEventKey: 'teacher:schulsong_rejected',
+    defaultSubject: 'Schulsong abgelehnt: {{schoolName}} - {{eventDate}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Schulsong vom Lehrer abgelehnt
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.5;">
+  Der Lehrer hat den Schulsong abgelehnt. Der Engineer wird eine überarbeitete Version hochladen.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Schule:</strong>
+      <span style="color: #4a5568; float: right;">{{schoolName}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Datum:</strong>
+      <span style="color: #4a5568; float: right;">{{eventDate}}</span>
+    </td>
+  </tr>
+</table>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px; background-color: #f7f7f7; border-radius: 8px;">
+  <tr>
+    <td style="padding: 16px;">
+      <p style="margin: 0 0 4px 0; color: #2F4858; font-size: 14px; font-weight: 600;">Anmerkungen der Lehrkraft:</p>
+      <p style="margin: 0; color: #4a5568; font-size: 14px; line-height: 1.6;">{{teacherNotes}}</p>
+    </td>
+  </tr>
+</table>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td align="center" style="padding: 8px 0;">
+      <a href="{{adminUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #1e3a4c; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+        Im Admin-Bereich prüfen
+      </a>
+    </td>
+  </tr>
+</table>`,
+    availableVariables: ['schoolName', 'eventDate', 'teacherNotes', 'adminUrl'],
+  },
+
   // ─── 6. Parent Welcome (migrated from Brevo) ───────────────────────
   {
     slug: 'parent_welcome',

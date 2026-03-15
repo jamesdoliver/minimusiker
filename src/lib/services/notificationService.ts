@@ -214,6 +214,50 @@ export async function triggerSchulsongTeacherApprovedNotification(
 }
 
 /**
+ * Notify admins when teacher rejects schulsong
+ * Reuses the same admin recipients from schulsong_teacher_approved notification settings
+ */
+export async function triggerSchulsongTeacherRejectedNotification(
+  data: { schoolName: string; eventDate: string; eventId: string; teacherNotes?: string }
+): Promise<{ sent: boolean; error?: string }> {
+  try {
+    // Reuse the same admin recipients as the approval notification
+    const settings = await getNotificationSettings('schulsong_teacher_approved');
+
+    if (!settings || !settings.enabled) {
+      console.log('[NotificationService] Schulsong teacher rejected notification disabled or not configured');
+      return { sent: false };
+    }
+
+    const recipients = parseRecipientEmails(settings.recipientEmails);
+    if (recipients.length === 0) {
+      console.log('[NotificationService] No recipients configured for schulsong teacher rejected notification');
+      return { sent: false };
+    }
+
+    const { sendSchulsongTeacherRejectedNotification } = await import('./resendService');
+    const result = await sendSchulsongTeacherRejectedNotification(recipients, {
+      schoolName: data.schoolName,
+      eventDate: data.eventDate,
+      eventId: data.eventId,
+      teacherNotes: data.teacherNotes,
+    });
+
+    if (result.success) {
+      console.log(`[NotificationService] Schulsong teacher rejected notification sent to ${recipients.length} recipients`);
+      return { sent: true };
+    } else {
+      console.error('[NotificationService] Failed to send schulsong teacher rejected notification:', result.error);
+      return { sent: false, error: result.error };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[NotificationService] Error in triggerSchulsongTeacherRejectedNotification:', error);
+    return { sent: false, error: errorMessage };
+  }
+}
+
+/**
  * Notify engineer (Micha) when teacher approves or rejects schulsong
  * Looks up engineer via ENGINEER_MICHA_ID env var -> Personen table
  */

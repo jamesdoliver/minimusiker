@@ -294,6 +294,31 @@ export async function sendSchulsongTeacherApprovedNotification(
   }, 'Schulsong teacher approved');
 }
 
+export interface SchulsongTeacherRejectedData {
+  schoolName: string;
+  eventDate: string;
+  eventId: string;
+  teacherNotes?: string;
+}
+
+/**
+ * Send schulsong teacher rejected notification to configured admin recipients
+ */
+export async function sendSchulsongTeacherRejectedNotification(
+  recipients: string[],
+  data: SchulsongTeacherRejectedData
+): Promise<SendEmailResult> {
+  if (recipients.length === 0) return { success: true, messageId: 'no-recipients' };
+
+  const adminUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app'}/admin/bookings`;
+  return sendTriggerEmail(recipients, 'schulsong_teacher_rejected', {
+    schoolName: data.schoolName,
+    eventDate: formatDateGerman(data.eventDate),
+    teacherNotes: data.teacherNotes || 'Keine Anmerkungen',
+    adminUrl,
+  }, 'Schulsong teacher rejected');
+}
+
 // ============================================================================
 // SCHULSONG TEACHER REVIEW NOTIFICATIONS
 // ============================================================================

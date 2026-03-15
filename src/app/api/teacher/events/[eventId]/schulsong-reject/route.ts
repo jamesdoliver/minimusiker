@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { triggerSchulsongTeacherActionNotification } from '@/lib/services/notificationService';
+import { triggerSchulsongTeacherActionNotification, triggerSchulsongTeacherRejectedNotification } from '@/lib/services/notificationService';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,7 +51,7 @@ export async function POST(
       await airtableService.setSchulsongReleasedAt(eventId, '');
     }
 
-    // Notify engineer (fire-and-forget)
+    // Notify engineer and admins (fire-and-forget)
     if (event) {
       triggerSchulsongTeacherActionNotification({
         schoolName: event.school_name,
@@ -61,6 +61,15 @@ export async function POST(
         teacherNotes: notes,
       }).catch((err) => {
         console.error('[schulsong-reject] Failed to send engineer notification:', err);
+      });
+
+      triggerSchulsongTeacherRejectedNotification({
+        schoolName: event.school_name,
+        eventDate: event.event_date,
+        eventId,
+        teacherNotes: notes,
+      }).catch((err) => {
+        console.error('[schulsong-reject] Failed to send admin notification:', err);
       });
     }
 
