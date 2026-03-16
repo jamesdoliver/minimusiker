@@ -3,6 +3,7 @@ import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { triggerSchulsongTeacherActionNotification, triggerSchulsongTeacherRejectedNotification } from '@/lib/services/notificationService';
+import { getActivityService } from '@/lib/services/activityService';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,6 +74,15 @@ export async function POST(
         teacherNotes: notes,
       }).catch((err) => {
         console.error('[schulsong-reject] Failed to send admin notification:', err);
+      });
+
+      // Log activity (fire-and-forget)
+      getActivityService().logActivity({
+        eventRecordId: event.id,
+        activityType: 'schulsong_rejected',
+        description: 'Schulsong rejected by teacher',
+        actorEmail: session.email,
+        actorType: 'teacher',
       });
     }
 

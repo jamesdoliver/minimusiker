@@ -5,6 +5,7 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { triggerSchulsongTeacherApprovedNotification, triggerSchulsongTeacherActionNotification } from '@/lib/services/notificationService';
 import { computeUnifiedReleaseDate, computeSchulsongMerchCutoff } from '@/lib/utils/schulsongRelease';
 import { getThreshold, parseOverrides } from '@/lib/utils/eventThresholds';
+import { getActivityService } from '@/lib/services/activityService';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,6 +78,15 @@ export async function POST(
         teacherNotes: notes,
       }).catch((err) => {
         console.error('[schulsong-approve] Failed to send engineer notification:', err);
+      });
+
+      // Log activity (fire-and-forget)
+      getActivityService().logActivity({
+        eventRecordId: event.id,
+        activityType: 'schulsong_approved',
+        description: 'Schulsong approved by teacher',
+        actorEmail: session.email,
+        actorType: 'teacher',
       });
     }
 
