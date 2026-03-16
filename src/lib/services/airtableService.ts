@@ -4748,6 +4748,26 @@ class AirtableService {
   }
 
   /**
+   * Get SchoolBooking by linked Events record ID
+   */
+  async getSchoolBookingByEventRecordId(eventRecordId: string): Promise<SchoolBooking | null> {
+    try {
+      const eventRecord = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
+      const schoolBookingIds = eventRecord.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[] | undefined;
+
+      if (!schoolBookingIds || schoolBookingIds.length === 0) {
+        return null;
+      }
+
+      const bookingRecord = await this.base(SCHOOL_BOOKINGS_TABLE_ID).find(schoolBookingIds[0]);
+      return this.transformSchoolBookingRecord(bookingRecord);
+    } catch (error) {
+      console.error('Error getting school booking by event record ID:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get booking statistics
    */
   async getBookingStats(): Promise<{
