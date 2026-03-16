@@ -30,6 +30,11 @@ const notificationTypes: NotificationTypeConfig[] = [
     title: 'Kein Mitarbeiter zugeordnet',
     description: 'Benachrichtigung, wenn bei einer neuen Buchung kein Mitarbeiter automatisch zugeordnet werden konnte.',
   },
+  {
+    type: 'event_readiness',
+    title: 'Event-Vorbereitung',
+    description: 'Tägliche/wöchentliche Übersicht: Events ohne Mitarbeiter, fehlende Klassen oder Lieder.',
+  },
 ];
 
 export default function NotificationSettings() {
