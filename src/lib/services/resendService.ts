@@ -597,3 +597,31 @@ export async function sendSchulsongAudioReleaseEmail(
     parentPortalLink: data.parentPortalLink,
   }, 'Schulsong audio release');
 }
+
+// ============================================================================
+// TEACHER INVITE EMAIL
+// ============================================================================
+
+export interface TeacherInviteEmailData {
+  inviterName: string;
+  schoolName: string;
+  eventDate: string;
+  eventType: string;
+  inviteUrl: string;
+}
+
+/**
+ * Send invite email to a teacher being invited to an event
+ */
+export async function sendTeacherInviteEmail(
+  email: string,
+  data: TeacherInviteEmailData
+): Promise<SendEmailResult> {
+  return sendTriggerEmail(email, 'teacher_invite', {
+    inviterName: data.inviterName,
+    schoolName: data.schoolName,
+    eventDate: formatDateGerman(data.eventDate),
+    eventType: data.eventType,
+    inviteUrl: data.inviteUrl,
+  }, 'Teacher invite');
+}

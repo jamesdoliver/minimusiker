@@ -895,6 +895,62 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
       recipientResolver: 'parents_by_registration',
     },
   },
+
+  // ─── Teacher Invite Email ─────────────────────────────────────────────
+  {
+    slug: 'teacher_invite',
+    name: 'Einladung Lehrkraft',
+    description: 'Wird gesendet, wenn eine Lehrkraft eine Kollegin/einen Kollegen zum Event-Portal einlädt.',
+    recipientType: 'teacher',
+    triggerEventKey: 'user:teacher_invite',
+    defaultSubject: '{{inviterName}} hat Sie zu einem Minimusiker-Event eingeladen',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo,
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  <strong>{{inviterName}}</strong> hat Sie eingeladen, am Minimusiker-Event für
+  <strong>{{schoolName}}</strong> mitzuarbeiten.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
+  <tr>
+    <td style="background-color: #f7fafc; border-radius: 8px; padding: 16px 20px;">
+      <p style="margin: 0 0 4px 0; color: #718096; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Event-Details</p>
+      <p style="margin: 0; color: #2d3748; font-size: 15px; line-height: 1.6;">
+        {{schoolName}}<br>
+        {{eventDate}} &middot; {{eventType}}
+      </p>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Über das Portal können Sie Klassen und Lieder verwalten, Audiodateien hochladen
+  und den Überblick über das Event behalten.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td align="center" style="padding: 8px 0 32px 0;">
+      <a href="{{inviteUrl}}"
+         style="display: inline-block; background-color: #d85a6a; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 2px 4px rgba(216, 90, 106, 0.3);">
+        Einladung annehmen
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0 0 16px 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  <strong>Hinweis:</strong> Dieser Link ist <strong>7 Tage</strong> gültig.
+</p>
+
+<p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Falls der Button nicht funktioniert, kopieren Sie diesen Link in Ihren Browser:<br>
+  <a href="{{inviteUrl}}" style="color: #d85a6a; word-break: break-all;">{{inviteUrl}}</a>
+</p>`,
+    availableVariables: ['inviterName', 'schoolName', 'eventDate', 'eventType', 'inviteUrl'],
+  },
 ];
 
 /**
