@@ -1263,6 +1263,9 @@ export default function TeacherEventDetailPage() {
 
   const choirs = collections.filter(c => c.classType === 'choir');
   const teacherSongs = collections.filter(c => c.classType === 'teacher_song');
+  const regularClasses = event?.classes?.filter(
+    (c) => !c.classType || c.classType === 'regular'
+  ) || [];
 
   if (isLoading) {
     return (
@@ -1439,7 +1442,7 @@ export default function TeacherEventDetailPage() {
           </div>
 
           {/* Missing songs warning */}
-          {event.classes.length > 0 && event.classes.some(c => c.songs.length === 0) && (
+          {regularClasses.length > 0 && regularClasses.some(c => c.songs.length === 0) && (
             <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
               <div className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1448,7 +1451,7 @@ export default function TeacherEventDetailPage() {
                 <p className="text-sm text-yellow-800">
                   Folgende Klassen haben noch keine Lieder:{' '}
                   <span className="font-medium">
-                    {event.classes.filter(c => c.songs.length === 0).map(c => c.className).join(', ')}
+                    {regularClasses.filter(c => c.songs.length === 0).map(c => c.className).join(', ')}
                   </span>
                   {' '}&mdash; diese fehlen in der Album-Reihenfolge.
                 </p>
@@ -1456,7 +1459,7 @@ export default function TeacherEventDetailPage() {
             </div>
           )}
 
-          {event.classes.length === 0 ? (
+          {regularClasses.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
               <div className="text-4xl mb-4">📚</div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Noch keine Klassen</h3>
@@ -1477,7 +1480,7 @@ export default function TeacherEventDetailPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {event.classes.map((cls) => (
+              {regularClasses.map((cls) => (
                 <ClassCard
                   key={cls.classId}
                   cls={cls}
