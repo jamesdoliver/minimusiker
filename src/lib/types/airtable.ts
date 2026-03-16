@@ -32,6 +32,7 @@ export const PERSONEN_FIELD_IDS = {
   telefon: 'fld8SFo4WPV5qqk9p',
   rollen: 'fldoyimmjNZY3sBLa',
   id: 'fld72aa8nR2Nizq1v',
+  provider_id: 'fldM2a7li4hGcFUuv',
   teams_regionen: 'fldsd73JGjVM7BpYW',
   // New fields for teacher portal representative cards
   bio: 'fldTKYnqcGgBZrKK9', // Long text - Personal introduction shown to teachers
