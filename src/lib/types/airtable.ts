@@ -570,6 +570,10 @@ export const EVENTS_FIELD_IDS = {
   deal_builder_enabled: 'fld19LJoYvr3ZVKpc',  // Checkbox - master toggle for Deal Builder
   deal_type: 'fldJNjJnyIPOMmb9y',                        // Single Select: mimu, mimu_scs, schus, schus_xl
   deal_config: 'fldw4PwiZTkShCZ7q',                    // Long Text - JSON blob with deal-specific config
+  // Bulk School Orders
+  scs_shirts_included: 'fldcriEUgu7ymH2l7',            // Checkbox - enables SchulClothingOrder
+  minicard_order_enabled: 'fldWGtJ7WXCK28wSt',          // Checkbox - enables bulk minicard order tracking
+  minicard_order_quantity: 'fldYkBvcTuI7i6t2m',         // Number - quantity of minicards ordered
 } as const;
 
 // Classes Table - 1 row per class
@@ -726,6 +730,11 @@ export type CustomFees = Partial<{
   gratis_minicards: number;      // Gratis Minicards fee amount (default 0)
 }>;
 
+export interface DealConfigPreset {
+  enabled: boolean;
+  amount: number;
+}
+
 export interface DealConfig {
   // #mimu toggles
   pauschale_enabled?: boolean;
@@ -755,6 +764,16 @@ export interface DealConfig {
     base: number;
     items: { label: string; amount: number }[];
     total: number;
+  };
+  // New preset-based structure (v2)
+  presets?: {
+    pauschale?: DealConfigPreset;
+    scs_pauschale?: DealConfigPreset;
+    distance_surcharge?: DealConfigPreset;
+    kleine_einrichtung?: DealConfigPreset;
+    grosse_einrichtung?: DealConfigPreset;
+    schulsong_discount?: DealConfigPreset;
+    shirts_discount?: DealConfigPreset;
   };
 }
 
@@ -812,6 +831,10 @@ export interface Event {
   deal_builder_enabled?: boolean;                 // Master toggle — when true, Deal Builder controls this event
   deal_type?: DealType;                           // Selected deal type
   deal_config?: DealConfig;                       // JSON blob with deal-specific configuration
+  // Bulk School Orders
+  scs_shirts_included?: boolean;                   // Enables SchulClothingOrder UI
+  minicard_order_enabled?: boolean;                 // Enables bulk minicard order tracking
+  minicard_order_quantity?: number;                  // Number of minicards ordered by school
 }
 
 /**
