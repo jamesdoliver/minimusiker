@@ -6,9 +6,6 @@ import { DealConfig, DealConfigPreset } from '@/lib/types/airtable';
 // ─── Props ───────────────────────────────────────────────────────────
 interface DealBuilderProps {
   dealConfig: DealConfig;
-  scsShirtsIncluded?: boolean;
-  minicardOrderEnabled?: boolean;
-  minicardOrderQuantity?: number;
   onSave: (config: DealConfig) => void;
   isUpdating?: boolean;
 }
@@ -292,9 +289,6 @@ function CustomFeesSection({
 
 export default function DealBuilder({
   dealConfig,
-  scsShirtsIncluded,
-  minicardOrderEnabled,
-  minicardOrderQuantity,
   onSave,
   isUpdating,
 }: DealBuilderProps) {
@@ -366,13 +360,13 @@ export default function DealBuilder({
 
   // ── Render ───────────────────────────────────────────────────────
   return (
-    <div className="border border-gray-200 rounded-lg bg-white">
+    <div>
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-100">
+      <div className="pb-3 border-b border-gray-100">
         <span className="text-sm font-semibold text-gray-800">Deal Builder</span>
       </div>
 
-      <div className="px-4 py-3 space-y-4">
+      <div className="pt-3 space-y-4">
         {/* ── Presets ─────────────────────────────────────────── */}
         <div className="space-y-3">
           {PRESET_DEFS.map((def) => (
@@ -415,25 +409,6 @@ export default function DealBuilder({
           onChange={(fees) => updateConfig({ additional_fees: fees.length > 0 ? fees : undefined })}
           disabled={isUpdating}
         />
-
-        {/* ── Bulk School Orders (read-only) ──────────────────── */}
-        {(scsShirtsIncluded || minicardOrderEnabled) && (
-          <div className="bg-gray-50 rounded-lg p-3 space-y-1">
-            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Bulk School Orders</h4>
-            {scsShirtsIncluded && (
-              <div className="flex items-center gap-2 text-sm text-gray-700">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                SCS Shirts: Included
-              </div>
-            )}
-            {minicardOrderEnabled && (
-              <div className="flex items-center gap-2 text-sm text-gray-700">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                Minicard Order: {minicardOrderQuantity ?? 0} Stk.
-              </div>
-            )}
-          </div>
-        )}
 
         {/* ── Summary ─────────────────────────────────────────── */}
         <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">

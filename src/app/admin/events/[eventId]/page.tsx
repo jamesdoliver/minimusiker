@@ -785,10 +785,11 @@ export default function EventDetailPage() {
         Back to Bookings
       </Link>
 
-      {/* Header Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-          {/* Left: Event Info */}
+      {/* Card 1: Event Overview */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+        {/* Row 1: Event identity + stats */}
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          {/* Left: Badge + Date + School + Teacher + gear */}
           <div>
             <div className="flex items-center gap-3 mb-3">
               <EventBadge type={event.eventType} size="md" />
@@ -872,7 +873,7 @@ export default function EventDetailPage() {
             </div>
           </div>
 
-          {/* Right: Stats */}
+          {/* Right: Stats pills */}
           <div className="flex gap-3">
             <StatsPill icon="classes" value={event.classCount} label="Classes" />
             <StatsPill icon="children" value={event.totalChildren} label="Children" />
@@ -880,21 +881,18 @@ export default function EventDetailPage() {
           </div>
         </div>
 
-        {/* Staff Assignment Section */}
-        <div className="mt-6 pt-6 border-t border-gray-100">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-1">Staff Assignment</h3>
-              <p className="text-xs text-gray-500">
-                Assign a team member to manage this event
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
+        {/* Row 2: Controls + Progress */}
+        <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          {/* Left: Staff + Status dropdowns side by side */}
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Staff Assignment */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">Staff:</span>
               <select
                 value={selectedStaffId}
                 onChange={(e) => handleAssignStaff(e.target.value)}
                 disabled={isAssigning}
-                className="block w-56 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#94B8B3] focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                className="block w-48 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#94B8B3] focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">No staff assigned</option>
                 {teamStaff.map((staff) => (
@@ -903,327 +901,57 @@ export default function EventDetailPage() {
                   </option>
                 ))}
               </select>
-              {isAssigning && (
-                <LoadingSpinner size="sm" />
-              )}
+              {isAssigning && <LoadingSpinner size="sm" />}
+            </div>
+            {assignError && (
+              <p className="text-sm text-red-600">{assignError}</p>
+            )}
+
+            {/* Status Dropdown */}
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  eventStatus === 'Confirmed'
+                    ? 'bg-green-500'
+                    : eventStatus === 'Pending'
+                    ? 'bg-yellow-500'
+                    : eventStatus === 'On Hold'
+                    ? 'bg-red-500'
+                    : eventStatus === 'Cancelled'
+                    ? 'bg-gray-400'
+                    : 'bg-gray-300'
+                }`}
+              />
+              <select
+                value={eventStatus || ''}
+                onChange={(e) => handleStatusChange(e.target.value as EventStatus)}
+                disabled={isUpdatingStatus}
+                className="block w-36 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#94B8B3] focus:border-transparent disabled:opacity-50"
+              >
+                <option value="">No status</option>
+                <option value="Confirmed">Confirmed</option>
+                <option value="Pending">Pending</option>
+                <option value="On Hold">On Hold</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+              {isUpdatingStatus && <LoadingSpinner size="sm" />}
             </div>
           </div>
-          {assignError && (
-            <p className="mt-2 text-sm text-red-600">{assignError}</p>
-          )}
-        </div>
 
-        {/* Event Status & Type Section */}
-        <div className="mt-6 pt-6 border-t border-gray-100">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Status Dropdown */}
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Event Status</h3>
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-4 h-4 rounded-full ${
-                    eventStatus === 'Confirmed'
-                      ? 'bg-green-500'
-                      : eventStatus === 'Pending'
-                      ? 'bg-yellow-500'
-                      : eventStatus === 'On Hold'
-                      ? 'bg-red-500'
-                      : eventStatus === 'Cancelled'
-                      ? 'bg-gray-400'
-                      : 'bg-gray-300'
-                  }`}
-                />
-                <select
-                  value={eventStatus || ''}
-                  onChange={(e) => handleStatusChange(e.target.value as EventStatus)}
-                  disabled={isUpdatingStatus}
-                  className="block w-40 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#94B8B3] focus:border-transparent disabled:opacity-50"
-                >
-                  <option value="">No status</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Pending">Pending</option>
-                  <option value="On Hold">On Hold</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-                {isUpdatingStatus && <LoadingSpinner size="sm" />}
-              </div>
+          {/* Right: Registration progress */}
+          <div className="w-full md:w-64">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-600">Registration</span>
+              <span className="text-xs font-semibold text-[#5a8a82]">
+                {event.overallRegistrationRate}%
+              </span>
             </div>
-
-            {/* Event Type Toggles */}
-            <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type</h3>
-              <div className="space-y-3">
-                {/* Off ←→ Minimusikertag ←→ PLUS Segmented Control */}
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`inline-flex rounded-lg p-0.5 ${isUpdatingToggles === 'tier' ? 'opacity-50 pointer-events-none' : ''}`}
-                    style={{ backgroundColor: '#e5e7eb' }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleTierSwitch('off')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
-                      style={currentTier === 'off' ? {
-                        backgroundColor: '#d1d5db',
-                        color: '#374151',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                      } : {
-                        backgroundColor: 'transparent',
-                        color: '#6b7280',
-                      }}
-                    >
-                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                        style={currentTier === 'off' ? { backgroundColor: '#374151', color: '#d1d5db' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
-                      >&mdash;</span>
-                      Off
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleTierSwitch('minimusikertag')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
-                      style={currentTier === 'minimusikertag' ? {
-                        backgroundColor: '#86efac',
-                        color: '#166534',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                      } : {
-                        backgroundColor: 'transparent',
-                        color: '#6b7280',
-                      }}
-                    >
-                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                        style={currentTier === 'minimusikertag' ? { backgroundColor: '#166534', color: '#86efac' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
-                      >M</span>
-                      Minimusikertag
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleTierSwitch('plus')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
-                      style={currentTier === 'plus' ? {
-                        backgroundColor: '#93c5fd',
-                        color: '#1e40af',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                      } : {
-                        backgroundColor: 'transparent',
-                        color: '#6b7280',
-                      }}
-                    >
-                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
-                        style={currentTier === 'plus' ? { backgroundColor: '#1e40af', color: '#93c5fd' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
-                      >+</span>
-                      PLUS
-                    </button>
-                  </div>
-                  {isUpdatingToggles === 'tier' && <LoadingSpinner size="sm" />}
-                </div>
-
-                {/* Kita Toggle */}
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      checked={isKita}
-                      onChange={(e) => handleToggleChange('is_kita', e.target.checked)}
-                      disabled={isUpdatingToggles === 'is_kita'}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-violet-500 peer-disabled:opacity-50 transition-colors" />
-                    <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
-                  </div>
-                  <span className="text-sm text-gray-700 group-hover:text-gray-900">Kita</span>
-                  {isKita && (
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
-                      style={{ backgroundColor: '#c4b5fd', color: '#5b21b6' }}
-                    >
-                      K
-                    </div>
-                  )}
-                  {isUpdatingToggles === 'is_kita' && <LoadingSpinner size="sm" />}
-                </label>
-
-                {/* Schulsong Toggle */}
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      checked={isSchulsong}
-                      onChange={(e) => handleToggleChange('is_schulsong', e.target.checked)}
-                      disabled={isUpdatingToggles === 'is_schulsong'}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-orange-500 peer-disabled:opacity-50 transition-colors" />
-                    <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
-                  </div>
-                  <span className="text-sm text-gray-700 group-hover:text-gray-900">Schulsong</span>
-                  {isSchulsong && (
-                    <div
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
-                      style={{ backgroundColor: '#fdba74', color: '#9a3412' }}
-                    >
-                      S
-                    </div>
-                  )}
-                  {isUpdatingToggles === 'is_schulsong' && <LoadingSpinner size="sm" />}
-                </label>
-              </div>
-            </div>
-
-            {/* Standard Merch Override */}
-            <div className="mt-4">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Standard Merch Gate</h3>
-              <div className="flex items-center gap-3">
-                <div
-                  className={`inline-flex rounded-lg p-0.5 ${isUpdatingToggles === 'standard_merch' ? 'opacity-50 pointer-events-none' : ''}`}
-                  style={{ backgroundColor: '#e5e7eb' }}
-                >
-                  {([
-                    { value: 'auto' as const, label: 'Auto' },
-                    { value: 'force-standard' as const, label: 'Standard Only' },
-                    { value: 'force-personalized' as const, label: 'Personalized' },
-                  ]).map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      disabled={isUpdatingToggles === 'standard_merch'}
-                      onClick={async () => {
-                        setIsUpdatingToggles('standard_merch');
-                        try {
-                          const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ standard_merch_override: option.value === 'auto' ? null : option.value }),
-                          });
-                          if (!response.ok) throw new Error('Failed to update');
-                          setStandardMerchOverride(option.value);
-                          toast.success(`Standard Merch: ${option.label}`);
-                        } catch {
-                          toast.error('Failed to update standard merch override');
-                        } finally {
-                          setIsUpdatingToggles(null);
-                        }
-                      }}
-                      className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-                      style={standardMerchOverride === option.value ? {
-                        backgroundColor: '#d1d5db',
-                        color: '#374151',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                      } : {
-                        backgroundColor: 'transparent',
-                        color: '#6b7280',
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                {isUpdatingToggles === 'standard_merch' && <LoadingSpinner size="sm" />}
-                <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                  (standardMerchOverride === 'force-standard' || (standardMerchOverride === 'auto' && isUnder100))
-                    ? 'bg-gray-200 text-gray-700'
-                    : 'bg-green-100 text-green-700'
-                }`}>
-                  {standardMerchOverride === 'auto'
-                    ? (isUnder100 ? 'Standard only (<100 Kinder)' : 'Personalisiert erlaubt')
-                    : standardMerchOverride === 'force-standard'
-                    ? 'Override: Standard only'
-                    : 'Override: Personalisiert'}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {estimatedChildren !== undefined
-                  ? `${estimatedChildren} geschätzte Kinder (Auto-Schwelle: <100 = Standard only)`
-                  : 'Keine geschätzte Kinderzahl gesetzt'}
-              </p>
-            </div>
-
-            {/* Bulk School Orders */}
-            <div className="mt-4 space-y-3">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Bulk School Orders</h3>
-
-              {/* SCS Shirts Toggle */}
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={scsShirtsIncluded}
-                    onChange={(e) => handleBulkOrderUpdate('scs_shirts_included', e.target.checked)}
-                  />
-                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-colors" />
-                  <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
-                </div>
-                <span className="text-sm text-gray-700">SCS Shirts Included</span>
-              </label>
-
-              {/* Minicard Order Toggle + Quantity */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <div className="relative">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={minicardOrderEnabled}
-                      onChange={(e) => handleBulkOrderUpdate('minicard_order_enabled', e.target.checked)}
-                    />
-                    <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-colors" />
-                    <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
-                  </div>
-                  <span className="text-sm text-gray-700">Minicard Order</span>
-                </label>
-                {minicardOrderEnabled && (
-                  <div className="ml-12 flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      value={minicardOrderQuantity ?? 0}
-                      onChange={(e) => handleBulkOrderUpdate('minicard_order_quantity', parseInt(e.target.value, 10) || 0)}
-                      className="w-24 px-2 py-1 text-sm border rounded"
-                    />
-                    <span className="text-xs text-gray-500">Minicards</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Deal Builder */}
-            <div className="mt-4">
-              <DealBuilder
-                dealConfig={dealConfig}
-                scsShirtsIncluded={scsShirtsIncluded}
-                minicardOrderEnabled={minicardOrderEnabled}
-                minicardOrderQuantity={minicardOrderQuantity}
-                onSave={handleDealSave}
-                isUpdating={isUpdatingDeal}
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-[#94B8B3] h-2 rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(event.overallRegistrationRate, 100)}%` }}
               />
             </div>
-
-            {/* SCS Clothing Order (only when shirts included) */}
-            {scsShirtsIncluded && (
-              <div className="mt-4">
-                <SchulClothingOrder
-                  eventId={eventId}
-                  apiBasePath="/api/admin/events"
-                  maxQuantity={(estimatedChildren ?? 0) > 250 ? 500 : 250}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Registration Progress */}
-        <div className="mt-6 pt-6 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-600">Overall Registration</span>
-            <span className="text-sm font-semibold text-[#5a8a82]">
-              {event.overallRegistrationRate}%
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-[#94B8B3] h-2 rounded-full transition-all duration-300"
-              style={{ width: `${Math.min(event.overallRegistrationRate, 100)}%` }}
-            />
           </div>
         </div>
       </div>
@@ -1289,6 +1017,271 @@ export default function EventDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Cards 2 + 3: Event Configuration + Deal Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+        {/* Card 2: Event Configuration (60%) */}
+        <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Event Configuration</h2>
+
+          {/* Event Type Toggles */}
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type</h3>
+            <div className="space-y-3">
+              {/* Off / Minimusikertag / PLUS Segmented Control */}
+              <div className="flex items-center gap-3">
+                <div
+                  className={`inline-flex rounded-lg p-0.5 ${isUpdatingToggles === 'tier' ? 'opacity-50 pointer-events-none' : ''}`}
+                  style={{ backgroundColor: '#e5e7eb' }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleTierSwitch('off')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+                    style={currentTier === 'off' ? {
+                      backgroundColor: '#d1d5db',
+                      color: '#374151',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                    } : {
+                      backgroundColor: 'transparent',
+                      color: '#6b7280',
+                    }}
+                  >
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                      style={currentTier === 'off' ? { backgroundColor: '#374151', color: '#d1d5db' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
+                    >&mdash;</span>
+                    Off
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTierSwitch('minimusikertag')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+                    style={currentTier === 'minimusikertag' ? {
+                      backgroundColor: '#86efac',
+                      color: '#166534',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                    } : {
+                      backgroundColor: 'transparent',
+                      color: '#6b7280',
+                    }}
+                  >
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                      style={currentTier === 'minimusikertag' ? { backgroundColor: '#166534', color: '#86efac' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
+                    >M</span>
+                    Minimusikertag
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTierSwitch('plus')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all"
+                    style={currentTier === 'plus' ? {
+                      backgroundColor: '#93c5fd',
+                      color: '#1e40af',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                    } : {
+                      backgroundColor: 'transparent',
+                      color: '#6b7280',
+                    }}
+                  >
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                      style={currentTier === 'plus' ? { backgroundColor: '#1e40af', color: '#93c5fd' } : { backgroundColor: '#d1d5db', color: '#6b7280' }}
+                    >+</span>
+                    PLUS
+                  </button>
+                </div>
+                {isUpdatingToggles === 'tier' && <LoadingSpinner size="sm" />}
+              </div>
+
+              {/* Kita Toggle */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={isKita}
+                    onChange={(e) => handleToggleChange('is_kita', e.target.checked)}
+                    disabled={isUpdatingToggles === 'is_kita'}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-violet-500 peer-disabled:opacity-50 transition-colors" />
+                  <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+                </div>
+                <span className="text-sm text-gray-700 group-hover:text-gray-900">Kita</span>
+                {isKita && (
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                    style={{ backgroundColor: '#c4b5fd', color: '#5b21b6' }}
+                  >
+                    K
+                  </div>
+                )}
+                {isUpdatingToggles === 'is_kita' && <LoadingSpinner size="sm" />}
+              </label>
+
+              {/* Schulsong Toggle */}
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={isSchulsong}
+                    onChange={(e) => handleToggleChange('is_schulsong', e.target.checked)}
+                    disabled={isUpdatingToggles === 'is_schulsong'}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-orange-500 peer-disabled:opacity-50 transition-colors" />
+                  <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
+                </div>
+                <span className="text-sm text-gray-700 group-hover:text-gray-900">Schulsong</span>
+                {isSchulsong && (
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
+                    style={{ backgroundColor: '#fdba74', color: '#9a3412' }}
+                  >
+                    S
+                  </div>
+                )}
+                {isUpdatingToggles === 'is_schulsong' && <LoadingSpinner size="sm" />}
+              </label>
+            </div>
+          </div>
+
+          {/* Standard Merch Override */}
+          <div className="mt-4">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Standard Merch Gate</h3>
+            <div className="flex items-center gap-3">
+              <div
+                className={`inline-flex rounded-lg p-0.5 ${isUpdatingToggles === 'standard_merch' ? 'opacity-50 pointer-events-none' : ''}`}
+                style={{ backgroundColor: '#e5e7eb' }}
+              >
+                {([
+                  { value: 'auto' as const, label: 'Auto' },
+                  { value: 'force-standard' as const, label: 'Standard Only' },
+                  { value: 'force-personalized' as const, label: 'Personalized' },
+                ]).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={isUpdatingToggles === 'standard_merch'}
+                    onClick={async () => {
+                      setIsUpdatingToggles('standard_merch');
+                      try {
+                        const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ standard_merch_override: option.value === 'auto' ? null : option.value }),
+                        });
+                        if (!response.ok) throw new Error('Failed to update');
+                        setStandardMerchOverride(option.value);
+                        toast.success(`Standard Merch: ${option.label}`);
+                      } catch {
+                        toast.error('Failed to update standard merch override');
+                      } finally {
+                        setIsUpdatingToggles(null);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+                    style={standardMerchOverride === option.value ? {
+                      backgroundColor: '#d1d5db',
+                      color: '#374151',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                    } : {
+                      backgroundColor: 'transparent',
+                      color: '#6b7280',
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {isUpdatingToggles === 'standard_merch' && <LoadingSpinner size="sm" />}
+              <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                (standardMerchOverride === 'force-standard' || (standardMerchOverride === 'auto' && isUnder100))
+                  ? 'bg-gray-200 text-gray-700'
+                  : 'bg-green-100 text-green-700'
+              }`}>
+                {standardMerchOverride === 'auto'
+                  ? (isUnder100 ? 'Standard only (<100 Kinder)' : 'Personalisiert erlaubt')
+                  : standardMerchOverride === 'force-standard'
+                  ? 'Override: Standard only'
+                  : 'Override: Personalisiert'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {estimatedChildren !== undefined
+                ? `${estimatedChildren} geschätzte Kinder (Auto-Schwelle: <100 = Standard only)`
+                : 'Keine geschätzte Kinderzahl gesetzt'}
+            </p>
+          </div>
+
+          {/* Bulk School Orders */}
+          <div className="mt-4 space-y-3">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Bulk School Orders</h3>
+
+            {/* SCS Shirts Toggle */}
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={scsShirtsIncluded}
+                  onChange={(e) => handleBulkOrderUpdate('scs_shirts_included', e.target.checked)}
+                />
+                <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-colors" />
+                <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+              </div>
+              <span className="text-sm text-gray-700">SCS Shirts Included</span>
+            </label>
+
+            {/* Minicard Order Toggle + Quantity */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={minicardOrderEnabled}
+                    onChange={(e) => handleBulkOrderUpdate('minicard_order_enabled', e.target.checked)}
+                  />
+                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-colors" />
+                  <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+                </div>
+                <span className="text-sm text-gray-700">Minicard Order</span>
+              </label>
+              {minicardOrderEnabled && (
+                <div className="ml-12 flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    value={minicardOrderQuantity ?? 0}
+                    onChange={(e) => handleBulkOrderUpdate('minicard_order_quantity', parseInt(e.target.value, 10) || 0)}
+                    className="w-24 px-2 py-1 text-sm border rounded"
+                  />
+                  <span className="text-xs text-gray-500">Minicards</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SCS Clothing Order (only when shirts included) */}
+          {scsShirtsIncluded && (
+            <div className="mt-4">
+              <SchulClothingOrder
+                eventId={eventId}
+                apiBasePath="/api/admin/events"
+                maxQuantity={(estimatedChildren ?? 0) > 250 ? 500 : 250}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Card 3: Deal Summary (40%) */}
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <DealBuilder
+            dealConfig={dealConfig}
+            onSave={handleDealSave}
+            isUpdating={isUpdatingDeal}
+          />
+        </div>
+      </div>
 
       {/* Booking Info Section - shown when no classes exist */}
       {event.bookingInfo && event.classes.length === 0 && (
