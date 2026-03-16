@@ -11,6 +11,7 @@ import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { triggerNewBookingNotification, triggerUnassignedStaffNotification } from '@/lib/services/notificationService';
+import { getActivityService } from '@/lib/services/activityService';
 import Airtable from 'airtable';
 
 export const dynamic = 'force-dynamic';
@@ -183,6 +184,16 @@ export async function POST(request: Request) {
         mappedData.numberOfChildren // estimatedChildren → auto-sets is_under_100
       );
       console.log('Created Event record:', eventRecord.id, 'event_id:', eventId);
+
+      // Log booking creation activity
+      getActivityService().logActivity({
+        eventRecordId: eventRecord.id,
+        activityType: 'booking_created',
+        description: `Booking created from SimplyBook (${mappedData.schoolName || 'unknown school'})`,
+        actorEmail: 'simplybook@system',
+        actorType: 'system',
+        metadata: { simplybookId: payload.booking_id, schoolName: mappedData.schoolName, eventDate: mappedData.bookingDate },
+      });
 
       // Initialize R2 event folder structure
       const initResult = await r2Service.initializeEventStructure(eventId);
@@ -453,6 +464,17 @@ async function handleBookingChange(payload: SimplybookWebhookPayload) {
       }
     }
 
+    // Log booking change activity
+    if (linkedEvent) {
+      getActivityService().logActivity({
+        eventRecordId: linkedEvent.id,
+        activityType: 'booking_changed',
+        description: 'Booking updated from SimplyBook',
+        actorEmail: 'simplybook@system',
+        actorType: 'system',
+      });
+    }
+
     // Ensure teacher exists for updated contact email
     if (mappedData.contactEmail) {
       try {
@@ -528,6 +550,23 @@ async function handleBookingCancel(payload: SimplybookWebhookPayload) {
     });
 
     console.log('[SimplyBook] Marked booking as cancelled:', existingRecord.id);
+
+    // Log booking cancellation activity
+    try {
+      const airtableService = getAirtableService();
+      const linkedEvent = await airtableService.getEventByBookingRecordId(existingRecord.id);
+      if (linkedEvent) {
+        getActivityService().logActivity({
+          eventRecordId: linkedEvent.id,
+          activityType: 'booking_cancelled',
+          description: 'Booking cancelled from SimplyBook',
+          actorEmail: 'simplybook@system',
+          actorType: 'system',
+        });
+      }
+    } catch (activityError) {
+      console.error('[SimplyBook] Error logging cancellation activity:', activityError);
+    }
 
     // Note: Events linked to this SchoolBooking via simplybook_booking field will still
     // show this booking, and staff can see the cancelled status through that link
