@@ -287,6 +287,52 @@ export async function sendUnassignedStaffAlertEmail(
   }, 'Unassigned staff alert');
 }
 
+/**
+ * Send daily "no staff assigned" admin digest
+ */
+export async function sendEventReadinessNoStaffEmail(
+  recipients: string[],
+  data: { count: number; eventListHtml: string }
+): Promise<SendEmailResult> {
+  if (recipients.length === 0) return { success: true, messageId: 'no-recipients' };
+
+  return sendTriggerEmail(recipients, 'event_readiness_no_staff', {
+    count: String(data.count),
+    eventListHtml: data.eventListHtml,
+  }, 'Event readiness: no staff digest');
+}
+
+/**
+ * Send weekly teacher nudge email for missing classes/songs
+ */
+export async function sendEventReadinessTeacherNudgeEmail(
+  to: string,
+  data: { teacherName: string; schoolName: string; eventDate: string; checklistHtml: string; portalUrl: string }
+): Promise<SendEmailResult> {
+  return sendTriggerEmail(to, 'event_readiness_teacher_nudge', {
+    teacherName: data.teacherName,
+    schoolName: data.schoolName,
+    eventDate: data.eventDate,
+    checklistHtml: data.checklistHtml,
+    portalUrl: data.portalUrl,
+  }, 'Event readiness: teacher nudge');
+}
+
+/**
+ * Send weekly admin digest of events with missing classes/songs
+ */
+export async function sendEventReadinessAdminDigestEmail(
+  recipients: string[],
+  data: { count: number; digestHtml: string }
+): Promise<SendEmailResult> {
+  if (recipients.length === 0) return { success: true, messageId: 'no-recipients' };
+
+  return sendTriggerEmail(recipients, 'event_readiness_admin_digest', {
+    count: String(data.count),
+    digestHtml: data.digestHtml,
+  }, 'Event readiness: admin weekly digest');
+}
+
 // ============================================================================
 // SCHULSONG TEACHER APPROVED NOTIFICATION
 // ============================================================================
