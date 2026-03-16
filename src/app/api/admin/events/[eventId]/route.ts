@@ -669,56 +669,69 @@ export async function PATCH(
 
       updatedEvent = await airtableService.updateEventFields(eventRecordId, fieldUpdates);
 
-      // Log activity for status change (fire-and-forget)
-      if (hasStatusUpdate && body.status !== undefined) {
+      // Log activity for status change (fire-and-forget) — only if value actually changed
+      if (hasStatusUpdate && body.status !== undefined && body.status !== existingEvent?.status) {
         getActivityService().logActivity({
           eventRecordId,
           activityType: 'status_changed',
           description: `Status changed to "${body.status || 'none'}"`,
           actorEmail: admin.email,
           actorType: 'admin',
-          metadata: { newStatus: body.status },
+          metadata: { oldStatus: existingEvent?.status, newStatus: body.status },
         });
       }
 
-      // Log activity for event type toggles (fire-and-forget)
+      // Log activity for event type toggles (fire-and-forget) — only if at least one toggle actually changed
       if (hasEventTypeUpdates) {
-        const changes: string[] = [];
-        if (body.is_plus !== undefined) changes.push(`is_plus → ${body.is_plus}`);
-        if (body.is_minimusikertag !== undefined) changes.push(`is_minimusikertag → ${body.is_minimusikertag}`);
-        if (body.is_schulsong !== undefined) changes.push(`is_schulsong → ${body.is_schulsong}`);
-        if (body.is_kita !== undefined) changes.push(`is_kita → ${body.is_kita}`);
-        getActivityService().logActivity({
-          eventRecordId,
-          activityType: 'event_type_changed',
-          description: `Event type updated: ${changes.join(', ')}`,
-          actorEmail: admin.email,
-          actorType: 'admin',
-          metadata: { is_plus: body.is_plus, is_minimusikertag: body.is_minimusikertag, is_schulsong: body.is_schulsong, is_kita: body.is_kita },
-        });
+        const hasActualChange =
+          (body.is_plus !== undefined && body.is_plus !== existingEvent?.is_plus) ||
+          (body.is_minimusikertag !== undefined && body.is_minimusikertag !== existingEvent?.is_minimusikertag) ||
+          (body.is_schulsong !== undefined && body.is_schulsong !== existingEvent?.is_schulsong) ||
+          (body.is_kita !== undefined && body.is_kita !== existingEvent?.is_kita);
+
+        if (hasActualChange) {
+          const changes: string[] = [];
+          if (body.is_plus !== undefined) changes.push(`is_plus → ${body.is_plus}`);
+          if (body.is_minimusikertag !== undefined) changes.push(`is_minimusikertag → ${body.is_minimusikertag}`);
+          if (body.is_schulsong !== undefined) changes.push(`is_schulsong → ${body.is_schulsong}`);
+          if (body.is_kita !== undefined) changes.push(`is_kita → ${body.is_kita}`);
+          getActivityService().logActivity({
+            eventRecordId,
+            activityType: 'event_type_changed',
+            description: `Event type updated: ${changes.join(', ')}`,
+            actorEmail: admin.email,
+            actorType: 'admin',
+            metadata: {
+              old_is_plus: existingEvent?.is_plus, is_plus: body.is_plus,
+              old_is_minimusikertag: existingEvent?.is_minimusikertag, is_minimusikertag: body.is_minimusikertag,
+              old_is_schulsong: existingEvent?.is_schulsong, is_schulsong: body.is_schulsong,
+              old_is_kita: existingEvent?.is_kita, is_kita: body.is_kita,
+            },
+          });
+        }
       }
 
-      // Log activity for estimated children update (fire-and-forget)
-      if (hasChildrenUpdate) {
+      // Log activity for estimated children update (fire-and-forget) — only if value actually changed
+      if (hasChildrenUpdate && body.estimated_children !== existingEvent?.estimated_children) {
         getActivityService().logActivity({
           eventRecordId,
           activityType: 'children_updated',
           description: `Estimated children updated to ${body.estimated_children}`,
           actorEmail: admin.email,
           actorType: 'admin',
-          metadata: { estimatedChildren: body.estimated_children },
+          metadata: { oldCount: existingEvent?.estimated_children, newCount: body.estimated_children },
         });
       }
 
-      // Log activity for standard merch override (fire-and-forget)
-      if (hasStandardMerchOverride) {
+      // Log activity for standard merch override (fire-and-forget) — only if value actually changed
+      if (hasStandardMerchOverride && body.standard_merch_override !== existingEvent?.standard_merch_override) {
         getActivityService().logActivity({
           eventRecordId,
           activityType: 'merch_override_changed',
           description: `Standard merch override set to "${body.standard_merch_override || 'auto'}"`,
           actorEmail: admin.email,
           actorType: 'admin',
-          metadata: { standardMerchOverride: body.standard_merch_override },
+          metadata: { oldOverride: existingEvent?.standard_merch_override, newOverride: body.standard_merch_override },
         });
       }
 

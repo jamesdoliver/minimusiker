@@ -66,18 +66,18 @@ export async function POST(
       }
     }
 
-    // Log activity for each track approval (fire-and-forget)
+    // Log activity only for successfully processed tracks (fire-and-forget)
     const eventRecordId = await airtableService.getEventsRecordIdByBookingId(resolvedEventId);
     if (eventRecordId) {
-      for (const approval of body.trackApprovals) {
-        if (!approval.audioFileId || !approval.status) continue;
+      for (const track of updatedTracks) {
+        const originalApproval = body.trackApprovals.find(a => a.audioFileId === track.audioFileId);
         getActivityService().logActivity({
           eventRecordId,
-          activityType: approval.status === 'approved' ? 'track_approved' : 'track_rejected',
-          description: `Track ${approval.status}${approval.comment ? `: ${approval.comment}` : ''}`,
+          activityType: track.approvalStatus === 'approved' ? 'track_approved' : 'track_rejected',
+          description: `Track ${track.approvalStatus}${originalApproval?.comment ? `: ${originalApproval.comment}` : ''}`,
           actorEmail: session.email,
           actorType: 'admin',
-          metadata: { audioFileId: approval.audioFileId, status: approval.status, comment: approval.comment },
+          metadata: { audioFileId: track.audioFileId, status: track.approvalStatus, comment: originalApproval?.comment },
         });
       }
     }

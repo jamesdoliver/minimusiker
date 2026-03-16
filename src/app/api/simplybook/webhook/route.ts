@@ -472,6 +472,7 @@ async function handleBookingChange(payload: SimplybookWebhookPayload) {
         description: 'Booking updated from SimplyBook',
         actorEmail: 'simplybook@system',
         actorType: 'system',
+        metadata: { simplybookId: payload.booking_id, schoolName: mappedData.schoolName, estimatedChildren: mappedData.numberOfChildren, startDate: booking.start_date },
       });
     }
 

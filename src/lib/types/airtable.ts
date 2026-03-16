@@ -1099,9 +1099,6 @@ export type EventActivityType =
   | 'track_rejected'
   | 'schulsong_approved'
   | 'schulsong_rejected'
-  | 'booking_created'
-  | 'booking_changed'
-  | 'booking_cancelled'
   | 'clothing_order_updated';
 
 export type ActorType = 'teacher' | 'admin' | 'system';
