@@ -3,7 +3,8 @@ import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { triggerSchulsongTeacherApprovedNotification, triggerSchulsongTeacherActionNotification } from '@/lib/services/notificationService';
-import { computeSchulsongReleaseDate } from '@/lib/utils/schulsongRelease';
+import { computeUnifiedReleaseDate, computeSchulsongMerchCutoff } from '@/lib/utils/schulsongRelease';
+import { getThreshold, parseOverrides } from '@/lib/utils/eventThresholds';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,13 +43,21 @@ export async function POST(
     // Approve the schulsong
     const result = await teacherService.approveSchulsongAsTeacher(eventId, notes);
 
-    // Auto-schedule release for next working day 7am Berlin
-    // (skip if already released — don't override an admin instant release)
     const airtableService = getAirtableService();
     const event = await airtableService.getEventByEventId(eventId);
     if (event && !event.schulsong_released_at) {
-      const releaseDate = computeSchulsongReleaseDate();
+      // Determine if this is a combined event (M/PLUS + Schulsong) or schulsong-only
+      const isCombined = !!(event.is_minimusikertag || event.is_plus);
+      const overrides = parseOverrides(event.timeline_overrides);
+      const fullReleaseDays = getThreshold('full_release_days', overrides);
+
+      // Unified release: schulsong-only = approval+1 day, combined = max(normal gate, approval+1)
+      const releaseDate = computeUnifiedReleaseDate(event.event_date, fullReleaseDays, isCombined);
       await airtableService.setSchulsongReleasedAt(eventId, releaseDate.toISOString());
+
+      // Auto-set merch cutoff: schulsong-only = release+10, combined = max(event+14, release+7)
+      const merchCutoff = computeSchulsongMerchCutoff(releaseDate, event.event_date, isCombined);
+      await airtableService.setSchulsongMerchCutoff(eventId, merchCutoff.toISOString());
     }
     if (event) {
       triggerSchulsongTeacherApprovedNotification({

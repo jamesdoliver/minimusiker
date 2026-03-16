@@ -68,3 +68,75 @@ export function computeSchulsongReleaseDate(now: Date = new Date()): Date {
 
   return new Date(Date.UTC(rYear, rMonth - 1, rDay, utcHour, 0, 0));
 }
+
+/**
+ * Compute the unified schulsong release date based on event type.
+ *
+ * Schulsong-only: next day at 7am Berlin (approval + 1 day)
+ * Combined (M/PLUS + Schulsong): max(event_date + full_release_days, next day 7am Berlin)
+ */
+export function computeUnifiedReleaseDate(
+  eventDate: string | undefined,
+  fullReleaseDays: number,
+  isCombined: boolean,
+  now: Date = new Date()
+): Date {
+  const nextDay7am = computeSchulsongReleaseDate(now);
+
+  if (!isCombined || !eventDate) {
+    // Schulsong-only: always next day 7am
+    return nextDay7am;
+  }
+
+  // Combined: max(event_date + full_release_days at 7am Berlin, next day 7am)
+  const normalGate = new Date(eventDate);
+  normalGate.setDate(normalGate.getDate() + fullReleaseDays);
+
+  // Set normal gate to 7am Berlin for fair comparison
+  const berlinFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Berlin',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const [gYear, gMonth, gDay] = berlinFormatter.format(normalGate).split('-').map(Number);
+  const midnightUtc = new Date(Date.UTC(gYear, gMonth - 1, gDay, 0, 0, 0));
+  const berlinHourAtMidnight = parseInt(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Berlin',
+      hour: 'numeric',
+      hour12: false,
+    }).format(midnightUtc)
+  );
+  const normalGate7am = new Date(Date.UTC(gYear, gMonth - 1, gDay, 7 - berlinHourAtMidnight, 0, 0));
+
+  return normalGate7am > nextDay7am ? normalGate7am : nextDay7am;
+}
+
+/**
+ * Compute the schulsong merch cutoff date.
+ *
+ * Schulsong-only: release_date + 10 days
+ * Combined: max(event_date + 14, release_date + 7 days)
+ */
+export function computeSchulsongMerchCutoff(
+  releaseDate: Date,
+  eventDate: string | undefined,
+  isCombined: boolean
+): Date {
+  if (!isCombined || !eventDate) {
+    // Schulsong-only: release + 10 days
+    const cutoff = new Date(releaseDate);
+    cutoff.setDate(cutoff.getDate() + 10);
+    return cutoff;
+  }
+
+  // Combined: max(event_date + 14, release + 7)
+  const eventGate = new Date(eventDate);
+  eventGate.setDate(eventGate.getDate() + 14);
+
+  const releaseGate = new Date(releaseDate);
+  releaseGate.setDate(releaseGate.getDate() + 7);
+
+  return eventGate > releaseGate ? eventGate : releaseGate;
+}
