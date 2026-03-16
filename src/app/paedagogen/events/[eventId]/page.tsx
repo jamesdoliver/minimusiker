@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { TeacherEventView, TeacherClassView, Song, ClassGroup } from '@/lib/types/teacher';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
-import InviteTeacherModal from '@/components/teacher/InviteTeacherModal';
+import EventTeamSection from '@/components/teacher/EventTeamSection';
 import AlbumLayoutModal from '@/components/shared/AlbumLayoutModal';
 import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModal';
 import SchulsongApprovalSection from '@/components/teacher/SchulsongApprovalSection';
@@ -1189,7 +1189,7 @@ export default function TeacherEventDetailPage() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showCreateChoir, setShowCreateChoir] = useState(false);
   const [showCreateTeacherSong, setShowCreateTeacherSong] = useState(false);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+
   const [showAlbumLayoutModal, setShowAlbumLayoutModal] = useState(false);
 
   const eventId = params.eventId as string;
@@ -1325,31 +1325,11 @@ export default function TeacherEventDetailPage() {
               )}
             </div>
 
-            {/* Right: Stats and Invite */}
-            <div className="flex flex-col gap-4 items-end">
-              <div className="flex gap-4">
-                <div className="bg-pink-50 rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-pink-600">{event.classes.length}</p>
-                  <p className="text-sm text-pink-700">{event.classes.length === 1 ? 'Klasse' : 'Klassen'}</p>
-                </div>
-                <div className="bg-blue-50 rounded-lg px-4 py-3 text-center">
-                  <p className="text-2xl font-bold text-blue-600">
-                    {event.classes.reduce((sum, cls) => sum + cls.songs.length, 0)}
-                  </p>
-                  <p className="text-sm text-blue-700">Lieder</p>
-                </div>
-              </div>
-              {/* Invite Button */}
-              <button
-                onClick={() => setShowInviteModal(true)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                </svg>
-                Kolleg:in einladen
-              </button>
-            </div>
+            <EventTeamSection
+              eventId={event.eventId}
+              classCount={event.classes.length}
+              songCount={event.classes.reduce((sum, cls) => sum + cls.songs.length, 0)}
+            />
           </div>
 
           {/* Edit Notice */}
@@ -1643,14 +1623,6 @@ export default function TeacherEventDetailPage() {
           />
         )}
 
-        {/* Invite Teacher Modal */}
-        {showInviteModal && (
-          <InviteTeacherModal
-            eventId={event.eventId}
-            schoolName={event.schoolName}
-            onClose={() => setShowInviteModal(false)}
-          />
-        )}
 
         {/* Album Layout Modal */}
         {showAlbumLayoutModal && (
