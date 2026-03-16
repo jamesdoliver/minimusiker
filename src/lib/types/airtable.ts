@@ -558,6 +558,7 @@ export const EVENTS_FIELD_IDS = {
   admin_notes: 'fldmzzlsrI5lKKx16', // Multiline text - free-text admin notes
   // Schulsong release date (set when admin approves schulsong after teacher approval)
   schulsong_released_at: 'fldIQeyEpW9lpmg5K', // DateTime - next workday 7am CET
+  schulsong_merch_cutoff: 'fld6idCWEcfYGg360',  // DateTime - auto-set on teacher schulsong approval, admin-overridable
   // Per-event timeline threshold overrides (JSON blob)
   timeline_overrides: 'fld25hstx4yePlpnB', // Multiline text - JSON with per-event timing overrides
   // Under-100-kids flag and estimated children count
@@ -799,6 +800,7 @@ export interface Event {
   admin_notes?: string;
   // Schulsong release date (set when admin approves schulsong after teacher approval)
   schulsong_released_at?: string;
+  schulsong_merch_cutoff?: string;              // Auto-set on teacher schulsong approval, admin-overridable
   // Per-event timeline threshold overrides (JSON blob)
   timeline_overrides?: string;
   // Under-100-kids flag and estimated children count

@@ -3966,6 +3966,33 @@ class AirtableService {
   }
 
   /**
+   * Set or clear schulsong_merch_cutoff on an event
+   * Auto-set when teacher approves schulsong, admin can override
+   */
+  async setSchulsongMerchCutoff(eventId: string, cutoffDate: string | null): Promise<void> {
+    try {
+      const events = await this.base(EVENTS_TABLE_ID).select({
+        filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+        maxRecords: 1,
+      }).firstPage();
+
+      if (events.length === 0) {
+        console.log(`[setSchulsongMerchCutoff] Event not found: ${eventId}`);
+        return;
+      }
+
+      await this.base(EVENTS_TABLE_ID).update(events[0].id, {
+        [EVENTS_FIELD_IDS.schulsong_merch_cutoff]: cutoffDate ?? undefined,
+      });
+
+      console.log(`[setSchulsongMerchCutoff] Updated event ${eventId}: schulsong_merch_cutoff=${cutoffDate}`);
+    } catch (error) {
+      console.error('[setSchulsongMerchCutoff] Error:', error);
+      throw new Error(`Failed to set schulsong merch cutoff: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Update the audio pipeline stage for an event
    * Called at each pipeline transition point (staff upload, engineer final, admin approve)
    */
@@ -5732,6 +5759,16 @@ class AirtableService {
   }
 
   /**
+   * Soft-delete an orphaned SchoolBooking (one with no linked Event).
+   * Sets simplybook_status to 'deleted' so it's filtered from the bookings list.
+   */
+  async softDeleteSchoolBooking(bookingRecordId: string): Promise<void> {
+    await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecordId, {
+      [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status]: 'deleted',
+    } as Partial<FieldSet>);
+  }
+
+  /**
    * Get logo URL for an Einrichtung (school)
    * Returns the logo_url field if it exists
    */
@@ -6192,6 +6229,7 @@ class AirtableService {
       admin_notes: record.get('admin_notes') as string | undefined,
       // Schulsong release date
       schulsong_released_at: record.get('schulsong_released_at') as string | undefined,
+      schulsong_merch_cutoff: record.get('schulsong_merch_cutoff') as string | undefined,
       // Per-event timeline threshold overrides
       timeline_overrides: record.get('timeline_overrides') as string | undefined,
       // Under-100-kids flag and estimated children
@@ -6453,6 +6491,9 @@ class AirtableService {
         is_minimusikertag: record.fields[EVENTS_FIELD_IDS.is_minimusikertag] as boolean | undefined,
         status: record.fields[EVENTS_FIELD_IDS.status] as Event['status'] | undefined,
         timeline_overrides: record.fields[EVENTS_FIELD_IDS.timeline_overrides] as string | undefined,
+        schulsong_released_at: record.fields[EVENTS_FIELD_IDS.schulsong_released_at] as string | undefined,
+        schulsong_merch_cutoff: record.fields[EVENTS_FIELD_IDS.schulsong_merch_cutoff] as string | undefined,
+        admin_approval_status: record.fields[EVENTS_FIELD_IDS.admin_approval_status] as Event['admin_approval_status'] | undefined,
       }));
     } catch (error) {
       console.error('Error fetching all events:', error);
