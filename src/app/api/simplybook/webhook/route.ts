@@ -10,7 +10,7 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
-import { triggerNewBookingNotification } from '@/lib/services/notificationService';
+import { triggerNewBookingNotification, triggerUnassignedStaffNotification } from '@/lib/services/notificationService';
 import Airtable from 'airtable';
 
 export const dynamic = 'force-dynamic';
@@ -92,6 +92,29 @@ export async function POST(request: Request) {
     }
 
     console.log('Staff ID found:', staffId, '(method:', staffMatchMethod, ', unit_id:', booking.unit_id, ')');
+
+    // Alert admins if no staff was assigned
+    if (!staffId) {
+      let reason = 'Kein Mitarbeiter gefunden';
+      if (booking.unit_id) {
+        reason = `Kein Mitarbeiter mit Provider ID ${booking.unit_id} gefunden, Region-Fallback (\u201E${mappedData.region || 'keine Region'}\u201C) ebenfalls erfolglos`;
+      } else {
+        reason = `Kein Provider in SimplyBook-Buchung angegeben, Region-Fallback (\u201E${mappedData.region || 'keine Region'}\u201C) erfolglos`;
+      }
+
+      try {
+        await triggerUnassignedStaffNotification({
+          bookingId: payload.booking_id,
+          schoolName: mappedData.schoolName,
+          eventDate: mappedData.bookingDate,
+          region: mappedData.region,
+          unitId: booking.unit_id,
+          reason,
+        });
+      } catch (notifyError) {
+        console.error('Error sending unassigned staff notification:', notifyError);
+      }
+    }
 
     // Find existing Einrichtung (school) to link
     const einrichtungId = await simplybookService.findEinrichtungByName(
