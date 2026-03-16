@@ -25,6 +25,11 @@ const notificationTypes: NotificationTypeConfig[] = [
     title: 'Stornierung / Löschung',
     description: 'Benachrichtigung bei Stornierung oder Löschung einer Buchung.',
   },
+  {
+    type: 'unassigned_staff',
+    title: 'Kein Mitarbeiter zugeordnet',
+    description: 'Benachrichtigung, wenn bei einer neuen Buchung kein Mitarbeiter automatisch zugeordnet werden konnte.',
+  },
 ];
 
 export default function NotificationSettings() {
