@@ -157,39 +157,3 @@ export function calculateDealFee(
 
   return null;
 }
-
-/**
- * Derive legacy boolean flags from a deal type.
- * Used to keep backward compatibility with existing booking views.
- */
-export function dealTypeToFlags(dealType: DealType, config: DealConfig): {
-  is_minimusikertag: boolean;
-  is_plus: boolean;
-  is_kita: boolean;
-  is_schulsong: boolean;
-} {
-  switch (dealType) {
-    case 'mimu':
-      return {
-        is_minimusikertag: true, // Always true — PLUS is a pricing tier, not a different event type
-        is_plus: (config.music_pricing_enabled ?? config.cheaper_music) === true,
-        is_kita: false,
-        is_schulsong: true,
-      };
-    case 'mimu_scs':
-      return {
-        is_minimusikertag: true, // Always true — SCS is a pricing arrangement, not a different event type
-        is_plus: config.scs_audio_pricing === 'plus',
-        is_kita: false,
-        is_schulsong: config.scs_song_option !== 'none',
-      };
-    case 'schus':
-    case 'schus_xl':
-      return {
-        is_minimusikertag: false,
-        is_plus: false,
-        is_kita: false,
-        is_schulsong: true,
-      };
-  }
-}

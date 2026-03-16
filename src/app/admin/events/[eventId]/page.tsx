@@ -46,7 +46,7 @@ import DateChangeModal from '@/components/admin/events/DateChangeModal';
 import AddTeacherModal from '@/components/admin/AddTeacherModal';
 import DealBuilder from '@/components/admin/DealBuilder';
 import SchulClothingOrder from '@/components/shared/SchulClothingOrder';
-import type { DealType, DealConfig } from '@/lib/types/airtable';
+import type { DealConfig } from '@/lib/types/airtable';
 
 // Group type for admin view
 interface ClassGroup {
@@ -171,8 +171,6 @@ export default function EventDetailPage() {
   const [isUpdatingToggles, setIsUpdatingToggles] = useState<string | null>(null); // Track which toggle is updating
 
   // Deal Builder state
-  const [dealBuilderEnabled, setDealBuilderEnabled] = useState(false);
-  const [dealType, setDealType] = useState<DealType | null>(null);
   const [dealConfig, setDealConfig] = useState<DealConfig>({});
   const [estimatedChildren, setEstimatedChildren] = useState<number | undefined>(undefined);
   const [isUnder100, setIsUnder100] = useState(false);
@@ -228,8 +226,6 @@ export default function EventDetailPage() {
       setSchulsongReleasedAt(data.data?.schulsongReleasedAt || null);
       setSchulsongMerchCutoff(data.data?.schulsongMerchCutoff || null);
       // Deal Builder state
-      setDealBuilderEnabled(data.data?.dealBuilderEnabled || false);
-      setDealType(data.data?.dealType || null);
       setDealConfig(data.data?.dealConfig || {});
       setEstimatedChildren(data.data?.estimatedChildren);
       setIsUnder100(data.data?.isUnder100 || false);
