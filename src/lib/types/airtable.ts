@@ -843,6 +843,7 @@ export interface Class {
   total_children: number;
   created_at: string;
   legacy_booking_id?: string;           // Original booking_id from parent_journey_table
+  is_default?: boolean;                  // Auto-created "Alle Kinder" catch-all class
   class_type?: ClassType;               // regular | choir | teacher_song (defaults to regular)
   display_order?: number;               // Order in which class appears in teacher portal
 }

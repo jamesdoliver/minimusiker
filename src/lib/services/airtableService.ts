@@ -6557,6 +6557,7 @@ class AirtableService {
         total_children: (record.fields[CLASSES_FIELD_IDS.total_children] as number) || 0,
         created_at: (record.fields[CLASSES_FIELD_IDS.created_at] as string) || '',
         legacy_booking_id: record.fields[CLASSES_FIELD_IDS.legacy_booking_id] as string | undefined,
+        is_default: record.fields[CLASSES_FIELD_IDS.is_default] as boolean | undefined,
       }));
     } catch (error) {
       console.error('Error fetching classes by event ID:', error);
