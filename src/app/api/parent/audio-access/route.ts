@@ -100,8 +100,14 @@ export async function GET(request: NextRequest) {
     // Default (absent) = visible. Admin can toggle audio_hidden=true to block parent access.
     const audioHidden = overrides?.audio_hidden === true;
 
+    // Schulsong gate: if event has schulsong, also require schulsong_released_at to have passed
+    // This holds class audio release until schulsong is approved (creating unified "moment")
+    const schulsongGatePassed = event?.is_schulsong
+      ? !!(event.schulsong_released_at && new Date(event.schulsong_released_at) <= now)
+      : true; // Non-schulsong events: no gate
+
     const hasPreviewsAvailable = previewDate ? now >= previewDate && !audioHidden : false;
-    const isReleased = releaseDate ? now >= releaseDate && !audioHidden : false;
+    const isReleased = releaseDate ? now >= releaseDate && !audioHidden && schulsongGatePassed : false;
 
     // 2. Check minicard purchase status
     const hasMinicard = await hasMinicardForEvent(session.parentId, eventId);
