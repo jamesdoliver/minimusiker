@@ -4,7 +4,7 @@
  */
 
 // Notification types that can be configured
-export type NotificationType = 'new_booking' | 'date_change' | 'cancellation' | 'schulsong_teacher_approved' | 'unassigned_staff';
+export type NotificationType = 'new_booking' | 'date_change' | 'cancellation' | 'schulsong_teacher_approved' | 'unassigned_staff' | 'event_readiness';
 
 // Notification setting record from Airtable
 export interface NotificationSetting {
