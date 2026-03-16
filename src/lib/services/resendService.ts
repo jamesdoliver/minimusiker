@@ -320,6 +320,46 @@ export async function sendSchulsongTeacherRejectedNotification(
 }
 
 // ============================================================================
+// SCHULSONG APPROVAL REMINDER + MERCH LAST CHANCE
+// ============================================================================
+
+/**
+ * Send schulsong approval reminder to teacher and admin recipients
+ */
+export async function sendSchulsongApprovalReminderEmail(
+  recipients: string[],
+  data: { schoolName: string; eventDate: string; daysPending: string }
+): Promise<SendEmailResult> {
+  if (recipients.length === 0) return { success: true, messageId: 'no-recipients' };
+
+  const teacherPortalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app'}/paedagogen`;
+  return sendTriggerEmail(recipients, 'schulsong_approval_reminder', {
+    schoolName: data.schoolName,
+    eventDate: formatDateGerman(data.eventDate),
+    teacherPortalUrl,
+    daysPending: data.daysPending,
+  }, 'Schulsong approval reminder');
+}
+
+/**
+ * Send last chance merch email to a single parent recipient
+ */
+export async function sendSchulsongMerchLastChanceEmail(
+  recipientEmail: string,
+  data: { schoolName: string; parentName: string; cutoffDate: string }
+): Promise<SendEmailResult> {
+  const parentPortalLink = `${process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app'}/familie`;
+  return sendTriggerEmail(recipientEmail, 'schulsong_merch_last_chance', {
+    schoolName: data.schoolName,
+    parentName: data.parentName,
+    parentPortalLink,
+    cutoffDate: data.cutoffDate,
+  }, 'Schulsong merch last chance', {
+    parentEmail: recipientEmail,
+  });
+}
+
+// ============================================================================
 // SCHULSONG TEACHER REVIEW NOTIFICATIONS
 // ============================================================================
 

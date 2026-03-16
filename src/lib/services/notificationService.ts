@@ -258,6 +258,44 @@ export async function triggerSchulsongTeacherRejectedNotification(
 }
 
 /**
+ * Send schulsong approval reminder to teacher + admin recipients
+ * Used by cron when schulsong is pending for >24h after upload
+ */
+export async function triggerSchulsongApprovalReminder(
+  data: { schoolName: string; eventDate: string; eventId: string; daysPending: number; teacherEmail: string }
+): Promise<{ sent: boolean; error?: string }> {
+  try {
+    // Get admin recipients from notification settings (reuse same config as approval notification)
+    const settings = await getNotificationSettings('schulsong_teacher_approved');
+    const adminRecipients = settings?.enabled ? parseRecipientEmails(settings.recipientEmails) : [];
+
+    // Combine teacher + admins, deduplicate
+    const allRecipients = [...new Set([data.teacherEmail, ...adminRecipients].map(e => e.toLowerCase()))];
+
+    if (allRecipients.length === 0) {
+      return { sent: false, error: 'No recipients' };
+    }
+
+    const { sendSchulsongApprovalReminderEmail } = await import('./resendService');
+    const result = await sendSchulsongApprovalReminderEmail(allRecipients, {
+      schoolName: data.schoolName,
+      eventDate: data.eventDate,
+      daysPending: String(data.daysPending),
+    });
+
+    if (result.success) {
+      console.log(`[NotificationService] Schulsong approval reminder sent for ${data.eventId} to ${allRecipients.length} recipients`);
+      return { sent: true };
+    }
+    return { sent: false, error: result.error };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[NotificationService] Error in triggerSchulsongApprovalReminder:', error);
+    return { sent: false, error: errorMessage };
+  }
+}
+
+/**
  * Notify engineer (Micha) when teacher approves or rejects schulsong
  * Looks up engineer via ENGINEER_MICHA_ID env var -> Personen table
  */
