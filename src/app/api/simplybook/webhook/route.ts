@@ -82,9 +82,16 @@ export async function POST(request: Request) {
     }
     console.log('Region record ID found:', regionRecordId);
 
-    // Find staff by region for auto-assignment
-    const staffId = await simplybookService.findStaffByRegion(mappedData.region);
-    console.log('Staff ID found by region:', staffId);
+    // Find staff by provider ID first (exact match), fall back to region
+    let staffId = await simplybookService.findStaffByProviderId(booking.unit_id);
+    let staffMatchMethod: 'provider_id' | 'region' | 'none' = staffId ? 'provider_id' : 'none';
+
+    if (!staffId) {
+      staffId = await simplybookService.findStaffByRegion(mappedData.region);
+      if (staffId) staffMatchMethod = 'region';
+    }
+
+    console.log('Staff ID found:', staffId, '(method:', staffMatchMethod, ', unit_id:', booking.unit_id, ')');
 
     // Find existing Einrichtung (school) to link
     const einrichtungId = await simplybookService.findEinrichtungByName(
