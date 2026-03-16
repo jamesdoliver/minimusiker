@@ -179,6 +179,11 @@ export default function EventDetailPage() {
   const [standardMerchOverride, setStandardMerchOverride] = useState<'auto' | 'force-standard' | 'force-personalized'>('auto');
   const [isUpdatingDeal, setIsUpdatingDeal] = useState(false);
 
+  // Bulk school order state
+  const [scsShirtsIncluded, setScsShirtsIncluded] = useState(false);
+  const [minicardOrderEnabled, setMinicardOrderEnabled] = useState(false);
+  const [minicardOrderQuantity, setMinicardOrderQuantity] = useState<number>(0);
+
   // Refresh teacher state
   const [isRefreshingTeacher, setIsRefreshingTeacher] = useState(false);
 
@@ -229,6 +234,10 @@ export default function EventDetailPage() {
       setEstimatedChildren(data.data?.estimatedChildren);
       setIsUnder100(data.data?.isUnder100 || false);
       setStandardMerchOverride(data.data?.standardMerchOverride || 'auto');
+      // Bulk school order state
+      setScsShirtsIncluded(data.data?.scsShirtsIncluded || false);
+      setMinicardOrderEnabled(data.data?.minicardOrderEnabled || false);
+      setMinicardOrderQuantity(data.data?.minicardOrderQuantity || 0);
     } catch (err) {
       console.error('Error fetching event detail:', err);
       setError(err instanceof Error ? err.message : 'Failed to load event details');
@@ -455,21 +464,33 @@ export default function EventDetailPage() {
       const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deal_builder_enabled: true,
-          deal_type: dealType,
-          deal_config: newConfig,
-        }),
+        body: JSON.stringify({ deal_config: newConfig }),
       });
       if (!response.ok) throw new Error('Failed to save deal');
       setDealConfig(newConfig);
-      // Re-fetch to sync boolean flags
-      fetchEventDetail();
       toast.success('Deal saved');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save deal');
     } finally {
       setIsUpdatingDeal(false);
+    }
+  };
+
+  // Bulk school order handler
+  const handleBulkOrderUpdate = async (field: string, value: boolean | number) => {
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!response.ok) throw new Error('Failed to update');
+      // Update local state
+      if (field === 'scs_shirts_included') setScsShirtsIncluded(value as boolean);
+      if (field === 'minicard_order_enabled') setMinicardOrderEnabled(value as boolean);
+      if (field === 'minicard_order_quantity') setMinicardOrderQuantity(value as number);
+    } catch (error) {
+      console.error('Failed to update bulk order field:', error);
     }
   };
 
@@ -922,8 +943,8 @@ export default function EventDetailPage() {
             </div>
 
             {/* Event Type Toggles */}
-            <div className={dealBuilderEnabled ? 'opacity-50 pointer-events-none' : ''}>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type {dealBuilderEnabled && <span className="text-xs text-gray-400">(controlled by Deal Builder)</span>}</h3>
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Event Type</h3>
               <div className="space-y-3">
                 {/* Off ←→ Minimusikertag ←→ PLUS Segmented Control */}
                 <div className="flex items-center gap-3">
@@ -1109,18 +1130,69 @@ export default function EventDetailPage() {
               </p>
             </div>
 
+            {/* Bulk School Orders */}
+            <div className="mt-4 space-y-3">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Bulk School Orders</h3>
+
+              {/* SCS Shirts Toggle */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={scsShirtsIncluded}
+                    onChange={(e) => handleBulkOrderUpdate('scs_shirts_included', e.target.checked)}
+                  />
+                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-colors" />
+                  <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+                </div>
+                <span className="text-sm text-gray-700">SCS Shirts Included</span>
+              </label>
+
+              {/* Minicard Order Toggle + Quantity */}
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={minicardOrderEnabled}
+                      onChange={(e) => handleBulkOrderUpdate('minicard_order_enabled', e.target.checked)}
+                    />
+                    <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-colors" />
+                    <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+                  </div>
+                  <span className="text-sm text-gray-700">Minicard Order</span>
+                </label>
+                {minicardOrderEnabled && (
+                  <div className="ml-12 flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={minicardOrderQuantity ?? 0}
+                      onChange={(e) => handleBulkOrderUpdate('minicard_order_quantity', parseInt(e.target.value, 10) || 0)}
+                      className="w-24 px-2 py-1 text-sm border rounded"
+                    />
+                    <span className="text-xs text-gray-500">Minicards</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Deal Builder */}
             <div className="mt-4">
               <DealBuilder
                 dealConfig={dealConfig}
-                scsShirtsIncluded={dealConfig.scs_shirts_included}
+                scsShirtsIncluded={scsShirtsIncluded}
+                minicardOrderEnabled={minicardOrderEnabled}
+                minicardOrderQuantity={minicardOrderQuantity}
                 onSave={handleDealSave}
                 isUpdating={isUpdatingDeal}
               />
             </div>
 
-            {/* SCS Clothing Order (only for mimuSCS with shirts included) */}
-            {dealType === 'mimu_scs' && dealConfig.scs_shirts_included !== false && (
+            {/* SCS Clothing Order (only when shirts included) */}
+            {scsShirtsIncluded && (
               <div className="mt-4">
                 <SchulClothingOrder
                   eventId={eventId}
