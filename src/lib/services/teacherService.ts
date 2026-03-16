@@ -3219,6 +3219,115 @@ class TeacherService {
   }
 
   /**
+   * Get all invites for an event (pending, accepted, expired)
+   * @param eventRecordId - The Airtable record ID of the event
+   * @returns Array of enriched invite objects with teacher names
+   */
+  async getEventInvites(eventRecordId: string): Promise<Array<{
+    id: string;
+    inviteToken: string;
+    status: 'pending' | 'accepted' | 'expired';
+    invitedByName: string;
+    invitedAt: string;
+    acceptedAt?: string;
+    acceptedByName?: string;
+    acceptedByEmail?: string;
+  }>> {
+    try {
+      const records = await this.base(TEACHER_INVITES_TABLE_ID)
+        .select({
+          filterByFormula: `FIND('${eventRecordId}', ARRAYJOIN({${TEACHER_INVITES_FIELD_IDS.event_id}}, ',')) > 0`,
+        })
+        .all();
+
+      const invites = records.map((record) => this.transformInviteRecord(record));
+
+      const enriched = await Promise.all(
+        invites.map(async (invite) => {
+          // Look up inviting teacher name
+          let invitedByName = 'Unknown';
+          if (invite.invitedBy) {
+            const inviter = await this.getTeacherById(invite.invitedBy);
+            if (inviter) {
+              invitedByName = inviter.name;
+            }
+          }
+
+          // Calculate invitedAt from expiresAt minus INVITE_EXPIRY_MS
+          const invitedAt = invite.expiresAt
+            ? new Date(new Date(invite.expiresAt).getTime() - INVITE_EXPIRY_MS).toISOString()
+            : '';
+
+          const result: {
+            id: string;
+            inviteToken: string;
+            status: 'pending' | 'accepted' | 'expired';
+            invitedByName: string;
+            invitedAt: string;
+            acceptedAt?: string;
+            acceptedByName?: string;
+            acceptedByEmail?: string;
+          } = {
+            id: invite.id,
+            inviteToken: invite.inviteToken,
+            status: invite.status,
+            invitedByName,
+            invitedAt,
+          };
+
+          // If accepted, enrich with acceptor details
+          if (invite.status === 'accepted' && invite.usedBy) {
+            const acceptor = await this.getTeacherById(invite.usedBy);
+            if (acceptor) {
+              result.acceptedByName = acceptor.name;
+              result.acceptedByEmail = acceptor.email;
+            }
+            if (invite.usedAt) {
+              result.acceptedAt = invite.usedAt;
+            }
+          }
+
+          return result;
+        })
+      );
+
+      return enriched;
+    } catch (error) {
+      console.error('Error getting event invites:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Revoke a pending invite by setting its status to expired
+   * @param inviteRecordId - The Airtable record ID of the invite
+   * @param eventRecordId - The Airtable record ID of the event (for verification)
+   */
+  async revokeInvite(inviteRecordId: string, eventRecordId: string): Promise<void> {
+    try {
+      const record = await this.base(TEACHER_INVITES_TABLE_ID).find(inviteRecordId);
+      const invite = this.transformInviteRecord(record);
+
+      // Verify invite belongs to the given event
+      if (invite.eventRecordId !== eventRecordId) {
+        throw new Error('Invite does not belong to this event');
+      }
+
+      // Only pending invites can be revoked
+      if (invite.status !== 'pending') {
+        throw new Error(`Cannot revoke invite with status: ${invite.status}`);
+      }
+
+      await this.base(TEACHER_INVITES_TABLE_ID).update(inviteRecordId, {
+        [TEACHER_INVITES_FIELD_IDS.status]: 'expired',
+      });
+    } catch (error) {
+      console.error('Error revoking invite:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Check if a teacher has access to an event
    */
   async teacherHasEventAccess(teacherEmail: string, eventId: string): Promise<boolean> {
