@@ -4,7 +4,7 @@
  */
 
 // Notification types that can be configured
-export type NotificationType = 'new_booking' | 'date_change' | 'cancellation' | 'schulsong_teacher_approved';
+export type NotificationType = 'new_booking' | 'date_change' | 'cancellation' | 'schulsong_teacher_approved' | 'unassigned_staff';
 
 // Notification setting record from Airtable
 export interface NotificationSetting {
@@ -63,6 +63,16 @@ export interface DateChangeNotificationData extends BookingNotificationData {
 // Cancellation notification data
 export interface CancellationNotificationData extends BookingNotificationData {
   reason: 'cancelled' | 'deleted';
+}
+
+// Unassigned staff notification data
+export interface UnassignedStaffNotificationData {
+  bookingId: string;
+  schoolName: string;
+  eventDate: string;
+  region?: string;
+  unitId?: string;
+  reason: string;
 }
 
 // Airtable table and field IDs for NotificationSettings
