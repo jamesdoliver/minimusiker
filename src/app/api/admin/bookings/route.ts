@@ -75,6 +75,7 @@ export interface BookingWithDetails {
     gratis_minicards_enabled?: boolean;
     gratis_minicards_quantity?: number;
     additional_fees?: { title: string; amount: number }[];
+    presets?: Record<string, { enabled: boolean; amount: number }>;
   };
 }
 
@@ -242,6 +243,7 @@ export async function GET(request: NextRequest) {
             gratis_minicards_enabled: event.deal_config.gratis_minicards_enabled,
             gratis_minicards_quantity: event.deal_config.gratis_minicards_quantity,
             additional_fees: event.deal_config.additional_fees,
+            presets: event.deal_config.presets,
           } : undefined,
         };
       }

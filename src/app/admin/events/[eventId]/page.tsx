@@ -474,6 +474,16 @@ export default function EventDetailPage() {
 
   // Bulk school order handler
   const handleBulkOrderUpdate = async (field: string, value: boolean | number) => {
+    // Save previous values for rollback
+    const prevScs = scsShirtsIncluded;
+    const prevMinicard = minicardOrderEnabled;
+    const prevMinicardQty = minicardOrderQuantity;
+
+    // Optimistic update
+    if (field === 'scs_shirts_included') setScsShirtsIncluded(value as boolean);
+    if (field === 'minicard_order_enabled') setMinicardOrderEnabled(value as boolean);
+    if (field === 'minicard_order_quantity') setMinicardOrderQuantity(value as number);
+
     try {
       const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
         method: 'PATCH',
@@ -481,12 +491,13 @@ export default function EventDetailPage() {
         body: JSON.stringify({ [field]: value }),
       });
       if (!response.ok) throw new Error('Failed to update');
-      // Update local state
-      if (field === 'scs_shirts_included') setScsShirtsIncluded(value as boolean);
-      if (field === 'minicard_order_enabled') setMinicardOrderEnabled(value as boolean);
-      if (field === 'minicard_order_quantity') setMinicardOrderQuantity(value as number);
     } catch (error) {
       console.error('Failed to update bulk order field:', error);
+      // Revert on failure
+      setScsShirtsIncluded(prevScs);
+      setMinicardOrderEnabled(prevMinicard);
+      setMinicardOrderQuantity(prevMinicardQty);
+      toast.error('Failed to update bulk order setting');
     }
   };
 

@@ -442,7 +442,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
         {/* Center Column: Deal Summary + Notes */}
         <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
 
-          {/* Deal Summary — only when deal is configured */}
+          {/* Deal Summary — when deal is configured (legacy deal_type or new presets) */}
           {hasDeal && feeBreakdown && (
             <div className="mb-3">
               <h4 className="text-sm font-semibold text-gray-700 mb-2">Deal Summary</h4>
@@ -451,9 +451,19 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
                   onClick={() => setDealExpanded(!dealExpanded)}
                   className="w-full flex justify-between items-center text-left"
                 >
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${dealTypeBadgeStyle(booking.dealType)}`}>
-                    #{dealTypeLabel(booking.dealType)}
-                  </span>
+                  {booking.dealType ? (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${dealTypeBadgeStyle(booking.dealType)}`}>
+                      #{dealTypeLabel(booking.dealType)}
+                    </span>
+                  ) : booking.dealConfig?.presets ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Deal
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      #deal
+                    </span>
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-gray-900">
                       {formatEuro(feeBreakdown.total)}

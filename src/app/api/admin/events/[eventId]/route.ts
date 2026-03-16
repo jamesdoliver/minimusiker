@@ -254,6 +254,16 @@ export async function PATCH(
       }
     }
 
+    // Validate minicard_order_quantity if provided
+    if (body.minicard_order_quantity !== undefined && body.minicard_order_quantity !== null) {
+      if (typeof body.minicard_order_quantity !== 'number' || body.minicard_order_quantity < 0 || body.minicard_order_quantity > 10000) {
+        return NextResponse.json(
+          { success: false, error: 'minicard_order_quantity must be a number between 0 and 10000' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Validate deal_config JSON if provided
     if (body.deal_config !== undefined && body.deal_config !== null) {
       if (typeof body.deal_config !== 'object') {
