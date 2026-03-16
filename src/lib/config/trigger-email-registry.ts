@@ -951,6 +951,91 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
 </p>`,
     availableVariables: ['inviterName', 'schoolName', 'eventDate', 'eventType', 'inviteUrl'],
   },
+
+  // ─── Event Readiness: No Staff (Admin Daily) ─────────────────────────
+  {
+    slug: 'event_readiness_no_staff',
+    name: 'Keine Mitarbeiter zugeordnet — Tägliche Übersicht (Admin)',
+    description: 'Tägliche Admin-Übersicht aller Events innerhalb von 42 Tagen ohne zugeordneten Mitarbeiter.',
+    recipientType: 'admin',
+    triggerEventKey: 'cron:event_readiness_no_staff',
+    defaultSubject: 'Events ohne Mitarbeiter — Tägliche Übersicht ({{count}} Events)',
+    defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Events ohne Mitarbeiter
+</h2>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Die folgenden {{count}} Events innerhalb der nächsten 42 Tage haben keinen zugeordneten Mitarbeiter.
+  Bitte weise manuell einen Mitarbeiter zu.
+</p>
+
+{{{eventListHtml}}}
+
+<p style="margin: 24px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Bitte melde dich im Admin-Portal an, um die Zuordnungen vorzunehmen.
+</p>`,
+    availableVariables: ['count', 'eventListHtml'],
+  },
+
+  // ─── Event Readiness: Teacher Weekly Nudge ────────────────────────────
+  {
+    slug: 'event_readiness_teacher_nudge',
+    name: 'Wöchentliche Erinnerung an Lehrer',
+    description: 'Wöchentliche Erinnerung an Lehrer mit fehlenden Klassen oder Liedern.',
+    recipientType: 'teacher',
+    triggerEventKey: 'cron:event_readiness_teacher_nudge',
+    defaultSubject: 'Erinnerung: Vorbereitungen für {{schoolName}} am {{eventDate}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{teacherName}},
+</h2>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Euer Minimusiker-Event an der <strong>{{schoolName}}</strong> am <strong>{{eventDate}}</strong> rückt näher!
+  Damit alles reibungslos abläuft, fehlen noch ein paar Vorbereitungen:
+</p>
+
+{{{checklistHtml}}}
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 24px 0;">
+  <tr>
+    <td align="center">
+      <a href="{{portalUrl}}"
+         style="display: inline-block; background-color: #d85a6a; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 2px 4px rgba(216, 90, 106, 0.3);">
+        Zum Pädagogen-Portal
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Bei Fragen wende dich gerne an unser Team.
+</p>`,
+    availableVariables: ['teacherName', 'schoolName', 'eventDate', 'checklistHtml', 'portalUrl'],
+  },
+
+  // ─── Event Readiness: Admin Weekly Digest ─────────────────────────────
+  {
+    slug: 'event_readiness_admin_digest',
+    name: 'Wöchentliche Event-Vorbereitung — Übersicht (Admin)',
+    description: 'Wöchentliche Admin-Übersicht aller Events mit fehlenden Klassen oder Liedern.',
+    recipientType: 'admin',
+    triggerEventKey: 'cron:event_readiness_admin_digest',
+    defaultSubject: 'Wöchentliche Event-Vorbereitung — {{count}} Events mit offenen Aufgaben',
+    defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Wöchentliche Event-Vorbereitung
+</h2>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bei {{count}} Events innerhalb der nächsten 42 Tage fehlen noch Vorbereitungen durch die Lehrkräfte.
+</p>
+
+{{{digestHtml}}}
+
+<p style="margin: 24px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Die betroffenen Lehrkräfte wurden automatisch per E-Mail erinnert.
+</p>`,
+    availableVariables: ['count', 'digestHtml'],
+  },
 ];
 
 /**

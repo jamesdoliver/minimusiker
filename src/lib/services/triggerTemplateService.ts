@@ -516,6 +516,21 @@ export function getSampleVariables(slug: string): Record<string, string> {
       unitId: '42',
       reason: 'Kein Mitarbeiter mit Provider ID 42 gefunden, Region-Fallback ebenfalls fehlgeschlagen',
     },
+    event_readiness_no_staff: {
+      count: '3',
+      eventListHtml: '<table><tr><td>Grundschule Sonnenschein — 15.03.2025 — Köln/Bonn</td></tr></table>',
+    },
+    event_readiness_teacher_nudge: {
+      teacherName: 'Frau Müller',
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      checklistHtml: '<ul><li>Klassen anlegen</li><li>Lieder für Klasse 3a auswählen</li></ul>',
+      portalUrl: 'https://minimusiker.app/paedagogen',
+    },
+    event_readiness_admin_digest: {
+      count: '5',
+      digestHtml: '<table><tr><td>Grundschule Sonnenschein — Keine Klassen — mueller@schule.de</td></tr></table>',
+    },
   };
 
   return samples[slug] || {};
