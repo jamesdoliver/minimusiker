@@ -94,6 +94,34 @@ export const TRIGGER_EVENT_CATALOG: TriggerEvent[] = [
     availableVariables: ['engineerName', 'schoolName', 'eventDate', 'eventId', 'engineerPortalUrl'],
     recipientMode: 'specific',
   },
+  {
+    key: 'webhook:unassigned_staff',
+    name: 'CRON: Kein Mitarbeiter bei Buchung',
+    description: 'SimplyBook-Webhook konnte keinen Mitarbeiter automatisch zuordnen (weder über Provider ID noch über Region). Wird sofort bei Buchungseingang ausgelöst.',
+    availableVariables: ['schoolName', 'eventDate', 'region', 'bookingId', 'unitId', 'reason'],
+    recipientMode: 'configurable',
+  },
+  {
+    key: 'cron:event_readiness_no_staff',
+    name: 'CRON: Tägliche Übersicht — Events ohne Mitarbeiter',
+    description: 'Läuft täglich um 7 Uhr. Listet alle bestätigten Events innerhalb der nächsten 42 Tage auf, die noch keinen zugeordneten Mitarbeiter haben.',
+    availableVariables: ['count', 'eventListHtml'],
+    recipientMode: 'configurable',
+  },
+  {
+    key: 'cron:event_readiness_teacher_nudge',
+    name: 'CRON: Wöchentliche Erinnerung an Lehrer',
+    description: 'Läuft jeden Montag um 7 Uhr. Erinnert Lehrkräfte an fehlende Vorbereitungen (Klassen anlegen, Lieder auswählen) für Events innerhalb der nächsten 42 Tage.',
+    availableVariables: ['teacherName', 'schoolName', 'eventDate', 'checklistHtml', 'portalUrl'],
+    recipientMode: 'specific',
+  },
+  {
+    key: 'cron:event_readiness_admin_digest',
+    name: 'CRON: Wöchentliche Event-Vorbereitung (Admin)',
+    description: 'Läuft jeden Montag um 7 Uhr. Zeigt Admins alle Events innerhalb der nächsten 42 Tage, bei denen Lehrkräfte noch Klassen oder Lieder einrichten müssen.',
+    availableVariables: ['count', 'digestHtml'],
+    recipientMode: 'configurable',
+  },
 ];
 
 export function getTriggerEvent(key: string): TriggerEvent | undefined {

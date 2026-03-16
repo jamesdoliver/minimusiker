@@ -426,8 +426,8 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   // ─── Unassigned Staff Alert (Admin) ──────────────────────────────────
   {
     slug: 'unassigned_staff_alert',
-    name: 'Kein Mitarbeiter zugeordnet (Admin)',
-    description: 'Wird an Admins gesendet, wenn bei einer neuen Buchung kein Mitarbeiter automatisch zugeordnet werden konnte.',
+    name: 'CRON: Kein Mitarbeiter bei Buchung (Admin)',
+    description: 'Wird sofort an Admins gesendet, wenn bei einer neuen SimplyBook-Buchung kein Mitarbeiter automatisch zugeordnet werden konnte. Prüft zuerst die Provider ID, dann die Region.',
     recipientType: 'admin',
     triggerEventKey: 'webhook:unassigned_staff',
     defaultSubject: 'Kein Mitarbeiter zugeordnet: {{schoolName}} - {{eventDate}}',
@@ -955,8 +955,8 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   // ─── Event Readiness: No Staff (Admin Daily) ─────────────────────────
   {
     slug: 'event_readiness_no_staff',
-    name: 'Keine Mitarbeiter zugeordnet — Tägliche Übersicht (Admin)',
-    description: 'Tägliche Admin-Übersicht aller Events innerhalb von 42 Tagen ohne zugeordneten Mitarbeiter.',
+    name: 'CRON: Tägliche Übersicht — Events ohne Mitarbeiter (Admin)',
+    description: 'Läuft täglich um 7 Uhr. Listet alle bestätigten Events innerhalb der nächsten 42 Tage auf, die noch keinen zugeordneten Mitarbeiter haben.',
     recipientType: 'admin',
     triggerEventKey: 'cron:event_readiness_no_staff',
     defaultSubject: 'Events ohne Mitarbeiter — Tägliche Übersicht ({{count}} Events)',
@@ -980,8 +980,8 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   // ─── Event Readiness: Teacher Weekly Nudge ────────────────────────────
   {
     slug: 'event_readiness_teacher_nudge',
-    name: 'Wöchentliche Erinnerung an Lehrer',
-    description: 'Wöchentliche Erinnerung an Lehrer mit fehlenden Klassen oder Liedern.',
+    name: 'CRON: Wöchentliche Erinnerung an Lehrer',
+    description: 'Läuft jeden Montag um 7 Uhr. Erinnert Lehrkräfte an fehlende Vorbereitungen (Klassen anlegen, Lieder auswählen) für Events innerhalb der nächsten 42 Tage.',
     recipientType: 'teacher',
     triggerEventKey: 'cron:event_readiness_teacher_nudge',
     defaultSubject: 'Erinnerung: Vorbereitungen für {{schoolName}} am {{eventDate}}',
@@ -1016,8 +1016,8 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   // ─── Event Readiness: Admin Weekly Digest ─────────────────────────────
   {
     slug: 'event_readiness_admin_digest',
-    name: 'Wöchentliche Event-Vorbereitung — Übersicht (Admin)',
-    description: 'Wöchentliche Admin-Übersicht aller Events mit fehlenden Klassen oder Liedern.',
+    name: 'CRON: Wöchentliche Event-Vorbereitung (Admin)',
+    description: 'Läuft jeden Montag um 7 Uhr. Zeigt Admins alle Events innerhalb der nächsten 42 Tage, bei denen Lehrkräfte noch Klassen oder Lieder einrichten müssen.',
     recipientType: 'admin',
     triggerEventKey: 'cron:event_readiness_admin_digest',
     defaultSubject: 'Wöchentliche Event-Vorbereitung — {{count}} Events mit offenen Aufgaben',
