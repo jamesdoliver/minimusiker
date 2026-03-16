@@ -813,6 +813,261 @@ export async function processSchulsongReleaseEmails(
 }
 
 // =============================================================================
+// Schulsong Approval Reminder Processing (called by cron)
+// =============================================================================
+
+/**
+ * Process schulsong approval reminders.
+ * Sends daily email to teacher + admins when schulsong is pending review for >24h.
+ *
+ * State-aware: only sends when latest schulsong file has approvalStatus='pending'.
+ * Pauses when rejected (engineer working). Stops when approved.
+ */
+export async function processSchulsongApprovalReminders(
+  dryRun: boolean = false
+): Promise<{ sent: number; skipped: number; failed: number; errors: string[] }> {
+  const airtable = getAirtableService();
+  const teacherService = getTeacherService();
+  const { triggerSchulsongApprovalReminder } = await import('@/lib/services/notificationService');
+
+  const allEvents = await airtable.getAllEvents();
+  const now = new Date();
+
+  // Filter: schulsong events that are not yet released and event_date has passed
+  const pending = allEvents.filter(
+    (e) =>
+      e.is_schulsong &&
+      e.status !== 'Cancelled' && e.status !== 'Deleted' &&
+      !parseOverrides(e.timeline_overrides)?.communications_paused &&
+      !e.schulsong_released_at &&
+      e.event_date && new Date(e.event_date) <= now
+  );
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const event of pending) {
+    try {
+      // Find the latest schulsong final audio file
+      const audioFiles = await teacherService.getAudioFilesByEventId(event.event_id);
+      const schulsongFinal = audioFiles.find(
+        (f) => f.isSchulsong && f.type === 'final' && f.status === 'ready'
+      );
+
+      if (!schulsongFinal) {
+        // No schulsong uploaded yet — skip
+        skipped++;
+        continue;
+      }
+
+      if (schulsongFinal.approvalStatus === 'rejected') {
+        // Engineer is working on revision — pause reminders
+        skipped++;
+        continue;
+      }
+
+      if (schulsongFinal.approvalStatus === 'approved') {
+        // Already approved but not released yet — skip
+        skipped++;
+        continue;
+      }
+
+      // Check if uploaded >24h ago
+      const uploadedAt = schulsongFinal.uploadedAt ? new Date(schulsongFinal.uploadedAt) : null;
+      if (!uploadedAt || (now.getTime() - uploadedAt.getTime()) < 24 * 60 * 60 * 1000) {
+        // Uploaded less than 24h ago — too early for reminder
+        skipped++;
+        continue;
+      }
+
+      // Check dedup: already sent today?
+      const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const dedupKey = `schulsong_approval_reminder_${todayStr}`;
+      const alreadySent = await airtable.hasEmailBeenSent(dedupKey, event.event_id, 'teacher+admin');
+      if (alreadySent) {
+        skipped++;
+        continue;
+      }
+
+      if (dryRun) {
+        console.log(`[ApprovalReminder] (dry-run) Would send for ${event.event_id} (${event.school_name})`);
+        skipped++;
+        continue;
+      }
+
+      // Compute days pending
+      const daysPending = Math.floor((now.getTime() - uploadedAt.getTime()) / (24 * 60 * 60 * 1000));
+
+      // Get teacher email from booking
+      const bookingRecordId = event.simplybook_booking?.[0];
+      let teacherEmail = '';
+      if (bookingRecordId) {
+        const booking = await airtable.getSchoolBookingById(bookingRecordId);
+        teacherEmail = booking?.schoolContactEmail || '';
+      }
+
+      if (!teacherEmail) {
+        console.warn(`[ApprovalReminder] No teacher email for ${event.event_id}`);
+        skipped++;
+        continue;
+      }
+
+      const result = await triggerSchulsongApprovalReminder({
+        schoolName: event.school_name,
+        eventDate: event.event_date,
+        eventId: event.event_id,
+        daysPending,
+        teacherEmail,
+      });
+
+      if (result.sent) {
+        // Log for dedup
+        await airtable.createEmailLog({
+          templateName: dedupKey,
+          eventId: event.event_id,
+          recipientEmail: 'teacher+admin',
+          recipientType: 'teacher',
+          status: 'sent',
+        });
+        sent++;
+      } else {
+        failed++;
+        if (result.error) errors.push(`${event.event_id}: ${result.error}`);
+      }
+    } catch (err) {
+      const msg = `Failed to process ${event.event_id}: ${err instanceof Error ? err.message : String(err)}`;
+      console.error(`[ApprovalReminder] ${msg}`);
+      errors.push(msg);
+      failed++;
+    }
+  }
+
+  console.log(`[ApprovalReminder] Processed ${pending.length} events: ${sent} sent, ${skipped} skipped, ${failed} failed`);
+  return { sent, skipped, failed, errors };
+}
+
+// =============================================================================
+// Schulsong Merch Last Chance Processing (called by cron)
+// =============================================================================
+
+/**
+ * Process schulsong merch "last chance" emails.
+ * Sends 24h before schulsong_merch_cutoff to parents who haven't ordered personalized merch.
+ */
+export async function processSchulsongMerchLastChance(
+  dryRun: boolean = false
+): Promise<{ sent: number; skipped: number; failed: number; errors: string[] }> {
+  const airtable = getAirtableService();
+  const { sendSchulsongMerchLastChanceEmail } = await import('@/lib/services/resendService');
+
+  const allEvents = await airtable.getAllEvents();
+  const now = new Date();
+
+  // Find events where schulsong_merch_cutoff is within next 48h
+  const eligible = allEvents.filter((e) => {
+    if (!e.is_schulsong || !e.schulsong_merch_cutoff) return false;
+    if (e.status === 'Cancelled' || e.status === 'Deleted') return false;
+    if (parseOverrides(e.timeline_overrides)?.communications_paused) return false;
+
+    const cutoff = new Date(e.schulsong_merch_cutoff);
+    const hoursUntilCutoff = (cutoff.getTime() - now.getTime()) / (60 * 60 * 1000);
+    // Send when cutoff is 24-48h away (gives cron window flexibility)
+    return hoursUntilCutoff > 0 && hoursUntilCutoff <= 48;
+  });
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const event of eligible) {
+    try {
+      // Get non-buyer parents (use functions defined in this file)
+      const allParents = await getParentRecipientsForEvent(event.event_id, event.id, {
+        eventId: event.event_id,
+        eventRecordId: event.id,
+        schoolName: event.school_name,
+        eventDate: event.event_date,
+        eventType: event.is_kita ? 'KiTa' : 'Schule',
+        daysUntilEvent: 0,
+        accessCode: event.access_code,
+        isKita: event.is_kita,
+        isMinimusikertag: event.is_minimusikertag,
+        isPlus: event.is_plus,
+        isSchulsong: event.is_schulsong,
+        isUnder100: event.is_under_100,
+      });
+      const paidEmails = await getPaidParentEmailsForEvent(event.id);
+      const nonBuyers = allParents.filter(p => !paidEmails.has(p.email.toLowerCase()));
+
+      if (nonBuyers.length === 0) {
+        skipped++;
+        continue;
+      }
+
+      const cutoffDateStr = new Date(event.schulsong_merch_cutoff!).toLocaleDateString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+
+      for (const parent of nonBuyers) {
+        // Dedup check
+        const alreadySent = await airtable.hasEmailBeenSent(
+          'schulsong_merch_last_chance',
+          event.event_id,
+          parent.email
+        );
+        if (alreadySent) {
+          skipped++;
+          continue;
+        }
+
+        if (dryRun) {
+          console.log(`[MerchLastChance] (dry-run) Would send to ${parent.email} for ${event.event_id}`);
+          skipped++;
+          continue;
+        }
+
+        const result = await sendSchulsongMerchLastChanceEmail(parent.email, {
+          schoolName: event.school_name,
+          parentName: parent.name || '',
+          cutoffDate: cutoffDateStr,
+        });
+
+        if (result.success) {
+          await airtable.createEmailLog({
+            templateName: 'schulsong_merch_last_chance',
+            eventId: event.event_id,
+            recipientEmail: parent.email,
+            recipientType: 'parent',
+            status: 'sent',
+            resendMessageId: result.messageId,
+          });
+          sent++;
+        } else {
+          failed++;
+          if (result.error) errors.push(`${event.event_id}/${parent.email}: ${result.error}`);
+        }
+
+        // Rate limit
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    } catch (err) {
+      const msg = `Failed to process ${event.event_id}: ${err instanceof Error ? err.message : String(err)}`;
+      console.error(`[MerchLastChance] ${msg}`);
+      errors.push(msg);
+      failed++;
+    }
+  }
+
+  console.log(`[MerchLastChance] Processed ${eligible.length} events: ${sent} sent, ${skipped} skipped, ${failed} failed`);
+  return { sent, skipped, failed, errors };
+}
+
+// =============================================================================
 // Utility Functions for Testing
 // =============================================================================
 

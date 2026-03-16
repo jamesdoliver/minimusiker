@@ -14,7 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { processEmailAutomation, processSchulsongReleaseEmails, getCurrentBerlinHour } from '@/lib/services/emailAutomationService';
+import { processEmailAutomation, processSchulsongReleaseEmails, processSchulsongApprovalReminders, processSchulsongMerchLastChance, getCurrentBerlinHour } from '@/lib/services/emailAutomationService';
 import { CronAutomationResponse } from '@/lib/types/email-automation';
 
 export const dynamic = 'force-dynamic';
@@ -74,6 +74,12 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
     // Process email automation
     const result = await processEmailAutomation(isDryRun);
 
+    // Process schulsong approval reminders (runs every hour, dedup prevents duplicates)
+    const approvalReminderResult = await processSchulsongApprovalReminders(isDryRun);
+    if (approvalReminderResult.errors.length > 0) {
+      console.error('[Email Automation Cron] Approval reminder errors:', approvalReminderResult.errors);
+    }
+
     // Process schulsong release emails in the 6-8am Berlin window
     // (covers cron drift; dedup makes multiple runs safe)
     let schulsongResult: { sent: number; skipped: number; failed: number; errors: string[] } | undefined;
@@ -83,6 +89,16 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
       schulsongResult = await processSchulsongReleaseEmails(isDryRun);
       if (schulsongResult.errors.length > 0) {
         console.error('[Email Automation Cron] Schulsong errors:', schulsongResult.errors);
+      }
+    }
+
+    // Process merch last chance emails (run in same window as schulsong releases)
+    let merchLastChanceResult: { sent: number; skipped: number; failed: number; errors: string[] } | undefined;
+    if (berlinHour >= 6 && berlinHour <= 8) {
+      console.log(`[Email Automation Cron] Processing merch last chance emails (Berlin hour: ${berlinHour})`);
+      merchLastChanceResult = await processSchulsongMerchLastChance(isDryRun);
+      if (merchLastChanceResult.errors.length > 0) {
+        console.error('[Email Automation Cron] Merch last chance errors:', merchLastChanceResult.errors);
       }
     }
 
@@ -96,6 +112,16 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
         `[Email Automation Cron] Schulsong: ${schulsongResult.sent} sent, ${schulsongResult.skipped} skipped, ${schulsongResult.failed} failed`
       );
     }
+    if (approvalReminderResult.sent > 0 || approvalReminderResult.failed > 0) {
+      console.log(
+        `[Email Automation Cron] Approval reminders: ${approvalReminderResult.sent} sent, ${approvalReminderResult.skipped} skipped, ${approvalReminderResult.failed} failed`
+      );
+    }
+    if (merchLastChanceResult) {
+      console.log(
+        `[Email Automation Cron] Merch last chance: ${merchLastChanceResult.sent} sent, ${merchLastChanceResult.skipped} skipped, ${merchLastChanceResult.failed} failed`
+      );
+    }
 
     if (result.errors.length > 0) {
       console.error('[Email Automation Cron] Errors:', result.errors);
@@ -106,6 +132,8 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
       mode: isDryRun ? 'dry-run' : 'live',
       result,
       schulsongResult,
+      approvalReminderResult,
+      merchLastChanceResult,
     });
   } catch (error) {
     const duration = Date.now() - startTime;
