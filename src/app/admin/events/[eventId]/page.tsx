@@ -163,6 +163,8 @@ export default function EventDetailPage() {
   const [isKita, setIsKita] = useState(false);
   const [isSchulsong, setIsSchulsong] = useState(false);
   const [isMinimusikertag, setIsMinimusikertag] = useState(true);
+  const [schulsongReleasedAt, setSchulsongReleasedAt] = useState<string | null>(null);
+  const [schulsongMerchCutoff, setSchulsongMerchCutoff] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdatingToggles, setIsUpdatingToggles] = useState<string | null>(null); // Track which toggle is updating
 
@@ -215,6 +217,8 @@ export default function EventDetailPage() {
       setIsKita(data.data?.isKita || false);
       setIsSchulsong(data.data?.isSchulsong || false);
       setIsMinimusikertag(data.data?.isMinimusikertag === true);
+      setSchulsongReleasedAt(data.data?.schulsongReleasedAt || null);
+      setSchulsongMerchCutoff(data.data?.schulsongMerchCutoff || null);
       // Deal Builder state
       setDealBuilderEnabled(data.data?.dealBuilderEnabled || false);
       setDealType(data.data?.dealType || null);
@@ -1132,6 +1136,37 @@ export default function EventDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Schulsong Release Hold Banner */}
+      {isSchulsong && !schulsongReleasedAt && (isPlus || isMinimusikertag) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="text-amber-600 mt-0.5">&#9203;</div>
+            <div>
+              <p className="text-sm font-medium text-amber-800">
+                Audio-Veroeffentlichung wartet auf Schulsong-Freigabe
+              </p>
+              <p className="text-xs text-amber-600 mt-1">
+                Die Klassen-Aufnahmen werden erst freigegeben, wenn der Lehrer den Schulsong genehmigt hat.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schulsong Merch Cutoff Banner */}
+      {schulsongMerchCutoff && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="text-blue-600 mt-0.5">&#128722;</div>
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Schulsong Merch-Frist: {new Date(schulsongMerchCutoff).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Booking Info Section - shown when no classes exist */}
       {event.bookingInfo && event.classes.length === 0 && (
