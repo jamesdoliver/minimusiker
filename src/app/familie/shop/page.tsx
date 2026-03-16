@@ -57,6 +57,7 @@ function ShopContent() {
   const [shopProfile, setShopProfile] = useState<ReturnType<typeof resolveShopProfile> | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isStandardMerchOnly, setIsStandardMerchOnly] = useState(false);
+  const [schulsongMerchCutoff, setSchulsongMerchCutoff] = useState<string | null>(null);
 
   const { products, isLoading, error } = useProducts({
     tagFilter: 'minimusiker-shop',
@@ -135,6 +136,9 @@ function ShopContent() {
           if (data.timelineOverrides) {
             setTimelineOverridesJson(data.timelineOverrides);
           }
+          if (data.schulsongMerchCutoff) {
+            setSchulsongMerchCutoff(data.schulsongMerchCutoff);
+          }
         }
       } catch (err) {
         console.error('Error fetching event profile:', err);
@@ -151,14 +155,20 @@ function ShopContent() {
   const excludedVariantIds = useMemo(() => {
     if (!shopProfile || !eventDate) return new Set<string>();
 
-    const isSchulsongOnly = shopProfile.audioProducts.length === 0;
-    const cutoffDays = isSchulsongOnly
-      ? getThreshold('schulsong_clothing_cutoff_days', overrides)
-      : getThreshold('personalized_clothing_cutoff_days', overrides);
-    // Standard merch gate: under-100-kid schools only see standard clothing
-    const showPersonalized = isStandardMerchOnly
-      ? false
-      : canOrderPersonalizedClothing(eventDate, cutoffDays);
+    let showPersonalized: boolean;
+    if (isStandardMerchOnly) {
+      showPersonalized = false;
+    } else if (schulsongMerchCutoff) {
+      // When schulsong_merch_cutoff is set, use that absolute date
+      showPersonalized = new Date() < new Date(schulsongMerchCutoff);
+    } else {
+      // Fallback to relative days from event date
+      const isSchulsongOnly = shopProfile.audioProducts.length === 0;
+      const cutoffDays = isSchulsongOnly
+        ? getThreshold('schulsong_clothing_cutoff_days', overrides)
+        : getThreshold('personalized_clothing_cutoff_days', overrides);
+      showPersonalized = canOrderPersonalizedClothing(eventDate, cutoffDays);
+    }
     const excluded = buildExcludedVariantIds(shopProfile.shopifyVariantMap, showPersonalized);
 
     // Also exclude variants for hidden products (uses date-based defaults if not explicitly configured)
@@ -180,7 +190,7 @@ function ShopContent() {
     }
 
     return excluded;
-  }, [shopProfile, eventDate, overrides, isStandardMerchOnly]);
+  }, [shopProfile, eventDate, overrides, isStandardMerchOnly, schulsongMerchCutoff]);
 
   if (isVerifying || isProfileLoading) {
     return (

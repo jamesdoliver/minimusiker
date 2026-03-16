@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
         dealType,
         dealConfig,
         isStandardMerchOnly: standardMerchOnly,
+        schulsongMerchCutoff: null,
       });
     }
 
@@ -95,6 +96,7 @@ export async function GET(request: NextRequest) {
         dealType,
         dealConfig,
         isStandardMerchOnly: standardMerchOnly,
+        schulsongMerchCutoff: event?.schulsong_merch_cutoff || null,
         hasAudio: false,
       });
     }
@@ -132,6 +134,7 @@ export async function GET(request: NextRequest) {
         dealType,
         dealConfig,
         isStandardMerchOnly: standardMerchOnly,
+        schulsongMerchCutoff: event?.schulsong_merch_cutoff || null,
         hasAudio: false,
       });
     }
@@ -149,6 +152,7 @@ export async function GET(request: NextRequest) {
         dealType,
         dealConfig,
         isStandardMerchOnly: standardMerchOnly,
+        schulsongMerchCutoff: event?.schulsong_merch_cutoff || null,
         hasAudio: false,
         notYetVisible: true,
         visibleAfter: releasedAt?.toISOString(),
@@ -166,6 +170,7 @@ export async function GET(request: NextRequest) {
       dealType,
       dealConfig,
       isStandardMerchOnly: standardMerchOnly,
+      schulsongMerchCutoff: event?.schulsong_merch_cutoff || null,
       hasAudio: true,
       audioUrl,
       downloadUrl,
