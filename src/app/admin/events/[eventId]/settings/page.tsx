@@ -112,8 +112,12 @@ export default function EventSettingsPage() {
   const [eventDate, setEventDate] = useState('');
   const [overrides, setOverrides] = useState<EventTimelineOverrides>({});
   const [savedOverrides, setSavedOverrides] = useState<EventTimelineOverrides>({});
+  const [isSchulsong, setIsSchulsong] = useState(false);
   const [isSchulsongOnly, setIsSchulsongOnly] = useState(false);
   const [shopProfile, setShopProfile] = useState<ShopProfile | null>(null);
+  const [schulsongMerchCutoff, setSchulsongMerchCutoff] = useState<string | null>(null);
+  const [schulsongMerchCutoffOverride, setSchulsongMerchCutoffOverride] = useState<string | null>(null);
+  const [isSavingMerchCutoff, setIsSavingMerchCutoff] = useState(false);
   // Tracks whether the admin has explicitly configured hidden_products for this event
   const [hasExplicitProductConfig, setHasExplicitProductConfig] = useState(false);
 
@@ -158,8 +162,10 @@ export default function EventSettingsPage() {
             setSavedOverrides(defaults);
           }
           // Determine effective tier: schulsong-only when is_schulsong=true but not plus/minimusikertag
-          const { is_schulsong, is_plus, is_minimusikertag, deal_builder_enabled, deal_type, deal_config } = eventRecordResult;
+          const { is_schulsong, is_plus, is_minimusikertag, deal_builder_enabled, deal_type, deal_config, schulsong_merch_cutoff } = eventRecordResult;
+          setIsSchulsong(is_schulsong);
           setIsSchulsongOnly(is_schulsong && !is_plus && !is_minimusikertag);
+          setSchulsongMerchCutoff(schulsong_merch_cutoff || null);
 
           // Resolve shop profile for product visibility toggles
           const parsedDealConfig = deal_config
@@ -280,6 +286,34 @@ export default function EventSettingsPage() {
       }
     }
     return unique;
+  };
+
+  // Save schulsong merch cutoff override
+  const handleSaveMerchCutoff = async () => {
+    setIsSavingMerchCutoff(true);
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schulsong_merch_cutoff: schulsongMerchCutoffOverride || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Save failed');
+      }
+
+      setSchulsongMerchCutoff(schulsongMerchCutoffOverride);
+      setSchulsongMerchCutoffOverride(null);
+      toast.success('Schulsong Merch-Frist gespeichert');
+    } catch (err) {
+      console.error('Error saving merch cutoff:', err);
+      toast.error(err instanceof Error ? err.message : 'Speichern fehlgeschlagen');
+    } finally {
+      setIsSavingMerchCutoff(false);
+    }
   };
 
   // Save overrides
@@ -438,6 +472,74 @@ export default function EventSettingsPage() {
             />
           ))}
         </SettingsSection>
+
+        {/* Section 1b: Schulsong Merch-Frist (only for schulsong events) */}
+        {isSchulsong && (
+          <SettingsSection title="Schulsong Merch-Frist" description="Bestellfrist fuer Schulsong-Merchandise nach Lehrer-Freigabe">
+            <div className="px-6 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <label className="font-medium text-gray-900 text-sm">Aktuelle Merch-Frist</label>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Wird automatisch berechnet, wenn der Lehrer den Schulsong genehmigt. Kann hier manuell ueberschrieben werden.
+                  </p>
+                  <p className="text-sm text-gray-700 mt-2">
+                    {schulsongMerchCutoff
+                      ? new Date(schulsongMerchCutoff).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                      : 'Noch nicht festgelegt (wird bei Freigabe berechnet)'}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <label className="text-sm font-medium text-gray-700">Manuell ueberschreiben</label>
+                <div className="flex items-center gap-3 mt-2">
+                  <input
+                    type="date"
+                    value={schulsongMerchCutoffOverride || ''}
+                    onChange={(e) => setSchulsongMerchCutoffOverride(e.target.value || null)}
+                    className="px-3 py-1.5 text-sm border rounded-lg focus:ring-2 focus:ring-[#5a8a82] focus:border-[#5a8a82] outline-none"
+                  />
+                  <button
+                    onClick={handleSaveMerchCutoff}
+                    disabled={isSavingMerchCutoff || !schulsongMerchCutoffOverride}
+                    className="px-4 py-1.5 bg-[#5a8a82] text-white rounded-lg hover:bg-[#4a7a72] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  >
+                    {isSavingMerchCutoff ? 'Speichert...' : 'Frist setzen'}
+                  </button>
+                  {schulsongMerchCutoff && (
+                    <button
+                      onClick={() => {
+                        setSchulsongMerchCutoffOverride('');
+                        // Immediately save to clear
+                        setIsSavingMerchCutoff(true);
+                        fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ schulsong_merch_cutoff: null }),
+                        })
+                          .then((res) => {
+                            if (!res.ok) throw new Error('Failed to clear');
+                            setSchulsongMerchCutoff(null);
+                            setSchulsongMerchCutoffOverride(null);
+                            toast.success('Merch-Frist zurueckgesetzt');
+                          })
+                          .catch(() => toast.error('Zuruecksetzen fehlgeschlagen'))
+                          .finally(() => setIsSavingMerchCutoff(false));
+                      }}
+                      disabled={isSavingMerchCutoff}
+                      className="text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                    >
+                      Zuruecksetzen
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Hinweis: Manuelles Setzen ueberschreibt die automatisch berechnete Frist.
+                </p>
+              </div>
+            </div>
+          </SettingsSection>
+        )}
 
         {/* Section 2: Audio & Portal */}
         <SettingsSection title="Audio & Portal" description="Zeitpunkte für Vorschau-Freigabe und vollständigen Zugang">

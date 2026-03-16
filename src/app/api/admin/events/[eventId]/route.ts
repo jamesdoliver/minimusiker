@@ -122,6 +122,8 @@ export async function GET(
       estimatedChildren?: number;
       isUnder100?: boolean;
       standardMerchOverride?: 'force-standard' | 'force-personalized';
+      schulsongReleasedAt?: string;
+      schulsongMerchCutoff?: string;
     } = {};
 
     try {
@@ -157,6 +159,8 @@ export async function GET(
             estimatedChildren: eventRecord.estimated_children,
             isUnder100: eventRecord.is_under_100,
             standardMerchOverride: eventRecord.standard_merch_override,
+            schulsongReleasedAt: eventRecord.schulsong_released_at,
+            schulsongMerchCutoff: eventRecord.schulsong_merch_cutoff,
           };
         }
       }
@@ -221,10 +225,11 @@ export async function PATCH(
       body.deal_type !== undefined ||
       body.deal_config !== undefined;
     const hasStandardMerchOverride = body.standard_merch_override !== undefined;
+    const hasMerchCutoffUpdate = body.schulsong_merch_cutoff !== undefined;
 
-    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate && !hasChildrenUpdate && !hasDealUpdate && !hasStandardMerchOverride) {
+    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate && !hasChildrenUpdate && !hasDealUpdate && !hasStandardMerchOverride && !hasMerchCutoffUpdate) {
       return NextResponse.json(
-        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children, deal_builder_enabled, deal_type, deal_config, standard_merch_override' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children, deal_builder_enabled, deal_type, deal_config, standard_merch_override, schulsong_merch_cutoff' },
         { status: 400 }
       );
     }
@@ -721,6 +726,16 @@ export async function PATCH(
       });
     }
 
+    // Handle schulsong merch cutoff update (admin override)
+    if (hasMerchCutoffUpdate) {
+      const base = airtableService['base'];
+      // Allow clearing (null/empty) or setting a date string
+      const cutoffValue = body.schulsong_merch_cutoff || null;
+      await base(EVENTS_TABLE_ID).update(eventRecordId, {
+        [EVENTS_FIELD_IDS.schulsong_merch_cutoff]: cutoffValue,
+      });
+    }
+
     // Auto-toggle communications_paused when status changes to/from Pending
     // Runs AFTER hasOverridesUpdate so the flag is merged into whatever was just written
     if (hasStatusUpdate) {
@@ -853,17 +868,32 @@ export async function DELETE(
     }
 
     // If not found, try by simplybookId via SchoolBookings (supports manual codes like "M-a3f9b2")
+    let orphanedBooking: { id: string; schoolName: string } | null = null;
     if (!eventRecordId) {
       const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
       if (booking) {
         const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
         if (eventRecord) {
           eventRecordId = eventRecord.id;
+        } else {
+          // Booking exists but has no linked Event — mark as orphaned for fallback deletion
+          orphanedBooking = { id: booking.id, schoolName: booking.schoolName || 'Unknown School' };
         }
       }
     }
 
     if (!eventRecordId) {
+      // Handle orphaned bookings (SchoolBooking exists but no Event record)
+      if (orphanedBooking) {
+        await airtableService.softDeleteSchoolBooking(orphanedBooking.id);
+        console.log(`[DELETE] Soft-deleted orphaned booking "${orphanedBooking.schoolName}" (${orphanedBooking.id}) by ${admin.email}`);
+
+        return NextResponse.json({
+          success: true,
+          message: `Booking "${orphanedBooking.schoolName}" has been deleted (no linked event)`,
+        });
+      }
+
       return NextResponse.json(
         { success: false, error: 'Event not found' },
         { status: 404 }
