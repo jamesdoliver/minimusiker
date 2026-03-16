@@ -2,14 +2,9 @@
  * Shop Profile Configuration
  *
  * Defines product catalogs and Shopify variant mappings per event type.
- * The admin toggles (is_minimusikertag, is_plus, is_schulsong) determine
- * which profile the parent portal shop displays.
- *
- * When Deal Builder is enabled, deal_type + deal_config override the
- * boolean flags to select the correct profile (including SCS profiles).
+ * The admin flags (is_minimusikertag, is_plus, is_schulsong, is_scs)
+ * determine which profile the parent portal shop displays.
  */
-
-import type { DealType, DealConfig } from '@/lib/types/airtable';
 
 // ============================================================================
 // TYPES
@@ -401,52 +396,34 @@ export interface ShopProfileFlags {
   isMinimusikertag?: boolean;
   isPlus?: boolean;
   isSchulsong?: boolean;
-}
-
-export interface DealProfileOverride {
-  enabled?: boolean;
-  type?: DealType;
-  config?: DealConfig;
+  isScs?: boolean;
 }
 
 /**
  * Resolve the shop profile from admin event type flags.
  *
- * When Deal Builder is enabled, deal_type + deal_config take priority.
- * Otherwise falls back to legacy boolean flags.
- *
- * Legacy priority: schulsong-only > plus > minimusikertag
+ * Priority: SCS > schulsong-only > plus > minimusikertag
  */
 export function resolveShopProfile(
-  flags: ShopProfileFlags,
-  deal?: DealProfileOverride
+  flags: ShopProfileFlags
 ): ShopProfile {
-  // Deal Builder resolution (only when enabled)
-  if (deal?.enabled && deal.type) {
-    if (deal.type === 'mimu_scs') {
-      return deal.config?.scs_audio_pricing === 'plus' ? SCS_PLUS_PROFILE : SCS_PROFILE;
-    }
-    if (deal.type === 'mimu') {
-      return (deal.config?.music_pricing_enabled ?? deal.config?.cheaper_music) ? PLUS_PROFILE : MINIMUSIKERTAG_PROFILE;
-    }
-    if (deal.type === 'schus' || deal.type === 'schus_xl') {
-      return SCHULSONG_ONLY_PROFILE;
-    }
+  const { isMinimusikertag, isPlus, isSchulsong, isScs } = flags;
+
+  // SCS takes highest priority
+  if (isScs) {
+    return isPlus ? SCS_PLUS_PROFILE : SCS_PROFILE;
   }
 
-  // Legacy boolean flag fallback (existing events or deal_builder_enabled=false)
-  const { isMinimusikertag, isPlus, isSchulsong } = flags;
-
-  // Schulsong-only takes highest priority
+  // Schulsong-only (schulsong flag set but NOT minimusikertag)
   if (isSchulsong && !isMinimusikertag) {
     return SCHULSONG_ONLY_PROFILE;
   }
 
-  // PLUS takes next priority
+  // PLUS pricing tier
   if (isPlus) {
     return PLUS_PROFILE;
   }
 
-  // Default to minimusikertag
+  // Default
   return MINIMUSIKERTAG_PROFILE;
 }
