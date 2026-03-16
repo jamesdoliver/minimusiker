@@ -294,6 +294,11 @@ export default function EventDetailPage() {
   const choirs = collections.filter(c => c.classType === 'choir');
   const teacherSongs = collections.filter(c => c.classType === 'teacher_song');
 
+  // Filter regular classes only (exclude choir/teacher_song which have their own sections)
+  const regularClasses = (event?.classes || []).filter(
+    (c: any) => !c.classType || c.classType === 'regular'
+  );
+
   // Collection management handlers
   const toggleCollectionExpanded = (classId: string) => {
     setExpandedCollections((prev) => {
@@ -1355,7 +1360,7 @@ export default function EventDetailPage() {
         </div>
 
         {/* Missing songs warning */}
-        {event.classes.length > 0 && event.classes.some((c: any) => (c.songs || []).length === 0) && (
+        {regularClasses.length > 0 && regularClasses.some((c: any) => (c.songs || []).length === 0) && (
           <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1364,7 +1369,7 @@ export default function EventDetailPage() {
               <p className="text-sm text-yellow-800">
                 Folgende Klassen haben noch keine Lieder:{' '}
                 <span className="font-medium">
-                  {event.classes.filter((c: any) => (c.songs || []).length === 0).map((c: any) => c.className).join(', ')}
+                  {regularClasses.filter((c: any) => (c.songs || []).length === 0).map((c: any) => c.className).join(', ')}
                 </span>
                 {' '}&mdash; diese fehlen in der Album-Reihenfolge.
               </p>
@@ -1372,7 +1377,7 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        {event.classes.length === 0 ? (
+        {regularClasses.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
             <div className="text-4xl mb-4">📚</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Classes Yet</h3>
@@ -1391,7 +1396,7 @@ export default function EventDetailPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {event.classes.map((cls: any) => {
+            {regularClasses.map((cls: any) => {
               const isExpanded = expandedClasses.has(cls.classId);
               const songs = cls.songs || [];
 
@@ -1886,17 +1891,35 @@ export default function EventDetailPage() {
                       </div>
                     </div>
 
-                    {/* Expand/Collapse Icon */}
-                    <svg
-                      className={`w-5 h-5 text-gray-400 transition-transform ${
-                        isExpanded ? 'rotate-180' : ''
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    {/* Expand/Collapse Icon & Actions */}
+                    <div className="flex items-center gap-2">
+                      {/* Action buttons (visible on hover) */}
+                      <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCollection(collection);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Löschen"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <svg
+                        className={`w-5 h-5 text-gray-400 transition-transform ${
+                          isExpanded ? 'rotate-180' : ''
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
                   </button>
 
                   {/* Expanded Content - Songs List */}
@@ -2107,17 +2130,35 @@ export default function EventDetailPage() {
                       </div>
                     </div>
 
-                    {/* Expand/Collapse Icon */}
-                    <svg
-                      className={`w-5 h-5 text-gray-400 transition-transform ${
-                        isExpanded ? 'rotate-180' : ''
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    {/* Expand/Collapse Icon & Actions */}
+                    <div className="flex items-center gap-2">
+                      {/* Action buttons (visible on hover) */}
+                      <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCollection(collection);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Löschen"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <svg
+                        className={`w-5 h-5 text-gray-400 transition-transform ${
+                          isExpanded ? 'rotate-180' : ''
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
                   </button>
 
                   {/* Expanded Content - Songs List */}
