@@ -35,6 +35,23 @@ const ACTIVITY_CONFIG: Record<
   audio_uploaded: { icon: '🎤', color: 'text-purple-600', bgColor: 'bg-purple-100' },
   email_sent: { icon: '📧', color: 'text-green-600', bgColor: 'bg-green-100' },
   deal_type_changed: { icon: '💰', color: 'text-emerald-600', bgColor: 'bg-emerald-100' },
+  status_changed: { icon: '📋', color: 'text-amber-600', bgColor: 'bg-amber-100' },
+  event_type_changed: { icon: '🔄', color: 'text-cyan-600', bgColor: 'bg-cyan-100' },
+  children_updated: { icon: '👶', color: 'text-teal-600', bgColor: 'bg-teal-100' },
+  merch_override_changed: { icon: '👕', color: 'text-pink-600', bgColor: 'bg-pink-100' },
+  notes_updated: { icon: '📝', color: 'text-gray-600', bgColor: 'bg-gray-100' },
+  timeline_updated: { icon: '⏱️', color: 'text-purple-600', bgColor: 'bg-purple-100' },
+  merch_cutoff_changed: { icon: '📅', color: 'text-orange-600', bgColor: 'bg-orange-100' },
+  bulk_order_updated: { icon: '📦', color: 'text-blue-600', bgColor: 'bg-blue-100' },
+  deal_config_saved: { icon: '💰', color: 'text-emerald-600', bgColor: 'bg-emerald-100' },
+  track_approved: { icon: '✅', color: 'text-green-600', bgColor: 'bg-green-100' },
+  track_rejected: { icon: '❌', color: 'text-red-600', bgColor: 'bg-red-100' },
+  schulsong_approved: { icon: '🎵', color: 'text-green-600', bgColor: 'bg-green-100' },
+  schulsong_rejected: { icon: '🎵', color: 'text-red-600', bgColor: 'bg-red-100' },
+  booking_created: { icon: '📥', color: 'text-purple-600', bgColor: 'bg-purple-100' },
+  booking_changed: { icon: '🔄', color: 'text-blue-600', bgColor: 'bg-blue-100' },
+  booking_cancelled: { icon: '🚫', color: 'text-red-600', bgColor: 'bg-red-100' },
+  clothing_order_updated: { icon: '👕', color: 'text-teal-600', bgColor: 'bg-teal-100' },
 };
 
 function formatRelativeTime(dateString: string): string {

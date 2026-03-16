@@ -1082,7 +1082,24 @@ export type EventActivityType =
   | 'email_discussion'
   | 'audio_uploaded'
   | 'email_sent'
-  | 'deal_type_changed';
+  | 'deal_type_changed'
+  | 'status_changed'
+  | 'event_type_changed'
+  | 'children_updated'
+  | 'merch_override_changed'
+  | 'notes_updated'
+  | 'timeline_updated'
+  | 'merch_cutoff_changed'
+  | 'bulk_order_updated'
+  | 'deal_config_saved'
+  | 'track_approved'
+  | 'track_rejected'
+  | 'schulsong_approved'
+  | 'schulsong_rejected'
+  | 'booking_created'
+  | 'booking_changed'
+  | 'booking_cancelled'
+  | 'clothing_order_updated';
 
 export type ActorType = 'teacher' | 'admin' | 'system';
 
