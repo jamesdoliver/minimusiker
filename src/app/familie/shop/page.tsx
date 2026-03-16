@@ -119,18 +119,12 @@ function ShopContent() {
         );
         if (response.ok) {
           const data = await response.json();
-          setShopProfile(resolveShopProfile(
-            {
-              isMinimusikertag: data.isMinimusikertag,
-              isPlus: data.isPlus,
-              isSchulsong: data.isSchulsong,
-            },
-            {
-              enabled: data.dealBuilderEnabled,
-              type: data.dealType,
-              config: data.dealConfig,
-            }
-          ));
+          setShopProfile(resolveShopProfile({
+            isMinimusikertag: data.isMinimusikertag,
+            isPlus: data.isPlus,
+            isSchulsong: data.isSchulsong,
+            isScs: false,
+          }));
           setEventDate(data.eventDate || null);
           setIsStandardMerchOnly(data.isStandardMerchOnly === true);
           if (data.timelineOverrides) {

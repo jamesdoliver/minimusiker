@@ -162,19 +162,18 @@ export default function EventSettingsPage() {
             setSavedOverrides(defaults);
           }
           // Determine effective tier: schulsong-only when is_schulsong=true but not plus/minimusikertag
-          const { is_schulsong, is_plus, is_minimusikertag, deal_builder_enabled, deal_type, deal_config, schulsong_merch_cutoff } = eventRecordResult;
+          const { is_schulsong, is_plus, is_minimusikertag, schulsong_merch_cutoff } = eventRecordResult;
           setIsSchulsong(is_schulsong);
           setIsSchulsongOnly(is_schulsong && !is_plus && !is_minimusikertag);
           setSchulsongMerchCutoff(schulsong_merch_cutoff || null);
 
           // Resolve shop profile for product visibility toggles
-          const parsedDealConfig = deal_config
-            ? (typeof deal_config === 'string' ? JSON.parse(deal_config) : deal_config)
-            : undefined;
-          setShopProfile(resolveShopProfile(
-            { isMinimusikertag: is_minimusikertag, isPlus: is_plus, isSchulsong: is_schulsong },
-            { enabled: deal_builder_enabled, type: deal_type, config: parsedDealConfig }
-          ));
+          setShopProfile(resolveShopProfile({
+            isMinimusikertag: is_minimusikertag,
+            isPlus: is_plus,
+            isSchulsong: is_schulsong,
+            isScs: false,
+          }));
         }
       } catch (err) {
         console.error('Error loading event:', err);
