@@ -55,7 +55,7 @@ export async function GET(
     }
 
     // Only accessible for SCS events with shirts included
-    if (event.deal_type !== 'mimu_scs' || event.deal_config?.scs_shirts_included === false) {
+    if (event.scs_shirts_included !== true) {
       return NextResponse.json(
         { error: 'Clothing order not available for this event' },
         { status: 403 }
@@ -118,7 +118,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    if (event.deal_type !== 'mimu_scs' || event.deal_config?.scs_shirts_included === false) {
+    if (event.scs_shirts_included !== true) {
       return NextResponse.json(
         { error: 'Clothing order not available for this event' },
         { status: 403 }

@@ -204,7 +204,7 @@ function ParentPortalContent() {
             isMinimusikertag: data.isMinimusikertag,
             isPlus: data.isPlus,
             isSchulsong: data.isSchulsong,
-            isScs: false,
+            isScs: data.scsShirtsIncluded === true,
           });
 
           // Filter out hidden products from the profile (uses date-based defaults if not explicitly configured)

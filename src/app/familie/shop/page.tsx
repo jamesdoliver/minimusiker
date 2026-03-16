@@ -123,7 +123,7 @@ function ShopContent() {
             isMinimusikertag: data.isMinimusikertag,
             isPlus: data.isPlus,
             isSchulsong: data.isSchulsong,
-            isScs: false,
+            isScs: data.scsShirtsIncluded === true,
           }));
           setEventDate(data.eventDate || null);
           setIsStandardMerchOnly(data.isStandardMerchOnly === true);

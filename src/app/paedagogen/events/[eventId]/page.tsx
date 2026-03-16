@@ -1364,8 +1364,8 @@ export default function TeacherEventDetailPage() {
           )}
         </div>
 
-        {/* SCS Clothing Order - Only shown for mimu_scs events with shirts included */}
-        {event.dealType === 'mimu_scs' && event.scsShirtsIncluded !== false && (
+        {/* SCS Clothing Order - Only shown when scs_shirts_included is enabled */}
+        {event.scsShirtsIncluded === true && (
           <div className="mb-8">
             <SchulClothingOrder
               eventId={event.eventId}

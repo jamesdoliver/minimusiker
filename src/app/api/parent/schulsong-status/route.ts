@@ -54,10 +54,8 @@ export async function GET(request: NextRequest) {
     const isPlus = event?.is_plus === true;
     const eventDate = event?.event_date || null;
     const timelineOverrides = event?.timeline_overrides || null;
-    // Deal Builder data for shop profile resolution
-    const dealBuilderEnabled = event?.deal_builder_enabled === true;
-    const dealType = event?.deal_type || null;
-    const dealConfig = event?.deal_config || null;
+    // SCS shirts included (event-level field for shop profile resolution)
+    const scsShirtsIncluded = event?.scs_shirts_included === true;
     // Standard merch gate: <100 kids = standard only (unless admin overrides)
     const standardMerchOnly = computeStandardMerchOnly(event?.standard_merch_override, event?.is_under_100);
 
@@ -73,9 +71,7 @@ export async function GET(request: NextRequest) {
         isPlus,
         eventDate,
         timelineOverrides,
-        dealBuilderEnabled,
-        dealType,
-        dealConfig,
+        scsShirtsIncluded,
         isStandardMerchOnly: standardMerchOnly,
         schulsongMerchCutoff: null,
       });
@@ -92,9 +88,7 @@ export async function GET(request: NextRequest) {
         isPlus,
         eventDate,
         timelineOverrides,
-        dealBuilderEnabled,
-        dealType,
-        dealConfig,
+        scsShirtsIncluded,
         isStandardMerchOnly: standardMerchOnly,
         schulsongMerchCutoff: event?.schulsong_merch_cutoff || null,
         hasAudio: false,
@@ -130,9 +124,7 @@ export async function GET(request: NextRequest) {
         isPlus,
         eventDate,
         timelineOverrides,
-        dealBuilderEnabled,
-        dealType,
-        dealConfig,
+        scsShirtsIncluded,
         isStandardMerchOnly: standardMerchOnly,
         schulsongMerchCutoff: event?.schulsong_merch_cutoff || null,
         hasAudio: false,
@@ -148,9 +140,7 @@ export async function GET(request: NextRequest) {
         isPlus,
         eventDate,
         timelineOverrides,
-        dealBuilderEnabled,
-        dealType,
-        dealConfig,
+        scsShirtsIncluded,
         isStandardMerchOnly: standardMerchOnly,
         schulsongMerchCutoff: event?.schulsong_merch_cutoff || null,
         hasAudio: false,
@@ -166,9 +156,7 @@ export async function GET(request: NextRequest) {
       isPlus,
       eventDate,
       timelineOverrides,
-      dealBuilderEnabled,
-      dealType,
-      dealConfig,
+      scsShirtsIncluded,
       isStandardMerchOnly: standardMerchOnly,
       schulsongMerchCutoff: event?.schulsong_merch_cutoff || null,
       hasAudio: true,
