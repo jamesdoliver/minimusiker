@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService } from '@/lib/services/activityService';
 import {
   SCHUL_CLOTHING_ORDERS_TABLE_ID,
   SCHUL_CLOTHING_ORDERS_FIELD_IDS,
@@ -153,6 +154,14 @@ export async function PUT(
         ...sizes,
       });
     }
+
+    getActivityService().logActivity({
+      eventRecordId,
+      activityType: 'clothing_order_updated',
+      description: 'Clothing order updated by teacher',
+      actorEmail: session.email,
+      actorType: 'teacher',
+    });
 
     return NextResponse.json({
       success: true,
