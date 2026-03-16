@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { getActivityService } from '@/lib/services/activityService';
 import { computeSchulsongReleaseDate } from '@/lib/utils/schulsongRelease';
 import { sendSchulsongReleaseEmailForEvent, sendSchulsongParentReleaseEmailForEvent } from '@/lib/services/schulsongEmailService';
 
@@ -87,6 +88,19 @@ export async function POST(
       }
     }
 
+    // Log activity (fire-and-forget)
+    const eventRecordId = await airtableService.getEventsRecordIdByBookingId(resolvedEventId);
+    if (eventRecordId) {
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'schulsong_approved',
+        description: 'Schulsong approved by admin',
+        actorEmail: session.email,
+        actorType: 'admin',
+        metadata: { mode, isOverride },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       releasedAt,
@@ -153,6 +167,19 @@ export async function DELETE(
 
     // Clear schulsong_released_at on Events table
     await airtableService.setSchulsongReleasedAt(resolvedEventId, null);
+
+    // Log activity (fire-and-forget)
+    const eventRecordId = await airtableService.getEventsRecordIdByBookingId(resolvedEventId);
+    if (eventRecordId) {
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'schulsong_rejected',
+        description: `Schulsong rejected by admin${comment ? `: ${comment}` : ''}`,
+        actorEmail: session.email,
+        actorType: 'admin',
+        metadata: { comment },
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

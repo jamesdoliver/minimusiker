@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService } from '@/lib/services/activityService';
 import {
   ApproveTracksRequest,
   ApproveTracksResponse,
@@ -62,6 +63,22 @@ export async function POST(
         });
       } catch (err) {
         console.error(`Error updating track ${approval.audioFileId}:`, err);
+      }
+    }
+
+    // Log activity for each track approval (fire-and-forget)
+    const eventRecordId = await airtableService.getEventsRecordIdByBookingId(resolvedEventId);
+    if (eventRecordId) {
+      for (const approval of body.trackApprovals) {
+        if (!approval.audioFileId || !approval.status) continue;
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: approval.status === 'approved' ? 'track_approved' : 'track_rejected',
+          description: `Track ${approval.status}${approval.comment ? `: ${approval.comment}` : ''}`,
+          actorEmail: session.email,
+          actorType: 'admin',
+          metadata: { audioFileId: approval.audioFileId, status: approval.status, comment: approval.comment },
+        });
       }
     }
 
