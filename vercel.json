@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/standard-clothing-batch",
       "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/cron/event-readiness",
+      "schedule": "0 7 * * *"
     }
   ],
   "functions": {
@@ -33,6 +37,9 @@
     },
     "src/app/api/cron/standard-clothing-batch/route.ts": {
       "maxDuration": 120
+    },
+    "src/app/api/cron/event-readiness/route.ts": {
+      "maxDuration": 300
     },
     "src/app/api/audio/process/route.ts": {
       "maxDuration": 300
