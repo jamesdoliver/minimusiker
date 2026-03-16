@@ -902,6 +902,18 @@ export async function PATCH(
           },
         });
       }
+
+      // Log activity for deal config change (when only config changes, no type change)
+      if (body.deal_config !== undefined && body.deal_type === undefined) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'deal_config_saved',
+          description: `Deal configuration updated${body.deal_config?.calculated_fee != null ? ` (total: €${body.deal_config.calculated_fee})` : ''}`,
+          actorEmail: admin.email,
+          actorType: 'admin',
+          metadata: { calculatedFee: body.deal_config?.calculated_fee },
+        });
+      }
     }
 
     // Handle bulk order field updates
@@ -917,6 +929,19 @@ export async function PATCH(
         bulkOrderFields.minicard_order_quantity = body.minicard_order_quantity;
       }
       updatedEvent = await airtableService.updateEventFields(eventRecordId, bulkOrderFields);
+
+      const changes: string[] = [];
+      if (body.scs_shirts_included !== undefined) changes.push(`SCS shirts: ${body.scs_shirts_included ? 'enabled' : 'disabled'}`);
+      if (body.minicard_order_enabled !== undefined) changes.push(`Minicard order: ${body.minicard_order_enabled ? 'enabled' : 'disabled'}`);
+      if (body.minicard_order_quantity !== undefined) changes.push(`Minicard qty: ${body.minicard_order_quantity}`);
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'bulk_order_updated',
+        description: `Bulk order updated: ${changes.join(', ')}`,
+        actorEmail: admin.email,
+        actorType: 'admin',
+        metadata: { scsShirtsIncluded: body.scs_shirts_included, minicardOrderEnabled: body.minicard_order_enabled, minicardOrderQuantity: body.minicard_order_quantity },
+      });
     }
 
     return NextResponse.json({
