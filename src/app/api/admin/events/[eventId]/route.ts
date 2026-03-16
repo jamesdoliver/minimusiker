@@ -669,6 +669,59 @@ export async function PATCH(
 
       updatedEvent = await airtableService.updateEventFields(eventRecordId, fieldUpdates);
 
+      // Log activity for status change (fire-and-forget)
+      if (hasStatusUpdate && body.status !== undefined) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'status_changed',
+          description: `Status changed to "${body.status || 'none'}"`,
+          actorEmail: admin.email,
+          actorType: 'admin',
+          metadata: { newStatus: body.status },
+        });
+      }
+
+      // Log activity for event type toggles (fire-and-forget)
+      if (hasEventTypeUpdates) {
+        const changes: string[] = [];
+        if (body.is_plus !== undefined) changes.push(`is_plus → ${body.is_plus}`);
+        if (body.is_minimusikertag !== undefined) changes.push(`is_minimusikertag → ${body.is_minimusikertag}`);
+        if (body.is_schulsong !== undefined) changes.push(`is_schulsong → ${body.is_schulsong}`);
+        if (body.is_kita !== undefined) changes.push(`is_kita → ${body.is_kita}`);
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'event_type_changed',
+          description: `Event type updated: ${changes.join(', ')}`,
+          actorEmail: admin.email,
+          actorType: 'admin',
+          metadata: { is_plus: body.is_plus, is_minimusikertag: body.is_minimusikertag, is_schulsong: body.is_schulsong, is_kita: body.is_kita },
+        });
+      }
+
+      // Log activity for estimated children update (fire-and-forget)
+      if (hasChildrenUpdate) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'children_updated',
+          description: `Estimated children updated to ${body.estimated_children}`,
+          actorEmail: admin.email,
+          actorType: 'admin',
+          metadata: { estimatedChildren: body.estimated_children },
+        });
+      }
+
+      // Log activity for standard merch override (fire-and-forget)
+      if (hasStandardMerchOverride) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'merch_override_changed',
+          description: `Standard merch override set to "${body.standard_merch_override || 'auto'}"`,
+          actorEmail: admin.email,
+          actorType: 'admin',
+          metadata: { standardMerchOverride: body.standard_merch_override },
+        });
+      }
+
       // Auto-assign/remove engineers based on schulsong toggle
       if (body.is_schulsong !== undefined) {
         try {
@@ -735,6 +788,14 @@ export async function PATCH(
       await base(EVENTS_TABLE_ID).update(eventRecordId, {
         [EVENTS_FIELD_IDS.admin_notes]: body.admin_notes,
       });
+
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'notes_updated',
+        description: 'Admin notes updated',
+        actorEmail: admin.email,
+        actorType: 'admin',
+      });
     }
 
     // Handle timeline overrides update
@@ -742,6 +803,14 @@ export async function PATCH(
       const base = airtableService['base'];
       await base(EVENTS_TABLE_ID).update(eventRecordId, {
         [EVENTS_FIELD_IDS.timeline_overrides]: body.timeline_overrides || '',
+      });
+
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'timeline_updated',
+        description: 'Timeline overrides updated',
+        actorEmail: admin.email,
+        actorType: 'admin',
       });
     }
 
@@ -752,6 +821,15 @@ export async function PATCH(
       const cutoffValue = body.schulsong_merch_cutoff || null;
       await base(EVENTS_TABLE_ID).update(eventRecordId, {
         [EVENTS_FIELD_IDS.schulsong_merch_cutoff]: cutoffValue,
+      });
+
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'merch_cutoff_changed',
+        description: `Schulsong merch cutoff ${body.schulsong_merch_cutoff ? 'updated' : 'cleared'}`,
+        actorEmail: admin.email,
+        actorType: 'admin',
+        metadata: { schulsongMerchCutoff: body.schulsong_merch_cutoff },
       });
     }
 
