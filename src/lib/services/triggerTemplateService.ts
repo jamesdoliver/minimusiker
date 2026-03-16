@@ -508,6 +508,14 @@ export function getSampleVariables(slug: string): Record<string, string> {
       eventId: 'evt_example_123',
       engineerPortalUrl: 'https://minimusiker.app/engineer',
     },
+    unassigned_staff_alert: {
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      region: 'Köln/Bonn',
+      bookingId: '12345',
+      unitId: '42',
+      reason: 'Kein Mitarbeiter mit Provider ID 42 gefunden, Region-Fallback ebenfalls fehlgeschlagen',
+    },
   };
 
   return samples[slug] || {};

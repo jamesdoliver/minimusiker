@@ -423,6 +423,68 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     availableVariables: ['schoolName', 'parentName', 'parentPortalLink', 'cutoffDate'],
   },
 
+  // ─── Unassigned Staff Alert (Admin) ──────────────────────────────────
+  {
+    slug: 'unassigned_staff_alert',
+    name: 'Kein Mitarbeiter zugeordnet (Admin)',
+    description: 'Wird an Admins gesendet, wenn bei einer neuen Buchung kein Mitarbeiter automatisch zugeordnet werden konnte.',
+    recipientType: 'admin',
+    triggerEventKey: 'webhook:unassigned_staff',
+    defaultSubject: 'Kein Mitarbeiter zugeordnet: {{schoolName}} - {{eventDate}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Mitarbeiter-Zuordnung fehlgeschlagen
+</h2>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bei einer neuen Buchung konnte kein Mitarbeiter automatisch zugeordnet werden.
+  Bitte weise manuell einen Mitarbeiter zu.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
+  <tr>
+    <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+      <strong style="color: #2F4858;">Schule:</strong>
+      <span style="color: #4a5568; margin-left: 8px;">{{schoolName}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+      <strong style="color: #2F4858;">Datum:</strong>
+      <span style="color: #4a5568; margin-left: 8px;">{{eventDate}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+      <strong style="color: #2F4858;">Region:</strong>
+      <span style="color: #4a5568; margin-left: 8px;">{{region}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+      <strong style="color: #2F4858;">SimplyBook ID:</strong>
+      <span style="color: #4a5568; margin-left: 8px;">{{bookingId}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+      <strong style="color: #2F4858;">Provider ID:</strong>
+      <span style="color: #4a5568; margin-left: 8px;">{{unitId}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 8px 0;">
+      <strong style="color: #c53030;">Grund:</strong>
+      <span style="color: #c53030; margin-left: 8px;">{{reason}}</span>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Bitte melde dich im Admin-Portal an und weise einen Mitarbeiter manuell zu.
+</p>`,
+    availableVariables: ['schoolName', 'eventDate', 'region', 'bookingId', 'unitId', 'reason'],
+  },
+
   // ─── 6. Parent Welcome (migrated from Brevo) ───────────────────────
   {
     slug: 'parent_welcome',
