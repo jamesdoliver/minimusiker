@@ -343,6 +343,86 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     availableVariables: ['schoolName', 'eventDate', 'teacherNotes', 'adminUrl'],
   },
 
+  // ─── 5c. Schulsong Approval Reminder (Teacher + Admin) ──────────────
+  {
+    slug: 'schulsong_approval_reminder',
+    name: 'Schulsong Freigabe-Erinnerung',
+    description: 'Wird täglich an Lehrer und Admins gesendet, solange der Schulsong noch nicht freigegeben wurde (24h+ nach Upload).',
+    recipientType: 'teacher',
+    triggerEventKey: 'cron:schulsong_approval_pending',
+    defaultSubject: 'Schulsong wartet auf Freigabe – {{schoolName}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Schulsong bereit zur Freigabe
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Der Schulsong für die <strong>{{schoolName}}</strong> ({{eventDate}}) wurde vor {{daysPending}} Tagen hochgeladen und wartet auf Ihre Freigabe.
+</p>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bitte hören Sie sich den Song an und geben Sie ihn frei, damit die Eltern ihren Schulsong und das passende Merchandise erhalten können.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td align="center" style="padding: 8px 0 32px 0;">
+      <a href="{{teacherPortalUrl}}"
+         style="display: inline-block; background-color: #d85a6a; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 2px 4px rgba(216, 90, 106, 0.3);">
+        Zum Pädagogen-Portal
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Falls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:<br>
+  <a href="{{teacherPortalUrl}}" style="color: #d85a6a; word-break: break-all;">{{teacherPortalUrl}}</a>
+</p>`,
+    availableVariables: ['schoolName', 'eventDate', 'teacherPortalUrl', 'daysPending'],
+  },
+
+  // ─── 5d. Schulsong Merch Last Chance (Parents) ─────────────────────
+  {
+    slug: 'schulsong_merch_last_chance',
+    name: 'Letzte Chance: Schul-Merch',
+    description: 'Wird 24 Stunden vor Ablauf der Schulsong-Merch-Frist an Eltern gesendet, die noch kein personalisiertes Merchandise bestellt haben.',
+    recipientType: 'parent',
+    triggerEventKey: 'cron:schulsong_merch_cutoff_reminder',
+    defaultSubject: 'Letzte Chance: Schul-Merch für {{schoolName}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Letzte Chance für personalisiertes Schul-Merch!
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Hallo {{parentName}},
+</p>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Die Bestellfrist für personalisierte T-Shirts und Hoodies mit dem Namen der <strong>{{schoolName}}</strong> endet morgen am <strong>{{cutoffDate}}</strong>.
+</p>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Danach sind nur noch Standard-Designs verfügbar. Jetzt bestellen und ein einzigartiges Erinnerungsstück sichern!
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td align="center" style="padding: 8px 0 32px 0;">
+      <a href="{{parentPortalLink}}"
+         style="display: inline-block; background-color: #d85a6a; color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 2px 4px rgba(216, 90, 106, 0.3);">
+        Zum Elternportal
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Falls der Button nicht funktioniert, kopiere diesen Link in deinen Browser:<br>
+  <a href="{{parentPortalLink}}" style="color: #d85a6a; word-break: break-all;">{{parentPortalLink}}</a>
+</p>`,
+    availableVariables: ['schoolName', 'parentName', 'parentPortalLink', 'cutoffDate'],
+  },
+
   // ─── 6. Parent Welcome (migrated from Brevo) ───────────────────────
   {
     slug: 'parent_welcome',
