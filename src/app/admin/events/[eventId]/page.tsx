@@ -140,7 +140,7 @@ export default function EventDetailPage() {
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<{
-    type: 'class' | 'song' | 'group';
+    type: 'class' | 'song' | 'group' | 'collection';
     id: string;
     name: string;
   } | null>(null);
@@ -150,7 +150,7 @@ export default function EventDetailPage() {
   // Move data confirmation dialog (for classes/groups with attached data)
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [pendingDeleteType, setPendingDeleteType] = useState<'class' | 'group'>('class');
+  const [pendingDeleteType, setPendingDeleteType] = useState<'class' | 'group' | 'collection'>('class');
   const [pendingDeleteName, setPendingDeleteName] = useState<string>('');
   const [pendingData, setPendingData] = useState({ songCount: 0, registrationCount: 0, audioFileCount: 0 });
 
@@ -165,6 +165,8 @@ export default function EventDetailPage() {
   const [isMinimusikertag, setIsMinimusikertag] = useState(true);
   const [schulsongReleasedAt, setSchulsongReleasedAt] = useState<string | null>(null);
   const [schulsongMerchCutoff, setSchulsongMerchCutoff] = useState<string | null>(null);
+  const [schulsongApprovalStatus, setSchulsongApprovalStatus] = useState<'pending' | 'approved' | 'rejected' | null>(null);
+  const [schulsongFileExists, setSchulsongFileExists] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdatingToggles, setIsUpdatingToggles] = useState<string | null>(null); // Track which toggle is updating
 
@@ -191,6 +193,7 @@ export default function EventDetailPage() {
       fetchTeamStaff();
       fetchGroups();
       fetchCollections();
+      fetchSchulsongStatus();
     }
   }, [eventId]);
 
@@ -231,6 +234,23 @@ export default function EventDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to load event details');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchSchulsongStatus = async () => {
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/schulsong-status`);
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.schulsongFile) {
+        setSchulsongFileExists(true);
+        setSchulsongApprovalStatus(data.schulsongFile.approvalStatus || 'pending');
+      } else {
+        setSchulsongFileExists(false);
+        setSchulsongApprovalStatus(null);
+      }
+    } catch (err) {
+      console.error('Error fetching schulsong status:', err);
     }
   };
 
@@ -290,6 +310,15 @@ export default function EventDetailPage() {
   const handleAddSongToCollection = (classId: string) => {
     setSelectedClass({ id: classId, name: '', numChildren: 0 });
     setShowAddSong(true);
+  };
+
+  const handleDeleteCollection = (collection: { classId: string; className: string }) => {
+    setDeleteTarget({
+      type: 'collection',
+      id: collection.classId,
+      name: collection.className,
+    });
+    setShowDeleteConfirm(true);
   };
 
   // Refresh teacher handler - syncs contact person to class main_teacher
@@ -619,7 +648,7 @@ export default function EventDetailPage() {
     setIsDeleting(true);
     try {
       let endpoint: string;
-      if (deleteTarget.type === 'class') {
+      if (deleteTarget.type === 'class' || deleteTarget.type === 'collection') {
         endpoint = `/api/admin/classes/${deleteTarget.id}`;
       } else if (deleteTarget.type === 'group') {
         endpoint = `/api/admin/groups/${deleteTarget.id}`;
@@ -632,7 +661,7 @@ export default function EventDetailPage() {
 
       if (!response.ok) {
         // Handle DATA_ATTACHED error - show move confirmation dialog
-        if (data.code === 'DATA_ATTACHED' && (deleteTarget.type === 'class' || deleteTarget.type === 'group')) {
+        if (data.code === 'DATA_ATTACHED' && (deleteTarget.type === 'class' || deleteTarget.type === 'group' || deleteTarget.type === 'collection')) {
           setPendingDeleteId(deleteTarget.id);
           setPendingDeleteType(deleteTarget.type);
           setPendingDeleteName(deleteTarget.name);
@@ -649,7 +678,7 @@ export default function EventDetailPage() {
         throw new Error(data.error || 'Failed to delete');
       }
 
-      const typeLabel = deleteTarget.type === 'class' ? 'Class' : deleteTarget.type === 'group' ? 'Group' : 'Song';
+      const typeLabel = deleteTarget.type === 'class' ? 'Class' : deleteTarget.type === 'group' ? 'Group' : deleteTarget.type === 'collection' ? 'Collection' : 'Song';
       toast.success(`${typeLabel} deleted successfully`);
       setShowDeleteConfirm(false);
       setDeleteTarget(null);
@@ -658,6 +687,9 @@ export default function EventDetailPage() {
       fetchEventDetail();
       if (deleteTarget.type === 'group') {
         fetchGroups();
+      }
+      if (deleteTarget.type === 'collection') {
+        fetchCollections();
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete');
@@ -672,7 +704,7 @@ export default function EventDetailPage() {
 
     setIsDeleting(true);
     try {
-      const endpoint = pendingDeleteType === 'class'
+      const endpoint = pendingDeleteType === 'class' || pendingDeleteType === 'collection'
         ? `/api/admin/classes/${pendingDeleteId}?confirmMove=true`
         : `/api/admin/groups/${pendingDeleteId}?confirmMove=true`;
 
@@ -683,7 +715,7 @@ export default function EventDetailPage() {
         throw new Error(data.error || 'Failed to delete');
       }
 
-      const typeLabel = pendingDeleteType === 'class' ? 'Class' : 'Group';
+      const typeLabel = pendingDeleteType === 'class' ? 'Class' : pendingDeleteType === 'collection' ? 'Collection' : 'Group';
       toast.success(`${typeLabel} deleted - data moved to "Alle Kinder"`);
       setShowMoveDialog(false);
       setPendingDeleteId(null);
@@ -693,6 +725,9 @@ export default function EventDetailPage() {
       fetchEventDetail();
       if (pendingDeleteType === 'group') {
         fetchGroups();
+      }
+      if (pendingDeleteType === 'collection') {
+        fetchCollections();
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete');
@@ -1137,17 +1172,48 @@ export default function EventDetailPage() {
         </div>
       </div>
 
-      {/* Schulsong Release Hold Banner */}
-      {isSchulsong && !schulsongReleasedAt && (isPlus || isMinimusikertag) && (
+      {/* Schulsong Status Banners */}
+      {isSchulsong && schulsongFileExists && schulsongApprovalStatus === 'pending' && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
           <div className="flex items-start gap-3">
             <div className="text-amber-600 mt-0.5">&#9203;</div>
             <div>
               <p className="text-sm font-medium text-amber-800">
-                Audio-Veroeffentlichung wartet auf Schulsong-Freigabe
+                Schulsong wartet auf Lehrer-Freigabe
               </p>
-              <p className="text-xs text-amber-600 mt-1">
-                Die Klassen-Aufnahmen werden erst freigegeben, wenn der Lehrer den Schulsong genehmigt hat.
+              {(isPlus || isMinimusikertag) && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Die Klassen-Aufnahmen werden zurueckgehalten, bis der Lehrer den Schulsong freigegeben hat.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {isSchulsong && schulsongFileExists && schulsongApprovalStatus === 'rejected' && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="text-orange-600 mt-0.5">&#9888;&#65039;</div>
+            <div>
+              <p className="text-sm font-medium text-orange-800">
+                Schulsong abgelehnt &mdash; Ingenieur arbeitet an neuer Version
+              </p>
+              {(isPlus || isMinimusikertag) && (
+                <p className="text-xs text-orange-600 mt-1">
+                  Die Klassen-Aufnahmen werden zurueckgehalten, bis eine neue Version freigegeben wurde.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {isSchulsong && schulsongFileExists && schulsongApprovalStatus === 'approved' && schulsongReleasedAt && new Date(schulsongReleasedAt) > new Date() && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <div className="text-green-600 mt-0.5">&#9989;</div>
+            <div>
+              <p className="text-sm font-medium text-green-800">
+                Schulsong freigegeben, Release am {new Date(schulsongReleasedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
               </p>
             </div>
           </div>
