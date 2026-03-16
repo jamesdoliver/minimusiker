@@ -154,7 +154,20 @@ export async function sendSchulsongReleaseEmailForEvent(
 
 const PARENT_SLUG = 'schulsong_parent_release';
 
-function computeMerchandiseDeadline(eventDate: string, overrides?: EventTimelineOverrides | null): string {
+function computeMerchandiseDeadline(
+  eventDate: string,
+  overrides?: EventTimelineOverrides | null,
+  schulsongMerchCutoff?: string | null
+): string {
+  // Prefer the auto-computed/admin-overridden absolute cutoff date
+  if (schulsongMerchCutoff) {
+    return new Date(schulsongMerchCutoff).toLocaleDateString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }
+  // Fallback: compute from event_date + threshold days
   const date = new Date(eventDate);
   const days = getThreshold('merchandise_deadline_days', overrides);
   date.setDate(date.getDate() + days);
@@ -238,7 +251,7 @@ export async function sendSchulsongParentReleaseEmailForEvent(
       eventLink,
       parentPortalLink: `${baseUrl}/familie`,
       parentName: recipient.name || '',
-      merchandiseDeadline: computeMerchandiseDeadline(event.event_date, parseOverrides(event.timeline_overrides)),
+      merchandiseDeadline: computeMerchandiseDeadline(event.event_date, parseOverrides(event.timeline_overrides), event.schulsong_merch_cutoff),
     };
 
     // Render template (with unsubscribe for parent recipients)
