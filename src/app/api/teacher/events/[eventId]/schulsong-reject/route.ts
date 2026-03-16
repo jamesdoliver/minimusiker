@@ -44,11 +44,14 @@ export async function POST(
     // Reject the schulsong
     const result = await teacherService.rejectSchulsongAsTeacher(eventId, notes);
 
-    // Clear any scheduled release
+    // Clear any scheduled release and merch cutoff (will be recomputed on next approval)
     const airtableService = getAirtableService();
     const event = await airtableService.getEventByEventId(eventId);
     if (event?.schulsong_released_at) {
       await airtableService.setSchulsongReleasedAt(eventId, '');
+    }
+    if (event?.schulsong_merch_cutoff) {
+      await airtableService.setSchulsongMerchCutoff(eventId, null);
     }
 
     // Notify engineer and admins (fire-and-forget)
