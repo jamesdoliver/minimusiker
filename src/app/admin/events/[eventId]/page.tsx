@@ -448,31 +448,8 @@ export default function EventDetailPage() {
     }
   };
 
-  // Deal Builder handlers
-  const handleDealToggleEnabled = async (enabled: boolean) => {
-    setIsUpdatingDeal(true);
-    try {
-      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deal_builder_enabled: enabled,
-          ...(enabled && dealType ? { deal_type: dealType, deal_config: dealConfig } : {}),
-        }),
-      });
-      if (!response.ok) throw new Error('Failed to toggle Deal Builder');
-      setDealBuilderEnabled(enabled);
-      // Re-fetch to sync boolean flags
-      fetchEventDetail();
-      toast.success(enabled ? 'Deal Builder enabled' : 'Deal Builder disabled');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to toggle Deal Builder');
-    } finally {
-      setIsUpdatingDeal(false);
-    }
-  };
-
-  const handleDealUpdate = async (newDealType: DealType | null, newConfig: DealConfig) => {
+  // Deal Builder handler
+  const handleDealSave = async (newConfig: DealConfig) => {
     setIsUpdatingDeal(true);
     try {
       const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
@@ -480,12 +457,11 @@ export default function EventDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deal_builder_enabled: true,
-          deal_type: newDealType,
+          deal_type: dealType,
           deal_config: newConfig,
         }),
       });
       if (!response.ok) throw new Error('Failed to save deal');
-      setDealType(newDealType);
       setDealConfig(newConfig);
       // Re-fetch to sync boolean flags
       fetchEventDetail();
@@ -1136,13 +1112,9 @@ export default function EventDetailPage() {
             {/* Deal Builder */}
             <div className="mt-4">
               <DealBuilder
-                eventId={eventId}
-                enabled={dealBuilderEnabled}
-                dealType={dealType}
                 dealConfig={dealConfig}
-                estimatedChildren={estimatedChildren}
-                onToggleEnabled={handleDealToggleEnabled}
-                onUpdate={handleDealUpdate}
+                scsShirtsIncluded={dealConfig.scs_shirts_included}
+                onSave={handleDealSave}
                 isUpdating={isUpdatingDeal}
               />
             </div>
