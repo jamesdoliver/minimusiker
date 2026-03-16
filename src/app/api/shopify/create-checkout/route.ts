@@ -74,9 +74,7 @@ export async function POST(request: NextRequest) {
         const event = await airtable.getEventByEventId(customAttributes.eventId);
 
         // Detect schulsong-only events (no audio products → no early-bird discount)
-        const isSchulsongOnly = event?.deal_builder_enabled
-          ? (event.deal_type === 'schus' || event.deal_type === 'schus_xl')
-          : (event?.is_schulsong === true && event?.is_minimusikertag !== true);
+        const isSchulsongOnly = event?.is_schulsong === true && event?.is_minimusikertag !== true;
 
         // Early-bird discount: must be within deadline window AND not schulsong-only
         if (event?.event_date && !isSchulsongOnly) {

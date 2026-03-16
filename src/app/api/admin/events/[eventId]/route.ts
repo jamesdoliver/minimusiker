@@ -7,7 +7,6 @@ import { SchoolEventDetail, EVENTS_TABLE_ID, EVENTS_FIELD_IDS, PERSONEN_TABLE_ID
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { simplybookService } from '@/lib/services/simplybookService';
-import { dealTypeToFlags } from '@/lib/utils/dealCalculator';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { parseOverrides } from '@/lib/utils/eventThresholds';
 import {
@@ -226,10 +225,14 @@ export async function PATCH(
       body.deal_config !== undefined;
     const hasStandardMerchOverride = body.standard_merch_override !== undefined;
     const hasMerchCutoffUpdate = body.schulsong_merch_cutoff !== undefined;
+    const hasBulkOrderUpdate =
+      body.scs_shirts_included !== undefined ||
+      body.minicard_order_enabled !== undefined ||
+      body.minicard_order_quantity !== undefined;
 
-    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate && !hasChildrenUpdate && !hasDealUpdate && !hasStandardMerchOverride && !hasMerchCutoffUpdate) {
+    if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate && !hasChildrenUpdate && !hasDealUpdate && !hasStandardMerchOverride && !hasMerchCutoffUpdate && !hasBulkOrderUpdate) {
       return NextResponse.json(
-        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children, deal_builder_enabled, deal_type, deal_config, standard_merch_override, schulsong_merch_cutoff' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children, deal_builder_enabled, deal_type, deal_config, standard_merch_override, schulsong_merch_cutoff, scs_shirts_included, minicard_order_enabled, minicard_order_quantity' },
         { status: 400 }
       );
     }
@@ -788,15 +791,6 @@ export async function PATCH(
         dealFieldUpdates.deal_config = body.deal_config ? JSON.stringify(body.deal_config) : '';
       }
 
-      // When deal builder is enabled and a deal type is set, auto-sync boolean flags
-      if (body.deal_builder_enabled && body.deal_type) {
-        const flags = dealTypeToFlags(body.deal_type as DealType, (body.deal_config || {}) as DealConfig);
-        dealFieldUpdates.is_plus = flags.is_plus;
-        dealFieldUpdates.is_kita = flags.is_kita;
-        dealFieldUpdates.is_schulsong = flags.is_schulsong;
-        dealFieldUpdates.is_minimusikertag = flags.is_minimusikertag;
-      }
-
       updatedEvent = await airtableService.updateEventFields(eventRecordId, dealFieldUpdates);
 
       // Log activity for deal type change
@@ -814,6 +808,21 @@ export async function PATCH(
           },
         });
       }
+    }
+
+    // Handle bulk order field updates
+    if (hasBulkOrderUpdate) {
+      const bulkOrderFields: Record<string, unknown> = {};
+      if (body.scs_shirts_included !== undefined) {
+        bulkOrderFields.scs_shirts_included = body.scs_shirts_included;
+      }
+      if (body.minicard_order_enabled !== undefined) {
+        bulkOrderFields.minicard_order_enabled = body.minicard_order_enabled;
+      }
+      if (body.minicard_order_quantity !== undefined) {
+        bulkOrderFields.minicard_order_quantity = body.minicard_order_quantity;
+      }
+      updatedEvent = await airtableService.updateEventFields(eventRecordId, bulkOrderFields);
     }
 
     return NextResponse.json({

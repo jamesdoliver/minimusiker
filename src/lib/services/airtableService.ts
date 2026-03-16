@@ -5680,6 +5680,9 @@ class AirtableService {
       deal_builder_enabled?: boolean;
       deal_type?: string | null;
       deal_config?: string;
+      scs_shirts_included?: boolean;
+      minicard_order_enabled?: boolean;
+      minicard_order_quantity?: number;
     }
   ): Promise<Event> {
     try {
@@ -5717,6 +5720,15 @@ class AirtableService {
       }
       if (updates.deal_config !== undefined) {
         updateFields[EVENTS_FIELD_IDS.deal_config] = updates.deal_config;
+      }
+      if (updates.scs_shirts_included !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.scs_shirts_included] = updates.scs_shirts_included;
+      }
+      if (updates.minicard_order_enabled !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.minicard_order_enabled] = updates.minicard_order_enabled;
+      }
+      if (updates.minicard_order_quantity !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.minicard_order_quantity] = updates.minicard_order_quantity;
       }
 
       if (Object.keys(updateFields).length === 0) {
@@ -6084,6 +6096,9 @@ class AirtableService {
           EVENTS_FIELD_IDS.deal_builder_enabled,
           EVENTS_FIELD_IDS.deal_type,
           EVENTS_FIELD_IDS.deal_config,
+          EVENTS_FIELD_IDS.scs_shirts_included,
+          EVENTS_FIELD_IDS.minicard_order_enabled,
+          EVENTS_FIELD_IDS.minicard_order_quantity,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -6264,6 +6279,10 @@ class AirtableService {
         if (!raw) return undefined;
         try { return JSON.parse(raw); } catch { return undefined; }
       })(),
+      // Bulk order fields
+      scs_shirts_included: record.get('scs_shirts_included') as boolean | undefined,
+      minicard_order_enabled: record.get('minicard_order_enabled') as boolean | undefined,
+      minicard_order_quantity: record.get('minicard_order_quantity') as number | undefined,
     };
   }
 
