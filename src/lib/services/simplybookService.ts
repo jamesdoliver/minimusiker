@@ -322,6 +322,29 @@ class SimplybookService {
   }
 
   /**
+   * Find staff member by SimplyBook provider ID (unit_id)
+   * Matches against the provider_id field in Personen table
+   */
+  async findStaffByProviderId(unitId: string | undefined): Promise<string | null> {
+    if (!unitId) return null;
+
+    try {
+      const records = await this.airtable
+        .table(PERSONEN_TABLE_ID)
+        .select({
+          filterByFormula: `{${PERSONEN_FIELD_IDS.provider_id}} = ${unitId}`,
+          maxRecords: 1,
+        })
+        .firstPage();
+
+      return records[0]?.id || null;
+    } catch (error) {
+      console.error('Error finding staff by provider ID:', error);
+      return null;
+    }
+  }
+
+  /**
    * Find staff member by region in Personen table
    * Matches against the Teams/Regionen field
    */
