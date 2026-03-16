@@ -10,6 +10,7 @@ import {
   BookingNotificationData,
   DateChangeNotificationData,
   CancellationNotificationData,
+  UnassignedStaffNotificationData,
 } from '@/lib/types/notification-settings';
 import {
   sendNewBookingNotification,
@@ -19,6 +20,7 @@ import {
   SchulsongTeacherApprovedData,
   sendEngineerSchulsongUploadedEmail,
   sendEngineerMinimusikerUploadedEmail,
+  sendUnassignedStaffAlertEmail,
 } from './resendService';
 import { getAirtableService } from './airtableService';
 
@@ -173,6 +175,42 @@ export async function triggerCancellationNotification(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[NotificationService] Error in triggerCancellationNotification:', error);
+    return { sent: false, error: errorMessage };
+  }
+}
+
+/**
+ * Send unassigned staff alert notification if enabled
+ */
+export async function triggerUnassignedStaffNotification(
+  data: UnassignedStaffNotificationData
+): Promise<{ sent: boolean; error?: string }> {
+  try {
+    const settings = await getNotificationSettings('unassigned_staff');
+
+    if (!settings || !settings.enabled) {
+      console.log('[NotificationService] Unassigned staff notification disabled or not configured');
+      return { sent: false };
+    }
+
+    const recipients = parseRecipientEmails(settings.recipientEmails);
+    if (recipients.length === 0) {
+      console.log('[NotificationService] No recipients configured for unassigned staff notification');
+      return { sent: false };
+    }
+
+    const result = await sendUnassignedStaffAlertEmail(recipients, data);
+
+    if (result.success) {
+      console.log(`[NotificationService] Unassigned staff alert sent to ${recipients.length} recipients`);
+      return { sent: true };
+    } else {
+      console.error('[NotificationService] Failed to send unassigned staff alert:', result.error);
+      return { sent: false, error: result.error };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[NotificationService] Error in triggerUnassignedStaffNotification:', error);
     return { sent: false, error: errorMessage };
   }
 }
