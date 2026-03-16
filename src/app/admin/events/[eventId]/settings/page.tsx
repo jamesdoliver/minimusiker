@@ -162,7 +162,7 @@ export default function EventSettingsPage() {
             setSavedOverrides(defaults);
           }
           // Determine effective tier: schulsong-only when is_schulsong=true but not plus/minimusikertag
-          const { is_schulsong, is_plus, is_minimusikertag, schulsong_merch_cutoff } = eventRecordResult;
+          const { is_schulsong, is_plus, is_minimusikertag, schulsong_merch_cutoff, scs_shirts_included } = eventRecordResult;
           setIsSchulsong(is_schulsong);
           setIsSchulsongOnly(is_schulsong && !is_plus && !is_minimusikertag);
           setSchulsongMerchCutoff(schulsong_merch_cutoff || null);
@@ -172,7 +172,7 @@ export default function EventSettingsPage() {
             isMinimusikertag: is_minimusikertag,
             isPlus: is_plus,
             isSchulsong: is_schulsong,
-            isScs: false,
+            isScs: scs_shirts_included,
           }));
         }
       } catch (err) {

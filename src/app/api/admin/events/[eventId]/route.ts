@@ -123,6 +123,9 @@ export async function GET(
       standardMerchOverride?: 'force-standard' | 'force-personalized';
       schulsongReleasedAt?: string;
       schulsongMerchCutoff?: string;
+      scsShirtsIncluded?: boolean;
+      minicardOrderEnabled?: boolean;
+      minicardOrderQuantity?: number;
     } = {};
 
     try {
@@ -160,6 +163,9 @@ export async function GET(
             standardMerchOverride: eventRecord.standard_merch_override,
             schulsongReleasedAt: eventRecord.schulsong_released_at,
             schulsongMerchCutoff: eventRecord.schulsong_merch_cutoff,
+            scsShirtsIncluded: eventRecord.scs_shirts_included,
+            minicardOrderEnabled: eventRecord.minicard_order_enabled,
+            minicardOrderQuantity: eventRecord.minicard_order_quantity,
           };
         }
       }

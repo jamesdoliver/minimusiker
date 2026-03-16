@@ -52,5 +52,6 @@ export async function GET(
     deal_type: event.deal_type || null,
     deal_config: event.deal_config || null,
     schulsong_merch_cutoff: event.schulsong_merch_cutoff || null,
+    scs_shirts_included: event.scs_shirts_included ?? false,
   });
 }

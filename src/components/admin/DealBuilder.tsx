@@ -335,9 +335,30 @@ export default function DealBuilder({
   }
 
   function handleSave() {
+    // Build fee_breakdown from enabled presets + custom fees
+    const breakdownItems: { label: string; amount: number }[] = [];
+
+    for (const [key, preset] of Object.entries(localConfig.presets || {})) {
+      if (preset?.enabled) {
+        const def = PRESET_DEFS.find(d => d.key === key);
+        breakdownItems.push({ label: def?.label || key, amount: preset.amount });
+      }
+    }
+
+    for (const fee of localConfig.additional_fees || []) {
+      if (fee.title && fee.amount !== 0) {
+        breakdownItems.push({ label: fee.title, amount: fee.amount });
+      }
+    }
+
     const configToSave: DealConfig = {
       ...localConfig,
       calculated_fee: total,
+      fee_breakdown: {
+        base: 0,
+        items: breakdownItems,
+        total,
+      },
     };
     onSave(configToSave);
     setIsDirty(false);
