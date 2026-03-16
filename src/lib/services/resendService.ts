@@ -8,6 +8,7 @@ import {
   BookingNotificationData,
   DateChangeNotificationData,
   CancellationNotificationData,
+  UnassignedStaffNotificationData,
 } from '@/lib/types/notification-settings';
 import {
   getTriggerTemplate,
@@ -265,6 +266,25 @@ export async function sendCancellationNotification(
       : 'Diese Buchung wurde aus dem System gelöscht.',
     reasonText: isCancelled ? 'Storniert' : 'Gelöscht',
   }, 'Cancellation notification');
+}
+
+/**
+ * Send unassigned staff alert to configured admin recipients
+ */
+export async function sendUnassignedStaffAlertEmail(
+  recipients: string[],
+  data: UnassignedStaffNotificationData
+): Promise<SendEmailResult> {
+  if (recipients.length === 0) return { success: true, messageId: 'no-recipients' };
+
+  return sendTriggerEmail(recipients, 'unassigned_staff_alert', {
+    schoolName: data.schoolName,
+    eventDate: formatDateGerman(data.eventDate),
+    region: data.region || 'Nicht angegeben',
+    bookingId: data.bookingId,
+    unitId: data.unitId || 'Nicht angegeben',
+    reason: data.reason,
+  }, 'Unassigned staff alert');
 }
 
 // ============================================================================
