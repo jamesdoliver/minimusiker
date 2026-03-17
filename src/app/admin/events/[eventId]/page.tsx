@@ -1277,6 +1277,10 @@ export default function EventDetailPage() {
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <DealBuilder
             dealConfig={dealConfig}
+            isPlus={isPlus}
+            scsShirtsIncluded={scsShirtsIncluded}
+            minicardOrderEnabled={minicardOrderEnabled}
+            minicardOrderQuantity={minicardOrderQuantity}
             onSave={handleDealSave}
             isUpdating={isUpdatingDeal}
           />

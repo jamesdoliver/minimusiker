@@ -6,28 +6,30 @@ import { DealConfig, DealConfigPreset } from '@/lib/types/airtable';
 // ─── Props ───────────────────────────────────────────────────────────
 interface DealBuilderProps {
   dealConfig: DealConfig;
+  isPlus?: boolean;
+  scsShirtsIncluded?: boolean;
+  minicardOrderEnabled?: boolean;
+  minicardOrderQuantity?: number;
   onSave: (config: DealConfig) => void;
   isUpdating?: boolean;
 }
 
 // ─── Preset definitions ──────────────────────────────────────────────
-type PresetKey = keyof NonNullable<DealConfig['presets']>;
+type PresetKey = 'pauschale' | 'distance_surcharge' | 'kleine_einrichtung' | 'schulsong_vorlage' | 'schulsong_individuell';
 
 interface PresetDef {
   key: PresetKey;
   label: string;
   defaultAmount: number;
-  isNegative?: boolean;
+  defaultEnabled?: boolean;
 }
 
 const PRESET_DEFS: PresetDef[] = [
-  { key: 'pauschale',          label: 'Pauschale',              defaultAmount: 0 },
-  { key: 'scs_pauschale',     label: 'SCS Pauschale',          defaultAmount: 9500 },
-  { key: 'distance_surcharge', label: 'Entfernungspauschale',   defaultAmount: 500 },
-  { key: 'kleine_einrichtung', label: 'Kleine Einrichtung',     defaultAmount: -500,  isNegative: true },
-  { key: 'grosse_einrichtung', label: 'Grosse Einrichtung',     defaultAmount: 2000 },
-  { key: 'schulsong_discount', label: 'Schulsong Discount',     defaultAmount: -500,  isNegative: true },
-  { key: 'shirts_discount',    label: 'Shirts Discount',        defaultAmount: -3000, isNegative: true },
+  { key: 'pauschale',              label: 'Pauschale',                          defaultAmount: 0,    defaultEnabled: true },
+  { key: 'distance_surcharge',     label: 'Entfernungspauschale',               defaultAmount: 0 },
+  { key: 'kleine_einrichtung',     label: 'Zuschlag für kleine Einrichtungen',  defaultAmount: 0 },
+  { key: 'schulsong_vorlage',      label: 'Schulsong (nach Vorlage)',           defaultAmount: 1000 },
+  { key: 'schulsong_individuell',  label: 'Schulsong (individuell)',            defaultAmount: 1800 },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -36,51 +38,27 @@ function formatCurrency(amount: number): string {
 }
 
 /**
- * Migrate old flat-field DealConfig into the new presets structure.
- * Only runs when `presets` is missing and old-format keys exist.
+ * Migrate old preset keys to v3 structure.
+ * Maps old keys to new ones where possible.
  */
-function migrateToPresets(cfg: DealConfig): DealConfig['presets'] {
-  const presets: NonNullable<DealConfig['presets']> = {};
+function migratePresets(cfg: DealConfig): DealConfig['presets'] {
+  const existing = cfg.presets;
+  if (!existing) return undefined;
 
-  // Old #mimu fields
-  if (cfg.pauschale_enabled !== undefined) {
-    presets.pauschale = {
-      enabled: cfg.pauschale_enabled !== false,
-      amount: cfg.custom_fees?.base ?? 0,
-    };
-  }
-  if (cfg.scs_pauschale_enabled !== undefined) {
-    presets.scs_pauschale = {
-      enabled: cfg.scs_pauschale_enabled !== false,
-      amount: cfg.custom_fees?.base ?? 9500,
-    };
-  }
-  if (cfg.distance_surcharge !== undefined) {
-    presets.distance_surcharge = {
-      enabled: !!cfg.distance_surcharge,
-      amount: cfg.custom_fees?.distance_surcharge ?? 500,
-    };
-  }
-  if (cfg.kleine_einrichtung_enabled !== undefined) {
-    presets.kleine_einrichtung = {
-      enabled: !!cfg.kleine_einrichtung_enabled,
-      amount: cfg.custom_fees?.under_100_kids ?? -500,
-    };
-  }
-  if (cfg.grosse_einrichtung_enabled !== undefined) {
-    presets.grosse_einrichtung = {
-      enabled: !!cfg.grosse_einrichtung_enabled,
-      amount: cfg.custom_fees?.over_250_kids ?? 2000,
-    };
-  }
-  if (cfg.scs_shirts_included === false) {
-    presets.shirts_discount = {
-      enabled: true,
-      amount: cfg.custom_fees?.no_shirts_discount ?? -3000,
-    };
+  const migrated: NonNullable<DealConfig['presets']> = { ...existing };
+
+  // Carry over pauschale, distance_surcharge, kleine_einrichtung as-is (keys unchanged)
+  // Map old schulsong_discount → schulsong_vorlage if no v3 keys exist yet
+  if (!migrated.schulsong_vorlage && !migrated.schulsong_individuell) {
+    if (existing.schulsong_discount) {
+      migrated.schulsong_vorlage = {
+        enabled: existing.schulsong_discount.enabled,
+        amount: Math.abs(existing.schulsong_discount.amount) || 1000,
+      };
+    }
   }
 
-  return Object.keys(presets).length > 0 ? presets : undefined;
+  return migrated;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────
@@ -90,14 +68,12 @@ function PresetRow({
   preset,
   defaultAmount,
   onChange,
-  isNegative,
   disabled,
 }: {
   label: string;
   preset?: DealConfigPreset;
   defaultAmount: number;
   onChange: (preset: DealConfigPreset) => void;
-  isNegative?: boolean;
   disabled?: boolean;
 }) {
   const enabled = preset?.enabled ?? false;
@@ -105,99 +81,31 @@ function PresetRow({
 
   return (
     <div className="flex items-center gap-3">
-      <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
-        <div className="relative flex-shrink-0">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => onChange({ enabled: e.target.checked, amount })}
-            disabled={disabled}
-            className="sr-only peer"
-          />
-          <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-emerald-500 peer-disabled:opacity-50 transition-colors" />
-          <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
-        </div>
-        <span className="text-sm text-gray-800 font-medium">{label}</span>
+      <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onChange({ enabled: e.target.checked, amount })}
+          disabled={disabled}
+          className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+        />
+        <span className={`text-sm ${enabled ? 'text-gray-800' : 'text-gray-500'}`}>{label}</span>
       </label>
       <span className="inline-flex items-center gap-1">
-        <span className="text-xs text-gray-400">{isNegative ? '-' : '+'}€</span>
+        <span className="text-xs text-gray-400">€</span>
         <input
           type="number"
           min="0"
           step="50"
-          value={Math.abs(amount)}
+          value={amount}
           onChange={(e) => {
             const raw = parseFloat(e.target.value);
             if (!isNaN(raw)) {
-              onChange({ enabled, amount: isNegative ? -raw : raw });
+              onChange({ enabled, amount: raw });
             }
           }}
-          disabled={disabled || !enabled}
-          className={`w-24 text-xs px-1.5 py-0.5 rounded border text-right tabular-nums ${
-            enabled ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50 text-gray-400'
-          } focus:outline-none focus:ring-1 focus:ring-emerald-400`}
-        />
-        {amount !== defaultAmount && enabled && (
-          <button
-            type="button"
-            onClick={() => onChange({ enabled, amount: defaultAmount })}
-            className="text-gray-400 hover:text-gray-600 p-0.5"
-            title="Reset to default"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
-        )}
-      </span>
-    </div>
-  );
-}
-
-function GratisItemRow({
-  label,
-  enabled,
-  onToggle,
-  quantity,
-  onQuantityChange,
-  disabled,
-}: {
-  label: string;
-  enabled: boolean;
-  onToggle: (enabled: boolean) => void;
-  quantity: number;
-  onQuantityChange: (qty: number) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
-        <div className="relative flex-shrink-0">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => onToggle(e.target.checked)}
-            disabled={disabled}
-            className="sr-only peer"
-          />
-          <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-emerald-500 peer-disabled:opacity-50 transition-colors" />
-          <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform" />
-        </div>
-        <span className="text-sm text-gray-800 font-medium">{label}</span>
-      </label>
-      <span className="inline-flex items-center gap-1">
-        <span className="text-xs text-gray-400">Anz:</span>
-        <input
-          type="number"
-          min="0"
-          value={quantity || ''}
-          placeholder="0"
-          onChange={(e) => {
-            const v = parseInt(e.target.value);
-            onQuantityChange(isNaN(v) ? 0 : v);
-          }}
-          disabled={disabled || !enabled}
-          className={`w-16 text-xs px-1.5 py-0.5 rounded border text-right tabular-nums ${
+          disabled={disabled}
+          className={`w-20 text-sm px-2 py-1 rounded border text-right tabular-nums ${
             enabled ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50 text-gray-400'
           } focus:outline-none focus:ring-1 focus:ring-emerald-400`}
         />
@@ -234,38 +142,53 @@ function CustomFeesSection({
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg p-3 space-y-2">
-      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Custom Fees</h4>
+    <div className="space-y-2">
+      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Individuelle Deals</h4>
+      {fees.length === 0 && (
+        <div className="flex items-center gap-2 opacity-40">
+          <input
+            type="text"
+            placeholder="z.B. Pauschale für gratis Minicards"
+            disabled
+            className="flex-1 text-sm px-2 py-1 rounded border border-gray-200 bg-gray-50"
+          />
+          <span className="text-xs text-gray-400">€</span>
+          <input
+            type="number"
+            placeholder="-"
+            disabled
+            className="w-20 text-sm px-2 py-1 rounded border border-gray-200 bg-gray-50 text-right"
+          />
+        </div>
+      )}
       {fees.map((f, i) => (
         <div key={i} className="flex items-center gap-2">
           <input
             type="text"
             value={f.title}
-            placeholder="Fee title"
+            placeholder="Bezeichnung"
             onChange={(e) => updateFee(i, 'title', e.target.value)}
             disabled={disabled}
-            className="flex-1 text-sm px-2 py-1 rounded border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="flex-1 text-sm px-2 py-1 rounded border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400"
           />
-          <span className="inline-flex items-center gap-1">
-            <span className="text-xs text-gray-400">+€</span>
-            <input
-              type="number"
-              step="50"
-              value={f.amount === 0 ? '0' : f.amount || ''}
-              onChange={(e) => {
-                const raw = e.target.value;
-                updateFee(i, 'amount', raw === '' ? 0 : parseFloat(raw) || 0);
-              }}
-              disabled={disabled}
-              className="w-20 text-xs px-1.5 py-0.5 rounded border border-gray-200 bg-white text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </span>
+          <span className="text-xs text-gray-400">€</span>
+          <input
+            type="number"
+            step="50"
+            value={f.amount === 0 ? '0' : f.amount || ''}
+            onChange={(e) => {
+              const raw = e.target.value;
+              updateFee(i, 'amount', raw === '' ? 0 : parseFloat(raw) || 0);
+            }}
+            disabled={disabled}
+            className="w-20 text-sm px-2 py-1 rounded border border-gray-200 bg-white text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-400"
+          />
           <button
             type="button"
             onClick={() => removeFee(i)}
             disabled={disabled}
             className="text-gray-400 hover:text-red-500 p-0.5"
-            title="Remove fee"
+            title="Entfernen"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -277,9 +200,9 @@ function CustomFeesSection({
         type="button"
         onClick={addFee}
         disabled={disabled}
-        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+        className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
       >
-        + Add Custom Fee
+        + weiteren Posten hinzufügen
       </button>
     </div>
   );
@@ -289,14 +212,27 @@ function CustomFeesSection({
 
 export default function DealBuilder({
   dealConfig,
+  isPlus,
+  scsShirtsIncluded,
+  minicardOrderEnabled,
+  minicardOrderQuantity,
   onSave,
   isUpdating,
 }: DealBuilderProps) {
-  // Initialise local config, migrating old format if necessary
   const [localConfig, setLocalConfig] = useState<DealConfig>(() => {
-    if (dealConfig.presets) return dealConfig;
-    const migrated = migrateToPresets(dealConfig);
-    return migrated ? { ...dealConfig, presets: migrated } : dealConfig;
+    const migrated = migratePresets(dealConfig);
+    const cfg = migrated ? { ...dealConfig, presets: migrated } : dealConfig;
+    // Ensure pauschale is always enabled for new configs
+    if (!cfg.presets?.pauschale) {
+      return {
+        ...cfg,
+        presets: {
+          ...cfg.presets,
+          pauschale: { enabled: true, amount: 0 },
+        },
+      };
+    }
+    return cfg;
   });
   const [isDirty, setIsDirty] = useState(false);
 
@@ -304,7 +240,8 @@ export default function DealBuilder({
   const total = useMemo(() => {
     let sum = 0;
     if (localConfig.presets) {
-      for (const preset of Object.values(localConfig.presets)) {
+      for (const key of PRESET_DEFS.map(d => d.key)) {
+        const preset = localConfig.presets[key];
         if (preset?.enabled) sum += preset.amount;
       }
     }
@@ -329,13 +266,12 @@ export default function DealBuilder({
   }
 
   function handleSave() {
-    // Build fee_breakdown from enabled presets + custom fees
     const breakdownItems: { label: string; amount: number }[] = [];
 
-    for (const [key, preset] of Object.entries(localConfig.presets || {})) {
+    for (const def of PRESET_DEFS) {
+      const preset = localConfig.presets?.[def.key];
       if (preset?.enabled) {
-        const def = PRESET_DEFS.find(d => d.key === key);
-        breakdownItems.push({ label: def?.label || key, amount: preset.amount });
+        breakdownItems.push({ label: def.label, amount: preset.amount });
       }
     }
 
@@ -348,11 +284,14 @@ export default function DealBuilder({
     const configToSave: DealConfig = {
       ...localConfig,
       calculated_fee: total,
-      fee_breakdown: {
-        base: 0,
-        items: breakdownItems,
-        total,
-      },
+      fee_breakdown: { base: 0, items: breakdownItems, total },
+      // Store Zusatzinformationen snapshot
+      info_tshirts_included: scsShirtsIncluded,
+      info_tshirts_quantity: localConfig.info_tshirts_quantity,
+      info_minicards_included: minicardOrderEnabled,
+      info_minicards_quantity: localConfig.info_minicards_quantity,
+      info_scs: scsShirtsIncluded,
+      info_plus: isPlus,
     };
     onSave(configToSave);
     setIsDirty(false);
@@ -363,72 +302,125 @@ export default function DealBuilder({
     <div>
       {/* Header */}
       <div className="pb-3 border-b border-gray-100">
-        <span className="text-sm font-semibold text-gray-800">Deal Builder</span>
+        <span className="text-lg font-semibold text-gray-900">Deal Builder</span>
       </div>
 
-      <div className="pt-3 space-y-4">
+      <div className="pt-4 space-y-5">
         {/* ── Presets ─────────────────────────────────────────── */}
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {PRESET_DEFS.map((def) => (
             <PresetRow
               key={def.key}
               label={def.label}
               preset={localConfig.presets?.[def.key]}
               defaultAmount={def.defaultAmount}
-              isNegative={def.isNegative}
               onChange={(p) => updatePreset(def.key, p)}
               disabled={isUpdating}
             />
           ))}
         </div>
 
-        {/* ── Gratis Items ────────────────────────────────────── */}
-        <div className="bg-gray-50 rounded-lg p-3 space-y-3">
-          <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Gratis Items</h4>
-          <GratisItemRow
-            label="Gratis T-Shirts"
-            enabled={localConfig.gratis_tshirts_enabled || false}
-            onToggle={(v) => updateConfig({ gratis_tshirts_enabled: v })}
-            quantity={localConfig.gratis_tshirts_quantity ?? 0}
-            onQuantityChange={(qty) => updateConfig({ gratis_tshirts_quantity: qty })}
-            disabled={isUpdating}
-          />
-          <GratisItemRow
-            label="Gratis Minicards"
-            enabled={localConfig.gratis_minicards_enabled || false}
-            onToggle={(v) => updateConfig({ gratis_minicards_enabled: v })}
-            quantity={localConfig.gratis_minicards_quantity ?? 0}
-            onQuantityChange={(qty) => updateConfig({ gratis_minicards_quantity: qty })}
-            disabled={isUpdating}
-          />
-        </div>
-
-        {/* ── Custom Fees ─────────────────────────────────────── */}
+        {/* ── Individuelle Deals ─────────────────────────────── */}
         <CustomFeesSection
           fees={localConfig.additional_fees ?? []}
-          onChange={(fees) => updateConfig({ additional_fees: fees.length > 0 ? fees : undefined })}
+          onChange={(fees) => {
+            updateConfig({ additional_fees: fees.length > 0 ? fees : undefined });
+          }}
           disabled={isUpdating}
         />
 
+        {/* ── Zusatzinformationen (read-only from Event Config + note quantities) */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Zusatzinformationen</h4>
+          <div className="space-y-2">
+            {/* T-Shirts inkl. */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={scsShirtsIncluded || false}
+                disabled
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+              />
+              <span className={`text-sm flex-1 ${scsShirtsIncluded ? 'text-gray-800' : 'text-gray-400'}`}>T-Shirts inkl.</span>
+              <span className="text-xs text-gray-400">Anzahl</span>
+              <input
+                type="number"
+                min="0"
+                value={localConfig.info_tshirts_quantity ?? 0}
+                onChange={(e) => {
+                  updateConfig({ info_tshirts_quantity: parseInt(e.target.value) || 0 });
+                }}
+                disabled={isUpdating}
+                className="w-16 text-sm px-2 py-1 rounded border border-gray-200 bg-white text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              />
+            </div>
+
+            {/* Minicards inkl. */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={minicardOrderEnabled || false}
+                disabled
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+              />
+              <span className={`text-sm flex-1 ${minicardOrderEnabled ? 'text-gray-800' : 'text-gray-400'}`}>Minicards inkl.</span>
+              <span className="text-xs text-gray-400">Anzahl</span>
+              <input
+                type="number"
+                min="0"
+                value={localConfig.info_minicards_quantity ?? minicardOrderQuantity ?? 0}
+                onChange={(e) => {
+                  updateConfig({ info_minicards_quantity: parseInt(e.target.value) || 0 });
+                }}
+                disabled={isUpdating}
+                className="w-16 text-sm px-2 py-1 rounded border border-gray-200 bg-white text-right tabular-nums focus:outline-none focus:ring-1 focus:ring-emerald-400"
+              />
+            </div>
+
+            {/* Start-Chancen-Schule */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={scsShirtsIncluded || false}
+                disabled
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+              />
+              <span className={`text-sm ${scsShirtsIncluded ? 'text-gray-800' : 'text-gray-400'}`}>Start-Chancen-Schule</span>
+            </div>
+
+            {/* Plus-Preise */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isPlus || false}
+                disabled
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+              />
+              <span className={`text-sm ${isPlus ? 'text-gray-800' : 'text-gray-400'}`}>Plus-Preise</span>
+            </div>
+          </div>
+        </div>
+
         {/* ── Summary ─────────────────────────────────────────── */}
         <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-          <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Summary</h4>
           <div className="space-y-1 text-sm">
-            {localConfig.presets && Object.entries(localConfig.presets).map(([key, preset]) => {
+            {PRESET_DEFS.map((def) => {
+              const preset = localConfig.presets?.[def.key];
               if (!preset?.enabled) return null;
-              const def = PRESET_DEFS.find(d => d.key === key);
               return (
-                <div key={key} className="flex justify-between text-gray-600">
-                  <span>{def?.label ?? key}</span>
-                  <span className={preset.amount < 0 ? 'text-green-600' : ''}>{formatCurrency(preset.amount)}</span>
+                <div key={def.key} className="flex justify-between text-gray-600">
+                  <span>{def.label}</span>
+                  <span>{formatCurrency(preset.amount)}</span>
                 </div>
               );
             })}
             {(localConfig.additional_fees ?? []).map((fee, i) => (
-              <div key={`custom-${i}`} className="flex justify-between text-gray-600">
-                <span>{fee.title || 'Custom Fee'}</span>
-                <span className={fee.amount < 0 ? 'text-green-600' : ''}>{formatCurrency(fee.amount)}</span>
-              </div>
+              fee.title ? (
+                <div key={`custom-${i}`} className="flex justify-between text-gray-600">
+                  <span>{fee.title}</span>
+                  <span>{formatCurrency(fee.amount)}</span>
+                </div>
+              ) : null
             ))}
             <div className="border-t border-gray-300 pt-1 mt-1 flex justify-between font-semibold text-gray-800">
               <span>Total</span>

@@ -765,7 +765,7 @@ export interface DealConfig {
     items: { label: string; amount: number }[];
     total: number;
   };
-  // New preset-based structure (v2)
+  // New preset-based structure (v2 → v3)
   presets?: {
     pauschale?: DealConfigPreset;
     scs_pauschale?: DealConfigPreset;
@@ -774,7 +774,17 @@ export interface DealConfig {
     grosse_einrichtung?: DealConfigPreset;
     schulsong_discount?: DealConfigPreset;
     shirts_discount?: DealConfigPreset;
+    // v3 presets
+    schulsong_vorlage?: DealConfigPreset;
+    schulsong_individuell?: DealConfigPreset;
   };
+  // Zusatzinformationen (note-only, stored in deal_config)
+  info_tshirts_included?: boolean;
+  info_tshirts_quantity?: number;
+  info_minicards_included?: boolean;
+  info_minicards_quantity?: number;
+  info_scs?: boolean;
+  info_plus?: boolean;
 }
 
 // ======================================================================
