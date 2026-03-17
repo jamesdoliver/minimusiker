@@ -293,8 +293,8 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
   };
 
   // Deal summary helpers
-  const hasDeal = booking.dealBuilderEnabled && booking.dealConfig?.fee_breakdown;
   const feeBreakdown = booking.dealConfig?.fee_breakdown;
+  const hasDeal = feeBreakdown || booking.dealConfig?.presets;
 
   const formatEuro = (amount: number) =>
     new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
@@ -507,7 +507,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
             <textarea
               value={notesText}
               onChange={(e) => handleNotesChange(e.target.value)}
-              className="w-full text-sm text-gray-900 border border-gray-300 rounded-md px-3 py-2 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 min-h-[280px] flex-1"
+              className="w-full text-sm text-gray-900 border border-gray-300 rounded-md px-3 py-2 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 min-h-[140px] flex-1"
               placeholder="Add notes about this booking..."
             />
             {notesSaveStatus !== 'idle' && (
