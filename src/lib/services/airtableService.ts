@@ -509,6 +509,7 @@ class AirtableService {
   // Update an existing record
   async update(id: string, data: Partial<ParentJourney>): Promise<ParentJourney & { id: string }> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Update in normalized tables (Registration + optionally Parent)
       try {
         // Get the existing registration record
@@ -618,6 +619,7 @@ class AirtableService {
   // Delete a record
   async delete(id: string): Promise<void> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Delete Registration record only (not Parent, Event, or Class)
       try {
         await this.registrationsTable!.destroy(id);
@@ -821,6 +823,7 @@ class AirtableService {
   // Get parent journey by parent ID
   async getParentById(parentId: string): Promise<ParentJourney | null> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Query Parents table by parent_id field
       try {
         const parentRecords = await this.parentsTable!.select({
@@ -910,6 +913,7 @@ class AirtableService {
   // Get parent journey by booking ID
   async getParentByBookingId(bookingId: string): Promise<ParentJourney | null> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Query Events → Registrations → Parents
       try {
         // Find event by event_id (booking_id)
@@ -2623,6 +2627,7 @@ class AirtableService {
     bookingId: string
   ): Promise<boolean> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Query Parents → Registrations → Events
       try {
         // Find parent by email
@@ -3846,6 +3851,7 @@ class AirtableService {
       console.log('[autoAssignEngineer] Skipping - normalized tables not enabled');
       return false;
     }
+    this.ensureNormalizedTablesInitialized();
 
     try {
       // Find the event
@@ -3900,6 +3906,7 @@ class AirtableService {
       console.log('[updateEventApprovalStatus] Skipping - normalized tables not enabled');
       return;
     }
+    this.ensureNormalizedTablesInitialized();
 
     try {
       // Find the event
@@ -4003,6 +4010,7 @@ class AirtableService {
     if (!this.useNormalizedTables()) {
       return;
     }
+    this.ensureNormalizedTablesInitialized();
 
     try {
       const events = await this.eventsTable!.select({
@@ -4320,6 +4328,7 @@ class AirtableService {
    */
   async getParentEmailsByEventId(eventId: string): Promise<string[]> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Query Events → Registrations → Parents
       try {
         // Find the event
@@ -4392,6 +4401,7 @@ class AirtableService {
    */
   async getParentEmailsByClassId(classId: string): Promise<string[]> {
     if (this.useNormalizedTables()) {
+      this.ensureNormalizedTablesInitialized();
       // NEW: Query Classes → Registrations → Parents
       try {
         // Find the class by class_id
