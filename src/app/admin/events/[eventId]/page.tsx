@@ -1572,10 +1572,17 @@ export default function EventDetailPage() {
                           {songs.map((song: any) => (
                             <div
                               key={song.id}
-                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors"
+                              className={`flex items-center justify-between p-3 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors ${song.hiddenByEngineer ? 'opacity-60' : ''}`}
                             >
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium text-gray-900 truncate">{song.title}</div>
+                                <div className="font-medium text-gray-900 truncate">
+                                  {song.title}
+                                  {song.hiddenByEngineer && (
+                                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
+                                      Hidden by engineer
+                                    </span>
+                                  )}
+                                </div>
                                 {song.artist && (
                                   <div className="text-sm text-gray-500 truncate">{song.artist}</div>
                                 )}
@@ -1791,10 +1798,17 @@ export default function EventDetailPage() {
                           {songs.map((song: any) => (
                             <div
                               key={song.id}
-                              className="flex items-center justify-between p-3 bg-white rounded-lg group hover:bg-gray-50 transition-colors"
+                              className={`flex items-center justify-between p-3 bg-white rounded-lg group hover:bg-gray-50 transition-colors ${song.hiddenByEngineer ? 'opacity-60' : ''}`}
                             >
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium text-gray-900 truncate">{song.title}</div>
+                                <div className="font-medium text-gray-900 truncate">
+                                  {song.title}
+                                  {song.hiddenByEngineer && (
+                                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
+                                      Hidden by engineer
+                                    </span>
+                                  )}
+                                </div>
                                 {song.artist && (
                                   <div className="text-sm text-gray-500 truncate">{song.artist}</div>
                                 )}
@@ -2026,10 +2040,17 @@ export default function EventDetailPage() {
                           {songs.map((song) => (
                             <div
                               key={song.id}
-                              className="flex items-center justify-between p-3 bg-white rounded-lg group hover:bg-gray-50 transition-colors"
+                              className={`flex items-center justify-between p-3 bg-white rounded-lg group hover:bg-gray-50 transition-colors ${song.hiddenByEngineer ? 'opacity-60' : ''}`}
                             >
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium text-gray-900 truncate">{song.title}</div>
+                                <div className="font-medium text-gray-900 truncate">
+                                  {song.title}
+                                  {song.hiddenByEngineer && (
+                                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
+                                      Hidden by engineer
+                                    </span>
+                                  )}
+                                </div>
                                 {song.artist && (
                                   <div className="text-sm text-gray-500 truncate">{song.artist}</div>
                                 )}
@@ -2265,10 +2286,17 @@ export default function EventDetailPage() {
                           {songs.map((song) => (
                             <div
                               key={song.id}
-                              className="flex items-center justify-between p-3 bg-white rounded-lg group hover:bg-gray-50 transition-colors"
+                              className={`flex items-center justify-between p-3 bg-white rounded-lg group hover:bg-gray-50 transition-colors ${song.hiddenByEngineer ? 'opacity-60' : ''}`}
                             >
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium text-gray-900 truncate">{song.title}</div>
+                                <div className="font-medium text-gray-900 truncate">
+                                  {song.title}
+                                  {song.hiddenByEngineer && (
+                                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
+                                      Hidden by engineer
+                                    </span>
+                                  )}
+                                </div>
                                 {song.artist && (
                                   <div className="text-sm text-gray-500 truncate">{song.artist}</div>
                                 )}

@@ -302,7 +302,7 @@ function SongCard({ song, onDelete }: { song: Song; onDelete: (songId: string) =
   };
 
   return (
-    <div className="bg-gray-50 rounded-lg p-4 flex items-start justify-between group">
+    <div className={`bg-gray-50 rounded-lg p-4 flex items-start justify-between group ${song.hiddenByEngineer ? 'opacity-60' : ''}`}>
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center flex-shrink-0 mt-0.5">
           <svg className="w-4 h-4 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -315,7 +315,14 @@ function SongCard({ song, onDelete }: { song: Song; onDelete: (songId: string) =
           </svg>
         </div>
         <div>
-          <p className="font-medium text-gray-900">{song.title}</p>
+          <p className="font-medium text-gray-900">
+            {song.title}
+            {song.hiddenByEngineer && (
+              <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
+                Vom Ingenieur ausgeblendet
+              </span>
+            )}
+          </p>
           {song.artist && <p className="text-sm text-gray-500">{song.artist}</p>}
           {song.notes && <p className="text-sm text-gray-400 mt-1">{song.notes}</p>}
         </div>
