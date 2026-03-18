@@ -157,6 +157,18 @@ class MasterCdService {
   ): Promise<Array<{ trackNumber: number; filename: string; url: string }>> {
     const tracklist = await this.getTracklist(eventId);
 
+    // Fetch audio files to access mp3R2Key for WAV→MP3 preference
+    const audioFiles = await this.teacherService.getAudioFilesByEventId(eventId);
+    const finalAudioBySongId = new Map<string, AudioFile>();
+    for (const af of audioFiles) {
+      if (af.type === 'final' && af.songId) {
+        const existing = finalAudioBySongId.get(af.songId);
+        if (!existing || (af.status === 'ready' && existing.status !== 'ready')) {
+          finalAudioBySongId.set(af.songId, af);
+        }
+      }
+    }
+
     const downloads: Array<{ trackNumber: number; filename: string; url: string }> = [];
 
     for (const track of tracklist.tracks) {
@@ -164,11 +176,15 @@ class MasterCdService {
         continue;
       }
 
-      const filename = `${track.trackNumber}. ${track.title} - ${track.className}.mp3`;
+      // Prefer MP3 version if available, fall back to primary r2Key (may be WAV)
+      const audioFile = finalAudioBySongId.get(track.songId);
+      const downloadKey = audioFile?.mp3R2Key || track.r2Key;
+      const isMp3 = downloadKey.toLowerCase().endsWith('.mp3') || !!audioFile?.mp3R2Key;
+      const ext = isMp3 ? 'mp3' : 'wav';
+      const padded = String(track.trackNumber).padStart(2, '0');
+      const filename = `${padded}. ${track.title} - ${track.className}.${ext}`;
 
-      // Use the R2 key directly. If the audio was WAV and has an mp3_r2_key,
-      // we still use the primary r2Key which points to the final file.
-      const url = await this.r2.generateSignedUrl(track.r2Key, 3600, filename);
+      const url = await this.r2.generateSignedUrl(downloadKey, 3600, filename);
 
       downloads.push({
         trackNumber: track.trackNumber,
