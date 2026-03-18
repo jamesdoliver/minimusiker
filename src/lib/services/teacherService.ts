@@ -539,6 +539,7 @@ class TeacherService {
       albumOrder: record.fields.album_order || record.fields[SONGS_FIELD_IDS.album_order],
       createdBy: record.fields.created_by || record.fields[SONGS_FIELD_IDS.created_by],
       createdAt: record.fields.created_at || record.fields[SONGS_FIELD_IDS.created_at] || record.createdTime,
+      hiddenByEngineer: Boolean(record.fields[SONGS_FIELD_IDS.hidden_by_engineer] || record.fields.hidden_by_engineer),
     };
   }
 
@@ -825,6 +826,15 @@ class TeacherService {
       console.error('Error updating song:', error);
       throw new Error(`Failed to update song: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Update the hidden_by_engineer flag on a song
+   */
+  async updateSongHiddenByEngineer(songId: string, hidden: boolean): Promise<void> {
+    await this.base(SONGS_TABLE).update(songId, {
+      [SONGS_FIELD_IDS.hidden_by_engineer]: hidden,
+    } as Airtable.FieldSet);
   }
 
   /**

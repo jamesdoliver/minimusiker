@@ -41,6 +41,7 @@ export const SONGS_FIELD_IDS = {
   album_order: 'fldj1xXfAhsaWcEE7', // Global album track order for printed album
   created_by: 'fldva8udIq88Syq0p', // Teacher record ID who added it
   created_at: 'fldw9R07novjsrvE5', // When song was added
+  hidden_by_engineer: 'fldTBD_HIDDEN', // Checkbox - engineer can hide songs
 } as const;
 
 export const AUDIO_FILES_FIELD_IDS = {
@@ -122,6 +123,7 @@ export interface Song {
   albumOrder?: number; // Global album track order for printed album
   createdBy?: string; // Teacher record ID who added it
   createdAt: string; // When song was added
+  hiddenByEngineer?: boolean;
 }
 
 /**
