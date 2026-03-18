@@ -3544,7 +3544,7 @@ class TeacherService {
   async getAlbumTracksData(eventId: string): Promise<AlbumTrack[]> {
     try {
       // Get all songs for this event
-      const songs = await this.getSongsByEventId(eventId);
+      const songs = await this.getSongsByEventId(eventId, { excludeHidden: true });
 
       // Get all classes for this event to map class names
       // Classes may have legacy_booking_id set to either the canonical event_id
