@@ -79,11 +79,15 @@ export function getMilestoneOffset(milestone: Milestone, overrides?: EventTimeli
 }
 
 /**
- * Default hidden products. Returns empty — all products in the audio arrays
- * are visible by default. Admins can hide specific products via timeline_overrides.
+ * Default hidden products based on launch date.
+ * Before April 1 2026: Kinderliederbox (bluetooth-box) hidden — not yet launched.
+ * From April 1 2026: all products visible by default.
+ * Admins can override per-event via timeline_overrides hidden_products.
  */
-export function getDefaultHiddenProducts(): string[] {
-  return [];
+const KINDERLIEDERBOX_LAUNCH = new Date('2026-04-01T00:00:00');
+
+export function getDefaultHiddenProducts(now: Date = new Date()): string[] {
+  return now < KINDERLIEDERBOX_LAUNCH ? ['bluetooth-box'] : [];
 }
 
 /**
