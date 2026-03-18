@@ -86,7 +86,7 @@ export async function GET(
           const parentRecordId = reg.parent_id[0];
           const parent = parentMap.get(parentRecordId);
           return {
-            parentId: parent?.parent_id || parentRecordId,
+            parentId: parentRecordId,
             parentName: parent?.parent_first_name || '',
             parentEmail: parent?.parent_email || '',
             childName: reg.registered_child || '',

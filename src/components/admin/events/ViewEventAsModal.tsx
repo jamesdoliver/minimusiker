@@ -11,11 +11,10 @@ interface ViewEventAsModalProps {
 interface TeacherData {
   name: string;
   email: string;
-  portalUrl: string;
 }
 
 interface ParentData {
-  id: string;
+  parentId: string;
   parentName: string;
   parentEmail: string;
   childName: string;
@@ -23,8 +22,8 @@ interface ParentData {
 }
 
 interface ClassData {
-  id: string;
-  name: string;
+  classId: string;
+  className: string;
   childCount: number;
   parents: ParentData[];
 }
@@ -47,7 +46,6 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
       fetchPreviewData();
     }
     if (!isOpen) {
-      // Reset state when modal closes
       setPreviewData(null);
       setError(null);
       setSelectedClassId(null);
@@ -94,7 +92,7 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
     }
   };
 
-  const openPortal = async (type: 'teacher' | 'parent', portalUrl: string, parentId?: string) => {
+  const openPortal = async (type: 'teacher' | 'parent', parentId?: string) => {
     const mintKey = type === 'teacher' ? 'teacher' : parentId!;
     setIsMintingSession(mintKey);
     try {
@@ -106,6 +104,7 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
       if (!response.ok) {
         throw new Error('Session konnte nicht erstellt werden');
       }
+      const { portalUrl } = await response.json();
       window.open(portalUrl, '_blank');
     } catch (err) {
       console.error('Error minting preview session:', err);
@@ -114,7 +113,7 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
     }
   };
 
-  const selectedClass = previewData?.classes.find((c) => c.id === selectedClassId) ?? null;
+  const selectedClass = previewData?.classes.find((c) => c.classId === selectedClassId) ?? null;
 
   if (!isOpen) return null;
 
@@ -127,7 +126,7 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
       <div className="relative bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Event-Vorschau</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Portal-Vorschau</h2>
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -157,7 +156,6 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
               {/* Teacher Card */}
               <div className="border border-gray-200 rounded-lg p-5">
                 <div className="flex items-center gap-2.5 mb-4">
-                  {/* Person icon */}
                   <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[#5a8a82]/10">
                     <svg className="w-5 h-5 text-[#5a8a82]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -168,39 +166,38 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
                       />
                     </svg>
                   </div>
-                  <h3 className="text-sm font-semibold text-gray-900">Als Padagoge ansehen</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">Als Pädagoge ansehen</h3>
                 </div>
 
-                {previewData.teacher ? (
+                {previewData.teacher && previewData.teacher.email ? (
                   <>
                     <div className="mb-4">
                       <p className="text-sm font-medium text-gray-900">{previewData.teacher.name}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{previewData.teacher.email}</p>
                     </div>
                     <button
-                      onClick={() => openPortal('teacher', previewData.teacher!.portalUrl)}
+                      onClick={() => openPortal('teacher')}
                       disabled={isMintingSession === 'teacher'}
                       className="w-full px-4 py-2 text-sm font-medium text-white bg-[#5a8a82] hover:bg-[#4a7a72] rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isMintingSession === 'teacher' ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                          Wird geoffnet...
+                          Wird geöffnet...
                         </>
                       ) : (
-                        'Padagogen-Portal offnen'
+                        'Pädagogen-Portal öffnen'
                       )}
                     </button>
                   </>
                 ) : (
-                  <p className="text-sm text-gray-400 italic">Kein Padagoge zugewiesen</p>
+                  <p className="text-sm text-gray-400 italic">Kein Pädagoge zugewiesen</p>
                 )}
               </div>
 
               {/* Parent Card */}
               <div className="border border-gray-200 rounded-lg p-5">
                 <div className="flex items-center gap-2.5 mb-4">
-                  {/* People icon */}
                   <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[#5a8a82]/10">
                     <svg className="w-5 h-5 text-[#5a8a82]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -222,10 +219,10 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
                       onChange={(e) => setSelectedClassId(e.target.value || null)}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#5a8a82]/30 focus:border-[#5a8a82] mb-3"
                     >
-                      <option value="">Klasse wahlen...</option>
+                      <option value="">Klasse wählen...</option>
                       {previewData.classes.map((cls) => (
-                        <option key={cls.id} value={cls.id}>
-                          {cls.name} — {cls.childCount} Kinder
+                        <option key={cls.classId} value={cls.classId}>
+                          {cls.className} — {cls.childCount} Kinder
                         </option>
                       ))}
                     </select>
@@ -236,18 +233,13 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
                         <div className="max-h-48 overflow-y-auto space-y-1">
                           {selectedClass.parents.map((parent) => (
                             <button
-                              key={parent.id}
-                              onClick={() => openPortal('parent', `/eltern/${eventId}`, parent.id)}
-                              disabled={isMintingSession === parent.id}
+                              key={`${parent.parentId}-${parent.childName}`}
+                              onClick={() => openPortal('parent', parent.parentId)}
+                              disabled={isMintingSession === parent.parentId}
                               className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed group"
                             >
                               {/* Audio access badge */}
-                              {parent.hasAudioAccess && (
-                                <span className="flex-shrink-0 w-2 h-2 rounded-full bg-green-500" />
-                              )}
-                              {!parent.hasAudioAccess && (
-                                <span className="flex-shrink-0 w-2 h-2 rounded-full bg-gray-300" />
-                              )}
+                              <span className={`flex-shrink-0 w-2 h-2 rounded-full ${parent.hasAudioAccess ? 'bg-green-500' : 'bg-gray-300'}`} />
 
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-gray-900 truncate">{parent.childName}</p>
@@ -258,7 +250,7 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
 
                               {/* External link icon or loading spinner */}
                               <div className="flex-shrink-0 text-gray-400 group-hover:text-[#5a8a82]">
-                                {isMintingSession === parent.id ? (
+                                {isMintingSession === parent.parentId ? (
                                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#5a8a82]" />
                                 ) : (
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
