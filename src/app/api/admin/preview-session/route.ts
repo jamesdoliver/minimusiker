@@ -60,11 +60,30 @@ export async function POST(request: NextRequest) {
 
     const airtableService = getAirtableService();
 
-    // Look up the event
-    const event = await airtableService.getEventByEventId(eventId);
-    if (!event) {
+    // Resolve event — same pattern as admin event route
+    let eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+
+    if (!eventRecordId) {
+      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      if (booking) {
+        const linkedEvent = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (linkedEvent) {
+          eventRecordId = linkedEvent.id;
+        }
+      }
+    }
+
+    if (!eventRecordId) {
       return NextResponse.json(
         { success: false, error: 'Event not found' },
+        { status: 404 }
+      );
+    }
+
+    const event = await airtableService.getEventById(eventRecordId);
+    if (!event) {
+      return NextResponse.json(
+        { success: false, error: 'Event record not found' },
         { status: 404 }
       );
     }

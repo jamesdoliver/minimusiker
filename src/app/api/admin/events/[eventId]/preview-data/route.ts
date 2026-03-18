@@ -24,11 +24,32 @@ export async function GET(
     const { eventId } = await params;
     const airtableService = getAirtableService();
 
-    // 1. Fetch event
-    const event = await airtableService.getEventByEventId(eventId);
-    if (!event) {
+    // 1. Resolve event — same pattern as /api/admin/events/[eventId] route
+    //    Supports event_id, legacy_booking_id, and SimplyBook ID formats
+    let eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+
+    if (!eventRecordId) {
+      // Fallback: resolve via SimplyBook booking link
+      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      if (booking) {
+        const linkedEvent = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (linkedEvent) {
+          eventRecordId = linkedEvent.id;
+        }
+      }
+    }
+
+    if (!eventRecordId) {
       return NextResponse.json(
         { success: false, error: 'Event not found' },
+        { status: 404 }
+      );
+    }
+
+    const event = await airtableService.getEventById(eventRecordId);
+    if (!event) {
+      return NextResponse.json(
+        { success: false, error: 'Event record not found' },
         { status: 404 }
       );
     }
@@ -46,7 +67,7 @@ export async function GET(
     }
 
     // 3. Get registrations for this event
-    const registrations = await airtableService.getRegistrationsByEventId(event.id);
+    const registrations = await airtableService.getRegistrationsByEventId(eventRecordId);
 
     // 4. Collect unique parent IDs from registrations
     const parentIdToRegistration = new Map<string, typeof registrations[0]>();
