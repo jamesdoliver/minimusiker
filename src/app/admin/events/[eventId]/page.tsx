@@ -53,7 +53,7 @@ interface ClassGroup {
   groupId: string;
   groupName: string;
   memberClasses: Array<{ classId: string; className: string }>;
-  songs: Array<{ id: string; title: string; artist?: string; notes?: string }>;
+  songs: Array<{ id: string; title: string; artist?: string; notes?: string; hiddenByEngineer?: boolean }>;
   songCount: number;
 }
 
@@ -62,7 +62,7 @@ interface Collection {
   classId: string;
   className: string;
   classType: 'choir' | 'teacher_song';
-  songs: Array<{ id: string; title: string; artist?: string; notes?: string }>;
+  songs: Array<{ id: string; title: string; artist?: string; notes?: string; hiddenByEngineer?: boolean }>;
   audioStatus: {
     hasRawAudio: boolean;
     hasPreview: boolean;
