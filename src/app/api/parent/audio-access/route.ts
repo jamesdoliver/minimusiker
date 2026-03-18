@@ -392,7 +392,7 @@ async function buildAllAudio(
   try {
     // 1. Bulk fetch songs + audio files for the event (2 Airtable calls)
     const [allSongs, allAudioFiles, eventDetail] = await Promise.all([
-      teacherService.getSongsByEventId(eventId),
+      teacherService.getSongsByEventId(eventId, { excludeHidden: true }),
       teacherService.getAudioFilesByEventId(eventId),
       airtableService.getSchoolEventDetail(eventId),
     ]);

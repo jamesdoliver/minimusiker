@@ -604,7 +604,10 @@ class TeacherService {
   /**
    * Get songs for an event (all classes)
    */
-  async getSongsByEventId(eventId: string): Promise<Song[]> {
+  async getSongsByEventId(eventId: string, options?: { excludeHidden?: boolean }): Promise<Song[]> {
+    const maybeFilterHidden = (songs: Song[]): Song[] =>
+      options?.excludeHidden ? songs.filter(s => !s.hiddenByEngineer) : songs;
+
     try {
       // Primary query: by text event_id field (fast, indexed)
       const records = await this.base(SONGS_TABLE)
@@ -649,7 +652,7 @@ class TeacherService {
           }
         }
 
-        return allRecords.map((record) => this.transformSongRecord(record));
+        return maybeFilterHidden(allRecords.map((record) => this.transformSongRecord(record)));
       }
 
       // Fallback: resolve eventId to Airtable record ID and query by linked event_link field.
@@ -694,7 +697,7 @@ class TeacherService {
 
             if (canonicalRecords.length > 0) {
               console.warn(`[getSongsByEventId] Found ${canonicalRecords.length} songs via canonical event_id '${canonicalEventId}' for input '${eventId}'`);
-              return canonicalRecords.map((record) => this.transformSongRecord(record));
+              return maybeFilterHidden(canonicalRecords.map((record) => this.transformSongRecord(record)));
             }
           }
 
@@ -710,7 +713,7 @@ class TeacherService {
 
           if (linkedRecords.length > 0) {
             console.warn(`[getSongsByEventId] Found ${linkedRecords.length} songs via event_link fallback for ${eventId}`);
-            return linkedRecords.map((record) => this.transformSongRecord(record));
+            return maybeFilterHidden(linkedRecords.map((record) => this.transformSongRecord(record)));
           }
         }
       }
