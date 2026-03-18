@@ -6065,6 +6065,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.standard_merch_override,
           EVENTS_FIELD_IDS.audio_pipeline_stage,
           EVENTS_FIELD_IDS.admin_notes,
+          EVENTS_FIELD_IDS.classes,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -6127,6 +6128,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.scs_shirts_included,
           EVENTS_FIELD_IDS.minicard_order_enabled,
           EVENTS_FIELD_IDS.minicard_order_quantity,
+          EVENTS_FIELD_IDS.classes,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -6311,6 +6313,8 @@ class AirtableService {
       scs_shirts_included: record.get('scs_shirts_included') as boolean | undefined,
       minicard_order_enabled: record.get('minicard_order_enabled') as boolean | undefined,
       minicard_order_quantity: record.get('minicard_order_quantity') as number | undefined,
+      // Linked classes
+      classes: record.get('classes') as string[] | undefined,
     };
   }
 

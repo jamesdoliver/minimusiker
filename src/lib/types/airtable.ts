@@ -815,6 +815,7 @@ export interface Event {
   school_address?: string;
   school_phone?: string;
   teachers?: string[];                  // Linked record IDs → Teachers
+  classes?: string[];                   // Linked record IDs → Classes (from Events.classes reverse lookup)
   // Status & Event Type fields for admin booking view
   status?: EventStatus;                 // Confirmed, On Hold, or Cancelled
   is_plus?: boolean;                    // Shows '+' instead of 'M' in event type circles
