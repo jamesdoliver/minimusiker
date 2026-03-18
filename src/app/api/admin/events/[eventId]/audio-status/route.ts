@@ -41,7 +41,7 @@ export async function GET(
 
     // Get songs for this event
     const teacherService = getTeacherService();
-    const songs = await teacherService.getSongsByEventId(resolvedEventId);
+    const songs = await teacherService.getSongsByEventId(resolvedEventId, { excludeHidden: true });
 
     // Get audio files for this event
     const audioFiles = await teacherService.getAudioFilesByEventId(resolvedEventId);
