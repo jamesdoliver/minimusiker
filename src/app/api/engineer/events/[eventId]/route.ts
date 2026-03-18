@@ -141,6 +141,7 @@ export async function GET(
             songTitle: song.title,
             artist: song.artist,
             order: song.order,
+            hiddenByEngineer: song.hiddenByEngineer,
             previewFile: songFiles.find(f => f.type === 'preview')
               || songFiles.find(f => f.type === 'final' && f.previewR2Key),
             finalMp3File: songFiles.find(f => f.type === 'final' && f.r2Key.endsWith('.mp3'))

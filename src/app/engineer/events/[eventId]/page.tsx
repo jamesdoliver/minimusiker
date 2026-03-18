@@ -9,6 +9,7 @@ import EngineerBatchUploadModal from '@/components/engineer/EngineerBatchUploadM
 import { useClientZipDownload, ZipDownloadFile } from '@/lib/hooks/useClientZipDownload';
 import ZipDownloadModal from '@/components/engineer/ZipDownloadModal';
 import { useEngineerEventDetail } from '@/lib/hooks/useEngineerEventDetail';
+import { toast } from 'sonner';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'No date';
@@ -63,6 +64,10 @@ export default function EngineerEventDetailPage() {
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [processingSongIds, setProcessingSongIds] = useState<Set<string>>(new Set());
   const [processedSongIds, setProcessedSongIds] = useState<Set<string>>(new Set());
+  const [editingSongId, setEditingSongId] = useState<string | null>(null);
+  const [editingSongTitle, setEditingSongTitle] = useState('');
+  const [addingSongClassId, setAddingSongClassId] = useState<string | null>(null);
+  const [newSongTitle, setNewSongTitle] = useState('');
 
   // Handle auth redirects
   useEffect(() => {
@@ -350,6 +355,72 @@ export default function EngineerEventDetailPage() {
       alert('Failed to submit finals. Please try again.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleRenameSong = async (songId: string, newTitle: string) => {
+    try {
+      const response = await fetch(
+        `/api/engineer/events/${encodeURIComponent(eventId)}/songs/${encodeURIComponent(songId)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: newTitle }),
+        }
+      );
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to rename');
+      }
+      toast.success('Song renamed');
+      setEditingSongId(null);
+      fetchEventDetail();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to rename song');
+    }
+  };
+
+  const handleToggleHidden = async (songId: string, hidden: boolean) => {
+    try {
+      const response = await fetch(
+        `/api/engineer/events/${encodeURIComponent(eventId)}/songs/${encodeURIComponent(songId)}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hidden }),
+        }
+      );
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update');
+      }
+      toast.success(hidden ? 'Song hidden from parents' : 'Song visible to parents');
+      fetchEventDetail();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update song');
+    }
+  };
+
+  const handleCreateSong = async (classId: string, title: string) => {
+    try {
+      const response = await fetch(
+        `/api/engineer/events/${encodeURIComponent(eventId)}/songs`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, classId }),
+        }
+      );
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to create');
+      }
+      toast.success('Song created');
+      setAddingSongClassId(null);
+      setNewSongTitle('');
+      fetchEventDetail();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create song');
     }
   };
 
@@ -750,6 +821,19 @@ export default function EngineerEventDetailPage() {
                   audioPipelineStage={event.audioPipelineStage}
                   processingSongIds={processingSongIds}
                   processedSongIds={processedSongIds}
+                  onRename={handleRenameSong}
+                  onToggleHidden={handleToggleHidden}
+                  editingSongId={editingSongId}
+                  editingSongTitle={editingSongTitle}
+                  onStartEdit={(id, title) => { setEditingSongId(id); setEditingSongTitle(title); }}
+                  onEditTitleChange={setEditingSongTitle}
+                  onCancelEdit={() => setEditingSongId(null)}
+                  addingSongClassId={addingSongClassId}
+                  newSongTitle={newSongTitle}
+                  onNewSongTitleChange={setNewSongTitle}
+                  onStartAddSong={setAddingSongClassId}
+                  onCancelAddSong={() => { setAddingSongClassId(null); setNewSongTitle(''); }}
+                  onCreateSong={handleCreateSong}
                 />
               ))}
             </div>
@@ -880,6 +964,19 @@ interface ClassCardProps {
   audioPipelineStage?: string;
   processingSongIds: Set<string>;
   processedSongIds: Set<string>;
+  onRename: (songId: string, newTitle: string) => void;
+  onToggleHidden: (songId: string, hidden: boolean) => void;
+  editingSongId: string | null;
+  editingSongTitle: string;
+  onStartEdit: (songId: string, currentTitle: string) => void;
+  onEditTitleChange: (title: string) => void;
+  onCancelEdit: () => void;
+  addingSongClassId: string | null;
+  newSongTitle: string;
+  onNewSongTitleChange: (title: string) => void;
+  onStartAddSong: (classId: string) => void;
+  onCancelAddSong: () => void;
+  onCreateSong: (classId: string, title: string) => void;
 }
 
 function ClassCard({
@@ -890,6 +987,19 @@ function ClassCard({
   audioPipelineStage,
   processingSongIds,
   processedSongIds,
+  onRename,
+  onToggleHidden,
+  editingSongId,
+  editingSongTitle,
+  onStartEdit,
+  onEditTitleChange,
+  onCancelEdit,
+  addingSongClassId,
+  newSongTitle,
+  onNewSongTitleChange,
+  onStartAddSong,
+  onCancelAddSong,
+  onCreateSong,
 }: ClassCardProps) {
   const songsWithFinal = classView.songs.filter(s => s.finalMp3File || s.finalWavFile).length;
 
@@ -906,7 +1016,7 @@ function ClassCard({
       {/* Songs */}
       {classView.songs.length === 0 ? (
         <div className="px-6 py-8 text-center">
-          <p className="text-sm text-gray-500">No songs added yet. Teachers must add songs first.</p>
+          <p className="text-sm text-gray-500">No songs added yet.</p>
         </div>
       ) : (
         <div className="divide-y divide-gray-100">
@@ -922,9 +1032,57 @@ function ClassCard({
                 audioPipelineStage={audioPipelineStage}
                 isProcessing={processingSongIds.has(song.songId)}
                 isProcessed={processedSongIds.has(song.songId)}
+                onRename={onRename}
+                onToggleHidden={onToggleHidden}
+                isEditing={editingSongId === song.songId}
+                editTitle={editingSongTitle}
+                onStartEdit={onStartEdit}
+                onEditTitleChange={onEditTitleChange}
+                onCancelEdit={onCancelEdit}
               />
             ))}
         </div>
+      )}
+
+      {/* Add Song */}
+      {addingSongClassId === classView.classId ? (
+        <div className="px-6 py-3 border-t border-gray-100 flex items-center gap-2">
+          <span className="text-xs text-gray-400">Add to {classView.className}:</span>
+          <input
+            type="text"
+            value={newSongTitle}
+            onChange={(e) => onNewSongTitleChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newSongTitle.trim()) onCreateSong(classView.classId, newSongTitle.trim());
+              if (e.key === 'Escape') { onCancelAddSong(); }
+            }}
+            placeholder="Song title..."
+            className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            autoFocus
+          />
+          <button
+            onClick={() => { if (newSongTitle.trim()) onCreateSong(classView.classId, newSongTitle.trim()); }}
+            className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+          >
+            Add
+          </button>
+          <button
+            onClick={() => { onCancelAddSong(); }}
+            className="px-3 py-1 text-gray-500 text-xs hover:text-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => onStartAddSong(classView.classId)}
+          className="w-full px-6 py-2 border-t border-gray-100 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-1 justify-center"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Song
+        </button>
       )}
     </div>
   );
@@ -938,6 +1096,13 @@ interface SongRowProps {
   audioPipelineStage?: string;
   isProcessing?: boolean;
   isProcessed?: boolean;
+  onRename: (songId: string, newTitle: string) => void;
+  onToggleHidden: (songId: string, hidden: boolean) => void;
+  isEditing: boolean;
+  editTitle: string;
+  onStartEdit: (songId: string, currentTitle: string) => void;
+  onEditTitleChange: (title: string) => void;
+  onCancelEdit: () => void;
 }
 
 function SongRow({
@@ -948,6 +1113,13 @@ function SongRow({
   audioPipelineStage,
   isProcessing,
   isProcessed,
+  onRename,
+  onToggleHidden,
+  isEditing,
+  editTitle,
+  onStartEdit,
+  onEditTitleChange,
+  onCancelEdit,
 }: SongRowProps) {
   const uploadTypeLabel =
     uploadState?.uploadType === 'final-mp3' ? 'Final MP3' :
@@ -961,10 +1133,58 @@ function SongRow({
         <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
         </svg>
-        <div>
-          <p className="text-sm font-medium text-gray-900">{song.songTitle}</p>
+        <div className={`flex-1 min-w-0 ${song.hiddenByEngineer ? 'opacity-50' : ''}`}>
+          {isEditing ? (
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => onEditTitleChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && editTitle.trim()) onRename(song.songId, editTitle.trim());
+                if (e.key === 'Escape') onCancelEdit();
+              }}
+              onBlur={() => {
+                if (editTitle.trim() && editTitle.trim() !== song.songTitle) onRename(song.songId, editTitle.trim());
+                else onCancelEdit();
+              }}
+              className="text-sm font-medium text-gray-900 border border-blue-300 rounded px-2 py-0.5 w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            />
+          ) : (
+            <p className={`text-sm font-medium ${song.hiddenByEngineer ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+              {song.songTitle}
+            </p>
+          )}
           {song.artist && <p className="text-xs text-gray-500">{song.artist}</p>}
         </div>
+        {/* Song management buttons */}
+        {!isEditing && (
+          <button
+            onClick={() => onStartEdit(song.songId, song.songTitle)}
+            className="p-1 text-gray-300 hover:text-gray-600 rounded transition-colors"
+            title="Rename song"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+        )}
+        <button
+          onClick={() => onToggleHidden(song.songId, !song.hiddenByEngineer)}
+          className={`p-1 rounded transition-colors ${song.hiddenByEngineer ? 'text-amber-500 hover:text-amber-600' : 'text-gray-300 hover:text-gray-600'}`}
+          title={song.hiddenByEngineer ? 'Unhide song' : 'Hide song (won\'t appear for parents)'}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {song.hiddenByEngineer ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+            ) : (
+              <>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </>
+            )}
+          </svg>
+        </button>
         <div className="ml-auto flex gap-1.5">
           <span className={`px-1.5 py-0.5 text-xs rounded ${
             song.previewFile || isProcessed

@@ -59,6 +59,7 @@ export interface EngineerSongView {
   songTitle: string;
   artist?: string;
   order: number;
+  hiddenByEngineer?: boolean;
   previewFile?: AudioFileWithUrl;
   finalMp3File?: AudioFileWithUrl;
   finalWavFile?: AudioFileWithUrl;
