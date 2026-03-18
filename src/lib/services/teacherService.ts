@@ -17,6 +17,7 @@ import {
   AudioFileStatus,
   AudioApprovalStatus,
   TeacherInvite,
+  AssignedStaffInfo,
   TEACHERS_TABLE_ID,
   SONGS_TABLE_ID,
   AUDIO_FILES_TABLE_ID,
@@ -43,6 +44,7 @@ import {
   ClassType,
 } from '@/lib/types/airtable';
 import { getAirtableService } from './airtableService';
+import { getR2Service } from './r2Service';
 
 // Table names in Airtable - use table IDs for API calls
 const TEACHERS_TABLE = TEACHERS_TABLE_ID; // tblLO2vXcgvNjrJ0T
@@ -2581,6 +2583,34 @@ class TeacherService {
   }
 
   /**
+   * Fetch assigned staff profile for an Event.
+   * Returns AssignedStaffInfo or null if no staff assigned.
+   */
+  private async getAssignedStaffInfo(assignedStaffIds?: string[]): Promise<AssignedStaffInfo | null> {
+    if (!assignedStaffIds || assignedStaffIds.length === 0) return null;
+
+    const person = await getAirtableService().getPersonWithProfile(assignedStaffIds[0]);
+    if (!person || !person.staff_name) return null;
+
+    let profilePhotoUrl: string | undefined;
+    if (person.profile_photo) {
+      try {
+        profilePhotoUrl = await getR2Service().generateSignedUrl(person.profile_photo, 86400); // 24h expiry
+      } catch (err) {
+        console.warn('Failed to generate staff photo URL:', err);
+      }
+    }
+
+    return {
+      name: person.staff_name,
+      email: person.email,
+      phone: person.phone,
+      bio: person.bio,
+      profilePhotoUrl,
+    };
+  }
+
+  /**
    * Get events for a teacher (by email)
    * Returns events where the teacher's email matches the school contact
    */
@@ -2757,6 +2787,8 @@ class TeacherService {
         const SONGS_PER_CLASS = 1;
         const expectedSongs = classesCount * SONGS_PER_CLASS;
 
+        const assignedStaff = await this.getAssignedStaffInfo(eventRecord?.assigned_staff) ?? undefined;
+
         events.push({
           eventId,
           simplybookId: booking.simplybookId, // Store simplybookId for fallback lookup
@@ -2772,6 +2804,7 @@ class TeacherService {
           isSchulsong: eventRecord?.is_schulsong === true,
           scsShirtsIncluded: eventRecord?.scs_shirts_included === true,
           estimatedChildren: eventRecord?.estimated_children,
+          assignedStaff,
           progress: {
             classesCount,
             expectedClasses: undefined,
@@ -2992,6 +3025,8 @@ class TeacherService {
         const SONGS_PER_CLASS = 1;
         const expectedSongs = classesCount * SONGS_PER_CLASS;
 
+        const assignedStaff = await this.getAssignedStaffInfo(linkedEvent.assigned_staff) ?? undefined;
+
         events.push({
           eventId,
           schoolName: actualSchoolName,
@@ -3004,6 +3039,7 @@ class TeacherService {
           isSchulsong: linkedEvent.is_schulsong === true,
           scsShirtsIncluded: linkedEvent.scs_shirts_included === true,
           estimatedChildren: linkedEvent.estimated_children,
+          assignedStaff,
           progress: {
             classesCount,
             expectedClasses: undefined,
