@@ -3160,6 +3160,7 @@ class TeacherService {
         .select({
           filterByFormula: `{${TEACHER_INVITES_FIELD_IDS.invite_token}} = '${token.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
+          returnFieldsByFieldId: true,
         })
         .all();
 
@@ -3220,6 +3221,7 @@ class TeacherService {
         .select({
           filterByFormula: `{${TEACHER_INVITES_FIELD_IDS.invite_token}} = '${token.replace(/'/g, "\\'")}'`,
           maxRecords: 1,
+          returnFieldsByFieldId: true,
         })
         .all();
 
@@ -3250,7 +3252,20 @@ class TeacherService {
       }
 
       // Get the event to find the event_id (booking_id)
-      const eventRecord = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
+      // Use select with returnFieldsByFieldId instead of .find()
+      const eventRecords = await this.base(EVENTS_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${eventRecordId}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (eventRecords.length === 0) {
+        throw new Error('Invalid event: event record not found');
+      }
+
+      const eventRecord = eventRecords[0];
       const eventId =
         (eventRecord.fields[EVENTS_FIELD_IDS.event_id] as string) ||
         (eventRecord.fields[EVENTS_FIELD_IDS.legacy_booking_id] as string);
@@ -3331,11 +3346,20 @@ class TeacherService {
     acceptedByEmail?: string;
   }>> {
     try {
-      const records = await this.base(TEACHER_INVITES_TABLE_ID)
+      // Fetch all invites with returnFieldsByFieldId and filter in code,
+      // because ARRAYJOIN on linked record fields returns display values (not record IDs)
+      // so we can't filter by eventRecordId in the formula
+      const allRecords = await this.base(TEACHER_INVITES_TABLE_ID)
         .select({
-          filterByFormula: `FIND('${eventRecordId}', ARRAYJOIN({${TEACHER_INVITES_FIELD_IDS.event_id}}, ',')) > 0`,
+          returnFieldsByFieldId: true,
         })
         .all();
+
+      // Filter to invites linked to this event
+      const records = allRecords.filter((record) => {
+        const linkedEventIds = record.fields[TEACHER_INVITES_FIELD_IDS.event_id] as string[] | undefined;
+        return linkedEventIds && linkedEventIds.includes(eventRecordId);
+      });
 
       const invites = records.map((record) => this.transformInviteRecord(record));
 
@@ -3402,8 +3426,21 @@ class TeacherService {
    */
   async revokeInvite(inviteRecordId: string, eventRecordId: string): Promise<void> {
     try {
-      const record = await this.base(TEACHER_INVITES_TABLE_ID).find(inviteRecordId);
-      const invite = this.transformInviteRecord(record);
+      // Use select with RECORD_ID() filter instead of .find() because
+      // .find() doesn't support returnFieldsByFieldId, which causes field mapping issues
+      const records = await this.base(TEACHER_INVITES_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${inviteRecordId}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (records.length === 0) {
+        throw new Error('Invite not found');
+      }
+
+      const invite = this.transformInviteRecord(records[0]);
 
       // Verify invite belongs to the given event
       if (invite.eventRecordId !== eventRecordId) {

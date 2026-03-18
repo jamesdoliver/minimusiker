@@ -4780,15 +4780,40 @@ class AirtableService {
    */
   async getSchoolBookingByEventRecordId(eventRecordId: string): Promise<SchoolBooking | null> {
     try {
-      const eventRecord = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
-      const schoolBookingIds = eventRecord.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[] | undefined;
+      // Use select with RECORD_ID() and returnFieldsByFieldId so field IDs resolve correctly
+      const eventRecords = await this.base(EVENTS_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${eventRecordId}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (eventRecords.length === 0) {
+        return null;
+      }
+
+      const schoolBookingIds = eventRecords[0].fields[EVENTS_FIELD_IDS.simplybook_booking] as string[] | undefined;
 
       if (!schoolBookingIds || schoolBookingIds.length === 0) {
         return null;
       }
 
-      const bookingRecord = await this.base(SCHOOL_BOOKINGS_TABLE_ID).find(schoolBookingIds[0]);
-      return this.transformSchoolBookingRecord(bookingRecord);
+      // Use select with RECORD_ID() filter instead of .find() because
+      // .find() doesn't support returnFieldsByFieldId, which causes field mapping issues
+      const bookingRecords = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
+        .select({
+          filterByFormula: `RECORD_ID() = '${schoolBookingIds[0]}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (bookingRecords.length === 0) {
+        return null;
+      }
+
+      return this.transformSchoolBookingRecord(bookingRecords[0]);
     } catch (error) {
       console.error('Error getting school booking by event record ID:', error);
       return null;
