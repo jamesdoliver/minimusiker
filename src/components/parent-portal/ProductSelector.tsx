@@ -7,7 +7,7 @@ import { ParentSessionChild } from '@/types/airtable';
 import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/stock';
 import { useProducts } from '@/lib/hooks/useProducts';
 import { Product } from '@/lib/types/airtable';
-import { canOrderPersonalizedClothing, getDaysUntilEvent, SCHULSONG_CLOTHING_CUTOFF_DAYS } from '@/lib/utils/eventTimeline';
+import { canOrderPersonalizedClothing, SCHULSONG_CLOTHING_CUTOFF_DAYS } from '@/lib/utils/eventTimeline';
 import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 import { ShopProfile, AudioProductId, ClothingProductId, AudioProduct, ClothingProduct } from '@/lib/config/shopProfiles';
 import AudioProductCard from './AudioProductCard';
@@ -49,7 +49,6 @@ interface ProductSelectorProps {
   isStandardMerchOnly?: boolean;
 }
 
-const COMBO_DISCOUNT_PERCENT = 10;
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -71,10 +70,10 @@ function calculateTotal(
   selection: ProductSelection,
   audioProducts: AudioProduct[],
   clothingProducts: ClothingProduct[],
+  isEarlyBird: boolean,
 ) {
   let subtotal = 0;
 
-  // Audio products (sum all selected with quantities)
   selection.audioProducts.forEach((item) => {
     const product = getAudioProduct(audioProducts, item.productId);
     if (product) {
@@ -82,7 +81,6 @@ function calculateTotal(
     }
   });
 
-  // Clothing (sum all items)
   selection.clothing.forEach((item) => {
     const product = getClothingProduct(clothingProducts, item.productId);
     if (product) {
@@ -90,10 +88,8 @@ function calculateTotal(
     }
   });
 
-  // Apply combo discount if both audio AND clothing
-  const hasAudio = selection.audioProducts.length > 0;
-  const hasClothing = selection.clothing.length > 0;
-  const discountPercent = hasAudio && hasClothing ? COMBO_DISCOUNT_PERCENT : 0;
+  const EARLY_BIRD_DISCOUNT_PERCENT = 10;
+  const discountPercent = isEarlyBird ? EARLY_BIRD_DISCOUNT_PERCENT : 0;
   const discount = subtotal * (discountPercent / 100);
 
   return {
@@ -101,7 +97,7 @@ function calculateTotal(
     discount,
     discountPercent,
     total: subtotal - discount,
-    hasComboDiscount: hasAudio && hasClothing,
+    hasEarlyBirdDiscount: isEarlyBird && subtotal > 0,
   };
 }
 
@@ -183,12 +179,12 @@ function OrderSummary({ selection, totals, audioProducts, clothingProducts, onCh
               <span className="text-gray-900">€{totals.subtotal.toFixed(2)}</span>
             </div>
 
-            {/* Combo Discount */}
-            {totals.hasComboDiscount && (
+            {/* Early-bird Discount */}
+            {totals.hasEarlyBirdDiscount && (
               <div className="flex justify-between text-sm text-sage-600">
                 <span className="flex items-center gap-1">
                   <span className="text-xs">🎉</span>
-                  {t('comboDiscount', { percent: totals.discountPercent })}
+                  {t('earlyBirdDiscount', { percent: totals.discountPercent })}
                 </span>
                 <span>-€{totals.discount.toFixed(2)}</span>
               </div>
@@ -233,22 +229,10 @@ function OrderSummary({ selection, totals, audioProducts, clothingProducts, onCh
         )}
       </button>
 
-      {/* Trust Badges */}
-      <div className="mt-3 flex items-center justify-center space-x-4 text-xs text-gray-500">
-        <span className="flex items-center gap-1">
-          <svg className="w-4 h-4 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-          </svg>
-          {t('secure')}
-        </span>
-        <span className="flex items-center gap-1">
-          <svg className="w-4 h-4 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-            <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v6.05A2.5 2.5 0 0115.95 16H17a1 1 0 001-1v-5a1 1 0 00-.293-.707l-2-2A1 1 0 0015 7h-1z" />
-          </svg>
-          {t('fastDelivery')}
-        </span>
-      </div>
+      {/* Shipping Info */}
+      <p className="mt-3 text-xs text-gray-400 leading-relaxed whitespace-pre-line">
+        {t('shippingInfo')}
+      </p>
     </div>
   );
 }
@@ -302,6 +286,17 @@ export default function ProductSelector({
   // Determine if personalized products should be shown
   // Use per-event override if available, otherwise fall back to global defaults
   const overrides = useMemo(() => parseOverrides(timelineOverrides), [timelineOverrides]);
+
+  const isWithinEarlyBird = useMemo(() => {
+    if (!eventDate || isSchulsongOnly) return false;
+    const event = new Date(eventDate);
+    const earlyBirdDays = getThreshold('early_bird_deadline_days', overrides);
+    const deadline = new Date(event);
+    deadline.setDate(deadline.getDate() - earlyBirdDays);
+    deadline.setHours(23, 59, 59, 999);
+    return Date.now() < deadline.getTime();
+  }, [eventDate, isSchulsongOnly, overrides]);
+
   const cutoffDays = isSchulsongOnly
     ? getThreshold('schulsong_clothing_cutoff_days', overrides)
     : getThreshold('personalized_clothing_cutoff_days', overrides);
@@ -377,8 +372,8 @@ export default function ProductSelector({
   }, [shopifyProducts, showPersonalized, shopProfile]);
 
   const totals = useMemo(
-    () => calculateTotal(selection, shopProfile.audioProducts, activeClothingProducts),
-    [selection, shopProfile.audioProducts, activeClothingProducts]
+    () => calculateTotal(selection, shopProfile.audioProducts, activeClothingProducts, isWithinEarlyBird),
+    [selection, shopProfile.audioProducts, activeClothingProducts, isWithinEarlyBird]
   );
 
   // Audio selection handlers
@@ -652,28 +647,6 @@ export default function ProductSelector({
           <h3 className="text-lg font-bold text-gray-900">{t('addClothing')}</h3>
           <span className="text-xs text-gray-500 font-medium">{t('optional')}</span>
         </div>
-
-        {/* Discount Banner - only show before event day (not applicable for schulsong-only) */}
-        {!isSchulsongOnly &&
-         selection.audioProducts.length > 0 &&
-         selection.clothing.length === 0 &&
-         eventDate &&
-         getDaysUntilEvent(eventDate) > 0 && (
-          <div className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-800 font-medium flex items-center gap-2">
-              <span className="text-lg">🎉</span>
-              {t('discountBanner', {
-                date: (() => {
-                  const event = new Date(eventDate);
-                  const day = event.getDate().toString().padStart(2, '0');
-                  const month = (event.getMonth() + 1).toString().padStart(2, '0');
-                  const year = event.getFullYear().toString().slice(-2);
-                  return `${day}.${month}.${year}`;
-                })()
-              })}
-            </p>
-          </div>
-        )}
 
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {activeClothingProducts.map((product) => (

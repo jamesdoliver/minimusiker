@@ -25,13 +25,13 @@ export const AUDIO_VARIANTS: Record<string, { type: string; description: string 
   // Minimusikertag variants
   '53258099720538': { type: 'minicard', description: 'Minicard (standalone)' },
   '53258098639194': { type: 'cd', description: 'CD' },
-  '53271523557722': { type: 'tonie', description: 'Kreativ-Tonie mit Minicard' },
   '53327238824282': { type: 'minicard-cd-bundle', description: 'Minicard+CD Bundle' },
+  '53265570824538': { type: 'bluetooth-box', description: 'Kinderliederbox' },
   // PLUS variants
   '53440629375322': { type: 'minicard', description: 'Minicard PLUS' },
   '53525559771482': { type: 'cd', description: 'CD PLUS' },
-  '53525526217050': { type: 'tonie', description: 'Tonie PLUS' },
   '53525549089114': { type: 'minicard-cd-bundle', description: 'Minicard+CD Bundle PLUS' },
+  '53836123472218': { type: 'bluetooth-box', description: 'Kinderliederbox (+)' },
 };
 
 // ---------------------------------------------------------------------------

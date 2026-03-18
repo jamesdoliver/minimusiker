@@ -10,7 +10,7 @@
 // TYPES
 // ============================================================================
 
-export type AudioProductId = 'minicard' | 'cd' | 'tonie' | 'minicard-cd-bundle' | 'bluetooth-box';
+export type AudioProductId = 'minicard' | 'cd' | 'minicard-cd-bundle' | 'bluetooth-box';
 export type ClothingProductId = 'tshirt' | 'hoodie' | 'tshirt-hoodie';
 
 export interface AudioProduct {
@@ -137,13 +137,6 @@ const MINIMUSIKERTAG_AUDIO: AudioProduct[] = [
     imageEmoji: '💿',
   },
   {
-    id: 'tonie',
-    name: 'Tonie',
-    description: 'Kreativ-Tonie mit Minicard',
-    price: 29.00,
-    imageEmoji: '🎵',
-  },
-  {
     id: 'minicard-cd-bundle',
     name: 'Minicard + CD',
     description: 'Beide Formate zum Sparpreis',
@@ -153,8 +146,8 @@ const MINIMUSIKERTAG_AUDIO: AudioProduct[] = [
   },
   {
     id: 'bluetooth-box',
-    name: 'Bluetooth Box',
-    description: 'Tragbare Bluetooth-Box mit allen Songs',
+    name: 'Kinderliederbox',
+    description: 'BT-Lautsprecher inkl. aller Songs',
     price: 39.00,
     imageEmoji: '🔊',
   },
@@ -164,9 +157,8 @@ const MINIMUSIKERTAG_VARIANT_MAP: Record<string, string> = {
   // Audio products
   'minicard': 'gid://shopify/ProductVariant/53258099720538',
   'cd': 'gid://shopify/ProductVariant/53258098639194',
-  'tonie': 'gid://shopify/ProductVariant/53271523557722',
   'minicard-cd-bundle': 'gid://shopify/ProductVariant/53327238824282',
-  'bluetooth-box': 'gid://shopify/ProductVariant/TODO_BT_BOX_STANDARD',
+  'bluetooth-box': 'gid://shopify/ProductVariant/53265570824538',
 
   // Standard T-Shirt sizes
   'tshirt-standard-98/104 (3-4J)': 'gid://shopify/ProductVariant/53328491512154',
@@ -226,13 +218,6 @@ const PLUS_AUDIO: AudioProduct[] = [
     imageEmoji: '💿',
   },
   {
-    id: 'tonie',
-    name: 'Tonie',
-    description: 'Kreativ-Tonie mit Minicard',
-    price: 23.00,
-    imageEmoji: '🎵',
-  },
-  {
     id: 'minicard-cd-bundle',
     name: 'Minicard + CD',
     description: 'Beide Formate zum Sparpreis',
@@ -242,8 +227,8 @@ const PLUS_AUDIO: AudioProduct[] = [
   },
   {
     id: 'bluetooth-box',
-    name: 'Bluetooth Box',
-    description: 'Tragbare Bluetooth-Box mit allen Songs',
+    name: 'Kinderliederbox',
+    description: 'BT-Lautsprecher inkl. aller Songs',
     price: 34.00,
     imageEmoji: '🔊',
   },
@@ -254,9 +239,8 @@ const PLUS_VARIANT_MAP: Record<string, string> = {
   // PLUS audio products (override minimusikertag audio entries)
   'minicard': 'gid://shopify/ProductVariant/53440629375322',
   'cd': 'gid://shopify/ProductVariant/53525559771482',
-  'tonie': 'gid://shopify/ProductVariant/53525526217050',
   'minicard-cd-bundle': 'gid://shopify/ProductVariant/53525549089114',
-  'bluetooth-box': 'gid://shopify/ProductVariant/TODO_BT_BOX_PLUS',
+  'bluetooth-box': 'gid://shopify/ProductVariant/53836123472218',
 };
 
 export const PLUS_PROFILE: ShopProfile = {
@@ -285,7 +269,7 @@ export const SCHULSONG_ONLY_PROFILE: ShopProfile = {
 // SCS PROFILE (Startchancenschule — reduced product set)
 // ============================================================================
 
-// SCS audio: CD, Tonie, Bluetooth Box only — NO Minicard, NO MC+CD bundle
+// SCS audio: CD, Kinderliederbox only — NO Minicard, NO MC+CD bundle
 const SCS_AUDIO: AudioProduct[] = [
   {
     id: 'cd',
@@ -295,16 +279,9 @@ const SCS_AUDIO: AudioProduct[] = [
     imageEmoji: '💿',
   },
   {
-    id: 'tonie',
-    name: 'Tonie',
-    description: 'Kreativ-Tonie mit Minicard',
-    price: 29.00,
-    imageEmoji: '🎵',
-  },
-  {
     id: 'bluetooth-box',
-    name: 'Bluetooth Box',
-    description: 'Tragbare Bluetooth-Box mit allen Songs',
+    name: 'Kinderliederbox',
+    description: 'BT-Lautsprecher inkl. aller Songs',
     price: 39.00,
     imageEmoji: '🔊',
   },
@@ -319,16 +296,9 @@ const SCS_PLUS_AUDIO: AudioProduct[] = [
     imageEmoji: '💿',
   },
   {
-    id: 'tonie',
-    name: 'Tonie',
-    description: 'Kreativ-Tonie mit Minicard',
-    price: 23.00,
-    imageEmoji: '🎵',
-  },
-  {
     id: 'bluetooth-box',
-    name: 'Bluetooth Box',
-    description: 'Tragbare Bluetooth-Box mit allen Songs',
+    name: 'Kinderliederbox',
+    description: 'BT-Lautsprecher inkl. aller Songs',
     price: 34.00,
     imageEmoji: '🔊',
   },
@@ -371,9 +341,8 @@ export const SCS_PLUS_PROFILE: ShopProfile = {
 // ============================================================================
 
 /**
- * All Shopify variant IDs that include a Minicard (grants full audio access).
- * Includes standalone Minicard, Minicard+CD bundles, and Tonie products
- * (Kreativ-Tonie ships with a Minicard).
+ * All Shopify variant IDs that grant full audio access in the parent portal.
+ * Includes standalone Minicard, Minicard+CD bundles, and Kinderliederbox.
  *
  * Variant IDs are the numeric portion after "gid://shopify/ProductVariant/"
  */
@@ -381,11 +350,11 @@ export const MINICARD_VARIANT_IDS = new Set([
   // Minimusikertag variants
   '53258099720538',   // Minicard (standalone)
   '53327238824282',   // Minicard+CD bundle
-  '53271523557722',   // Tonie (Kreativ-Tonie mit Minicard)
+  '53265570824538',   // Kinderliederbox
   // PLUS variants
   '53440629375322',   // Minicard PLUS
   '53525549089114',   // Minicard+CD bundle PLUS
-  '53525526217050',   // Tonie PLUS
+  '53836123472218',   // Kinderliederbox (+)
 ]);
 
 // ============================================================================

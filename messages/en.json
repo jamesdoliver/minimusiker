@@ -180,9 +180,7 @@
     "required": "(Required)",
     "addClothing": "Add Clothing",
     "optional": "(Optional)",
-    "discountBanner": "Save 10% when you order before {date}!",
     "addItems": "Add items",
-    "comboHint": "10% off with audio!",
     "addButton": "Add",
     "addedItems": "Added Items:",
     "size": "Size:",
@@ -213,13 +211,12 @@
     "title": "Order Summary",
     "selectItems": "Select items above to build your order",
     "subtotal": "Subtotal",
-    "comboDiscount": "Combo Discount ({percent}%)",
+    "earlyBirdDiscount": "Early-bird Discount ({percent}%)",
     "total": "Total",
     "processing": "Processing...",
     "checkout": "Checkout - €{total}",
     "addItems": "Add items to checkout",
-    "secure": "Secure",
-    "fastDelivery": "Fast Delivery"
+    "shippingInfo": "All audio recordings are shipped after completion following the project day. This is usually 2-3 weeks afterwards.\nT-shirts and hoodies are produced for you after ordering. If you order T-shirts or hoodies up to 19 days before the project day, they will arrive before the project day. All orders after that can only be shipped after the project day due to production lead times and will arrive together with the audio recordings."
   },
   "shop": {
     "header": {

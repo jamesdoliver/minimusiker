@@ -108,9 +108,9 @@ export async function hasMinicardForEvent(
         return true;
       }
 
-      // Fallback: check product_title contains "minicard" or "tonie"
+      // Fallback: check product_title for access-granting products
       const title = (item.product_title || '').toLowerCase();
-      if (title.includes('minicard') || title.includes('tonie')) {
+      if (title.includes('minicard') || title.includes('tonie') || title.includes('kinderliederbox')) {
         return true;
       }
     }

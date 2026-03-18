@@ -4,7 +4,7 @@
  *
  * NEW LOGIC (Jan 2026):
  * - Personalized clothing: available up to 4 days AFTER event
- * - EARLYBIRD10: applies BEFORE event day only (daysUntilEvent > 0)
+ * - EARLYBIRD10: applies when more than 19 days before event (early bird deadline)
  * - BUNDLE15: always applies for T-shirt + Hoodie combo
  */
 
@@ -36,16 +36,19 @@ function createLineItems(
   return lineItems;
 }
 
+// Default early bird deadline: 19 days before event
+const EARLY_BIRD_DEADLINE_DAYS = 19;
+
 // Simulate the discount check logic from create-checkout API
-// NEW: EARLYBIRD10 applies when daysUntilEvent > 0 (before event day)
+// EARLYBIRD10 applies when more than EARLY_BIRD_DEADLINE_DAYS before event
 function determineDiscountCodes(
   lineItems: Array<{ productType: string }>,
   daysUntilEvent: number
 ): string[] {
   const discountCodes: string[] = [];
 
-  // Early-bird check - only applies BEFORE event day
-  if (daysUntilEvent > 0) {
+  // Early-bird check - only applies before early bird deadline
+  if (daysUntilEvent > EARLY_BIRD_DEADLINE_DAYS) {
     discountCodes.push('EARLYBIRD10');
   }
 
@@ -122,27 +125,34 @@ describe('ProductSelector Discount Compatibility', () => {
   });
 
   describe('EARLYBIRD10 discount', () => {
-    it('applies when event is 10 days away', () => {
+    it('applies when event is 25 days away (within early bird window)', () => {
+      const discounts = determineDiscountCodes([], 25);
+      expect(discounts).toContain('EARLYBIRD10');
+    });
+
+    it('applies when event is 20 days away (within early bird window)', () => {
+      const discounts = determineDiscountCodes([], 20);
+      expect(discounts).toContain('EARLYBIRD10');
+    });
+
+    it('does NOT apply when event is 19 days away (at deadline)', () => {
+      const discounts = determineDiscountCodes([], 19);
+      expect(discounts).not.toContain('EARLYBIRD10');
+    });
+
+    it('does NOT apply when event is 10 days away (past deadline)', () => {
       const discounts = determineDiscountCodes([], 10);
-      expect(discounts).toContain('EARLYBIRD10');
+      expect(discounts).not.toContain('EARLYBIRD10');
     });
 
-    it('applies when event is 1 day away', () => {
-      const discounts = determineDiscountCodes([], 1);
-      expect(discounts).toContain('EARLYBIRD10');
-    });
-
-    it('does NOT apply on event day (daysUntilEvent = 0)', () => {
+    it('does NOT apply on event day', () => {
       const discounts = determineDiscountCodes([], 0);
       expect(discounts).not.toContain('EARLYBIRD10');
     });
 
-    it('does NOT apply after event (daysUntilEvent < 0)', () => {
+    it('does NOT apply after event', () => {
       const discounts = determineDiscountCodes([], -1);
       expect(discounts).not.toContain('EARLYBIRD10');
-
-      const discounts3 = determineDiscountCodes([], -3);
-      expect(discounts3).not.toContain('EARLYBIRD10');
     });
   });
 
@@ -174,13 +184,22 @@ describe('ProductSelector Discount Compatibility', () => {
   });
 
   describe('Combined discounts', () => {
-    it('applies both EARLYBIRD10 and BUNDLE15 for bundle purchase before event', () => {
+    it('applies both EARLYBIRD10 and BUNDLE15 for bundle purchase within early bird window', () => {
       const lineItems = createLineItems(true, '98/104 (3-4J)', '116 (5-6 J)');
-      const discounts = determineDiscountCodes(lineItems, 10);
+      const discounts = determineDiscountCodes(lineItems, 25);
 
       expect(discounts).toContain('EARLYBIRD10');
       expect(discounts).toContain('BUNDLE15');
       expect(discounts).toHaveLength(2);
+    });
+
+    it('applies only BUNDLE15 when past early bird deadline', () => {
+      const lineItems = createLineItems(true, '98/104 (3-4J)', '116 (5-6 J)');
+      const discounts = determineDiscountCodes(lineItems, 10);
+
+      expect(discounts).not.toContain('EARLYBIRD10');
+      expect(discounts).toContain('BUNDLE15');
+      expect(discounts).toHaveLength(1);
     });
 
     it('applies only BUNDLE15 on event day', () => {
@@ -203,64 +222,54 @@ describe('ProductSelector Discount Compatibility', () => {
   });
 
   describe('Business scenarios', () => {
-    it('Scenario: Event in future - personalized + discount banner + EARLYBIRD10', () => {
+    it('Scenario: Event 25 days away - personalized + EARLYBIRD10', () => {
+      const eventDate = daysFromToday(25);
+      const daysUntilEvent = 25;
+
+      expect(canOrderPersonalizedClothing(eventDate)).toBe(true);
+
+      const discounts = determineDiscountCodes([], daysUntilEvent);
+      expect(discounts).toContain('EARLYBIRD10');
+    });
+
+    it('Scenario: Event 10 days away - personalized + NO EARLYBIRD10 (past deadline)', () => {
       const eventDate = daysFromToday(10);
       const daysUntilEvent = 10;
 
-      // Personalized products available
       expect(canOrderPersonalizedClothing(eventDate)).toBe(true);
 
-      // EARLYBIRD10 applies
       const discounts = determineDiscountCodes([], daysUntilEvent);
-      expect(discounts).toContain('EARLYBIRD10');
-
-      // Banner should show (daysUntilEvent > 0)
-      expect(daysUntilEvent > 0).toBe(true);
+      expect(discounts).not.toContain('EARLYBIRD10');
     });
 
-    it('Scenario: Event today - personalized + NO banner + NO EARLYBIRD10', () => {
+    it('Scenario: Event today - personalized + NO EARLYBIRD10', () => {
       const eventDate = daysFromToday(0);
       const daysUntilEvent = 0;
 
-      // Personalized products available
       expect(canOrderPersonalizedClothing(eventDate)).toBe(true);
 
-      // EARLYBIRD10 does NOT apply
       const discounts = determineDiscountCodes([], daysUntilEvent);
       expect(discounts).not.toContain('EARLYBIRD10');
-
-      // Banner should NOT show (daysUntilEvent > 0 is false)
-      expect(daysUntilEvent > 0).toBe(false);
     });
 
-    it('Scenario: Event 3 days ago - personalized + NO banner + NO EARLYBIRD10', () => {
+    it('Scenario: Event 3 days ago - personalized + NO EARLYBIRD10', () => {
       const eventDate = daysFromToday(-3);
       const daysUntilEvent = -3;
 
-      // Personalized products still available (within 4-day window)
       expect(canOrderPersonalizedClothing(eventDate)).toBe(true);
 
-      // EARLYBIRD10 does NOT apply
       const discounts = determineDiscountCodes([], daysUntilEvent);
       expect(discounts).not.toContain('EARLYBIRD10');
-
-      // Banner should NOT show
-      expect(daysUntilEvent > 0).toBe(false);
     });
 
-    it('Scenario: Event 5+ days ago - standard products + NO banner + NO EARLYBIRD10', () => {
+    it('Scenario: Event 5+ days ago - standard products + NO EARLYBIRD10', () => {
       const eventDate = daysFromToday(-5);
       const daysUntilEvent = -5;
 
-      // Personalized products NOT available (past 4-day window)
       expect(canOrderPersonalizedClothing(eventDate)).toBe(false);
 
-      // EARLYBIRD10 does NOT apply
       const discounts = determineDiscountCodes([], daysUntilEvent);
       expect(discounts).not.toContain('EARLYBIRD10');
-
-      // Banner should NOT show
-      expect(daysUntilEvent > 0).toBe(false);
     });
   });
 });

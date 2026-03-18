@@ -79,20 +79,17 @@ export function getMilestoneOffset(milestone: Milestone, overrides?: EventTimeli
 }
 
 /**
- * Date-based default hidden products.
- * Before April 1 2026: bluetooth-box hidden (not yet launched).
- * From April 1 2026: tonie hidden (discontinued from shop).
+ * Default hidden products. Returns empty — all products in the audio arrays
+ * are visible by default. Admins can hide specific products via timeline_overrides.
  */
-const PRODUCT_VISIBILITY_CUTOFF = new Date('2026-04-01T00:00:00');
-
-export function getDefaultHiddenProducts(now: Date = new Date()): string[] {
-  return now < PRODUCT_VISIBILITY_CUTOFF ? ['bluetooth-box'] : ['tonie'];
+export function getDefaultHiddenProducts(): string[] {
+  return [];
 }
 
 /**
  * Resolve which products are hidden for an event.
  * If the admin has explicitly set hidden_products (even []), use that.
- * Otherwise fall back to date-based defaults.
+ * Otherwise fall back to defaults (empty).
  */
 export function getEffectiveHiddenProducts(overrides?: EventTimelineOverrides | null): string[] {
   if (overrides && 'hidden_products' in overrides) {
