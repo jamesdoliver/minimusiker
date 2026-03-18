@@ -199,6 +199,36 @@ class AirtableService {
   }
 
   /**
+   * Batch-fetch parent records by their Airtable record IDs
+   */
+  async getParentsByIds(parentRecordIds: string[]): Promise<Parent[]> {
+    this.ensureNormalizedTablesInitialized();
+    if (!this.parentsTable || parentRecordIds.length === 0) return [];
+
+    try {
+      const formula = `OR(${parentRecordIds.map(id => `RECORD_ID() = '${id}'`).join(',')})`;
+      const records = await this.parentsTable.select({
+        filterByFormula: formula,
+        returnFieldsByFieldId: true,
+      }).all();
+
+      return records.map((record) => ({
+        id: record.id,
+        parents_id: record.fields[PARENTS_FIELD_IDS.parents_id] as string,
+        parent_id: record.fields[PARENTS_FIELD_IDS.parent_id] as string,
+        parent_email: record.fields[PARENTS_FIELD_IDS.parent_email] as string,
+        parent_first_name: record.fields[PARENTS_FIELD_IDS.parent_first_name] as string,
+        parent_telephone: record.fields[PARENTS_FIELD_IDS.parent_telephone] as string,
+        email_campaigns: record.fields[PARENTS_FIELD_IDS.email_campaigns] as 'yes' | 'no',
+        created_at: record.fields[PARENTS_FIELD_IDS.created_at] as string,
+      }));
+    } catch (error) {
+      console.error('Error fetching parents by IDs:', error);
+      return [];
+    }
+  }
+
+  /**
    * Helper: Query registrations by parent record ID
    */
   private async queryRegistrationsByParent(parentRecordId: string): Promise<Registration[]> {
