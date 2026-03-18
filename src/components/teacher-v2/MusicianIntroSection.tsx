@@ -1,15 +1,15 @@
 'use client';
 
-import type { MinimusikanRepresentative } from '@/lib/types/airtable';
+import type { AssignedStaffInfo } from '@/lib/types/teacher';
 
 interface MusicianIntroSectionProps {
-  representative: MinimusikanRepresentative | null;
+  assignedStaff: AssignedStaffInfo | null;
   isLoading: boolean;
   onContactClick: () => void;
 }
 
 export function MusicianIntroSection({
-  representative,
+  assignedStaff,
   isLoading,
   onContactClick,
 }: MusicianIntroSectionProps) {
@@ -42,21 +42,21 @@ export function MusicianIntroSection({
           </div>
         )}
 
-        {/* Representative Display - 2-column grid with photo centered vertically */}
-        {!isLoading && representative && (
+        {/* Staff Display - 2-column grid with photo centered vertically */}
+        {!isLoading && assignedStaff && (
           <div className="grid md:grid-cols-[auto_1fr] gap-8 items-center">
             {/* Left: Circular photo - vertically centered */}
             <div className="flex justify-center">
-              {representative.profilePhotoUrl ? (
+              {assignedStaff.profilePhotoUrl ? (
                 <img
-                  src={representative.profilePhotoUrl}
-                  alt={representative.name}
+                  src={assignedStaff.profilePhotoUrl}
+                  alt={assignedStaff.name}
                   className="w-48 h-48 rounded-full object-cover border-4 border-white"
                 />
               ) : (
                 <div className="w-48 h-48 rounded-full bg-white/20 flex items-center justify-center border-4 border-white">
                   <span className="text-white text-5xl font-bold">
-                    {representative.name.charAt(0).toUpperCase()}
+                    {assignedStaff.name.charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}
@@ -68,20 +68,20 @@ export function MusicianIntroSection({
                 Am Minimusikertag komme ICH zu euch!
               </h2>
               <p className="text-white/90 leading-relaxed mb-4 whitespace-pre-wrap">
-                {representative.bio}
+                {assignedStaff.bio}
               </p>
               <button
                 onClick={onContactClick}
                 className="text-white underline hover:no-underline text-sm"
               >
-                Kontakt zu {representative.name.split(' ')[0]}
+                Kontakt zu {assignedStaff.name.split(' ')[0]}
               </button>
             </div>
           </div>
         )}
 
-        {/* Fallback for no representative */}
-        {!isLoading && !representative && (
+        {/* Fallback for no staff assigned */}
+        {!isLoading && !assignedStaff && (
           <div className="grid md:grid-cols-[auto_1fr] gap-8 items-center">
             {/* Left: Placeholder photo */}
             <div className="flex justify-center">

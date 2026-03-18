@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { TeacherEventView, Teacher } from '@/lib/types/teacher';
-import type { MinimusikanRepresentative } from '@/lib/types/airtable';
+import { TeacherEventView, Teacher, type AssignedStaffInfo } from '@/lib/types/teacher';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { EditSchoolInfoModal } from '@/components/teacher/EditSchoolInfoModal';
 import { RepresentativeContactModal } from '@/components/teacher/RepresentativeContactModal';
@@ -43,9 +42,7 @@ export default function TeacherDashboard() {
   const [pendingBookings, setPendingBookings] = useState<PendingBooking[]>([]);
   const [showPendingModal, setShowPendingModal] = useState(false);
 
-  // Representative state
-  const [representative, setRepresentative] = useState<MinimusikanRepresentative | null>(null);
-  const [isRepLoading, setIsRepLoading] = useState(true);
+  // Contact modal state
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
   // Edit school info modal
@@ -53,7 +50,6 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     checkAuthAndFetchData();
-    fetchRepresentative();
   }, []);
 
   const checkAuthAndFetchData = async () => {
@@ -99,20 +95,6 @@ export default function TeacherDashboard() {
     }
   };
 
-  const fetchRepresentative = async () => {
-    try {
-      const response = await fetch('/api/teacher/representative');
-      const data = await response.json();
-      if (response.ok) {
-        setRepresentative(data.representative);
-      }
-    } catch (err) {
-      console.error('Error fetching representative:', err);
-    } finally {
-      setIsRepLoading(false);
-    }
-  };
-
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/teacher-logout', { method: 'POST' });
@@ -144,6 +126,9 @@ export default function TeacherDashboard() {
 
   // Get current event for address/phone display and editing
   const currentEvent = filteredEvents[currentEventIndex];
+
+  // Derive assigned staff from current event
+  const currentAssignedStaff: AssignedStaffInfo | null = currentEvent?.assignedStaff ?? null;
 
   // Reset index when filter changes
   useEffect(() => {
@@ -220,8 +205,8 @@ export default function TeacherDashboard() {
 
         {/* Musician Intro Section */}
         <MusicianIntroSection
-          representative={representative}
-          isLoading={isRepLoading}
+          assignedStaff={currentAssignedStaff}
+          isLoading={isLoading}
           onContactClick={() => setIsContactModalOpen(true)}
         />
 
@@ -252,13 +237,13 @@ export default function TeacherDashboard() {
       />
 
       {/* Representative Contact Modal */}
-      {representative && (
+      {currentAssignedStaff && (
         <RepresentativeContactModal
           isOpen={isContactModalOpen}
           onClose={() => setIsContactModalOpen(false)}
-          name={representative.name}
-          email={representative.email}
-          phone={representative.phone}
+          name={currentAssignedStaff.name}
+          email={currentAssignedStaff.email || ''}
+          phone={currentAssignedStaff.phone}
         />
       )}
 
