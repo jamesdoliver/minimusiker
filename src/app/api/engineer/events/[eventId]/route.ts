@@ -201,6 +201,7 @@ export async function GET(
       isSchulsong: event.isSchulsong,
       schulsongClass: schulsongClassView,
       audioPipelineStage: event.audioPipelineStage as EngineerEventDetail['audioPipelineStage'],
+      assignedStaff: event.assignedStaff,
       logicProjects: logicProjects.length > 0 ? logicProjects : undefined,
     };
 

@@ -99,6 +99,7 @@ export interface EngineerEventDetail {
   isSchulsong?: boolean;
   schulsongClass?: EngineerClassView;
   audioPipelineStage?: 'not_started' | 'staff_uploaded' | 'finals_submitted';
+  assignedStaff?: { name: string; phone?: string };
   logicProjects?: LogicProjectInfo[];
 }
 

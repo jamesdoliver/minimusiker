@@ -4257,6 +4257,7 @@ class AirtableService {
       eventType: string;
       isSchulsong: boolean;
       audioPipelineStage?: string;
+      assignedStaff?: { name: string; phone?: string };
       classes: Array<{
         classId: string;
         className: string;
@@ -4281,6 +4282,22 @@ class AirtableService {
       const record = eventRecords[0];
       const assignedEngineers = (record.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[]) || [];
       const isAssigned = assignedEngineers.includes(engineerId);
+
+      // Fetch assigned staff info
+      const assignedStaffIds = (record.fields[EVENTS_FIELD_IDS.assigned_staff] as string[]) || [];
+      let assignedStaff: { name: string; phone?: string } | undefined;
+      if (assignedStaffIds.length > 0) {
+        try {
+          const staffRecord = await this.base(PERSONEN_TABLE_ID).find(assignedStaffIds[0]);
+          const staffName = (staffRecord.fields['staff_name'] as string) || '';
+          const staffPhone = (staffRecord.fields['Telefon'] as string) || undefined;
+          if (staffName) {
+            assignedStaff = { name: staffName, phone: staffPhone };
+          }
+        } catch (err) {
+          console.error('Error fetching assigned staff:', err);
+        }
+      }
 
       const linkedClassIds = (record.fields[EVENTS_FIELD_IDS.classes] as string[]) || [];
 
@@ -4313,6 +4330,7 @@ class AirtableService {
           eventType: record.fields[EVENTS_FIELD_IDS.event_type] as string,
           isSchulsong: (record.fields[EVENTS_FIELD_IDS.is_schulsong] as boolean) || false,
           audioPipelineStage: record.fields[EVENTS_FIELD_IDS.audio_pipeline_stage] as string | undefined,
+          assignedStaff,
           classes,
         },
       };
