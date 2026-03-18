@@ -206,7 +206,11 @@ class AirtableService {
     if (!this.parentsTable || parentRecordIds.length === 0) return [];
 
     try {
-      const formula = `OR(${parentRecordIds.map(id => `RECORD_ID() = '${id}'`).join(',')})`;
+      // Sanitize IDs: only allow valid Airtable record ID characters
+      const safeIds = parentRecordIds.filter(id => /^rec[a-zA-Z0-9]{14}$/.test(id));
+      if (safeIds.length === 0) return [];
+
+      const formula = `OR(${safeIds.map(id => `RECORD_ID() = '${id}'`).join(',')})`;
       const records = await this.parentsTable.select({
         filterByFormula: formula,
         returnFieldsByFieldId: true,

@@ -40,6 +40,24 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isMintingSession, setIsMintingSession] = useState<string | null>(null);
 
+  const fetchPreviewData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/preview-data`);
+      if (!response.ok) {
+        throw new Error('Vorschaudaten konnten nicht geladen werden');
+      }
+      const data = await response.json();
+      setPreviewData(data);
+    } catch (err) {
+      console.error('Error fetching preview data:', err);
+      setError(err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [eventId]);
+
   // Fetch preview data when modal opens
   useEffect(() => {
     if (isOpen && eventId) {
@@ -51,7 +69,7 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
       setSelectedClassId(null);
       setIsMintingSession(null);
     }
-  }, [isOpen, eventId]);
+  }, [isOpen, eventId, fetchPreviewData]);
 
   // Handle escape key
   const handleKeyDown = useCallback(
@@ -74,24 +92,6 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
     };
   }, [isOpen, handleKeyDown]);
 
-  const fetchPreviewData = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}/preview-data`);
-      if (!response.ok) {
-        throw new Error('Vorschaudaten konnten nicht geladen werden');
-      }
-      const data = await response.json();
-      setPreviewData(data);
-    } catch (err) {
-      console.error('Error fetching preview data:', err);
-      setError(err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const openPortal = async (type: 'teacher' | 'parent', parentId?: string) => {
     const mintKey = type === 'teacher' ? 'teacher' : parentId!;
     setIsMintingSession(mintKey);
@@ -108,6 +108,7 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
       window.open(portalUrl, '_blank');
     } catch (err) {
       console.error('Error minting preview session:', err);
+      setError(err instanceof Error ? err.message : 'Session konnte nicht erstellt werden');
     } finally {
       setIsMintingSession(null);
     }
@@ -137,8 +138,13 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
           </button>
         </div>
 
+        {/* Cookie warning */}
+        <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 text-xs text-amber-700">
+          Hinweis: Das Öffnen einer Vorschau ersetzt eine eventuell vorhandene Pädagogen- oder Eltern-Session in diesem Browser. Verwende ein Inkognito-Fenster, um dies zu vermeiden.
+        </div>
+
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-73px)]">
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
           {isLoading && (
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#5a8a82]" />

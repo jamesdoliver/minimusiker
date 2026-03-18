@@ -5,11 +5,15 @@ import { createTeacherSessionToken } from '@/lib/auth/verifyTeacherSession';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { TeacherSession, TEACHER_SESSION_COOKIE } from '@/lib/types/teacher';
 import { Event, ParentSession, ParentSessionChild } from '@/lib/types/airtable';
+import { generateSchoolId } from '@/lib/utils/eventIdentifiers';
 
 export const dynamic = 'force-dynamic';
 
 const PARENT_JWT_SECRET = process.env.PARENT_JWT_SECRET || process.env.JWT_SECRET || 'parent-secret-key';
 const PREVIEW_SESSION_DURATION = 1800; // 30 minutes
+
+// Airtable record IDs follow the pattern rec + 14 alphanumeric characters
+const AIRTABLE_RECORD_ID_PATTERN = /^rec[a-zA-Z0-9]{14}$/;
 
 /**
  * Derive event type string from event flags.
@@ -29,7 +33,7 @@ function deriveEventType(event: { is_minimusikertag?: boolean; is_plus?: boolean
  */
 export async function POST(request: NextRequest) {
   try {
-    const [, authError] = requireAdmin(request);
+    const [admin, authError] = requireAdmin(request);
     if (authError) return authError;
 
     const body = await request.json();
@@ -46,6 +50,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate parentId format to prevent formula injection
+    if (parentId && !AIRTABLE_RECORD_ID_PATTERN.test(parentId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid parentId format' },
+        { status: 400 }
+      );
+    }
+
     const airtableService = getAirtableService();
 
     // Look up the event
@@ -58,8 +70,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === 'teacher') {
+      console.log('[preview-session] Admin preview:', { admin: admin!.email, type: 'teacher', eventId });
       return await handleTeacherPreview(airtableService, event, eventId);
     } else if (type === 'parent') {
+      console.log('[preview-session] Admin preview:', { admin: admin!.email, type: 'parent', eventId, parentId });
       return await handleParentPreview(airtableService, event, eventId, parentId);
     } else {
       return NextResponse.json(
@@ -182,12 +196,14 @@ async function handleParentPreview(
     };
   });
 
+  const schoolName = event.school_name || '';
   const sessionData: ParentSession = {
     parentId: parent.id,
     email: parent.parent_email,
     firstName: parent.parent_first_name || 'Preview',
     bookingId: eventId,
-    schoolName: event.school_name || '',
+    schoolName,
+    schoolId: generateSchoolId(schoolName),
     eventType: children[0]?.eventType || 'minimusikertag',
     childName: children[0]?.childName || 'Unknown',
     bookingDate: event.event_date,

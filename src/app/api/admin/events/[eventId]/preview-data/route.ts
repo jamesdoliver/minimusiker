@@ -60,18 +60,27 @@ export async function GET(
     const parents = await airtableService.getParentsByIds([...allParentIds]);
     const parentMap = new Map(parents.map(p => [p.id, p]));
 
-    // 6. Batch-check minicard access for all parents
-    const accessChecks = await Promise.all(
-      [...allParentIds].map(async (parentRecordId) => {
-        try {
-          const hasAccess = await hasMinicardForEvent(parentRecordId, eventId);
-          return [parentRecordId, hasAccess] as const;
-        } catch {
-          return [parentRecordId, false] as const;
-        }
-      })
-    );
-    const accessMap = new Map(accessChecks);
+    // 6. Check minicard access for parents (throttled to avoid Airtable rate limits)
+    const parentIdList = [...allParentIds];
+    const accessMap = new Map<string, boolean>();
+    const BATCH_SIZE = 3; // Process 3 at a time to stay under Airtable's 5 req/s limit
+
+    for (let i = 0; i < parentIdList.length; i += BATCH_SIZE) {
+      const batch = parentIdList.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map(async (parentRecordId) => {
+          try {
+            const hasAccess = await hasMinicardForEvent(parentRecordId, eventId);
+            return [parentRecordId, hasAccess] as const;
+          } catch {
+            return [parentRecordId, false] as const;
+          }
+        })
+      );
+      for (const [id, access] of results) {
+        accessMap.set(id, access);
+      }
+    }
 
     // 7. Build class data with parents
     const classData = classes.map((cls) => {
