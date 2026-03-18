@@ -52,6 +52,9 @@ const ACTIVITY_CONFIG: Record<
   booking_changed: { icon: '🔄', color: 'text-blue-600', bgColor: 'bg-blue-100' },
   booking_cancelled: { icon: '🚫', color: 'text-red-600', bgColor: 'bg-red-100' },
   clothing_order_updated: { icon: '👕', color: 'text-teal-600', bgColor: 'bg-teal-100' },
+  song_renamed: { icon: '✏️', color: 'text-blue-600', bgColor: 'bg-blue-100' },
+  song_hidden: { icon: '🙈', color: 'text-amber-600', bgColor: 'bg-amber-100' },
+  song_unhidden: { icon: '👁️', color: 'text-green-600', bgColor: 'bg-green-100' },
 };
 
 function formatRelativeTime(dateString: string): string {
