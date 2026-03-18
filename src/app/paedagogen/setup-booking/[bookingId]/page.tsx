@@ -254,8 +254,8 @@ export default function SetupBookingPage({ params }: { params: { bookingId: stri
               <div className="mt-6 p-4 bg-blue-50 rounded-lg">
                 <h3 className="text-sm font-semibold text-blue-900 mb-2">Nächster Schritt:</h3>
                 <p className="text-sm text-blue-700">
-                  Klicken Sie auf "Event initialisieren", um mit der Einrichtung zu beginnen.
-                  Danach können Sie Klassen hinzufügen, damit Eltern sich registrieren können.
+                  Klick auf &quot;Event initialisieren&quot;, um mit der Einrichtung zu beginnen.
+                  Danach kannst du Klassen hinzufügen, damit Eltern sich registrieren können.
                 </p>
               </div>
             )}

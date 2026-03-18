@@ -269,8 +269,8 @@ function TeacherLoginContent() {
             <div>
               <p className="text-sm font-medium text-blue-800">So funktioniert die Anmeldung</p>
               <p className="text-sm text-blue-700 mt-1">
-                Wir senden Ihnen einen sicheren Login-Link per E-Mail. Klicken Sie einfach auf den
-                Link, um sich anzumelden. Kein Passwort erforderlich!
+                Wir senden dir einen sicheren Login-Link per E-Mail. Klick einfach auf den
+                Link, um dich anzumelden. Kein Passwort erforderlich!
               </p>
             </div>
           </div>
