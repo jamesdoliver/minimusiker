@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     const type = typeParam === 'choir' || typeParam === 'teacher_song' ? typeParam : undefined;
 
     // Get collections for this event
-    const collections = await teacherService.getCollectionsForEvent(eventId, type);
+    const collections = await teacherService.getCollectionsForEvent(eventId, type, { excludeHidden: true });
 
     // Map to parent-friendly format
     const collectionsWithDetails = collections.map((collection) => ({

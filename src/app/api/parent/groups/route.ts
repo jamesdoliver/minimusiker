@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const teacherService = getTeacherService();
 
     // Get groups that contain this class
-    const groups = await teacherService.getGroupsForClass(classId);
+    const groups = await teacherService.getGroupsForClass(classId, { excludeHidden: true });
 
     // Return groups with their audio status
     const groupsWithDetails = groups.map((group) => ({

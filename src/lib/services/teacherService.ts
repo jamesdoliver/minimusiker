@@ -546,7 +546,10 @@ class TeacherService {
   /**
    * Get songs for a class
    */
-  async getSongsByClassId(classId: string): Promise<Song[]> {
+  async getSongsByClassId(classId: string, options?: { excludeHidden?: boolean }): Promise<Song[]> {
+    const maybeFilterHidden = (songs: Song[]): Song[] =>
+      options?.excludeHidden ? songs.filter(s => !s.hiddenByEngineer) : songs;
+
     // For groups (classId starts with 'group_'), query by class_id text field directly
     // because groups don't use the class_link linked record field
     const isGroup = classId.startsWith('group_');
@@ -559,7 +562,7 @@ class TeacherService {
             sort: [{ field: 'order', direction: 'asc' }],
           })
           .all();
-        return records.map((record) => this.transformSongRecord(record));
+        return maybeFilterHidden(records.map((record) => this.transformSongRecord(record)));
       } catch (error) {
         console.error('Error getting songs for group:', error);
         return [];
@@ -578,7 +581,7 @@ class TeacherService {
           })
           .all();
 
-        return records.map((record) => this.transformSongRecord(record));
+        return maybeFilterHidden(records.map((record) => this.transformSongRecord(record)));
       } catch (error) {
         console.error('Error getting songs by class ID (normalized):', error);
         return [];
@@ -593,7 +596,7 @@ class TeacherService {
           })
           .all();
 
-        return records.map((record) => this.transformSongRecord(record));
+        return maybeFilterHidden(records.map((record) => this.transformSongRecord(record)));
       } catch (error) {
         console.error('Error getting songs by class ID:', error);
         return [];
@@ -1963,7 +1966,8 @@ class TeacherService {
    */
   async getCollectionsForEvent(
     eventId: string,
-    type?: 'choir' | 'teacher_song'
+    type?: 'choir' | 'teacher_song',
+    options?: { excludeHidden?: boolean }
   ): Promise<TeacherClassView[]> {
     try {
       // Classes may have legacy_booking_id set to either the canonical event_id
@@ -1995,7 +1999,7 @@ class TeacherService {
         .all();
 
       // Get songs and audio files for this event
-      const songs = await this.getSongsByEventId(eventId);
+      const songs = await this.getSongsByEventId(eventId, options);
       const audioFiles = await this.getAudioFilesByEventId(eventId);
 
       // Build class views
@@ -2456,7 +2460,7 @@ class TeacherService {
   /**
    * Get all groups that a specific class belongs to
    */
-  async getGroupsForClass(classId: string): Promise<ClassGroup[]> {
+  async getGroupsForClass(classId: string, options?: { excludeHidden?: boolean }): Promise<ClassGroup[]> {
     try {
       if (!this.groupsTable) {
         return [];
@@ -2500,6 +2504,18 @@ class TeacherService {
             console.warn('Could not fetch event record:', err);
           }
         }
+
+        // Get songs for this group (stored with group_id as the class_id)
+        const songs = await this.getSongsByClassId(group.groupId, options);
+        group.songs = songs;
+
+        // Get audio files for this group
+        const audioFiles = await this.getAudioFilesByClassId(group.groupId);
+        group.audioStatus = {
+          hasRawAudio: audioFiles.some((a) => a.type === 'raw' && a.status !== 'error'),
+          hasPreview: audioFiles.some((a) => a.type === 'preview' && a.status !== 'error'),
+          hasFinal: audioFiles.some((a) => a.type === 'final' && a.status !== 'error'),
+        };
 
         groups.push(group);
       }
