@@ -169,6 +169,12 @@ class ActivityService {
         return `Audio uploaded for "${details.songTitle || 'event'}" by ${details.staffName || 'staff'}`;
       case 'email_sent':
         return `${details.emailType || 'Email'} sent to ${details.recipient}`;
+      case 'song_renamed':
+        return `Song renamed: "${details.oldTitle}" → "${details.newTitle}"`;
+      case 'song_hidden':
+        return `Song hidden: "${details.songTitle}"`;
+      case 'song_unhidden':
+        return `Song unhidden: "${details.songTitle}"`;
       default:
         return 'Activity logged';
     }

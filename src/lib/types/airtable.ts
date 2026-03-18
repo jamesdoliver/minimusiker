@@ -1109,9 +1109,12 @@ export type EventActivityType =
   | 'track_rejected'
   | 'schulsong_approved'
   | 'schulsong_rejected'
-  | 'clothing_order_updated';
+  | 'clothing_order_updated'
+  | 'song_renamed'
+  | 'song_hidden'
+  | 'song_unhidden';
 
-export type ActorType = 'teacher' | 'admin' | 'system';
+export type ActorType = 'teacher' | 'admin' | 'system' | 'engineer';
 
 export interface EventActivity {
   id: string;
