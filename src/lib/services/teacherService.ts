@@ -2643,19 +2643,37 @@ class TeacherService {
         const actualEventDate = booking.startDate || '';
         const actualSchoolName = booking.schoolName || '';
 
-        // Query Classes table to get classes for this event
-        // Search for both event_id format AND simplybookId to catch classes created with either identifier
-        const simplybookId = booking.simplybookId;
-        const classFilterFormula = simplybookId && simplybookId !== eventId
-          ? `OR({${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${simplybookId.replace(/'/g, "\\'")}')`
-          : `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`;
+        // Query Classes table using Event's linked class record IDs (primary)
+        // Falls back to legacy_booking_id text match if Event record unavailable
+        let classRecords: Airtable.Records<Airtable.FieldSet>;
 
-        const classRecords = await this.base(CLASSES_TABLE_ID)
-          .select({
-            filterByFormula: classFilterFormula,
-            returnFieldsByFieldId: true,
-          })
-          .all();
+        const linkedClassIds = eventRecord?.classes;
+        if (linkedClassIds && linkedClassIds.length > 0) {
+          // Fetch classes by linked record IDs from Event — guaranteed complete
+          const classFormula = linkedClassIds.length === 1
+            ? `RECORD_ID() = '${linkedClassIds[0]}'`
+            : `OR(${linkedClassIds.map(id => `RECORD_ID() = '${id}'`).join(',')})`;
+
+          classRecords = await this.base(CLASSES_TABLE_ID)
+            .select({
+              filterByFormula: classFormula,
+              returnFieldsByFieldId: true,
+            })
+            .all();
+        } else {
+          // Fallback: text-based lookup (legacy events without linked records)
+          const simplybookId = booking.simplybookId;
+          const classFilterFormula = simplybookId && simplybookId !== eventId
+            ? `OR({${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}', {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${simplybookId.replace(/'/g, "\\'")}')`
+            : `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`;
+
+          classRecords = await this.base(CLASSES_TABLE_ID)
+            .select({
+              filterByFormula: classFilterFormula,
+              returnFieldsByFieldId: true,
+            })
+            .all();
+        }
 
         // Get songs and audio files for this event
         const songs = await this.getSongsByEventId(eventId);
@@ -2888,13 +2906,29 @@ class TeacherService {
         const actualEventDate = linkedEvent.event_date;
         const actualSchoolName = linkedEvent.school_name;
 
-        // Query Classes table to get classes for this event
-        const classRecords = await this.base(CLASSES_TABLE_ID)
-          .select({
-            filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`,
-            returnFieldsByFieldId: true,
-          })
-          .all();
+        // Query Classes using Event's linked class record IDs
+        let classRecords: Airtable.Records<Airtable.FieldSet>;
+
+        const linkedClassIds = linkedEvent.classes;
+        if (linkedClassIds && linkedClassIds.length > 0) {
+          const classFormula = linkedClassIds.length === 1
+            ? `RECORD_ID() = '${linkedClassIds[0]}'`
+            : `OR(${linkedClassIds.map(id => `RECORD_ID() = '${id}'`).join(',')})`;
+
+          classRecords = await this.base(CLASSES_TABLE_ID)
+            .select({
+              filterByFormula: classFormula,
+              returnFieldsByFieldId: true,
+            })
+            .all();
+        } else {
+          classRecords = await this.base(CLASSES_TABLE_ID)
+            .select({
+              filterByFormula: `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}'`,
+              returnFieldsByFieldId: true,
+            })
+            .all();
+        }
 
         // Get songs and audio files for this event
         const songs = await this.getSongsByEventId(eventId);
