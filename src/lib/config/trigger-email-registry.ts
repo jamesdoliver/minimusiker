@@ -360,7 +360,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
 </p>
 
 <p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
-  Bitte hören Sie sich den Song an und geben Sie ihn frei, damit die Eltern ihren Schulsong und das passende Merchandise erhalten können.
+  Bitte höre dir den Song an und gib ihn frei, damit die Eltern ihren Schulsong und das passende Merchandise erhalten können.
 </p>
 
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">

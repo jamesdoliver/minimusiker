@@ -6065,6 +6065,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.standard_merch_override,
           EVENTS_FIELD_IDS.audio_pipeline_stage,
           EVENTS_FIELD_IDS.admin_notes,
+          EVENTS_FIELD_IDS.classes,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -6127,6 +6128,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.scs_shirts_included,
           EVENTS_FIELD_IDS.minicard_order_enabled,
           EVENTS_FIELD_IDS.minicard_order_quantity,
+          EVENTS_FIELD_IDS.classes,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -6311,6 +6313,8 @@ class AirtableService {
       scs_shirts_included: record.get('scs_shirts_included') as boolean | undefined,
       minicard_order_enabled: record.get('minicard_order_enabled') as boolean | undefined,
       minicard_order_quantity: record.get('minicard_order_quantity') as number | undefined,
+      // Linked classes
+      classes: record.get('classes') as string[] | undefined,
     };
   }
 
@@ -6729,6 +6733,36 @@ class AirtableService {
       };
     } catch (error) {
       console.error('Error fetching person by ID:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch a Personen record with full profile info for teacher portal display.
+   * Returns name, bio, profile_photo R2 key, email, and phone.
+   */
+  async getPersonWithProfile(personId: string): Promise<{
+    id: string;
+    staff_name: string;
+    email?: string;
+    phone?: string;
+    bio?: string;
+    profile_photo?: string; // R2 key, e.g., mm-staff-pictures/cassy.jpg
+  } | null> {
+    try {
+      const record = await this.base(PERSONEN_TABLE_ID).find(personId);
+      if (!record) return null;
+
+      return {
+        id: record.id,
+        staff_name: (record.get('Name') as string) || '',
+        email: record.get('E-Mail') as string | undefined,
+        phone: record.get('telefon') as string | undefined,
+        bio: record.get('bio') as string | undefined,
+        profile_photo: record.get('profile_photo') as string | undefined,
+      };
+    } catch (error) {
+      console.error('Error fetching person with profile:', error);
       return null;
     }
   }

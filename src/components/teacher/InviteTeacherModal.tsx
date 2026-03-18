@@ -131,7 +131,7 @@ export default function InviteTeacherModal({
                 <div>
                   <p className="text-sm font-medium text-green-800">Link erstellt!</p>
                   <p className="text-sm text-green-700 mt-1">
-                    Teilen Sie diesen Link mit Ihrer Kollegin oder Ihrem Kollegen.
+                    Teile diesen Link mit deiner Kollegin oder deinem Kollegen.
                   </p>
                 </div>
               </div>

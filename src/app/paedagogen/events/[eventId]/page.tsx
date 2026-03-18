@@ -127,7 +127,7 @@ function AddClassModal({ eventId, onClose, onClassAdded }: AddClassModalProps) {
               value={className}
               onChange={(e) => setClassName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500"
-              placeholder="z.B. Klasse 3a, Jahrgang 2, etc."
+              placeholder="z.B. Klasse 3a, Fuchsklasse, etc."
             />
           </div>
 
@@ -422,7 +422,7 @@ function EditClassModal({ classId, className: initialName, numChildren: initialC
               value={className}
               onChange={(e) => setClassName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500"
-              placeholder="z.B. Klasse 3a, Jahrgang 2, etc."
+              placeholder="z.B. Klasse 3a, Fuchsklasse, etc."
             />
           </div>
 
@@ -1360,9 +1360,9 @@ export default function TeacherEventDetailPage() {
                   />
                 </svg>
                 <div>
-                  <p className="text-sm font-medium text-blue-800">Sie können Lieder bearbeiten</p>
+                  <p className="text-sm font-medium text-blue-800">Du kannst Lieder bearbeiten</p>
                   <p className="text-sm text-blue-700 mt-1">
-                    Klicken Sie auf eine Klasse, um Lieder hinzuzufügen oder zu entfernen.
+                    Klick auf eine Klasse, um Lieder hinzuzufügen oder zu entfernen.
                     Änderungen sind bis zum Event-Datum möglich.
                   </p>
                 </div>
@@ -1413,7 +1413,7 @@ export default function TeacherEventDetailPage() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  Gruppe
+                  Gruppe erstellen
                 </button>
                 <button
                   onClick={() => setShowCreateChoir(true)}
@@ -1423,7 +1423,7 @@ export default function TeacherEventDetailPage() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                   </svg>
-                  Chor
+                  Chor erstellen
                 </button>
                 <button
                   onClick={() => setShowCreateTeacherSong(true)}
@@ -1433,7 +1433,7 @@ export default function TeacherEventDetailPage() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                   </svg>
-                  Lehrerlied
+                  Lehrerlied erstellen
                 </button>
                 <button
                   onClick={() => setShowAddClass(true)}
@@ -1442,7 +1442,7 @@ export default function TeacherEventDetailPage() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Klasse
+                  Klasse erstellen
                 </button>
               </div>
             )}

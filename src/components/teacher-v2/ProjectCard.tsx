@@ -77,7 +77,7 @@ export function ProjectCard({ event }: ProjectCardProps) {
         {needsSetup && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
             <p className="text-sm text-yellow-800">
-              Richten Sie Ihre Klassen ein, um Lieder hinzuzufügen und Eltern zur Registrierung einzuladen.
+              Richte deine Klassen ein, um Lieder hinzuzufügen und Eltern zur Registrierung einzuladen.
             </p>
           </div>
         )}
@@ -92,13 +92,6 @@ export function ProjectCard({ event }: ProjectCardProps) {
               {progress.songsCount} Liedern festgelegt
             </p>
           </div>
-        )}
-
-        {/* Link - only show when not needing setup */}
-        {!needsSetup && (
-          <button className="text-mm-accent text-sm hover:underline mb-4 block">
-            Was ist noch zu tun?
-          </button>
         )}
 
         {/* CTA Button - different for setup vs normal */}
@@ -122,7 +115,7 @@ export function ProjectCard({ event }: ProjectCardProps) {
             href={`/paedagogen/events/${eventId}`}
             className="inline-flex items-center gap-2 px-6 py-3 bg-mm-primary-dark text-white rounded-lg font-medium text-sm hover:bg-mm-primary-dark/90 transition-colors"
           >
-            Zur Liederliste
+            Aufnahmetag verwalten
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -141,7 +134,7 @@ export function ProjectCard({ event }: ProjectCardProps) {
           <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Datum ändern</h3>
             <p className="text-gray-600 mb-4">
-              Um das Datum Ihres Events zu ändern, kontaktieren Sie uns bitte:
+              Um das Datum deines Events zu ändern, kontaktiere uns bitte:
             </p>
             <a
               href="tel:02513966054"
