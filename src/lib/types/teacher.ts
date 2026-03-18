@@ -230,6 +230,17 @@ export interface UpsertClassRequest {
 }
 
 /**
+ * Assigned staff info for teacher portal display
+ */
+export interface AssignedStaffInfo {
+  name: string;
+  email?: string;
+  phone?: string;
+  bio?: string;
+  profilePhotoUrl?: string; // Signed R2 URL or direct URL
+}
+
+/**
  * Teacher's view of their event
  */
 export interface TeacherEventView {
@@ -247,6 +258,7 @@ export interface TeacherEventView {
   isSchulsong?: boolean; // Whether this event has a schulsong (for teacher approval workflow)
   scsShirtsIncluded?: boolean; // Whether SCS shirts are included (event-level field for clothing order form)
   estimatedChildren?: number; // Estimated children (for clothing order max quantity)
+  assignedStaff?: AssignedStaffInfo; // Event-level assigned staff from Personen table
   // Progress tracking fields (for dashboard)
   progress?: {
     classesCount: number; // Number of classes created
