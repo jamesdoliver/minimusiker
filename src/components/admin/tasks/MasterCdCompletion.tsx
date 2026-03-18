@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { useClientZipDownload, ZipDownloadFile } from '@/lib/hooks/useClientZipDownload';
 
 interface TrackInfo {
   songId: string;
@@ -20,11 +21,6 @@ interface MasterCdData {
   readyTracks: number;
   allReady: boolean;
   tracks: TrackInfo[];
-}
-
-interface DownloadUrl {
-  fileName: string;
-  url: string;
 }
 
 interface MasterCdCompletionProps {
@@ -46,10 +42,9 @@ export default function MasterCdCompletion({
 }: MasterCdCompletionProps) {
   const [tracklist, setTracklist] = useState<MasterCdData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState<{ current: number; total: number } | null>(null);
+  const { state: zipState, startDownload: startZipDownload, cancel: cancelZipDownload } = useClientZipDownload();
 
   const fetchTracklist = useCallback(async () => {
     setIsLoading(true);
@@ -79,8 +74,6 @@ export default function MasterCdCompletion({
   }, [fetchTracklist]);
 
   const handleDownloadAll = async () => {
-    setIsDownloading(true);
-    setDownloadProgress(null);
     setError(null);
 
     try {
@@ -95,30 +88,23 @@ export default function MasterCdCompletion({
         throw new Error(data.error || 'Failed to get download URLs');
       }
 
-      const urls: DownloadUrl[] = data.data.urls;
-      setDownloadProgress({ current: 0, total: urls.length });
-
-      for (let i = 0; i < urls.length; i++) {
-        const { url, fileName } = urls[i];
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setDownloadProgress({ current: i + 1, total: urls.length });
-
-        // Small delay between downloads to avoid browser blocking
-        if (i < urls.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
+      const tracks: Array<{ trackNumber: number; filename: string; url: string }> = data.data.tracks;
+      if (!tracks || tracks.length === 0) {
+        throw new Error('No tracks available for download');
       }
+
+      // Build file list for ZIP download
+      const files: ZipDownloadFile[] = tracks.map((track) => ({
+        url: track.url,
+        filename: track.filename,
+        path: track.filename,
+        fileSizeBytes: 0, // Unknown upfront — ZIP hook handles streaming
+      }));
+
+      const zipName = `Master CD - ${tracklist?.schoolName || 'Album'}.zip`;
+      await startZipDownload(files, zipName);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Download failed');
-    } finally {
-      setIsDownloading(false);
-      setDownloadProgress(null);
     }
   };
 
@@ -220,57 +206,42 @@ export default function MasterCdCompletion({
           </div>
 
           {/* Download All Button */}
-          <button
-            onClick={handleDownloadAll}
-            disabled={isDownloading || tracklist.tracks.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-[#94B8B3] text-white text-sm font-medium rounded-lg hover:bg-[#7da39e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isDownloading ? (
+          <div className="flex items-center gap-2">
+            {zipState.status === 'downloading' ? (
               <>
-                <svg
-                  className="w-4 h-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span>
+                    {zipState.currentFileIndex + 1}/{zipState.totalFiles} — {zipState.currentFilename}
+                  </span>
+                </div>
+                <button
+                  onClick={cancelZipDownload}
+                  className="px-3 py-1.5 text-xs text-gray-500 hover:text-red-600 transition-colors"
                 >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
-                <span>
-                  {downloadProgress
-                    ? `${downloadProgress.current}/${downloadProgress.total}`
-                    : 'Preparing...'}
-                </span>
+                  Cancel
+                </button>
               </>
             ) : (
-              <>
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
+              <button
+                onClick={handleDownloadAll}
+                disabled={tracklist.tracks.filter(t => t.status === 'ready').length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-[#94B8B3] text-white text-sm font-medium rounded-lg hover:bg-[#7da39e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                <span>Download All</span>
-              </>
+                <span>
+                  {zipState.status === 'complete' ? 'Download Again' :
+                   zipState.status === 'error' ? 'Retry Download' :
+                   'Download All as ZIP'}
+                </span>
+              </button>
             )}
-          </button>
+          </div>
         </div>
       </div>
 

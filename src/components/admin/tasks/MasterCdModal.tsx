@@ -6,6 +6,7 @@ import { cn, formatDate } from '@/lib/utils';
 import type { TaskMatrixCell } from '@/lib/types/tasks';
 import { getTimelineEntry, PREFIX_STYLES } from '@/lib/config/taskTimeline';
 import type { MasterCdData, MasterCdTrack } from '@/lib/services/masterCdService';
+import { useClientZipDownload, ZipDownloadFile } from '@/lib/hooks/useClientZipDownload';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,8 +92,7 @@ export default function MasterCdModal({
   // Save/download state
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<{ current: number; total: number } | null>(null);
+  const { state: zipState, startDownload: startZipDownload, cancel: cancelZipDownload } = useClientZipDownload();
 
   // Notes for partial completion
   const [showNotesInput, setShowNotesInput] = useState(false);
@@ -267,8 +267,6 @@ export default function MasterCdModal({
       setSaveError('Save changes before downloading');
       return;
     }
-    setIsDownloading(true);
-    setDownloadProgress(null);
 
     try {
       const res = await fetch(`/api/admin/tasks/download?eventId=${eventId}`, {
@@ -279,28 +277,21 @@ export default function MasterCdModal({
       if (!json.success) throw new Error(json.error || 'Failed to get download URLs');
 
       const tracks: Array<{ trackNumber: number; filename: string; url: string }> = json.data.tracks;
-      setDownloadProgress({ current: 0, total: tracks.length });
-
-      for (let i = 0; i < tracks.length; i++) {
-        const { url, filename } = tracks[i];
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setDownloadProgress({ current: i + 1, total: tracks.length });
-
-        if (i < tracks.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
+      if (!tracks || tracks.length === 0) {
+        throw new Error('No tracks available for download');
       }
+
+      const files: ZipDownloadFile[] = tracks.map((track) => ({
+        url: track.url,
+        filename: track.filename,
+        path: track.filename,
+        fileSizeBytes: 0,
+      }));
+
+      const zipName = `Master CD - ${tracklist?.schoolName || 'Album'}.zip`;
+      await startZipDownload(files, zipName);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Download failed');
-    } finally {
-      setIsDownloading(false);
-      setDownloadProgress(null);
     }
   };
 
@@ -544,28 +535,33 @@ export default function MasterCdModal({
                     </div>
 
                     {editTracks.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleDownloadAll}
-                        disabled={isDownloading || readyCount === 0 || isDirty}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#94B8B3] border border-[#94B8B3] rounded hover:bg-[#94B8B3]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {isDownloading ? (
+                      <div className="flex items-center gap-2">
+                        {zipState.status === 'downloading' ? (
                           <>
-                            <div className="w-3 h-3 border-2 border-[#94B8B3] border-t-transparent rounded-full animate-spin" />
-                            {downloadProgress
-                              ? `${downloadProgress.current}/${downloadProgress.total} downloading...`
-                              : 'Preparing...'}
+                            <span className="flex items-center gap-1.5 text-xs text-gray-600">
+                              <div className="w-3 h-3 border-2 border-[#94B8B3] border-t-transparent rounded-full animate-spin" />
+                              {zipState.currentFileIndex + 1}/{zipState.totalFiles}
+                            </span>
+                            <button type="button" onClick={cancelZipDownload} className="text-xs text-gray-500 hover:text-red-600">
+                              Cancel
+                            </button>
                           </>
                         ) : (
-                          <>
+                          <button
+                            type="button"
+                            onClick={handleDownloadAll}
+                            disabled={readyCount === 0 || isDirty}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#94B8B3] border border-[#94B8B3] rounded hover:bg-[#94B8B3]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
-                            Download All ({readyCount})
-                          </>
+                            {zipState.status === 'complete' ? 'Download Again' :
+                             zipState.status === 'error' ? 'Retry' :
+                             `Download ZIP (${readyCount})`}
+                          </button>
                         )}
-                      </button>
+                      </div>
                     )}
                   </div>
                 )}
