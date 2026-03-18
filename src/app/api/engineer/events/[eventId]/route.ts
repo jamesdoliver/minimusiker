@@ -55,10 +55,11 @@ export async function GET(
 
     const { event } = result;
 
-    // Parallel fetch: songs + audio files (2 calls)
-    const [allSongs, allAudioFiles] = await Promise.all([
+    // Parallel fetch: songs + audio files + groups (3 calls)
+    const [allSongs, allAudioFiles, groups] = await Promise.all([
       teacherService.getSongsByEventId(eventId),
       teacherService.getAudioFilesByEventId(eventId),
+      teacherService.getGroupsByEventId(eventId),
     ]);
 
     // Separate logic project files (event-level, visible to all engineers)
@@ -160,6 +161,40 @@ export async function GET(
           rawFiles,
         };
       });
+
+    // Add groups as additional class entries (groups have songs with group IDs as classId)
+    if (!isMichaEngineer && groups.length > 0) {
+      for (const group of groups) {
+        const groupSongs = allSongs.filter(s => s.classId === group.groupId);
+        if (groupSongs.length === 0) continue;
+
+        const groupAudioFiles = audioFilesWithUrls.filter(f => f.classId === group.groupId);
+        const songs: EngineerSongView[] = groupSongs.map(song => {
+          const songFiles = groupAudioFiles.filter(f => f.songId === song.id);
+          return {
+            songId: song.id,
+            songTitle: song.title,
+            artist: song.artist,
+            order: song.order,
+            hiddenByEngineer: song.hiddenByEngineer,
+            previewFile: songFiles.find(f => f.type === 'preview')
+              || songFiles.find(f => f.type === 'final' && f.previewR2Key),
+            finalMp3File: songFiles.find(f => f.type === 'final' && f.r2Key.endsWith('.mp3'))
+              || songFiles.find(f => f.type === 'final' && f.mp3R2Key),
+            finalWavFile: songFiles.find(f => f.type === 'final' && f.r2Key.endsWith('.wav')),
+          };
+        });
+
+        const memberNames = group.memberClasses?.map(c => c.className).join(' + ') || group.groupName;
+
+        classesWithAudio.push({
+          classId: group.groupId,
+          className: `${group.groupName} (${memberNames})`,
+          songs,
+          rawFiles: groupAudioFiles.filter(f => !f.songId && f.type === 'raw'),
+        });
+      }
+    }
 
     // Determine overall mixing status (song-based)
     const allSongViews = classesWithAudio.flatMap(c => c.songs);
