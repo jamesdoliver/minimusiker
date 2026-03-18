@@ -94,13 +94,6 @@ export function ProjectCard({ event }: ProjectCardProps) {
           </div>
         )}
 
-        {/* Link - only show when not needing setup */}
-        {!needsSetup && (
-          <button className="text-mm-accent text-sm hover:underline mb-4 block">
-            Was ist noch zu tun?
-          </button>
-        )}
-
         {/* CTA Button - different for setup vs normal */}
         {needsSetup ? (
           <Link
@@ -122,7 +115,7 @@ export function ProjectCard({ event }: ProjectCardProps) {
             href={`/paedagogen/events/${eventId}`}
             className="inline-flex items-center gap-2 px-6 py-3 bg-mm-primary-dark text-white rounded-lg font-medium text-sm hover:bg-mm-primary-dark/90 transition-colors"
           >
-            Zur Liederliste
+            Aufnahmetag verwalten
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
