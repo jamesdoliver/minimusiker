@@ -242,14 +242,14 @@ export default function EventTeamSection({
     <div className="space-y-6">
       {/* Stats Row */}
       <div className="flex gap-4">
-        <div className="bg-pink-50 rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-pink-600">{classCount}</p>
+        <div className="bg-pink-50 rounded-xl px-6 py-4 text-center">
+          <p className="text-4xl font-bold text-pink-600">{classCount}</p>
           <p className="text-sm text-pink-700">
             {classCount === 1 ? 'Klasse' : 'Klassen'}
           </p>
         </div>
-        <div className="bg-blue-50 rounded-lg px-4 py-3 text-center">
-          <p className="text-2xl font-bold text-blue-600">{songCount}</p>
+        <div className="bg-blue-50 rounded-xl px-6 py-4 text-center">
+          <p className="text-4xl font-bold text-blue-600">{songCount}</p>
           <p className="text-sm text-blue-700">Lieder</p>
         </div>
       </div>

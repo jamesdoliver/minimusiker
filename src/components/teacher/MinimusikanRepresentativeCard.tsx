@@ -139,7 +139,7 @@ export function MinimusikanRepresentativeCard() {
           onClose={() => setIsContactModalOpen(false)}
           name={representative.name}
           email={representative.email}
-          phone={representative.phone}
+          phone={representative.phone || '+49 40 22 86 42 02'}
         />
       )}
     </>
