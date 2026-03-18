@@ -125,8 +125,8 @@ export function MinimusikanRepresentativeCard() {
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Minimusiker Team</h3>
             <p className="text-gray-700 text-sm max-w-md">
-              Wir freuen uns darauf, Sie bei Ihrem Minimusikertag zu besuchen! Bei Fragen können Sie
-              sich jederzeit an uns wenden.
+              Wir freuen uns darauf, dich bei deinem Minimusikertag zu besuchen! Bei Fragen kannst du
+              dich jederzeit an uns wenden.
             </p>
           </div>
         )}

@@ -264,7 +264,7 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
           </div>
           <p className="text-gray-600 font-medium">Der Schulsong wird gerade vorbereitet.</p>
           <p className="text-sm text-gray-500 mt-1">
-            Sobald er fertig ist, können Sie ihn hier anhören und freigeben.
+            Sobald er fertig ist, kannst du ihn hier anhören und freigeben.
           </p>
         </div>
       )}
@@ -343,7 +343,7 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
           {/* Approval Instructions */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <p className="text-sm text-yellow-800">
-              Bitte hören Sie sich den Schulsong an. Sie können ihn freigeben oder Änderungen anfordern.
+              Bitte höre dir den Schulsong an. Du kannst ihn freigeben oder Änderungen anfordern.
             </p>
           </div>
 
