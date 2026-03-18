@@ -7,8 +7,11 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/admin/events/[eventId]/preview-data
- * Returns teacher info, classes with parents, and audio access status
- * for the "View Event As" admin modal.
+ * Returns teacher info and 1-2 representative parents for the "View Event As" modal.
+ *
+ * Parents returned:
+ * - 1 "any" parent (first registered parent found)
+ * - 1 "buyer" parent (first parent with minicard/audio purchase, if any)
  */
 export async function GET(
   request: NextRequest,
@@ -21,7 +24,7 @@ export async function GET(
     const { eventId } = await params;
     const airtableService = getAirtableService();
 
-    // 1. Fetch event by event_id
+    // 1. Fetch event
     const event = await airtableService.getEventByEventId(eventId);
     if (!event) {
       return NextResponse.json(
@@ -42,82 +45,80 @@ export async function GET(
       }
     }
 
-    // 3. Get classes and registrations using the Airtable record ID
-    const [classes, registrations] = await Promise.all([
-      airtableService.getClassesByEventId(event.id),
-      airtableService.getRegistrationsByEventId(event.id),
-    ]);
+    // 3. Get registrations for this event
+    const registrations = await airtableService.getRegistrationsByEventId(event.id);
 
-    // 4. Collect all unique parent record IDs from registrations
-    const allParentIds = new Set<string>();
+    // 4. Collect unique parent IDs from registrations
+    const parentIdToRegistration = new Map<string, typeof registrations[0]>();
     for (const reg of registrations) {
-      if (reg.parent_id?.[0]) {
-        allParentIds.add(reg.parent_id[0]);
+      const pid = reg.parent_id?.[0];
+      if (pid && !parentIdToRegistration.has(pid)) {
+        parentIdToRegistration.set(pid, reg);
       }
     }
 
-    // 5. Batch-fetch parent details
-    const parents = await airtableService.getParentsByIds([...allParentIds]);
+    const uniqueParentIds = [...parentIdToRegistration.keys()];
+    if (uniqueParentIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        teacher: { name: teacherName, email: teacherEmail },
+        previewParent: null,
+        buyerParent: null,
+      });
+    }
+
+    // 5. Fetch parent details for all unique parents
+    const parents = await airtableService.getParentsByIds(uniqueParentIds);
     const parentMap = new Map(parents.map(p => [p.id, p]));
 
-    // 6. Check minicard access for parents (throttled to avoid Airtable rate limits)
-    const parentIdList = [...allParentIds];
-    const accessMap = new Map<string, boolean>();
-    const BATCH_SIZE = 3; // Process 3 at a time to stay under Airtable's 5 req/s limit
+    // Helper to build a parent preview object
+    const buildParentPreview = (parentRecordId: string, hasAudio: boolean) => {
+      const parent = parentMap.get(parentRecordId);
+      const reg = parentIdToRegistration.get(parentRecordId);
+      return {
+        parentId: parentRecordId,
+        parentName: parent?.parent_first_name || '',
+        parentEmail: parent?.parent_email || '',
+        childName: reg?.registered_child || '',
+        hasAudioAccess: hasAudio,
+      };
+    };
 
-    for (let i = 0; i < parentIdList.length; i += BATCH_SIZE) {
-      const batch = parentIdList.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(
-        batch.map(async (parentRecordId) => {
-          try {
-            const hasAccess = await hasMinicardForEvent(parentRecordId, eventId);
-            return [parentRecordId, hasAccess] as const;
-          } catch {
-            return [parentRecordId, false] as const;
+    // 6. Pick the first parent as the "any" preview parent
+    const firstParentId = uniqueParentIds[0];
+    let previewParent: ReturnType<typeof buildParentPreview> | null = buildParentPreview(firstParentId, false);
+
+    // 7. Find a buyer parent (check one at a time, stop at first hit)
+    let buyerParent = null;
+    for (const parentRecordId of uniqueParentIds) {
+      try {
+        const hasPurchased = await hasMinicardForEvent(parentRecordId, eventId);
+        if (hasPurchased) {
+          buyerParent = buildParentPreview(parentRecordId, true);
+          // If the buyer is the same as the preview parent, update it and pick a different non-buyer
+          if (parentRecordId === firstParentId) {
+            previewParent = buyerParent;
+            // Try to find a different non-buyer parent
+            const otherParentId = uniqueParentIds.find(id => id !== parentRecordId);
+            if (otherParentId) {
+              previewParent = buildParentPreview(otherParentId, false);
+            } else {
+              // Only one parent exists — they're both the buyer and the preview
+              previewParent = null;
+            }
           }
-        })
-      );
-      for (const [id, access] of results) {
-        accessMap.set(id, access);
+          break;
+        }
+      } catch {
+        // Skip this parent and try next
       }
     }
-
-    // 7. Build class data with parents
-    const classData = classes.map((cls) => {
-      // Find registrations for this class
-      const classRegistrations = registrations.filter(
-        (reg) => reg.class_id?.[0] === cls.id
-      );
-
-      const classParents = classRegistrations
-        .filter((reg) => reg.parent_id?.[0])
-        .map((reg) => {
-          const parentRecordId = reg.parent_id[0];
-          const parent = parentMap.get(parentRecordId);
-          return {
-            parentId: parentRecordId,
-            parentName: parent?.parent_first_name || '',
-            parentEmail: parent?.parent_email || '',
-            childName: reg.registered_child || '',
-            hasAudioAccess: accessMap.get(parentRecordId) || false,
-          };
-        });
-
-      return {
-        classId: cls.class_id,
-        className: cls.class_name,
-        childCount: cls.total_children,
-        parents: classParents,
-      };
-    });
 
     return NextResponse.json({
       success: true,
-      teacher: {
-        name: teacherName,
-        email: teacherEmail,
-      },
-      classes: classData,
+      teacher: { name: teacherName, email: teacherEmail },
+      previewParent,
+      buyerParent,
     });
   } catch (error) {
     console.error('Error fetching preview data:', error);

@@ -13,7 +13,7 @@ interface TeacherData {
   email: string;
 }
 
-interface ParentData {
+interface ParentPreview {
   parentId: string;
   parentName: string;
   parentEmail: string;
@@ -21,23 +21,16 @@ interface ParentData {
   hasAudioAccess: boolean;
 }
 
-interface ClassData {
-  classId: string;
-  className: string;
-  childCount: number;
-  parents: ParentData[];
-}
-
 interface PreviewData {
   teacher: TeacherData | null;
-  classes: ClassData[];
+  previewParent: ParentPreview | null;
+  buyerParent: ParentPreview | null;
 }
 
 export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEventAsModalProps) {
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isMintingSession, setIsMintingSession] = useState<string | null>(null);
 
   const fetchPreviewData = useCallback(async () => {
@@ -58,7 +51,6 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
     }
   }, [eventId]);
 
-  // Fetch preview data when modal opens
   useEffect(() => {
     if (isOpen && eventId) {
       fetchPreviewData();
@@ -66,17 +58,13 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
     if (!isOpen) {
       setPreviewData(null);
       setError(null);
-      setSelectedClassId(null);
       setIsMintingSession(null);
     }
   }, [isOpen, eventId, fetchPreviewData]);
 
-  // Handle escape key
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
+      if (event.key === 'Escape') onClose();
     },
     [onClose]
   );
@@ -114,16 +102,14 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
     }
   };
 
-  const selectedClass = previewData?.classes.find((c) => c.classId === selectedClassId) ?? null;
-
   if (!isOpen) return null;
+
+  const hasAnyParent = previewData?.previewParent || previewData?.buyerParent;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
-      {/* Modal */}
       <div className="relative bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -139,12 +125,12 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
         </div>
 
         {/* Cookie warning */}
-        <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 text-xs text-amber-700">
+        <div className="px-6 py-2.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-700">
           Hinweis: Das Öffnen einer Vorschau ersetzt eine eventuell vorhandene Pädagogen- oder Eltern-Session in diesem Browser. Verwende ein Inkognito-Fenster, um dies zu vermeiden.
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-130px)]">
           {isLoading && (
             <div className="flex items-center justify-center py-16">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#5a8a82]" />
@@ -152,7 +138,7 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
           )}
 
           {error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700">
+            <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700 mb-4">
               {error}
             </div>
           )}
@@ -164,12 +150,7 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
                 <div className="flex items-center gap-2.5 mb-4">
                   <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[#5a8a82]/10">
                     <svg className="w-5 h-5 text-[#5a8a82]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-                      />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                     </svg>
                   </div>
                   <h3 className="text-sm font-semibold text-gray-900">Als Pädagoge ansehen</h3>
@@ -206,79 +187,36 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
                 <div className="flex items-center gap-2.5 mb-4">
                   <div className="flex items-center justify-center w-9 h-9 rounded-full bg-[#5a8a82]/10">
                     <svg className="w-5 h-5 text-[#5a8a82]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
-                      />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
                     </svg>
                   </div>
                   <h3 className="text-sm font-semibold text-gray-900">Als Elternteil ansehen</h3>
                 </div>
 
-                {previewData.classes.length > 0 ? (
-                  <>
-                    {/* Class dropdown */}
-                    <select
-                      value={selectedClassId ?? ''}
-                      onChange={(e) => setSelectedClassId(e.target.value || null)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#5a8a82]/30 focus:border-[#5a8a82] mb-3"
-                    >
-                      <option value="">Klasse wählen...</option>
-                      {previewData.classes.map((cls) => (
-                        <option key={cls.classId} value={cls.classId}>
-                          {cls.className} — {cls.childCount} Kinder
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* Parent list */}
-                    {selectedClass && (
-                      selectedClass.parents.length > 0 ? (
-                        <div className="max-h-48 overflow-y-auto space-y-1">
-                          {selectedClass.parents.map((parent) => (
-                            <button
-                              key={`${parent.parentId}-${parent.childName}`}
-                              onClick={() => openPortal('parent', parent.parentId)}
-                              disabled={isMintingSession === parent.parentId}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed group"
-                            >
-                              {/* Audio access badge */}
-                              <span className={`flex-shrink-0 w-2 h-2 rounded-full ${parent.hasAudioAccess ? 'bg-green-500' : 'bg-gray-300'}`} />
-
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-900 truncate">{parent.childName}</p>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {parent.parentName} &middot; {parent.parentEmail}
-                                </p>
-                              </div>
-
-                              {/* External link icon or loading spinner */}
-                              <div className="flex-shrink-0 text-gray-400 group-hover:text-[#5a8a82]">
-                                {isMintingSession === parent.parentId ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#5a8a82]" />
-                                ) : (
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                                    />
-                                  </svg>
-                                )}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-400 italic py-2">Keine Registrierungen</p>
-                      )
+                {hasAnyParent ? (
+                  <div className="space-y-2">
+                    {/* Non-buyer parent (standard view) */}
+                    {previewData.previewParent && (
+                      <ParentRow
+                        parent={previewData.previewParent}
+                        label="Eltern-Ansicht"
+                        isMinting={isMintingSession === previewData.previewParent.parentId}
+                        onOpen={() => openPortal('parent', previewData.previewParent!.parentId)}
+                      />
                     )}
-                  </>
+
+                    {/* Buyer parent (audio access view) */}
+                    {previewData.buyerParent && (
+                      <ParentRow
+                        parent={previewData.buyerParent}
+                        label="Käufer-Ansicht"
+                        isMinting={isMintingSession === previewData.buyerParent.parentId}
+                        onOpen={() => openPortal('parent', previewData.buyerParent!.parentId)}
+                      />
+                    )}
+                  </div>
                 ) : (
-                  <p className="text-sm text-gray-400 italic">Keine Klassen vorhanden</p>
+                  <p className="text-sm text-gray-400 italic">Keine Registrierungen vorhanden</p>
                 )}
               </div>
             </div>
@@ -286,5 +224,52 @@ export default function ViewEventAsModal({ isOpen, onClose, eventId }: ViewEvent
         </div>
       </div>
     </div>
+  );
+}
+
+/** Individual parent row with open button */
+function ParentRow({
+  parent,
+  label,
+  isMinting,
+  onOpen,
+}: {
+  parent: ParentPreview;
+  label: string;
+  isMinting: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      onClick={onOpen}
+      disabled={isMinting}
+      className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg border border-gray-100 hover:border-[#5a8a82]/30 hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed group"
+    >
+      {/* Audio badge */}
+      <span className={`flex-shrink-0 w-2.5 h-2.5 rounded-full ${parent.hasAudioAccess ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-gray-900 truncate">{parent.childName}</p>
+          <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
+            {label}
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 truncate">
+          {parent.parentName} &middot; {parent.parentEmail}
+        </p>
+      </div>
+
+      {/* Open icon / spinner */}
+      <div className="flex-shrink-0 text-gray-400 group-hover:text-[#5a8a82]">
+        {isMinting ? (
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#5a8a82]" />
+        ) : (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+          </svg>
+        )}
+      </div>
+    </button>
   );
 }
