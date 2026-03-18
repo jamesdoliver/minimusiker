@@ -6738,6 +6738,36 @@ class AirtableService {
   }
 
   /**
+   * Fetch a Personen record with full profile info for teacher portal display.
+   * Returns name, bio, profile_photo R2 key, email, and phone.
+   */
+  async getPersonWithProfile(personId: string): Promise<{
+    id: string;
+    staff_name: string;
+    email?: string;
+    phone?: string;
+    bio?: string;
+    profile_photo?: string; // R2 key, e.g., mm-staff-pictures/cassy.jpg
+  } | null> {
+    try {
+      const record = await this.base(PERSONEN_TABLE_ID).find(personId);
+      if (!record) return null;
+
+      return {
+        id: record.id,
+        staff_name: (record.get('Name') as string) || '',
+        email: record.get('E-Mail') as string | undefined,
+        phone: record.get('telefon') as string | undefined,
+        bio: record.get('bio') as string | undefined,
+        profile_photo: record.get('profile_photo') as string | undefined,
+      };
+    } catch (error) {
+      console.error('Error fetching person with profile:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get all staff members from Personen table for dropdown lists
    * Returns id and name for each staff member
    */
