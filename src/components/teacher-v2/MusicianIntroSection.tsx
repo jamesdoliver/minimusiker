@@ -96,8 +96,8 @@ export function MusicianIntroSection({
                 Am Minimusikertag komme ICH zu euch!
               </h2>
               <p className="text-white/90 leading-relaxed">
-                Wir freuen uns darauf, Sie bei Ihrem Minimusikertag zu besuchen!
-                Bei Fragen können Sie sich jederzeit an uns wenden.
+                Wir freuen uns darauf, dich bei deinem Minimusikertag zu besuchen!
+                Bei Fragen kannst du dich jederzeit an uns wenden.
               </p>
             </div>
           </div>

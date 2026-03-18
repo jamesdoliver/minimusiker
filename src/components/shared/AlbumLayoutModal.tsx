@@ -378,8 +378,8 @@ export default function AlbumLayoutModal({
               ) : (
                 <>
                   <p className="text-sm text-gray-600 mb-4">
-                    Ziehen Sie die Lieder in die gewünschte Reihenfolge für das gedruckte Album.
-                    Sie können auch Titel und Klassennamen bearbeiten.
+                    Ziehe die Lieder in die gewünschte Reihenfolge für das gedruckte Album.
+                    Du kannst auch Titel und Klassennamen bearbeiten.
                   </p>
 
                   <DndContext
