@@ -1360,9 +1360,9 @@ export default function TeacherEventDetailPage() {
                   />
                 </svg>
                 <div>
-                  <p className="text-sm font-medium text-blue-800">Sie können Lieder bearbeiten</p>
+                  <p className="text-sm font-medium text-blue-800">Du kannst Lieder bearbeiten</p>
                   <p className="text-sm text-blue-700 mt-1">
-                    Klicken Sie auf eine Klasse, um Lieder hinzuzufügen oder zu entfernen.
+                    Klick auf eine Klasse, um Lieder hinzuzufügen oder zu entfernen.
                     Änderungen sind bis zum Event-Datum möglich.
                   </p>
                 </div>
