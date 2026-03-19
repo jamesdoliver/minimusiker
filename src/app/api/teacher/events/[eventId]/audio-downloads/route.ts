@@ -67,7 +67,8 @@ export async function GET(
       ? finalReadyFiles.some((f: AudioFile) => f.isSchulsong)
       : true;
 
-    const allComplete = allClassesHaveFinal && schulsongSatisfied;
+    const allComplete =
+      nonDefaultClasses.length > 0 && allClassesHaveFinal && schulsongSatisfied;
 
     if (!allComplete) {
       return NextResponse.json({
