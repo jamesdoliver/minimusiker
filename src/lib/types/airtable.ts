@@ -433,6 +433,7 @@ export interface EventClassDetail {
   totalChildren: number;
   registeredParents: number;
   registrationRate: number;  // percentage
+  songs?: { songId: string; songTitle: string }[];
 }
 
 // Full event detail for the [eventId] detail page

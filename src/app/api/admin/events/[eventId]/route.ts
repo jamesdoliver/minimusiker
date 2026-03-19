@@ -102,7 +102,7 @@ export async function GET(
         ...eventDetail,
         classes: eventDetail.classes.map((cls) => ({
           ...cls,
-          songs: songsByClass[cls.classId] || [],
+          songs: (songsByClass[cls.classId] || []).map((s) => ({ songId: s.id, songTitle: s.title })),
         })),
       };
     }
