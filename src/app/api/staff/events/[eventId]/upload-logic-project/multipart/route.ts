@@ -166,21 +166,25 @@ export async function PUT(
     });
 
     // Auto-assign engineer based on project type
+    const tag = `[UploadLogicProject:multipart:PUT]`;
+    let engineerAssigned = false;
     try {
-      await getAirtableService().autoAssignEngineerForUpload(eventId, projectType === 'schulsong');
+      engineerAssigned = await getAirtableService().autoAssignEngineerForUpload(eventId, projectType === 'schulsong');
+      console.log(`${tag} Auto-assign engineer for event=${eventId}: ${engineerAssigned ? 'assigned' : 'skipped (already assigned or no engineer ID)'}`);
     } catch (error) {
-      console.error('Error auto-assigning engineer:', error);
+      console.error(`${tag} FAILED auto-assigning engineer for event=${eventId}:`, error);
     }
 
     // Non-critical post-upload operations — must not fail the upload response
     // The file is already assembled in R2 and the audio record is created above.
     notifyEngineerOfUpload(eventId, projectType as 'schulsong' | 'minimusiker').catch(err =>
-      console.error('Engineer notification error:', err)
+      console.error(`${tag} Engineer notification error for event=${eventId}:`, err)
     );
     try {
       await getAirtableService().updateEventAudioPipelineStage(eventId, 'staff_uploaded');
+      console.log(`${tag} Pipeline stage updated to 'staff_uploaded' for event=${eventId}`);
     } catch (error) {
-      console.error('Error updating pipeline stage (upload still succeeded):', error);
+      console.error(`${tag} FAILED updating pipeline stage for event=${eventId}:`, error);
     }
 
     return NextResponse.json({

@@ -417,30 +417,39 @@ export async function notifyEngineerOfUpload(
   eventId: string,
   projectType: 'schulsong' | 'minimusiker'
 ): Promise<void> {
+  const tag = `[NotificationService:engineerUpload]`;
   try {
+    console.log(`${tag} Starting notification for event=${eventId}, projectType=${projectType}`);
+
     const airtable = getAirtableService();
     const event = await airtable.getEventByEventId(eventId);
     if (!event) {
-      console.log(`[NotificationService] notifyEngineerOfUpload: Event not found: ${eventId}`);
+      console.error(`${tag} FAILED: Event not found by event_id="${eventId}". Check if this ID matches the event_id field in Airtable Events table.`);
       return;
     }
+    console.log(`${tag} Event found: school="${event.school_name}", date="${event.event_date}"`);
 
     // Determine which engineer to notify based on project type
-    const engineerId = projectType === 'schulsong'
-      ? process.env.ENGINEER_MICHA_ID
-      : process.env.ENGINEER_JAKOB_ID;
+    const envVarName = projectType === 'schulsong' ? 'ENGINEER_MICHA_ID' : 'ENGINEER_JAKOB_ID';
+    const engineerId = process.env[envVarName];
 
     if (!engineerId) {
-      console.warn(`[NotificationService] No engineer ID configured for ${projectType}`);
+      console.error(`${tag} FAILED: ${envVarName} env var is not set`);
       return;
     }
+    console.log(`${tag} Engineer ID from ${envVarName}: ${engineerId}`);
 
     // Look up engineer from Personen table
     const engineer = await airtable.getPersonById(engineerId);
-    if (!engineer || !engineer.email) {
-      console.warn(`[NotificationService] Engineer ${engineerId} has no email, skipping notification`);
+    if (!engineer) {
+      console.error(`${tag} FAILED: No Personen record found for ID="${engineerId}". Verify ${envVarName} is a valid Airtable record ID.`);
       return;
     }
+    if (!engineer.email) {
+      console.error(`${tag} FAILED: Engineer "${engineer.staff_name}" (${engineerId}) has no email in Personen table. Add an email to send notifications.`);
+      return;
+    }
+    console.log(`${tag} Engineer found: name="${engineer.staff_name}", email="${engineer.email}"`);
 
     const eventDate = event.event_date
       ? new Date(event.event_date).toLocaleDateString('de-DE', {
@@ -461,14 +470,25 @@ export async function notifyEngineerOfUpload(
       engineerPortalUrl,
     };
 
-    if (projectType === 'schulsong') {
-      await sendEngineerSchulsongUploadedEmail(engineer.email, emailData);
-    } else {
-      await sendEngineerMinimusikerUploadedEmail(engineer.email, emailData);
-    }
+    const templateSlug = projectType === 'schulsong' ? 'engineer_schulsong_uploaded' : 'engineer_minimusiker_uploaded';
+    console.log(`${tag} Sending email template="${templateSlug}" to="${engineer.email}"`);
 
-    console.log(`[NotificationService] Engineer ${projectType} uploaded notification sent to ${engineer.email} for event ${eventId}`);
+    const result = projectType === 'schulsong'
+      ? await sendEngineerSchulsongUploadedEmail(engineer.email, emailData)
+      : await sendEngineerMinimusikerUploadedEmail(engineer.email, emailData);
+
+    if (result.success) {
+      if (result.messageId === 'disabled') {
+        console.error(`${tag} FAILED: Email template "${templateSlug}" is DISABLED in Airtable TriggerEmails table. Enable it to send notifications.`);
+      } else if (result.messageId === 'dev-mode') {
+        console.log(`${tag} Dev mode: RESEND_API_KEY not set, email logged but not sent`);
+      } else {
+        console.log(`${tag} SUCCESS: Email sent to ${engineer.email} for event ${eventId} (messageId=${result.messageId})`);
+      }
+    } else {
+      console.error(`${tag} FAILED: Resend API error sending to ${engineer.email}: ${result.error}`);
+    }
   } catch (error) {
-    console.error('[NotificationService] Error in notifyEngineerOfUpload:', error);
+    console.error(`${tag} FAILED: Unexpected error:`, error);
   }
 }
