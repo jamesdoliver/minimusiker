@@ -7,11 +7,12 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/teacher/events/[eventId]/audio-downloads/[fileId]
- * Download a single audio track by redirecting to a signed R2 URL.
+ * Download or stream a single audio track via a signed R2 URL.
  *
- * The file must be type=final and status=ready. The browser receives a
- * redirect with a Content-Disposition header that suggests a friendly
- * filename derived from the class name (or "Schulsong").
+ * The file must be type=final and status=ready.
+ *
+ * ?stream=1 — returns JSON { url } for audio element playback (no download disposition).
+ * Default  — redirects with Content-Disposition to trigger a file download.
  */
 export async function GET(
   request: NextRequest,
@@ -52,7 +53,16 @@ export async function GET(
       );
     }
 
-    // 4. Build download filename
+    const r2Service = getR2Service();
+
+    // 4. Stream mode: return signed URL as JSON (no download disposition)
+    const isStream = request.nextUrl.searchParams.get('stream') === '1';
+    if (isStream) {
+      const streamUrl = await r2Service.generateSignedUrl(audioFile.r2Key, 3600);
+      return NextResponse.json({ url: streamUrl });
+    }
+
+    // 5. Download mode: redirect with Content-Disposition filename
     let baseName: string;
     if (audioFile.isSchulsong) {
       baseName = 'Schulsong';
@@ -64,8 +74,6 @@ export async function GET(
     const extension = audioFile.r2Key.endsWith('.wav') ? '.wav' : '.mp3';
     const downloadFilename = `${baseName}${extension}`;
 
-    // 5. Generate signed URL with download disposition
-    const r2Service = getR2Service();
     const signedUrl = await r2Service.generateSignedUrl(audioFile.r2Key, 3600, downloadFilename);
 
     // 6. Redirect
