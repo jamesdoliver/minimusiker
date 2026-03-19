@@ -6814,11 +6814,11 @@ class AirtableService {
 
       return {
         id: record.id,
-        staff_name: (record.get('Name') as string) || '',
-        email: record.get('E-Mail') as string | undefined,
-        phone: record.get('telefon') as string | undefined,
-        bio: record.get('bio') as string | undefined,
-        profile_photo: record.get('profile_photo') as string | undefined,
+        staff_name: (record.fields['staff_name'] as string) || '',
+        email: record.fields['E-Mail'] as string | undefined,
+        phone: record.fields['Telefon'] as string | undefined,
+        bio: record.fields['bio'] as string | undefined,
+        profile_photo: record.fields['profile_photo'] as string | undefined,
       };
     } catch (error) {
       console.error('Error fetching person with profile:', error);
