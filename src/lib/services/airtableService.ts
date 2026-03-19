@@ -3615,32 +3615,28 @@ class AirtableService {
       // NEW: Update Events table assigned_staff field
       this.ensureNormalizedTablesInitialized();
       try {
-        // Find the event by event_id (bookingId)
-        const events = await this.eventsTable!.select({
-          filterByFormula: `{${EVENTS_FIELD_IDS.event_id}} = '${bookingId}'`,
+        // Find the event by event_id OR legacy_booking_id (matches getSchoolEventDetail lookup)
+        let events = await this.eventsTable!.select({
+          filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${bookingId}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${bookingId}')`,
           maxRecords: 1,
         }).firstPage();
 
-        if (events.length === 0) {
-          // No event found - try SchoolBookings table instead
-          const bookingRecords = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
-            .select({
-              filterByFormula: `{${SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id}} = '${bookingId}'`,
-              maxRecords: 1,
-              returnFieldsByFieldId: true,
-            })
-            .firstPage();
-
-          if (bookingRecords.length === 0) {
-            return 0;
+        // Fallback: resolve via SimplyBook ID → SchoolBooking → Event
+        if (events.length === 0 && /^\d+$/.test(bookingId)) {
+          const booking = await this.getSchoolBookingBySimplybookId(bookingId);
+          if (booking) {
+            const linkedEvent = await this.getEventBySchoolBookingId(booking.id);
+            if (linkedEvent) {
+              events = await this.eventsTable!.select({
+                filterByFormula: `RECORD_ID() = '${linkedEvent.id}'`,
+                maxRecords: 1,
+              }).firstPage();
+            }
           }
+        }
 
-          // Update the SchoolBookings record
-          await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecords[0].id, {
-            [SCHOOL_BOOKINGS_FIELD_IDS.assigned_staff]: staffId ? [staffId] : [],
-          });
-
-          return 1;
+        if (events.length === 0) {
+          return 0;
         }
 
         // Update the Events record
