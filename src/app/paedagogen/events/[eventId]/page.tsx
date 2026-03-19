@@ -11,6 +11,7 @@ import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModa
 import SchulsongApprovalSection from '@/components/teacher/SchulsongApprovalSection';
 import SchulClothingOrder from '@/components/shared/SchulClothingOrder';
 import AudioStatusBadge from '@/components/shared/AudioStatusBadge';
+import AudioDownloadSection from '@/components/teacher/AudioDownloadSection';
 import { deriveStageFromSimple } from '@/lib/utils/audioStatusHelpers';
 
 function formatDate(dateStr: string): string {
@@ -1386,6 +1387,9 @@ export default function TeacherEventDetailPage() {
         {event.isSchulsong && (
           <SchulsongApprovalSection eventId={event.eventId} />
         )}
+
+        {/* Audio Downloads Section - Shows when all final audio is ready */}
+        <AudioDownloadSection eventId={event.eventId} />
 
         {/* Classes Section */}
         <div>
