@@ -168,6 +168,9 @@ export default function StaffEventDetailPage() {
                       Teacher
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Songs
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Children
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -186,6 +189,22 @@ export default function StaffEventDetailPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-gray-600">
                         {cls.mainTeacher || '-'}
+                      </td>
+                      <td className="px-6 py-4">
+                        {cls.songs && cls.songs.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {cls.songs.map((song) => (
+                              <span
+                                key={song.songId}
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700"
+                              >
+                                {song.songTitle}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-gray-900">
                         {cls.totalChildren}
