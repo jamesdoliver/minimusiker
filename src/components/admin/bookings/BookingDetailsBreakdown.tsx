@@ -28,7 +28,6 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
   const [showOrdersModal, setShowOrdersModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [discountCopied, setDiscountCopied] = useState(false);
-  const [eventIdCopied, setEventIdCopied] = useState(false);
   const [shopifyTagCopied, setShopifyTagCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showRefreshModal, setShowRefreshModal] = useState(false);
@@ -177,14 +176,6 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
     navigator.clipboard.writeText(booking.discountCode);
     setDiscountCopied(true);
     setTimeout(() => setDiscountCopied(false), 2000);
-  };
-
-  const handleCopyEventId = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!booking.eventId) return;
-    navigator.clipboard.writeText(booking.eventId);
-    setEventIdCopied(true);
-    setTimeout(() => setEventIdCopied(false), 2000);
   };
 
   const handleCopyShopifyTag = (e: React.MouseEvent) => {
@@ -406,38 +397,20 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
               <label className="text-xs text-gray-500 uppercase tracking-wide">Booking Code</label>
               <p className="text-sm font-mono text-gray-900">{booking.code}</p>
             </div>
-            {booking.eventId && (
+            {shopifyTag && (
               <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wide">Event Codes</label>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={handleCopyEventId}
-                    className="text-sm font-mono text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
-                    title="Copy event ID"
-                  >
-                    {eventIdCopied ? (
-                      <span className="text-green-600 font-sans">Copied!</span>
-                    ) : (
-                      booking.eventId
-                    )}
-                  </button>
-                  {shopifyTag && (
-                    <>
-                      <span className="text-gray-300">·</span>
-                      <button
-                        onClick={handleCopyShopifyTag}
-                        className="text-sm font-mono text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
-                        title="Copy Shopify tag"
-                      >
-                        {shopifyTagCopied ? (
-                          <span className="text-green-600 font-sans">Copied!</span>
-                        ) : (
-                          shopifyTag
-                        )}
-                      </button>
-                    </>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">Event Code</label>
+                <button
+                  onClick={handleCopyShopifyTag}
+                  className="text-sm font-mono text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
+                  title="Copy Shopify event code"
+                >
+                  {shopifyTagCopied ? (
+                    <span className="text-green-600 font-sans">Copied!</span>
+                  ) : (
+                    shopifyTag
                   )}
-                </div>
+                </button>
               </div>
             )}
             {booking.discountCode && (
