@@ -303,29 +303,35 @@ export async function triggerSchulsongApprovalReminder(
   data: { schoolName: string; eventDate: string; eventId: string; daysPending: number; teacherEmail: string }
 ): Promise<{ sent: boolean; error?: string }> {
   try {
-    // Get admin recipients from notification settings (reuse same config as approval notification)
-    const settings = await getNotificationSettings('schulsong_teacher_approved');
-    const adminRecipients = settings?.enabled ? parseRecipientEmails(settings.recipientEmails) : [];
-
-    // Combine teacher + admins, deduplicate
-    const allRecipients = [...new Set([data.teacherEmail, ...adminRecipients].map(e => e.toLowerCase()))];
-
-    if (allRecipients.length === 0) {
-      return { sent: false, error: 'No recipients' };
-    }
-
     const { sendSchulsongApprovalReminderEmail } = await import('./resendService');
-    const result = await sendSchulsongApprovalReminderEmail(allRecipients, {
+    const templateData = {
       schoolName: data.schoolName,
       eventDate: data.eventDate,
       daysPending: String(data.daysPending),
-    });
+    };
 
-    if (result.success) {
-      console.log(`[NotificationService] Schulsong approval reminder sent for ${data.eventId} to ${allRecipients.length} recipients`);
+    // Send to teacher individually (never expose admin addresses)
+    const teacherResult = await sendSchulsongApprovalReminderEmail([data.teacherEmail], templateData);
+
+    // Send to admin recipients separately
+    const settings = await getNotificationSettings('schulsong_teacher_approved');
+    const adminRecipients = settings?.enabled
+      ? parseRecipientEmails(settings.recipientEmails).filter(
+          (e) => e.toLowerCase() !== data.teacherEmail.toLowerCase()
+        )
+      : [];
+
+    let adminResult = { success: true };
+    if (adminRecipients.length > 0) {
+      adminResult = await sendSchulsongApprovalReminderEmail(adminRecipients, templateData);
+    }
+
+    if (teacherResult.success || adminResult.success) {
+      const totalRecipients = 1 + adminRecipients.length;
+      console.log(`[NotificationService] Schulsong approval reminder sent for ${data.eventId} to ${totalRecipients} recipients`);
       return { sent: true };
     }
-    return { sent: false, error: result.error };
+    return { sent: false, error: teacherResult.error };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[NotificationService] Error in triggerSchulsongApprovalReminder:', error);
