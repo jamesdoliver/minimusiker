@@ -402,7 +402,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
                 <label className="text-xs text-gray-500 uppercase tracking-wide">Event Code</label>
                 <button
                   onClick={handleCopyShopifyTag}
-                  className="text-sm font-mono text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
+                  className="block text-sm font-mono text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
                   title="Copy Shopify event code"
                 >
                   {shopifyTagCopied ? (
