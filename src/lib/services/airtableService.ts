@@ -2512,7 +2512,7 @@ class AirtableService {
         for (const cls of classes) {
           cls.songs = allSongs
             .filter(s => s.classId === cls.classId)
-            .map(s => ({ songId: s.id, songTitle: s.title }));
+            .map(s => ({ id: s.id, title: s.title, artist: s.artist, notes: s.notes, order: s.order, hiddenByEngineer: s.hiddenByEngineer }));
         }
 
         // Sort classes by name

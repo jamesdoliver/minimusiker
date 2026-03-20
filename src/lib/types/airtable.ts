@@ -433,7 +433,7 @@ export interface EventClassDetail {
   totalChildren: number;
   registeredParents: number;
   registrationRate: number;  // percentage
-  songs?: { songId: string; songTitle: string }[];
+  songs?: { id: string; title: string; artist?: string; notes?: string; order?: number; hiddenByEngineer?: boolean }[];
 }
 
 // Full event detail for the [eventId] detail page
