@@ -51,6 +51,7 @@ export interface BookingWithDetails {
   // Registration tracking
   registrationCount?: number;    // Count of registrations for linked event
   eventRecordId?: string;        // Event record ID for registration lookup
+  eventId?: string;              // Event identifier (e.g., evt_schulname_minimusiker_20260320_a1b2c3)
   // Audio pipeline
   audioPipelineStage?: 'not_started' | 'staff_uploaded' | 'finals_submitted';
   // Admin notes
@@ -231,6 +232,7 @@ export async function GET(request: NextRequest) {
           assignedStaff: event.assigned_staff,
           assignedStaffNames: event.assigned_staff?.map(id => staffMap.get(id)).filter(Boolean) as string[],
           eventRecordId: event.id,
+          eventId: event.event_id,
           audioPipelineStage: event.audio_pipeline_stage,
           adminNotes: event.admin_notes,
           dealBuilderEnabled: event.deal_builder_enabled,

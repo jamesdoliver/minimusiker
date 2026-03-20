@@ -28,6 +28,8 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
   const [showOrdersModal, setShowOrdersModal] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [discountCopied, setDiscountCopied] = useState(false);
+  const [eventIdCopied, setEventIdCopied] = useState(false);
+  const [shopifyTagCopied, setShopifyTagCopied] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showRefreshModal, setShowRefreshModal] = useState(false);
   const [refreshData, setRefreshData] = useState<{
@@ -176,6 +178,33 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
     setDiscountCopied(true);
     setTimeout(() => setDiscountCopied(false), 2000);
   };
+
+  const handleCopyEventId = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!booking.eventId) return;
+    navigator.clipboard.writeText(booking.eventId);
+    setEventIdCopied(true);
+    setTimeout(() => setEventIdCopied(false), 2000);
+  };
+
+  const handleCopyShopifyTag = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!booking.eventId) return;
+    const hashMatch = booking.eventId.match(/_([a-f0-9]{6})$/);
+    const tag = hashMatch ? `evt-${hashMatch[1]}` : (/^\d+$/.test(booking.eventId) ? `evt-${booking.eventId.slice(-6)}` : null);
+    if (!tag) return;
+    navigator.clipboard.writeText(tag);
+    setShopifyTagCopied(true);
+    setTimeout(() => setShopifyTagCopied(false), 2000);
+  };
+
+  // Derive Shopify tag from event_id
+  const shopifyTag = booking.eventId ? (() => {
+    const hashMatch = booking.eventId.match(/_([a-f0-9]{6})$/);
+    if (hashMatch) return `evt-${hashMatch[1]}`;
+    if (/^\d+$/.test(booking.eventId)) return `evt-${booking.eventId.slice(-6)}`;
+    return null;
+  })() : null;
 
   // Create event for bookings missing one
   const handleCreateEvent = async () => {
@@ -377,6 +406,40 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
               <label className="text-xs text-gray-500 uppercase tracking-wide">Booking Code</label>
               <p className="text-sm font-mono text-gray-900">{booking.code}</p>
             </div>
+            {booking.eventId && (
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">Event Codes</label>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleCopyEventId}
+                    className="text-sm font-mono text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
+                    title="Copy event ID"
+                  >
+                    {eventIdCopied ? (
+                      <span className="text-green-600 font-sans">Copied!</span>
+                    ) : (
+                      booking.eventId
+                    )}
+                  </button>
+                  {shopifyTag && (
+                    <>
+                      <span className="text-gray-300">·</span>
+                      <button
+                        onClick={handleCopyShopifyTag}
+                        className="text-sm font-mono text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
+                        title="Copy Shopify tag"
+                      >
+                        {shopifyTagCopied ? (
+                          <span className="text-green-600 font-sans">Copied!</span>
+                        ) : (
+                          shopifyTag
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
             {booking.discountCode && (
               <div>
                 <label className="text-xs text-gray-500 uppercase tracking-wide">Discount Code</label>
