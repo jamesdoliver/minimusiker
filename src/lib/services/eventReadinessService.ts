@@ -201,7 +201,7 @@ export async function checkBookingsWithoutEvent(dryRun = false): Promise<Readine
       .map(
         (b) =>
           `<tr>
-            <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #2F4858;">${b.schoolName}</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #2F4858;">${b.schoolName || b.schoolContactName || '(unbekannt)'}</td>
             <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${formatDateGerman(b.startDate!)}</td>
             <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${b.simplybookId || '—'}</td>
           </tr>`
