@@ -462,6 +462,16 @@ async function handleBookingChange(payload: SimplybookWebhookPayload) {
       } catch (err) {
         console.error('[SimplyBook] Failed to sync estimated_children to Event:', err);
       }
+
+      // Sync event_date to linked Event
+      try {
+        await airtableService.updateEventFields(linkedEvent.id, {
+          event_date: booking.start_date,
+        });
+        console.log(`[SimplyBook] Synced event_date=${booking.start_date} to Event ${linkedEvent.id}`);
+      } catch (err) {
+        console.warn('[SimplyBook] Failed to sync event_date to Event:', err);
+      }
     }
 
     // Log booking change activity
