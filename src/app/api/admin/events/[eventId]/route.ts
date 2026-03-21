@@ -347,6 +347,7 @@ export async function PATCH(
     // First, we need to get the Airtable record ID for this event
     // The eventId might be a simplybookId, event_id, or Airtable record ID
     let eventRecordId: string | null = null;
+    let resolvedBookingRecordId: string | null = null;
 
     // Try to find the event by event_id first
     const eventsByEventId = await airtableService.getEventsRecordIdByBookingId(eventId);
@@ -358,6 +359,7 @@ export async function PATCH(
     if (!eventRecordId) {
       const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
       if (booking) {
+        resolvedBookingRecordId = booking.id;
         const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
         if (eventRecord) {
           eventRecordId = eventRecord.id;
@@ -404,7 +406,11 @@ export async function PATCH(
     // Handle date update
     if (hasDateUpdate) {
       const oldDate = existingEvent?.event_date || 'Unknown';
-      dateResult = await airtableService.updateEventDate(eventRecordId, body.event_date);
+      // Resolve booking record ID for fallback date propagation
+      if (!resolvedBookingRecordId && existingEvent?.simplybook_booking?.[0]) {
+        resolvedBookingRecordId = existingEvent.simplybook_booking[0];
+      }
+      dateResult = await airtableService.updateEventDate(eventRecordId, body.event_date, resolvedBookingRecordId || undefined);
 
       // Sync date change back to SimplyBook (best-effort)
       if (dateResult.simplybookId) {

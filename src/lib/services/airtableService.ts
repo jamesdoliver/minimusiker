@@ -5702,7 +5702,8 @@ class AirtableService {
    */
   async updateEventDate(
     eventRecordId: string,
-    newDate: string
+    newDate: string,
+    fallbackBookingRecordId?: string
   ): Promise<{ success: boolean; bookingUpdated: boolean; simplybookId?: string; message: string }> {
     try {
       // Validate date format
@@ -5739,12 +5740,27 @@ class AirtableService {
       // If there's a linked SchoolBooking, update it too
       let bookingUpdated = false;
       let simplybookId: string | undefined;
-      if (linkedBookingIds && linkedBookingIds.length > 0) {
-        const bookingRecordId = linkedBookingIds[0];
+      const resolvedBookingId = (linkedBookingIds && linkedBookingIds.length > 0)
+        ? linkedBookingIds[0]
+        : fallbackBookingRecordId;
+
+      if (resolvedBookingId) {
+        // Backfill simplybook_booking link if it was missing and we used the fallback
+        if ((!linkedBookingIds || linkedBookingIds.length === 0) && fallbackBookingRecordId) {
+          try {
+            await this.base(EVENTS_TABLE_ID).update(eventRecordId, {
+              [EVENTS_FIELD_IDS.simplybook_booking]: [fallbackBookingRecordId],
+            });
+            console.log(`[updateEventDate] Backfilled simplybook_booking link on Event ${eventRecordId}`);
+          } catch (backfillError) {
+            console.warn('[updateEventDate] Could not backfill simplybook_booking:', backfillError);
+          }
+        }
+
         try {
           // Fetch the SchoolBooking to get simplybook_id before updating
           const bookingRecords = await this.base(SCHOOL_BOOKINGS_TABLE_ID).select({
-            filterByFormula: `RECORD_ID() = '${bookingRecordId}'`,
+            filterByFormula: `RECORD_ID() = '${resolvedBookingId}'`,
             maxRecords: 1,
             returnFieldsByFieldId: true,
           }).firstPage();
@@ -5753,11 +5769,11 @@ class AirtableService {
             simplybookId = bookingRecords[0].fields[SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id] as string | undefined;
           }
 
-          await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecordId, {
+          await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(resolvedBookingId, {
             [SCHOOL_BOOKINGS_FIELD_IDS.start_date]: newDate,
             [SCHOOL_BOOKINGS_FIELD_IDS.end_date]: newDate,
           });
-          console.log(`Updated SchoolBooking ${bookingRecordId} start_date and end_date to: ${newDate}`);
+          console.log(`Updated SchoolBooking ${resolvedBookingId} start_date and end_date to: ${newDate}`);
           bookingUpdated = true;
         } catch (bookingError) {
           console.error('Warning: Could not update linked SchoolBooking:', bookingError);
