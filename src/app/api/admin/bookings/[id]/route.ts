@@ -185,6 +185,21 @@ export async function PATCH(
             console.warn('[EditBooking] Failed to sync estimated_children to Event:', eventErr);
           }
         }
+
+        // Sync event_date to the linked Event record
+        if (body.event_date !== undefined) {
+          try {
+            const linkedEvent = await airtableService.getEventByBookingRecordId(bookingId);
+            if (linkedEvent) {
+              await airtableService.updateEventFields(linkedEvent.id, {
+                event_date: body.event_date,
+              });
+              console.log(`[EditBooking] Synced event_date=${body.event_date} to Event ${linkedEvent.id}`);
+            }
+          } catch (eventErr) {
+            console.warn('[EditBooking] Failed to sync event_date to Event:', eventErr);
+          }
+        }
       }
     } catch (airtableError) {
       console.error('[EditBooking] Airtable update failed:', airtableError);

@@ -5853,6 +5853,7 @@ class AirtableService {
       scs_shirts_included?: boolean;
       minicard_order_enabled?: boolean;
       minicard_order_quantity?: number;
+      event_date?: string;
     }
   ): Promise<Event> {
     try {
@@ -5899,6 +5900,9 @@ class AirtableService {
       }
       if (updates.minicard_order_quantity !== undefined) {
         updateFields[EVENTS_FIELD_IDS.minicard_order_quantity] = updates.minicard_order_quantity;
+      }
+      if (updates.event_date !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.event_date] = updates.event_date;
       }
 
       if (Object.keys(updateFields).length === 0) {
