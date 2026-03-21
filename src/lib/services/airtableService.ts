@@ -4714,6 +4714,40 @@ class AirtableService {
   }
 
   /**
+   * Get confirmed school bookings with start_date within the next N days.
+   * Filtered server-side via Airtable formula for efficiency (200+ bookings).
+   */
+  async getConfirmedBookingsInWindow(days: number): Promise<SchoolBooking[]> {
+    try {
+      const now = new Date();
+      const cutoff = new Date();
+      cutoff.setDate(now.getDate() + days);
+
+      const todayStr = now.toISOString().split('T')[0];
+      const cutoffStr = cutoff.toISOString().split('T')[0];
+
+      const filterFormula = `AND(
+        {${SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status}} = 'confirmed',
+        {${SCHOOL_BOOKINGS_FIELD_IDS.start_date}} >= '${todayStr}',
+        {${SCHOOL_BOOKINGS_FIELD_IDS.start_date}} <= '${cutoffStr}'
+      )`;
+
+      const records = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
+        .select({
+          filterByFormula: filterFormula,
+          pageSize: 100,
+          sort: [{ field: SCHOOL_BOOKINGS_FIELD_IDS.start_date, direction: 'asc' }],
+        })
+        .all();
+
+      return records.map((record) => this.transformSchoolBookingRecord(record));
+    } catch (error) {
+      console.error('Error fetching confirmed bookings in window:', error);
+      throw new Error(`Failed to fetch confirmed bookings: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
    * Get future bookings (start_date >= today)
    * Only returns records that have a valid start_date
    */
