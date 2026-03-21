@@ -13,6 +13,7 @@ import {
   sendEventReadinessNoStaffEmail,
   sendEventReadinessTeacherNudgeEmail,
   sendEventReadinessAdminDigestEmail,
+  sendEventReadinessNoEventEmail,
 } from './resendService';
 import Airtable from 'airtable';
 
@@ -152,6 +153,91 @@ export async function checkNoStaffAssigned(dryRun = false): Promise<ReadinessRes
     result.failed = 1;
     result.errors.push(error instanceof Error ? error.message : 'Unknown error');
     console.error('[EventReadiness] Error in checkNoStaffAssigned:', error);
+  }
+
+  return result;
+}
+
+export async function checkBookingsWithoutEvent(dryRun = false): Promise<ReadinessResult> {
+  const result: ReadinessResult = { sent: 0, skipped: 0, failed: 0, errors: [] };
+
+  try {
+    const airtable = getAirtableService();
+
+    // Two queries, in-memory join (efficient for 200+ bookings)
+    const [bookings, allEvents] = await Promise.all([
+      airtable.getConfirmedBookingsInWindow(READINESS_WINDOW_DAYS),
+      airtable.getAllEvents(),
+    ]);
+
+    // Build set of booking record IDs that have a linked event
+    const bookingIdsWithEvent = new Set<string>();
+    for (const event of allEvents) {
+      if (event.simplybook_booking) {
+        for (const bookingId of event.simplybook_booking) {
+          bookingIdsWithEvent.add(bookingId);
+        }
+      }
+    }
+
+    // Find bookings with no linked event
+    const orphaned = bookings.filter((b) => !bookingIdsWithEvent.has(b.id));
+
+    if (orphaned.length === 0) {
+      console.log('[EventReadiness] All confirmed bookings have linked events');
+      result.skipped = 1;
+      return result;
+    }
+
+    const recipients = await getAdminRecipients();
+    if (recipients.length === 0) {
+      console.log('[EventReadiness] No admin recipients configured for event_readiness');
+      result.skipped = 1;
+      return result;
+    }
+
+    const rows = orphaned
+      .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime())
+      .map(
+        (b) =>
+          `<tr>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #2F4858;">${b.schoolName}</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${formatDateGerman(b.startDate!)}</td>
+            <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${b.simplybookId || '—'}</td>
+          </tr>`
+      )
+      .join('\n');
+
+    const eventListHtml = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 16px;">
+      <tr style="background-color: #f7fafc;">
+        <th style="padding: 8px 12px; text-align: left; color: #2F4858; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Schule</th>
+        <th style="padding: 8px 12px; text-align: left; color: #2F4858; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Datum</th>
+        <th style="padding: 8px 12px; text-align: left; color: #2F4858; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Buchungs-ID</th>
+      </tr>
+      ${rows}
+    </table>`;
+
+    if (dryRun) {
+      console.log(`[EventReadiness] DRY RUN: Would send no-event digest (${orphaned.length} bookings) to ${recipients.length} recipients`);
+      result.skipped = 1;
+      return result;
+    }
+
+    const emailResult = await sendEventReadinessNoEventEmail(recipients, {
+      count: orphaned.length,
+      eventListHtml,
+    });
+
+    if (emailResult.success) {
+      result.sent = 1;
+    } else {
+      result.failed = 1;
+      result.errors.push(emailResult.error || 'Unknown email error');
+    }
+  } catch (error) {
+    result.failed = 1;
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    console.error('[EventReadiness] Error in checkBookingsWithoutEvent:', error);
   }
 
   return result;
