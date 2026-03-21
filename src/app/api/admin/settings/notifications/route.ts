@@ -27,6 +27,8 @@ const DEFAULT_SETTINGS: { type: NotificationType; recipientEmails: string; enabl
   { type: 'new_booking', recipientEmails: '', enabled: false },
   { type: 'date_change', recipientEmails: '', enabled: false },
   { type: 'cancellation', recipientEmails: '', enabled: false },
+  { type: 'event_readiness', recipientEmails: '', enabled: false },
+  { type: 'unassigned_staff', recipientEmails: '', enabled: false },
 ];
 
 /**
@@ -121,7 +123,8 @@ export async function PUT(
     const body: UpdateNotificationSettingRequest = await request.json();
 
     // Validate request
-    if (!body.type || !['new_booking', 'date_change', 'cancellation'].includes(body.type)) {
+    const validTypes: NotificationType[] = ['new_booking', 'date_change', 'cancellation', 'schulsong_teacher_approved', 'unassigned_staff', 'event_readiness'];
+    if (!body.type || !validTypes.includes(body.type as NotificationType)) {
       return NextResponse.json(
         { success: false, error: 'Invalid notification type' },
         { status: 400 }
