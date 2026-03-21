@@ -5468,6 +5468,18 @@ class AirtableService {
 
       if (existingRecords.length > 0) {
         console.log(`Event ${eventId} already exists, returning existing record`);
+        // Backfill simplybook_booking link if missing
+        const existingBookingLinks = existingRecords[0].get('simplybook_booking') as string[] | undefined;
+        if ((!existingBookingLinks || existingBookingLinks.length === 0) && schoolBookingRecordId) {
+          try {
+            await this.base(EVENTS_TABLE_ID).update(existingRecords[0].id, {
+              [EVENTS_FIELD_IDS.simplybook_booking]: [schoolBookingRecordId],
+            });
+            console.log(`[createEventFromBooking] Backfilled simplybook_booking link on Event ${existingRecords[0].id}`);
+          } catch (backfillError) {
+            console.warn('[createEventFromBooking] Could not backfill simplybook_booking:', backfillError);
+          }
+        }
         return this.transformEventRecord(existingRecords[0]);
       }
 
@@ -5498,6 +5510,18 @@ class AirtableService {
             `[createEventFromBooking] Potential duplicate: found existing event ${existingEvent.event_id} ` +
             `for "${schoolName}" on ${eventDate}. Returning existing instead of creating new.`
           );
+          // Backfill simplybook_booking link if missing
+          const existingBookingLinks = nearDuplicates[0].get('simplybook_booking') as string[] | undefined;
+          if ((!existingBookingLinks || existingBookingLinks.length === 0) && schoolBookingRecordId) {
+            try {
+              await this.base(EVENTS_TABLE_ID).update(nearDuplicates[0].id, {
+                [EVENTS_FIELD_IDS.simplybook_booking]: [schoolBookingRecordId],
+              });
+              console.log(`[createEventFromBooking] Backfilled simplybook_booking link on near-duplicate Event ${nearDuplicates[0].id}`);
+            } catch (backfillError) {
+              console.warn('[createEventFromBooking] Could not backfill simplybook_booking:', backfillError);
+            }
+          }
           return existingEvent;
         }
       }
