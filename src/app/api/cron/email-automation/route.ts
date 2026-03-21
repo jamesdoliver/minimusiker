@@ -74,16 +74,26 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
     // Process email automation
     const result = await processEmailAutomation(isDryRun);
 
-    // Process schulsong approval reminders (runs every hour, dedup prevents duplicates)
-    const approvalReminderResult = await processSchulsongApprovalReminders(isDryRun);
-    if (approvalReminderResult.errors.length > 0) {
-      console.error('[Email Automation Cron] Approval reminder errors:', approvalReminderResult.errors);
+    // Compute Berlin time once for all time-gated sections
+    const berlinHour = getCurrentBerlinHour();
+    const berlinNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+    const berlinDay = berlinNow.getDay(); // 0=Sun, 6=Sat
+    const isWeekday = berlinDay >= 1 && berlinDay <= 5;
+
+    // Process schulsong approval reminders — weekdays only at 7am Berlin time
+    let approvalReminderResult: { sent: number; skipped: number; failed: number; errors: string[] } | undefined;
+    if (isWeekday && berlinHour === 7) {
+      approvalReminderResult = await processSchulsongApprovalReminders(isDryRun);
+      if (approvalReminderResult.errors.length > 0) {
+        console.error('[Email Automation Cron] Approval reminder errors:', approvalReminderResult.errors);
+      }
+    } else {
+      console.log(`[Email Automation Cron] Skipping approval reminders (Berlin hour: ${berlinHour}, day: ${berlinDay}, weekday: ${isWeekday})`);
     }
 
     // Process schulsong release emails in the 6-8am Berlin window
     // (covers cron drift; dedup makes multiple runs safe)
     let schulsongResult: { sent: number; skipped: number; failed: number; errors: string[] } | undefined;
-    const berlinHour = getCurrentBerlinHour();
     if (berlinHour >= 6 && berlinHour <= 8) {
       console.log(`[Email Automation Cron] Processing schulsong releases (Berlin hour: ${berlinHour})`);
       schulsongResult = await processSchulsongReleaseEmails(isDryRun);
@@ -112,7 +122,7 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
         `[Email Automation Cron] Schulsong: ${schulsongResult.sent} sent, ${schulsongResult.skipped} skipped, ${schulsongResult.failed} failed`
       );
     }
-    if (approvalReminderResult.sent > 0 || approvalReminderResult.failed > 0) {
+    if (approvalReminderResult && (approvalReminderResult.sent > 0 || approvalReminderResult.failed > 0)) {
       console.log(
         `[Email Automation Cron] Approval reminders: ${approvalReminderResult.sent} sent, ${approvalReminderResult.skipped} skipped, ${approvalReminderResult.failed} failed`
       );

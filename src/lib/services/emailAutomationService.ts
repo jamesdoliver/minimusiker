@@ -882,10 +882,9 @@ export async function processSchulsongApprovalReminders(
         continue;
       }
 
-      // Check dedup: already sent today?
-      const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const dedupKey = `schulsong_approval_reminder_${todayStr}`;
-      const alreadySent = await airtable.hasEmailBeenSent(dedupKey, event.event_id, 'teacher+admin');
+      // Check dedup: already sent in last 24 hours?
+      const dedupKey = 'schulsong_approval_reminder';
+      const alreadySent = await airtable.hasEmailBeenSentSince(dedupKey, event.event_id, 'teacher+admin', 24);
       if (alreadySent) {
         skipped++;
         continue;

@@ -7239,6 +7239,42 @@ class AirtableService {
   }
 
   /**
+   * Check if an email has been sent within the last N hours for a specific template/event/recipient.
+   * Used for rolling dedup windows instead of per-calendar-day dedup.
+   */
+  async hasEmailBeenSentSince(
+    templateName: string,
+    eventId: string,
+    recipientEmail: string,
+    hours: number
+  ): Promise<boolean> {
+    if (!this.ensureEmailTablesInitialized()) return false;
+
+    try {
+      const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+      const formula = `AND(
+        {${EMAIL_LOGS_FIELD_IDS.template_name}} = '${templateName.replace(/'/g, "\\'")}',
+        {${EMAIL_LOGS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}',
+        {${EMAIL_LOGS_FIELD_IDS.recipient_email}} = '${recipientEmail.replace(/'/g, "\\'")}',
+        {${EMAIL_LOGS_FIELD_IDS.status}} = 'sent',
+        IS_AFTER({${EMAIL_LOGS_FIELD_IDS.sent_at}}, '${cutoff}')
+      )`;
+
+      const records = await this.emailLogsTable!.select({
+        filterByFormula: formula,
+        maxRecords: 1,
+        returnFieldsByFieldId: true,
+      }).firstPage();
+
+      return records.length > 0;
+    } catch (error) {
+      console.error('Error checking if email has been sent since:', error);
+      return true; // Fail closed: skip email rather than risk duplicate
+    }
+  }
+
+  /**
    * Get email logs for a specific event
    */
   async getEmailLogsForEvent(eventId: string): Promise<EmailLog[]> {
