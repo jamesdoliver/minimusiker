@@ -303,6 +303,21 @@ export async function sendEventReadinessNoStaffEmail(
 }
 
 /**
+ * Send daily "bookings without event" admin digest
+ */
+export async function sendEventReadinessNoEventEmail(
+  recipients: string[],
+  data: { count: number; eventListHtml: string }
+): Promise<SendEmailResult> {
+  if (recipients.length === 0) return { success: true, messageId: 'no-recipients' };
+
+  return sendTriggerEmail(recipients, 'event_readiness_no_event', {
+    count: String(data.count),
+    eventListHtml: data.eventListHtml,
+  }, 'Event readiness: no event digest');
+}
+
+/**
  * Send weekly teacher nudge email for missing classes/songs
  */
 export async function sendEventReadinessTeacherNudgeEmail(

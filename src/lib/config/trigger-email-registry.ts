@@ -977,6 +977,31 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     availableVariables: ['count', 'eventListHtml'],
   },
 
+  // ─── Event Readiness: Bookings Without Event (Admin Daily) ───────────
+  {
+    slug: 'event_readiness_no_event',
+    name: 'CRON: Tägliche Übersicht — Buchungen ohne Event (Admin)',
+    description: 'Läuft täglich um 7 Uhr. Listet alle bestätigten Buchungen innerhalb der nächsten 42 Tage auf, die keinen verknüpften Event-Eintrag haben.',
+    recipientType: 'admin',
+    triggerEventKey: 'cron:event_readiness_no_event',
+    defaultSubject: 'Buchungen ohne Event-Eintrag — Tägliche Übersicht ({{count}} Buchungen)',
+    defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Buchungen ohne Event-Eintrag
+</h2>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Die folgenden {{count}} Buchungen innerhalb der nächsten 42 Tage haben keinen verknüpften Event-Eintrag.
+  Das Event wurde möglicherweise nicht automatisch erstellt. Bitte prüfe und erstelle die Events manuell.
+</p>
+
+{{{eventListHtml}}}
+
+<p style="margin: 24px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Bitte melde dich im Admin-Portal an, um die fehlenden Events zu erstellen.
+</p>`,
+    availableVariables: ['count', 'eventListHtml'],
+  },
+
   // ─── Event Readiness: Teacher Weekly Nudge ────────────────────────────
   {
     slug: 'event_readiness_teacher_nudge',
