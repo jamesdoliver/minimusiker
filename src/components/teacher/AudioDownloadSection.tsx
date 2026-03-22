@@ -12,7 +12,6 @@ interface Track {
 }
 
 interface AudioDownloadResponse {
-  allComplete: boolean;
   tracks: Track[];
 }
 
@@ -46,7 +45,6 @@ function sortTracks(tracks: Track[]): Track[] {
 
 export default function AudioDownloadSection({ eventId }: AudioDownloadSectionProps) {
   const [loading, setLoading] = useState(true);
-  const [allComplete, setAllComplete] = useState(false);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [zipDownloading, setZipDownloading] = useState(false);
 
@@ -63,7 +61,6 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
       try {
         const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/audio-downloads`);
         const data: AudioDownloadResponse = await response.json();
-        setAllComplete(data.allComplete);
         setTracks(sortTracks(data.tracks || []));
       } catch (err) {
         console.error('Error fetching audio downloads:', err);
@@ -154,7 +151,7 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
     setCurrentTime(newTime);
   }, []);
 
-  if (loading || !allComplete) {
+  if (loading || tracks.length === 0) {
     return null;
   }
 

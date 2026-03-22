@@ -54,24 +54,8 @@ export async function GET(
       );
     }
 
-    // 4. Completeness gate: all non-default classes must have final audio
+    // 4. Pick best file per class (prefer MP3 over WAV)
     const nonDefaultClasses = event.classes.filter((c) => !c.isDefault);
-    const classesWithFinal = new Set(finalReadyFiles.map((f: AudioFile) => f.classId));
-    const allClassesHaveFinal =
-      nonDefaultClasses.length > 0 &&
-      nonDefaultClasses.every((c) => classesWithFinal.has(c.classId));
-    const schulsongSatisfied = event.isSchulsong
-      ? finalReadyFiles.some((f: AudioFile) => f.isSchulsong)
-      : true;
-
-    if (!allClassesHaveFinal || !schulsongSatisfied) {
-      return NextResponse.json(
-        { error: 'Not all audio tracks are finalized yet' },
-        { status: 400 }
-      );
-    }
-
-    // 5. Pick best file per class (prefer MP3 over WAV)
     const filesByClass = new Map<string, AudioFile[]>();
     const schulsongFiles: AudioFile[] = [];
 
