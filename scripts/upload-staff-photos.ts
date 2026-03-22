@@ -1,14 +1,22 @@
 /**
- * Upload Staff Photos to R2 and Update Airtable
+ * Upload Staff Photos to R2
  *
- * Usage: npx ts-node scripts/upload-staff-photos.ts
+ * Uploads photos from public/images/staff_photo/ to R2 under mm-staff-pictures/.
+ * After uploading, manually update the profile_photo field in Airtable's Personen table.
+ *
+ * Usage:
+ *   npx ts-node scripts/upload-staff-photos.ts --dry-run   # Check only, no changes
+ *   npx ts-node scripts/upload-staff-photos.ts              # Actually upload
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import Airtable from 'airtable';
 import * as dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -26,24 +34,16 @@ const s3Client = new S3Client({
 const ASSETS_BUCKET = process.env.R2_ASSETS_BUCKET_NAME || 'minimusiker-assets';
 const R2_PREFIX = 'mm-staff-pictures';
 
-// Airtable Configuration
-Airtable.configure({
-  apiKey: process.env.AIRTABLE_API_KEY!,
-});
-
-const base = Airtable.base(process.env.AIRTABLE_BASE_ID!);
-const PERSONEN_TABLE_ID = 'tblBNlrp1MRHOFwMz';
-const STAFF_NAME_FIELD_ID = 'fldEBMBVfGSWpywKU';
-const PROFILE_PHOTO_FIELD_ID = 'fldcSWJFKy1DW8pXA';
+// CLI flags
+const DRY_RUN = process.argv.includes('--dry-run');
 
 // Local photos directory
-const PHOTOS_DIR = '/Users/jamesoliver/Documents/Guesstimate/Minimusiker/mm-staff-photos';
+const PHOTOS_DIR = path.join(__dirname, '..', 'public', 'images', 'staff_photo');
 
 interface UploadResult {
   filename: string;
   staffName: string;
   r2Key: string;
-  airtableRecordId?: string;
   success: boolean;
   error?: string;
 }
@@ -64,36 +64,11 @@ async function uploadToR2(filePath: string, key: string): Promise<void> {
   await s3Client.send(command);
 }
 
-async function findAirtableRecord(staffName: string): Promise<string | null> {
-  try {
-    const records = await base(PERSONEN_TABLE_ID)
-      .select({
-        filterByFormula: `FIND(LOWER("${staffName}"), LOWER({${STAFF_NAME_FIELD_ID}}))`,
-        maxRecords: 1,
-        returnFieldsByFieldId: true,
-      })
-      .firstPage();
-
-    if (records && records.length > 0) {
-      return records[0].id;
-    }
-    return null;
-  } catch (error) {
-    console.error(`Error finding record for ${staffName}:`, error);
-    return null;
-  }
-}
-
-async function updateAirtableRecord(recordId: string, r2Key: string): Promise<void> {
-  await base(PERSONEN_TABLE_ID).update(recordId, {
-    [PROFILE_PHOTO_FIELD_ID]: r2Key,
-  });
-}
-
 async function processPhoto(filename: string): Promise<UploadResult> {
-  // Extract staff name from filename (before underscore)
-  const staffName = filename.split('_')[0];
-  const ext = path.extname(filename);
+  // Extract staff name from filename (without extension)
+  const parsed = path.parse(filename);
+  const staffName = parsed.name;
+  const ext = parsed.ext;
   const r2Key = `${R2_PREFIX}/${staffName.toLowerCase()}${ext}`;
   const filePath = path.join(PHOTOS_DIR, filename);
 
@@ -105,26 +80,21 @@ async function processPhoto(filename: string): Promise<UploadResult> {
   };
 
   try {
-    // 1. Upload to R2
-    console.log(`  Uploading ${filename} to R2...`);
-    await uploadToR2(filePath, r2Key);
+    // 1. Verify file is readable
+    const stats = fs.statSync(filePath);
+    console.log(`  File size: ${(stats.size / 1024).toFixed(1)} KB`);
 
-    // 2. Find Airtable record
-    console.log(`  Finding Airtable record for "${staffName}"...`);
-    const recordId = await findAirtableRecord(staffName);
+    console.log(`  R2 key: ${r2Key}`);
 
-    if (!recordId) {
-      result.error = `No Airtable record found for "${staffName}"`;
-      console.log(`  ⚠️  ${result.error}`);
-      result.success = true; // R2 upload succeeded
+    if (DRY_RUN) {
+      result.success = true;
+      console.log(`  🔍 DRY RUN — would upload to R2`);
       return result;
     }
 
-    result.airtableRecordId = recordId;
-
-    // 3. Update Airtable
-    console.log(`  Updating Airtable record ${recordId}...`);
-    await updateAirtableRecord(recordId, r2Key);
+    // 2. Upload to R2
+    console.log(`  Uploading ${filename} to R2...`);
+    await uploadToR2(filePath, r2Key);
 
     result.success = true;
     console.log(`  ✅ Done`);
@@ -137,7 +107,7 @@ async function processPhoto(filename: string): Promise<UploadResult> {
 }
 
 async function main() {
-  console.log('🚀 Starting staff photo upload...\n');
+  console.log(`🚀 Starting staff photo ${DRY_RUN ? 'DRY RUN' : 'upload'}...\n`);
   console.log(`Source: ${PHOTOS_DIR}`);
   console.log(`Destination: R2 bucket "${ASSETS_BUCKET}" / ${R2_PREFIX}/\n`);
 
@@ -161,18 +131,19 @@ async function main() {
   console.log('\n📊 Summary:');
   console.log('─'.repeat(60));
 
-  const successful = results.filter((r) => r.success && r.airtableRecordId);
-  const uploadedOnly = results.filter((r) => r.success && !r.airtableRecordId);
+  const successful = results.filter((r) => r.success);
   const failed = results.filter((r) => !r.success);
 
-  console.log(`✅ Fully processed: ${successful.length}`);
-  if (uploadedOnly.length > 0) {
-    console.log(`⚠️  Uploaded but no Airtable match: ${uploadedOnly.length}`);
-    uploadedOnly.forEach((r) => console.log(`   - ${r.staffName}`));
-  }
+  console.log(`✅ Uploaded: ${successful.length}`);
+  successful.forEach((r) => console.log(`   ${r.r2Key}`));
   if (failed.length > 0) {
     console.log(`❌ Failed: ${failed.length}`);
     failed.forEach((r) => console.log(`   - ${r.filename}: ${r.error}`));
+  }
+
+  if (successful.length > 0) {
+    console.log('\n📋 Update these Airtable profile_photo values:');
+    successful.forEach((r) => console.log(`   ${r.staffName} → ${r.r2Key}`));
   }
 
   console.log('\n✨ Done!');
