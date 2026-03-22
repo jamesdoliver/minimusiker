@@ -2595,7 +2595,7 @@ class TeacherService {
     let profilePhotoUrl: string | undefined;
     if (person.profile_photo) {
       try {
-        profilePhotoUrl = await getR2Service().generateSignedUrl(person.profile_photo, 86400); // 24h expiry
+        profilePhotoUrl = await getR2Service().generateSignedUrlForAssetsBucket(person.profile_photo, 86400); // 24h expiry
       } catch (err) {
         console.warn('Failed to generate staff photo URL:', err);
       }
