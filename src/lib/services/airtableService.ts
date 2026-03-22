@@ -6896,25 +6896,16 @@ class AirtableService {
     profile_photo?: string; // R2 key, e.g., mm-staff-pictures/cassy.jpg
   } | null> {
     try {
-      // Use select with returnFieldsByFieldId to avoid field name mismatches
-      const records = await this.base(PERSONEN_TABLE_ID)
-        .select({
-          filterByFormula: `RECORD_ID() = '${personId}'`,
-          maxRecords: 1,
-          returnFieldsByFieldId: true,
-        })
-        .firstPage();
-
-      const record = records?.[0];
+      const record = await this.base(PERSONEN_TABLE_ID).find(personId);
       if (!record) return null;
 
       return {
         id: record.id,
-        staff_name: (record.fields[PERSONEN_FIELD_IDS.staff_name] as string) || '',
-        email: record.fields[PERSONEN_FIELD_IDS.email] as string | undefined,
-        phone: record.fields[PERSONEN_FIELD_IDS.telefon] as string | undefined,
-        bio: record.fields[PERSONEN_FIELD_IDS.bio] as string | undefined,
-        profile_photo: record.fields[PERSONEN_FIELD_IDS.profile_photo] as string | undefined,
+        staff_name: (record.fields['staff_name'] as string) || '',
+        email: record.fields['E-Mail'] as string | undefined,
+        phone: record.fields['Telefon'] as string | undefined,
+        bio: record.fields['bio'] as string | undefined,
+        profile_photo: record.fields['profile_photo'] as string | undefined,
       };
     } catch (error) {
       console.error('Error fetching person with profile:', error);
