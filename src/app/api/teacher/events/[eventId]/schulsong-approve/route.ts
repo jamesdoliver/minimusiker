@@ -41,53 +41,62 @@ export async function POST(
     const notes = body.notes as string | undefined;
     const teacherService = getTeacherService();
 
-    // Approve the schulsong
+    // Approve the schulsong (critical — sets teacher_approved_at + approval_status)
     const result = await teacherService.approveSchulsongAsTeacher(eventId, notes);
 
-    const airtableService = getAirtableService();
-    const event = await airtableService.getEventByEventId(eventId);
-    if (event && !event.schulsong_released_at) {
-      // Determine if this is a combined event (M/PLUS + Schulsong) or schulsong-only
-      const isCombined = !!(event.is_minimusikertag || event.is_plus);
-      const overrides = parseOverrides(event.timeline_overrides);
-      const fullReleaseDays = getThreshold('full_release_days', overrides);
+    // Post-approval side effects: release scheduling, notifications, activity log.
+    // These are non-fatal — the teacher approval is the critical action.
+    // If these fail, admin can manually trigger release from AudioReviewModal.
+    try {
+      const airtableService = getAirtableService();
+      const event = await airtableService.getEventByEventId(eventId);
+      if (event && !event.schulsong_released_at) {
+        // Determine if this is a combined event (M/PLUS + Schulsong) or schulsong-only
+        const isCombined = !!(event.is_minimusikertag || event.is_plus);
+        const overrides = parseOverrides(event.timeline_overrides);
+        const fullReleaseDays = getThreshold('full_release_days', overrides);
 
-      // Unified release: schulsong-only = approval+1 day, combined = max(normal gate, approval+1)
-      const releaseDate = computeUnifiedReleaseDate(event.event_date, fullReleaseDays, isCombined);
-      await airtableService.setSchulsongReleasedAt(eventId, releaseDate.toISOString());
+        // Unified release: schulsong-only = approval+1 day, combined = max(normal gate, approval+1)
+        const releaseDate = computeUnifiedReleaseDate(event.event_date, fullReleaseDays, isCombined);
+        await airtableService.setSchulsongReleasedAt(eventId, releaseDate.toISOString());
 
-      // Auto-set merch cutoff: schulsong-only = release+10, combined = max(event+14, release+7)
-      const merchCutoff = computeSchulsongMerchCutoff(releaseDate, event.event_date, isCombined);
-      await airtableService.setSchulsongMerchCutoff(eventId, merchCutoff.toISOString());
-    }
-    if (event) {
-      triggerSchulsongTeacherApprovedNotification({
-        schoolName: event.school_name,
-        eventDate: event.event_date,
-        eventId,
-      }).catch((err) => {
-        console.error('[schulsong-approve] Failed to send notification:', err);
-      });
+        // Auto-set merch cutoff: schulsong-only = release+10, combined = max(event+14, release+7)
+        const merchCutoff = computeSchulsongMerchCutoff(releaseDate, event.event_date, isCombined);
+        await airtableService.setSchulsongMerchCutoff(eventId, merchCutoff.toISOString());
+      }
+      if (event) {
+        triggerSchulsongTeacherApprovedNotification({
+          schoolName: event.school_name,
+          eventDate: event.event_date,
+          eventId,
+        }).catch((err) => {
+          console.error('[schulsong-approve] Failed to send notification:', err);
+        });
 
-      // Notify engineer of teacher's decision (fire-and-forget)
-      triggerSchulsongTeacherActionNotification({
-        schoolName: event.school_name,
-        eventDate: event.event_date,
-        eventId,
-        action: 'approved',
-        teacherNotes: notes,
-      }).catch((err) => {
-        console.error('[schulsong-approve] Failed to send engineer notification:', err);
-      });
+        // Notify engineer of teacher's decision (fire-and-forget)
+        triggerSchulsongTeacherActionNotification({
+          schoolName: event.school_name,
+          eventDate: event.event_date,
+          eventId,
+          action: 'approved',
+          teacherNotes: notes,
+        }).catch((err) => {
+          console.error('[schulsong-approve] Failed to send engineer notification:', err);
+        });
 
-      // Log activity (fire-and-forget)
-      getActivityService().logActivity({
-        eventRecordId: event.id,
-        activityType: 'schulsong_approved',
-        description: 'Schulsong approved by teacher',
-        actorEmail: session.email,
-        actorType: 'teacher',
-      });
+        // Log activity (fire-and-forget)
+        getActivityService().logActivity({
+          eventRecordId: event.id,
+          activityType: 'schulsong_approved',
+          description: 'Schulsong approved by teacher',
+          actorEmail: session.email,
+          actorType: 'teacher',
+        });
+      }
+    } catch (postApprovalError) {
+      // Teacher approval succeeded but release scheduling failed.
+      // Admin will see "Approved" state and can manually trigger release.
+      console.error('[schulsong-approve] Post-approval side effects failed (teacher approval succeeded):', postApprovalError);
     }
 
     return NextResponse.json({

@@ -4000,10 +4000,11 @@ class TeacherService {
         return { approvedAt: schulsongFile.teacherApprovedAt };
       }
 
-      // Set teacher_approved_at timestamp (and notes if provided) in single call
+      // Set teacher_approved_at + approval_status in single call
       const approvedAt = new Date().toISOString();
       const updateData: Record<string, string> = {
         [AUDIO_FILES_FIELD_IDS.teacher_approved_at]: approvedAt,
+        [AUDIO_FILES_FIELD_IDS.approval_status]: 'approved',
       };
       if (notes) {
         updateData[AUDIO_FILES_FIELD_IDS.rejection_comment] = notes;

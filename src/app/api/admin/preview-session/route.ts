@@ -174,6 +174,12 @@ async function handleParentPreview(
     );
   }
 
+  // Use the canonical event_id from the resolved Event record.
+  // The raw eventId param may be a simplybookId (e.g. "1726") which downstream
+  // endpoints like audio-access and schulsong-status can't resolve — they
+  // query by the event_id text field only.
+  const canonicalEventId = event.event_id || eventId;
+
   // Fetch parent record
   const parents = await airtableService.getParentsByIds([parentId]);
   if (parents.length === 0) {
@@ -205,10 +211,10 @@ async function handleParentPreview(
     const cls = reg.class_id?.[0] ? classMap.get(reg.class_id[0]) : undefined;
     return {
       childName: reg.registered_child,
-      bookingId: eventId,
+      bookingId: canonicalEventId,
       classId: cls?.class_id || '',
       class: cls?.class_name || '',
-      eventId: eventId,
+      eventId: canonicalEventId,
       schoolName: event.school_name || '',
       eventType,
       bookingDate: event.event_date,
@@ -220,13 +226,13 @@ async function handleParentPreview(
     parentId: parent.id,
     email: parent.parent_email,
     firstName: parent.parent_first_name || 'Preview',
-    bookingId: eventId,
+    bookingId: canonicalEventId,
     schoolName,
     schoolId: generateSchoolId(schoolName),
     eventType: children[0]?.eventType || 'minimusikertag',
     childName: children[0]?.childName || 'Unknown',
     bookingDate: event.event_date,
-    eventId: eventId,
+    eventId: canonicalEventId,
     children,
     loginTimestamp: Date.now(),
   };
