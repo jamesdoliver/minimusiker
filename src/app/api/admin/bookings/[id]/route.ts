@@ -4,6 +4,12 @@ import { getAirtableService } from '@/lib/services/airtableService';
 import { simplybookService } from '@/lib/services/simplybookService';
 import { SCHOOL_BOOKINGS_FIELD_IDS } from '@/lib/types/airtable';
 import { updateSchoolBookingById } from '@/lib/services/teacherService';
+import { getActivityService, ActivityService } from '@/lib/services/activityService';
+import {
+  triggerDateChangeNotification,
+  triggerNewBookingNotification,
+} from '@/lib/services/notificationService';
+import { getTaskService } from '@/lib/services/taskService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
@@ -170,34 +176,113 @@ export async function PATCH(
         airtableUpdated = true;
         console.log(`[EditBooking] Updated Airtable booking: ${bookingId}`);
 
-        // Sync estimated_children to the linked Event record
-        if (body.estimated_children !== undefined) {
+        // Fetch linked Event once for all downstream syncs
+        // (estimated_children, event_date, activity log, notifications)
+        let linkedEvent: Awaited<ReturnType<typeof airtableService.getEventByBookingRecordId>> = null;
+        if (body.estimated_children !== undefined || body.event_date !== undefined) {
           try {
-            const linkedEvent = await airtableService.getEventByBookingRecordId(bookingId);
-            if (linkedEvent) {
-              await airtableService.updateEventFields(linkedEvent.id, {
-                estimated_children: body.estimated_children,
-                is_under_100: body.estimated_children < 100,
-              });
-              console.log(`[EditBooking] Synced estimated_children=${body.estimated_children} to Event ${linkedEvent.id}`);
+            linkedEvent = await airtableService.getEventByBookingRecordId(bookingId);
+            if (!linkedEvent) {
+              console.warn(`[EditBooking] No linked Event found for booking ${bookingId}`);
             }
+          } catch (eventErr) {
+            console.warn('[EditBooking] Failed to find linked Event:', eventErr);
+          }
+        }
+
+        // Sync estimated_children to the linked Event record
+        // NOTE: Kept as separate updateEventFields call (not merged with event_date)
+        // for clear per-field logging. Could merge if Airtable rate limits become an issue.
+        if (body.estimated_children !== undefined && linkedEvent) {
+          try {
+            await airtableService.updateEventFields(linkedEvent.id, {
+              estimated_children: body.estimated_children,
+              is_under_100: body.estimated_children < 100,
+            });
+            console.log(`[EditBooking] Synced estimated_children=${body.estimated_children} to Event ${linkedEvent.id}`);
           } catch (eventErr) {
             console.warn('[EditBooking] Failed to sync estimated_children to Event:', eventErr);
           }
         }
 
         // Sync event_date to the linked Event record
-        if (body.event_date !== undefined) {
+        if (body.event_date !== undefined && linkedEvent) {
           try {
-            const linkedEvent = await airtableService.getEventByBookingRecordId(bookingId);
-            if (linkedEvent) {
-              await airtableService.updateEventFields(linkedEvent.id, {
-                event_date: body.event_date,
-              });
-              console.log(`[EditBooking] Synced event_date=${body.event_date} to Event ${linkedEvent.id}`);
-            }
+            await airtableService.updateEventFields(linkedEvent.id, {
+              event_date: body.event_date,
+            });
+            console.log(`[EditBooking] Synced event_date=${body.event_date} to Event ${linkedEvent.id}`);
           } catch (eventErr) {
             console.warn('[EditBooking] Failed to sync event_date to Event:', eventErr);
+          }
+        }
+
+        // Activity log for date change
+        if (body.event_date !== undefined && linkedEvent) {
+          const oldDate = booking.startDate || 'Unknown';
+          getActivityService().logActivity({
+            eventRecordId: linkedEvent.id,
+            activityType: 'date_changed',
+            description: ActivityService.generateDescription('date_changed', {
+              oldDate,
+              newDate: body.event_date,
+            }),
+            actorEmail: admin.email,
+            actorType: 'admin',
+            metadata: { oldDate, newDate: body.event_date, source: 'booking_edit' },
+          });
+        }
+
+        // Date change notification
+        if (body.event_date !== undefined && linkedEvent) {
+          try {
+            const isFirstDateAssignment = !booking.startDate;
+
+            if (isFirstDateAssignment) {
+              await triggerNewBookingNotification({
+                bookingId: linkedEvent.event_id || linkedEvent.id,
+                schoolName: booking.schoolName || '',
+                contactName: booking.schoolContactName || '',
+                contactEmail: booking.schoolContactEmail || '',
+                contactPhone: booking.schoolPhone || '',
+                eventDate: body.event_date,
+                estimatedChildren: booking.estimatedChildren,
+                address: booking.schoolAddress || '',
+                city: booking.city || '',
+                status: 'Bestätigt',
+              });
+              console.log(`[EditBooking] Sent new booking notification for ${linkedEvent.event_id}`);
+            } else {
+              await triggerDateChangeNotification({
+                bookingId: linkedEvent.event_id || linkedEvent.id,
+                schoolName: booking.schoolName || '',
+                contactName: booking.schoolContactName || '',
+                contactEmail: booking.schoolContactEmail || '',
+                contactPhone: booking.schoolPhone || '',
+                eventDate: body.event_date,
+                address: booking.schoolAddress || '',
+                city: booking.city || '',
+                oldDate: booking.startDate!,
+                newDate: body.event_date,
+              });
+              console.log(`[EditBooking] Sent date change notification for ${linkedEvent.event_id}`);
+            }
+          } catch (notifErr) {
+            console.warn('[EditBooking] Failed to send date notification:', notifErr);
+          }
+        }
+
+        // Recalculate task deadlines for pending tasks
+        if (body.event_date !== undefined && linkedEvent) {
+          try {
+            const taskService = getTaskService();
+            const taskResult = await taskService.recalculateDeadlinesForEvent(
+              linkedEvent.id,
+              body.event_date
+            );
+            console.log(`[EditBooking] Recalculated ${taskResult.updatedCount} task deadlines for Event ${linkedEvent.id}`);
+          } catch (taskError) {
+            console.warn('[EditBooking] Could not recalculate task deadlines:', taskError);
           }
         }
       }
@@ -317,8 +402,26 @@ export async function PATCH(
               console.warn(`[EditBooking] SimplyBook update failed: ${result.error}`);
             }
           } else {
-            // No SimplyBook-relevant fields to update
+            // No SimplyBook-relevant client fields to update
             simplybookUpdated = true; // Consider it "success" since there was nothing to do
+          }
+
+          // Sync date change to SimplyBook (separate from client data)
+          if (body.event_date !== undefined) {
+            const dateResult = await simplybookService.editBookingDate(
+              booking.simplybookId!,
+              body.event_date
+            );
+            if (dateResult.success) {
+              simplybookUpdated = true;
+              console.log(`[EditBooking] Updated SimplyBook date to ${body.event_date} for booking ${booking.simplybookId}`);
+            } else {
+              // Date sync is the critical operation when admin changed a date —
+              // override any prior simplybookUpdated=true from client update
+              simplybookUpdated = false;
+              simplybookError = dateResult.error;
+              console.warn(`[EditBooking] SimplyBook date sync failed: ${dateResult.error}`);
+            }
           }
         } else {
           simplybookError = 'No client ID found in SimplyBook booking';
