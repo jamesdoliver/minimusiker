@@ -2502,19 +2502,6 @@ class AirtableService {
           });
         }
 
-        // Fetch songs for this event
-        const { getTeacherService } = await import('@/lib/services/teacherService');
-        const teacherService = getTeacherService();
-        const resolvedEventIdForSongs = eventRecord.fields[EVENTS_FIELD_IDS.event_id] as string || eventId;
-        const allSongs = await teacherService.getSongsByEventId(resolvedEventIdForSongs);
-
-        // Attach songs to each class
-        for (const cls of classes) {
-          cls.songs = allSongs
-            .filter(s => s.classId === cls.classId)
-            .map(s => ({ id: s.id, title: s.title, artist: s.artist, notes: s.notes, order: s.order, hiddenByEngineer: s.hiddenByEngineer }));
-        }
-
         // Sort classes by name
         classes.sort((a, b) => a.className.localeCompare(b.className));
 

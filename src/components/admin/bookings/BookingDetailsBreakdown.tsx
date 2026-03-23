@@ -593,7 +593,7 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
 
       {/* Audio Status Section */}
       <div className="mt-6 pt-4 border-t border-gray-200">
-        <div className={`grid gap-6 ${booking.isSchulsong && schulsongStatus?.hasSchulsong ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        <div className={`grid gap-6 ${booking.isSchulsong ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {/* Left: Audio Finals */}
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-3">Audio Status</h4>
