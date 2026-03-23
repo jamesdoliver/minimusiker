@@ -45,6 +45,15 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
   const [audioStatusLoading, setAudioStatusLoading] = useState(false);
   const [showAudioReviewModal, setShowAudioReviewModal] = useState(false);
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+  const [schulsongStatus, setSchulsongStatus] = useState<{
+    hasSchulsong: boolean;
+    schulsongFile?: {
+      approvalStatus: 'pending' | 'approved' | 'rejected';
+      rejectionComment?: string;
+      teacherApprovedAt?: string;
+    };
+    releasedAt?: string;
+  } | null>(null);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [dealExpanded, setDealExpanded] = useState(true);
 
@@ -114,8 +123,23 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
       }
     };
 
+    const fetchSchulsongStatus = async () => {
+      try {
+        const response = await fetch(`/api/admin/events/${encodeURIComponent(booking.code)}/schulsong-status`);
+        if (response.ok) {
+          const data = await response.json();
+          setSchulsongStatus(data);
+        }
+      } catch (error) {
+        console.error('Error fetching schulsong status:', error);
+      }
+    };
+
     fetchAudioStatus();
-  }, [booking.code]);
+    if (booking.isSchulsong) {
+      fetchSchulsongStatus();
+    }
+  }, [booking.code, booking.isSchulsong]);
 
   const handleToggleAudioVisibility = async () => {
     if (!audioStatus || isTogglingVisibility) return;
