@@ -593,56 +593,121 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
 
       {/* Audio Status Section */}
       <div className="mt-6 pt-4 border-t border-gray-200">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Audio Status</h4>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          {audioStatusLoading ? (
-            <div className="flex items-center gap-2 text-gray-500">
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <span className="text-sm">Loading audio status...</span>
-            </div>
-          ) : audioStatus ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                {(() => {
-                  const summary = deriveSummaryFromRich(audioStatus);
-                  return <AudioStatusBadge variant="summary" stage={summary.stage} summary={summary} />;
-                })()}
-                {/* Audio visibility toggle */}
-                <button
-                  onClick={handleToggleAudioVisibility}
-                  disabled={isTogglingVisibility}
-                  className="flex items-center gap-2 group"
-                  title={audioStatus.audioHidden ? 'Audio ist ausgeblendet – klicken zum Einblenden' : 'Audio ist sichtbar – klicken zum Ausblenden'}
-                >
-                  <div className={`relative w-9 h-5 rounded-full transition-colors ${
-                    isTogglingVisibility ? 'opacity-50' : ''
-                  } ${audioStatus.audioHidden ? 'bg-gray-300' : 'bg-green-500'}`}>
-                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                      audioStatus.audioHidden ? '' : 'translate-x-4'
-                    }`} />
+        <div className={`grid gap-6 ${booking.isSchulsong && schulsongStatus?.hasSchulsong ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {/* Left: Audio Finals */}
+          <div>
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">Audio Status</h4>
+            <div className="bg-white rounded-lg border border-gray-200 p-4">
+              {audioStatusLoading ? (
+                <div className="flex items-center gap-2 text-gray-500">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span className="text-sm">Loading audio status...</span>
+                </div>
+              ) : audioStatus ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-6">
+                    {(() => {
+                      const summary = deriveSummaryFromRich(audioStatus);
+                      return <AudioStatusBadge variant="summary" stage={summary.stage} summary={summary} />;
+                    })()}
+                    {/* Audio visibility toggle */}
+                    <button
+                      onClick={handleToggleAudioVisibility}
+                      disabled={isTogglingVisibility}
+                      className="flex items-center gap-2 group"
+                      title={audioStatus.audioHidden ? 'Audio ist ausgeblendet – klicken zum Einblenden' : 'Audio ist sichtbar – klicken zum Ausblenden'}
+                    >
+                      <div className={`relative w-9 h-5 rounded-full transition-colors ${
+                        isTogglingVisibility ? 'opacity-50' : ''
+                      } ${audioStatus.audioHidden ? 'bg-gray-300' : 'bg-green-500'}`}>
+                        <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                          audioStatus.audioHidden ? '' : 'translate-x-4'
+                        }`} />
+                      </div>
+                      <span className={`text-xs font-medium ${audioStatus.audioHidden ? 'text-red-600' : 'text-green-700'}`}>
+                        {audioStatus.audioHidden ? 'Ausgeblendet' : 'Sichtbar'}
+                      </span>
+                    </button>
                   </div>
-                  <span className={`text-xs font-medium ${audioStatus.audioHidden ? 'text-red-600' : 'text-green-700'}`}>
-                    {audioStatus.audioHidden ? 'Ausgeblendet' : 'Sichtbar'}
-                  </span>
-                </button>
-              </div>
-              <button
-                onClick={() => setShowAudioReviewModal(true)}
-                disabled={!audioStatus || audioStatus.mixMasterUploadedCount === 0}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  audioStatus && audioStatus.mixMasterUploadedCount > 0
-                    ? 'bg-blue-500 text-white hover:bg-blue-600'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                View Audio
-              </button>
+                  <button
+                    onClick={() => setShowAudioReviewModal(true)}
+                    disabled={!audioStatus || audioStatus.mixMasterUploadedCount === 0}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      audioStatus && audioStatus.mixMasterUploadedCount > 0
+                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    View Audio
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Unable to load audio status</p>
+              )}
             </div>
-          ) : (
-            <p className="text-sm text-gray-500">Unable to load audio status</p>
+          </div>
+
+          {/* Right: Schulsong Status (only when event has schulsong) */}
+          {booking.isSchulsong && schulsongStatus?.hasSchulsong && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Schulsong</h4>
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                {schulsongStatus.schulsongFile ? (
+                  <div className="space-y-2">
+                    {/* Approval status badge */}
+                    {(() => {
+                      const status = schulsongStatus.schulsongFile!.approvalStatus;
+                      const badgeConfig = {
+                        pending: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Ausstehend' },
+                        approved: { bg: 'bg-green-100', text: 'text-green-800', label: 'Freigegeben' },
+                        rejected: { bg: 'bg-red-100', text: 'text-red-800', label: 'Abgelehnt' },
+                      }[status] || { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Ausstehend' };
+
+                      const isWaitingForTeacher = status === 'pending';
+
+                      return (
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            isWaitingForTeacher ? 'bg-amber-100 text-amber-800' : `${badgeConfig.bg} ${badgeConfig.text}`
+                          }`}>
+                            {isWaitingForTeacher ? 'Wartet auf Lehrer' : badgeConfig.label}
+                          </span>
+                          {status === 'approved' && schulsongStatus.schulsongFile!.teacherApprovedAt && (
+                            <span className="text-xs text-gray-500">
+                              {new Date(schulsongStatus.schulsongFile!.teacherApprovedAt).toLocaleDateString('de-DE', {
+                                day: 'numeric', month: 'short', year: 'numeric',
+                              })}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {/* Rejection comment */}
+                    {schulsongStatus.schulsongFile!.approvalStatus === 'rejected' && schulsongStatus.schulsongFile!.rejectionComment && (
+                      <p className="text-xs text-red-600 truncate max-w-xs" title={schulsongStatus.schulsongFile!.rejectionComment}>
+                        {schulsongStatus.schulsongFile!.rejectionComment}
+                      </p>
+                    )}
+                    {/* Release date */}
+                    {schulsongStatus.releasedAt && (
+                      <p className="text-xs text-gray-500">
+                        Release: {new Date(schulsongStatus.releasedAt).toLocaleDateString('de-DE', {
+                          day: 'numeric', month: 'short', year: 'numeric',
+                        })}{' '}
+                        {new Date(schulsongStatus.releasedAt).toLocaleTimeString('de-DE', {
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Kein Schulsong hochgeladen</p>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>
