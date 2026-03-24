@@ -42,48 +42,55 @@ export async function POST(
 
     const teacherService = getTeacherService();
 
-    // Reject the schulsong
+    // Reject the schulsong (critical operation)
     const result = await teacherService.rejectSchulsongAsTeacher(eventId, notes);
 
-    // Clear any scheduled release and merch cutoff (will be recomputed on next approval)
-    const airtableService = getAirtableService();
-    const event = await airtableService.getEventByEventId(eventId);
-    if (event?.schulsong_released_at) {
-      await airtableService.setSchulsongReleasedAt(eventId, '');
-    }
-    if (event?.schulsong_merch_cutoff) {
-      await airtableService.setSchulsongMerchCutoff(eventId, null);
-    }
+    // Post-rejection side effects (non-fatal — rejection already succeeded above)
+    try {
+      const airtableService = getAirtableService();
+      const event = await airtableService.getEventByEventId(eventId);
+      if (event?.schulsong_released_at) {
+        await airtableService.setSchulsongReleasedAt(eventId, null);
+      }
+      if (event?.schulsong_merch_cutoff) {
+        await airtableService.setSchulsongMerchCutoff(eventId, null);
+      }
 
-    // Notify engineer and admins (fire-and-forget)
-    if (event) {
-      triggerSchulsongTeacherActionNotification({
-        schoolName: event.school_name,
-        eventDate: event.event_date,
-        eventId,
-        action: 'rejected',
-        teacherNotes: notes,
-      }).catch((err) => {
-        console.error('[schulsong-reject] Failed to send engineer notification:', err);
-      });
+      // Notify engineer and admins (fire-and-forget)
+      if (event) {
+        triggerSchulsongTeacherActionNotification({
+          schoolName: event.school_name,
+          eventDate: event.event_date,
+          eventId,
+          action: 'rejected',
+          teacherNotes: notes,
+        }).catch((err) => {
+          console.error('[schulsong-reject] Failed to send engineer notification:', err);
+        });
 
-      triggerSchulsongTeacherRejectedNotification({
-        schoolName: event.school_name,
-        eventDate: event.event_date,
-        eventId,
-        teacherNotes: notes,
-      }).catch((err) => {
-        console.error('[schulsong-reject] Failed to send admin notification:', err);
-      });
+        triggerSchulsongTeacherRejectedNotification({
+          schoolName: event.school_name,
+          eventDate: event.event_date,
+          eventId,
+          teacherNotes: notes,
+        }).catch((err) => {
+          console.error('[schulsong-reject] Failed to send admin notification:', err);
+        });
 
-      // Log activity (fire-and-forget)
-      getActivityService().logActivity({
-        eventRecordId: event.id,
-        activityType: 'schulsong_rejected',
-        description: 'Schulsong rejected by teacher',
-        actorEmail: session.email,
-        actorType: 'teacher',
-      });
+        // Log activity (fire-and-forget)
+        getActivityService().logActivity({
+          eventRecordId: event.id,
+          activityType: 'schulsong_rejected',
+          description: 'Schulsong rejected by teacher',
+          actorEmail: session.email,
+          actorType: 'teacher',
+        }).catch((err: unknown) => {
+          console.error('[schulsong-reject] Failed to log activity:', err);
+        });
+      }
+    } catch (postRejectionError) {
+      // Rejection succeeded but side effects failed — log but don't fail the request
+      console.error('[schulsong-reject] Post-rejection side effects failed (rejection succeeded):', postRejectionError);
     }
 
     return NextResponse.json({
