@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { SchoolEventDetail } from '@/lib/types/airtable';
+import { useStaffEventDetail } from '@/lib/hooks/useStaffEventDetail';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EventBadge from '@/components/admin/EventBadge';
 import StatsPill from '@/components/admin/StatsPill';
@@ -27,42 +27,15 @@ function formatDate(dateString: string): string {
 export default function StaffEventDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [event, setEvent] = useState<SchoolEventDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const eventId = params.eventId as string;
 
-  const fetchEventDetail = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/staff/events/${encodeURIComponent(eventId)}`);
-
-      if (response.status === 401) {
-        router.push('/staff-login');
-        return;
-      }
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('Event not found');
-        }
-        throw new Error('Failed to fetch event details');
-      }
-      const data = await response.json();
-      setEvent(data.data);
-    } catch (err) {
-      console.error('Error fetching event detail:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load event details');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [eventId, router]);
+  const { event, isLoading, isUnauthorized, isNotFound, error } = useStaffEventDetail(eventId);
 
   useEffect(() => {
-    if (eventId) {
-      fetchEventDetail();
+    if (isUnauthorized) {
+      router.push('/staff-login');
     }
-  }, [eventId, fetchEventDetail]);
+  }, [isUnauthorized, router]);
 
   if (isLoading) {
     return (
@@ -72,7 +45,7 @@ export default function StaffEventDetailPage() {
     );
   }
 
-  if (error || !event) {
+  if (error || isNotFound || !event) {
     return (
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
