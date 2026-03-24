@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get only events assigned to this staff member
-    const assignedEvents = await getAirtableService().getSchoolEventSummariesByStaff(staffRecord.id);
+    const assignedEvents = await getAirtableService().getStaffEventSummaries(staffRecord.id);
 
     return NextResponse.json({
       success: true,

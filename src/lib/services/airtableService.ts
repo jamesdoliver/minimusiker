@@ -3702,16 +3702,95 @@ class AirtableService {
   }
 
   /**
-   * Get school event summaries filtered by assigned staff
-   * Used for Staff Portal to show only assigned events
+   * Optimized: Get staff event summaries with minimal Airtable calls.
+   * Single events fetch + batched class queries per event (in parallel).
+   * Replaces getSchoolEventSummariesByStaff which called getSchoolEventSummaries()
+   * (ALL events with per-event sub-queries) then filtered in JS.
    */
-  async getSchoolEventSummariesByStaff(staffId: string): Promise<SchoolEventSummary[]> {
+  async getStaffEventSummaries(staffId: string): Promise<SchoolEventSummary[]> {
+    this.ensureNormalizedTablesInitialized();
+
     try {
-      // Get all events first
-      const allEvents = await this.getSchoolEventSummaries();
+      // Single fetch of all events (same pattern as getEngineerEventSummaries)
+      const eventRecords = await this.base(EVENTS_TABLE_ID)
+        .select({
+          returnFieldsByFieldId: true,
+          sort: [{ field: EVENTS_FIELD_IDS.event_date, direction: 'desc' }],
+        })
+        .all();
 
       // Filter to only events assigned to this staff member
-      return allEvents.filter(event => event.assignedStaffId === staffId);
+      const staffEvents = eventRecords.filter((record) => {
+        const assignedStaff = (record.fields[EVENTS_FIELD_IDS.assigned_staff] as string[]) || [];
+        return assignedStaff.includes(staffId);
+      });
+
+      // Batch fetch class counts and children totals for all staff events
+      // Use Promise.all to fetch classes for each event in parallel
+      const summaries = await Promise.all(
+        staffEvents.map(async (eventRecord) => {
+          const eventId = eventRecord.fields[EVENTS_FIELD_IDS.event_id] as string;
+          const schoolName = eventRecord.fields[EVENTS_FIELD_IDS.school_name] as string;
+          const eventDate = eventRecord.fields[EVENTS_FIELD_IDS.event_date] as string;
+          const eventType = eventRecord.fields[EVENTS_FIELD_IDS.event_type] as string;
+          const assignedStaffIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_staff] as string[];
+          const assignedEngineerIds = eventRecord.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[];
+          const isSchulsong = eventRecord.fields[EVENTS_FIELD_IDS.is_schulsong] as boolean || false;
+
+          // Fetch classes for this event to get class count, children, and teacher
+          const linkedClassIds = (eventRecord.fields[EVENTS_FIELD_IDS.classes] as string[]) || [];
+          let classCount = linkedClassIds.length;
+          let totalChildren = 0;
+          let mainTeacher = '';
+          let totalParents = 0;
+
+          // Batch fetch class records if there are linked classes
+          if (linkedClassIds.length > 0) {
+            try {
+              // Use OR formula to fetch all classes in one call
+              const classFormula = linkedClassIds.length === 1
+                ? `RECORD_ID() = '${linkedClassIds[0]}'`
+                : `OR(${linkedClassIds.map(id => `RECORD_ID() = '${id}'`).join(',')})`;
+
+              const classRecords = await this.base(CLASSES_TABLE_ID)
+                .select({
+                  filterByFormula: classFormula,
+                  returnFieldsByFieldId: true,
+                })
+                .all();
+
+              for (const classRecord of classRecords) {
+                totalChildren += (classRecord.fields[CLASSES_FIELD_IDS.total_children] as number) || 0;
+                if (!mainTeacher) {
+                  mainTeacher = (classRecord.fields[CLASSES_FIELD_IDS.main_teacher] as string) || '';
+                }
+                // Count registrations from linked field
+                const linkedRegistrationIds = (classRecord.fields[CLASSES_FIELD_IDS.registrations] as string[]) || [];
+                totalParents += linkedRegistrationIds.length;
+              }
+            } catch (error) {
+              console.error(`Error fetching classes for event ${eventId}:`, error);
+            }
+          }
+
+          return {
+            eventId,
+            schoolName,
+            eventDate,
+            eventType,
+            mainTeacher,
+            classCount,
+            totalChildren,
+            totalParents,
+            assignedStaffId: assignedStaffIds?.[0],
+            assignedEngineerIds: assignedEngineerIds || [],
+            assignedEngineerId: assignedEngineerIds?.[0],
+            isSchulsong,
+          } as SchoolEventSummary;
+        })
+      );
+
+      return summaries;
     } catch (error) {
       console.error('Error fetching staff event summaries:', error);
       throw new Error(`Failed to fetch staff events: ${error instanceof Error ? error.message : 'Unknown error'}`);
