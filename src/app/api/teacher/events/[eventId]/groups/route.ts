@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService, ActivityService } from '@/lib/services/activityService';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,6 +115,30 @@ export async function POST(
       memberClassIds,
       createdBy: session.email,
     });
+
+    // Log activity (fire-and-forget)
+    const airtableService = getAirtableService();
+    let eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+    if (!eventRecordId && /^\d+$/.test(eventId)) {
+      const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+      if (booking) {
+        const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+        if (eventRecord) {
+          eventRecordId = eventRecord.id;
+        }
+      }
+    }
+    if (eventRecordId) {
+      getActivityService().logActivity({
+        eventRecordId,
+        activityType: 'group_created',
+        description: ActivityService.generateDescription('group_created', {
+          groupName: groupName.trim(),
+        }),
+        actorEmail: session.email,
+        actorType: 'teacher',
+      });
+    }
 
     return NextResponse.json({
       success: true,

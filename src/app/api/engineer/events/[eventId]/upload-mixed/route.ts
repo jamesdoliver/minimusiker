@@ -3,6 +3,7 @@ import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService } from '@/lib/services/activityService';
 import { generateAudioDisplayName } from '@/lib/utils/audioFilename';
 import { triggerSchulsongNewVersionNotification } from '@/lib/services/notificationService';
 
@@ -246,6 +247,30 @@ export async function PUT(
             });
           }
         }
+      }
+    }
+
+    // Log activity for final uploads (fire-and-forget)
+    if (type === 'final') {
+      const airtableService = getAirtableService();
+      const eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+      if (eventRecordId) {
+        // Resolve song name for description
+        let songTitle = meaningfulFilename.replace(/\.\w+$/, '');
+        if (songId) {
+          const song = await teacherService.getSongById(songId);
+          if (song?.title) songTitle = song.title;
+        }
+        const description = isSchulsong
+          ? `Engineer uploaded schulsong for teacher approval`
+          : `Engineer uploaded final for "${songTitle}"`;
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'audio_uploaded',
+          description,
+          actorEmail: session.email,
+          actorType: 'engineer',
+        });
       }
     }
 

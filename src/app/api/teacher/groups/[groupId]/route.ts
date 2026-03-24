@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService, ActivityService } from '@/lib/services/activityService';
+
+// Helper to resolve eventRecordId from eventId
+async function resolveEventRecordId(eventId: string): Promise<string | null> {
+  const airtableService = getAirtableService();
+  let eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+  if (!eventRecordId && /^\d+$/.test(eventId)) {
+    const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+    if (booking) {
+      const eventRecord = await airtableService.getEventBySchoolBookingId(booking.id);
+      if (eventRecord) {
+        eventRecordId = eventRecord.id;
+      }
+    }
+  }
+  return eventRecordId;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -121,10 +139,29 @@ export async function PUT(
       }
     }
 
+    // Get existing group for activity logging
+    const existingGroup = await teacherService.getGroupById(groupId);
+
     const updatedGroup = await teacherService.updateGroup(groupId, {
       groupName: groupName?.trim(),
       memberClassIds,
     });
+
+    // Log activity (fire-and-forget)
+    if (existingGroup?.eventId) {
+      const eventRecordId = await resolveEventRecordId(existingGroup.eventId);
+      if (eventRecordId) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'group_updated',
+          description: ActivityService.generateDescription('group_updated', {
+            groupName: groupName?.trim() || existingGroup.groupName,
+          }),
+          actorEmail: session.email,
+          actorType: 'teacher',
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -169,8 +206,27 @@ export async function DELETE(
       );
     }
 
+    // Get group info before deletion for activity logging
+    const groupToDelete = await teacherService.getGroupById(groupId);
+
     // Business rules (cannot delete if has songs/audio) enforced in service layer
     await teacherService.deleteGroup(groupId);
+
+    // Log activity (fire-and-forget)
+    if (groupToDelete?.eventId) {
+      const eventRecordId = await resolveEventRecordId(groupToDelete.eventId);
+      if (eventRecordId) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'group_deleted',
+          description: ActivityService.generateDescription('group_deleted', {
+            groupName: groupToDelete.groupName,
+          }),
+          actorEmail: session.email,
+          actorType: 'teacher',
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,

@@ -44,7 +44,7 @@ class ActivityService {
 
       console.log('[ActivityService] Creating record with fields:', JSON.stringify(fields, null, 2));
 
-      const result = await this.base(EVENT_ACTIVITY_TABLE_ID).create([{ fields }]);
+      const result = await this.base(EVENT_ACTIVITY_TABLE_ID).create([{ fields }], { typecast: true });
 
       console.log(
         `[ActivityService] Logged: ${input.activityType} by ${input.actorEmail} (record: ${result[0]?.id})`

@@ -3,6 +3,7 @@ import { verifyEngineerSession } from '@/lib/auth/verifyEngineerSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService } from '@/lib/services/activityService';
 import { ENGINEER_IDS } from '@/lib/config/engineers';
 import { autoMatchFiles, getMatchSummary } from '@/lib/utils/autoMatch';
 import { generateAudioDisplayName } from '@/lib/utils/audioFilename';
@@ -246,6 +247,21 @@ export async function PUT(
       songId: af.songId,
       displayName: af.filename.replace(/\.\w+$/, ''),
     }));
+
+    // Log activity (fire-and-forget)
+    if (audioFiles.length > 0) {
+      const eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+      if (eventRecordId) {
+        const totalSongs = eventDetail?.classes.reduce((sum, c) => sum + (c.songs?.length || 0), 0) || confirmedMatches.length;
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'audio_uploaded',
+          description: `Engineer bulk uploaded ${audioFiles.length} of ${totalSongs} finals`,
+          actorEmail: session.email,
+          actorType: 'engineer',
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,
