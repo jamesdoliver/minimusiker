@@ -910,27 +910,38 @@ class TeacherService {
   async getAudioFilesByClassId(classId: string): Promise<AudioFile[]> {
     if (this.useNormalizedTables()) {
       this.ensureNormalizedTablesInitialized();
-      // NEW: Use linked record field (class_link)
       try {
-        // First, find the Classes record by class_id field
-        const classRecords = await this.classesTable!.select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
-          maxRecords: 1,
-        }).firstPage();
+        // Query by linked record field (class_link) using the class_id text value.
+        // Airtable linked record fields in formulas resolve to the primary field
+        // value (class_id text), NOT the record ID — so we query directly with classId.
+        // Also query the text class_id field and merge results for completeness
+        // (some records may only have one or the other set).
+        const [linkRecords, textRecords] = await Promise.all([
+          this.base(AUDIO_FILES_TABLE)
+            .select({
+              filterByFormula: `{${AUDIO_FILES_LINKED_FIELD_IDS.class_link}} = '${classId.replace(/'/g, "\\'")}'`,
+              sort: [{ field: 'uploaded_at', direction: 'desc' }],
+            })
+            .all(),
+          this.base(AUDIO_FILES_TABLE)
+            .select({
+              filterByFormula: `{${AUDIO_FILES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+              sort: [{ field: 'uploaded_at', direction: 'desc' }],
+            })
+            .all(),
+        ]);
 
-        if (classRecords.length === 0) return [];
+        // Merge and deduplicate by record ID
+        const seen = new Set<string>();
+        const merged = [];
+        for (const record of [...linkRecords, ...textRecords]) {
+          if (!seen.has(record.id)) {
+            seen.add(record.id);
+            merged.push(record);
+          }
+        }
 
-        const classRecordId = classRecords[0].id;
-
-        // Query AudioFiles table by linked record (class_link)
-        const records = await this.base(AUDIO_FILES_TABLE)
-          .select({
-            filterByFormula: `{${AUDIO_FILES_LINKED_FIELD_IDS.class_link}} = '${classRecordId}'`,
-            sort: [{ field: 'uploaded_at', direction: 'desc' }],
-          })
-          .all();
-
-        return records.map((record) => this.transformAudioFileRecord(record));
+        return merged.map((record) => this.transformAudioFileRecord(record));
       } catch (error) {
         console.error('Error getting audio files by class ID (normalized):', error);
         return [];
