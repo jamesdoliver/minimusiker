@@ -7,6 +7,7 @@ interface Track {
   className: string;
   classType: string;
   songTitle?: string;
+  displayName: string;
   fileSizeBytes?: number;
   isSchulsong: boolean;
 }
@@ -39,7 +40,7 @@ function sortTracks(tracks: Track[]): Track[] {
       return a.isSchulsong ? 1 : -1;
     }
     // Then alphabetical by className
-    return a.className.localeCompare(b.className, 'de');
+    return a.displayName.localeCompare(b.displayName, 'de');
   });
 }
 
@@ -240,15 +241,17 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 truncate">{track.className}</span>
+                    <span className="text-sm font-medium text-gray-900 truncate">{track.displayName}</span>
                     {track.isSchulsong && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex-shrink-0">
                         Schulsong
                       </span>
                     )}
                   </div>
-                  {track.songTitle && (
-                    <p className="text-xs text-gray-500 truncate">{track.songTitle}</p>
+                  {track.classType && track.classType !== 'regular' && (
+                    <p className="text-xs text-gray-500 truncate">
+                      {track.classType === 'choir' ? 'Chor' : track.classType === 'teacher_song' ? 'Lehrerlied' : track.classType}
+                    </p>
                   )}
                 </div>
               </div>
