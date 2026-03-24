@@ -80,7 +80,8 @@ export async function GET(
         : className;
     }
 
-    const downloadFilename = `${baseName}.mp3`;
+    const extension = r2Key.endsWith('.wav') ? '.wav' : '.mp3';
+    const downloadFilename = `${baseName}${extension}`;
     const signedUrl = await r2Service.generateSignedUrl(r2Key, 3600, downloadFilename);
 
     return NextResponse.redirect(signedUrl);

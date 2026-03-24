@@ -39,7 +39,7 @@ function sortTracks(tracks: Track[]): Track[] {
     if (a.isSchulsong !== b.isSchulsong) {
       return a.isSchulsong ? 1 : -1;
     }
-    // Then alphabetical by className
+    // Then alphabetical by displayName
     return a.displayName.localeCompare(b.displayName, 'de');
   });
 }

@@ -52,6 +52,19 @@ export async function GET(
     const nonDefaultClasses = event.classes.filter((c) => !c.isDefault);
     const r2Service = getR2Service();
     const filesToZip: { buffer: Buffer; zipName: string }[] = [];
+    const usedNames = new Set<string>();
+
+    function deduplicateName(name: string): string {
+      let candidate = name;
+      let counter = 2;
+      while (usedNames.has(candidate)) {
+        const ext = name.lastIndexOf('.');
+        candidate = `${name.slice(0, ext)} (${counter})${name.slice(ext)}`;
+        counter++;
+      }
+      usedNames.add(candidate);
+      return candidate;
+    }
 
     // One file per song-level audio
     for (const cls of nonDefaultClasses) {
@@ -72,7 +85,8 @@ export async function GET(
         const baseName = song?.title
           ? `${song.title} - ${cls.className}`
           : cls.className;
-        const zipName = `${baseName}.mp3`;
+        const extension = r2Key.endsWith('.wav') ? '.wav' : '.mp3';
+        const zipName = deduplicateName(`${baseName}${extension}`);
 
         const buffer = await r2Service.getFileBuffer(r2Key);
         if (buffer) {
@@ -91,7 +105,8 @@ export async function GET(
         const r2Key = best.mp3R2Key || best.r2Key;
         const buffer = await r2Service.getFileBuffer(r2Key);
         if (buffer) {
-          filesToZip.push({ buffer, zipName: 'Schulsong.mp3' });
+          const ext = r2Key.endsWith('.wav') ? '.wav' : '.mp3';
+          filesToZip.push({ buffer, zipName: deduplicateName(`Schulsong${ext}`) });
         }
       }
     }
