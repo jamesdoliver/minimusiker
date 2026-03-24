@@ -451,7 +451,7 @@ async function handleBookingChange(payload: SimplybookWebhookPayload) {
 
     // Propagate estimated_children + is_under_100 to linked Event
     const airtableService = getAirtableService();
-    const linkedEvent = await airtableService.getEventByBookingRecordId(existingRecord.id);
+    const linkedEvent = await airtableService.getEventBySchoolBookingId(existingRecord.id);
     if (linkedEvent) {
       try {
         await airtableService.updateEventFields(linkedEvent.id, {
@@ -565,7 +565,7 @@ async function handleBookingCancel(payload: SimplybookWebhookPayload) {
     // Log booking cancellation activity
     try {
       const airtableService = getAirtableService();
-      const linkedEvent = await airtableService.getEventByBookingRecordId(existingRecord.id);
+      const linkedEvent = await airtableService.getEventBySchoolBookingId(existingRecord.id);
       if (linkedEvent) {
         getActivityService().logActivity({
           eventRecordId: linkedEvent.id,

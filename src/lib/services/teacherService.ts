@@ -503,7 +503,7 @@ class TeacherService {
       if (cascadeData) {
         try {
           const airtableService = getAirtableService();
-          const linkedEvent = await airtableService.getEventByBookingRecordId(bookingId);
+          const linkedEvent = await airtableService.getEventBySchoolBookingId(bookingId);
           if (linkedEvent) {
             await airtableService.updateEvent(linkedEvent.id, {
               school_address: cascadeData.address,

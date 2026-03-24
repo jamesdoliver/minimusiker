@@ -5662,29 +5662,6 @@ class AirtableService {
   }
 
   /**
-   * Get an Event by its linked SchoolBookings record ID
-   * Used to find the Event associated with a specific booking
-   */
-  async getEventByBookingRecordId(bookingRecordId: string): Promise<Event | null> {
-    try {
-      // Find Events where simplybook_booking contains this booking record ID
-      const records = await this.base(EVENTS_TABLE_ID).select({
-        filterByFormula: `FIND("${bookingRecordId}", ARRAYJOIN({simplybook_booking}))`,
-        maxRecords: 1,
-      }).firstPage();
-
-      if (records.length === 0) {
-        return null;
-      }
-
-      return this.transformEventRecord(records[0]);
-    } catch (error) {
-      console.error('Error fetching Event by booking record ID:', error);
-      return null;
-    }
-  }
-
-  /**
    * Update an Event record
    * Used to sync school contact info from teacher portal updates
    */

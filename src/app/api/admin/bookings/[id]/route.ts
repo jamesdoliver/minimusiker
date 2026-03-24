@@ -178,10 +178,10 @@ export async function PATCH(
 
         // Fetch linked Event once for all downstream syncs
         // (estimated_children, event_date, activity log, notifications)
-        let linkedEvent: Awaited<ReturnType<typeof airtableService.getEventByBookingRecordId>> = null;
+        let linkedEvent: Awaited<ReturnType<typeof airtableService.getEventBySchoolBookingId>> = null;
         if (body.estimated_children !== undefined || body.event_date !== undefined) {
           try {
-            linkedEvent = await airtableService.getEventByBookingRecordId(bookingId);
+            linkedEvent = await airtableService.getEventBySchoolBookingId(bookingId);
             if (!linkedEvent) {
               console.warn(`[EditBooking] No linked Event found for booking ${bookingId}`);
             }
