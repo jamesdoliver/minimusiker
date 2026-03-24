@@ -86,8 +86,8 @@ export async function GET(
       }
     }
 
-    // Schulsong track
-    if (event.isSchulsong) {
+    // Schulsong track (include if any schulsong audio exists, regardless of event flag)
+    {
       const schulsongFiles = finalReadyFiles.filter(
         (f: AudioFile) => f.isSchulsong
       );

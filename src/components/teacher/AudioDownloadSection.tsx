@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 interface Track {
   fileId: string;
   className: string;
-  classType: string;
+  classType?: string;
   songTitle?: string;
   displayName: string;
   fileSizeBytes?: number;
@@ -86,12 +86,19 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
       setIsPlaying(false);
       setCurrentTime(0);
     };
+    const onError = () => {
+      setIsPlaying(false);
+      setActiveTrackId(null);
+      setCurrentTime(0);
+      setDuration(0);
+    };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('durationchange', onDurationChange);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('error', onError);
 
     return () => {
       audio.pause();
@@ -100,6 +107,7 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('error', onError);
       audioRef.current = null;
     };
   }, []);
@@ -257,9 +265,6 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
               </div>
 
               <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-                {track.fileSizeBytes != null && (
-                  <span className="text-xs text-gray-400">{formatFileSize(track.fileSizeBytes)}</span>
-                )}
                 <button
                   onClick={() => handleDownloadTrack(track.fileId)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
