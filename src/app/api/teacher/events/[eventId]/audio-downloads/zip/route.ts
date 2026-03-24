@@ -12,17 +12,15 @@ export const dynamic = 'force-dynamic';
  * GET /api/teacher/events/[eventId]/audio-downloads/zip
  * Stream a zip archive containing all final audio tracks for the event.
  *
- * Each non-default class gets one track (MP3 preferred over WAV).
- * If the event has a schulsong, it is included as "Schulsong.mp3/.wav".
+ * One track per song. Uses mp3R2Key when available.
+ * Filenames: "SongTitle - ClassName.mp3" or "ClassName.mp3" as fallback.
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
-    // 1. Auth
     const session = verifyTeacherSession(request);
-
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -31,9 +29,7 @@ export async function GET(
     const eventId = decodeURIComponent(rawEventId);
     const teacherService = getTeacherService();
 
-    // 2. Event access
     const event = await teacherService.getTeacherEventDetail(eventId, session.email);
-
     if (!event) {
       return NextResponse.json(
         { error: 'Event not found or you do not have access to this event' },
@@ -41,7 +37,6 @@ export async function GET(
       );
     }
 
-    // 3. Fetch audio files, filter to final + ready
     const allAudioFiles = await teacherService.getAudioFilesByEventId(eventId);
     const finalReadyFiles = allAudioFiles.filter(
       (f: AudioFile) => f.type === 'final' && f.status === 'ready'
@@ -54,48 +49,50 @@ export async function GET(
       );
     }
 
-    // 4. Pick best file per class (prefer MP3 over WAV)
     const nonDefaultClasses = event.classes.filter((c) => !c.isDefault);
-    const filesByClass = new Map<string, AudioFile[]>();
-    const schulsongFiles: AudioFile[] = [];
-
-    for (const f of finalReadyFiles) {
-      if (f.isSchulsong) {
-        schulsongFiles.push(f);
-        continue;
-      }
-      const existing = filesByClass.get(f.classId) || [];
-      existing.push(f);
-      filesByClass.set(f.classId, existing);
-    }
-
-    const filesToZip: { buffer: Buffer; zipName: string }[] = [];
     const r2Service = getR2Service();
+    const filesToZip: { buffer: Buffer; zipName: string }[] = [];
 
-    // One track per non-default class
+    // One file per song-level audio
     for (const cls of nonDefaultClasses) {
-      const candidates = filesByClass.get(cls.classId);
-      if (!candidates || candidates.length === 0) continue;
+      const classFiles = finalReadyFiles.filter(
+        (f) => f.classId === cls.classId && !f.isSchulsong
+      );
 
-      const best = pickBestFile(candidates);
-      const extension = best.r2Key.endsWith('.mp3') ? '.mp3' : '.wav';
-      const zipName = `${cls.className}${extension}`;
+      for (const af of classFiles) {
+        const r2Key = af.mp3R2Key || af.r2Key;
 
-      const buffer = await r2Service.getFileBuffer(best.r2Key);
-      if (buffer) {
-        filesToZip.push({ buffer, zipName });
+        // Resolve song title
+        const song = af.songId
+          ? cls.songs.find((s) => s.id === af.songId)
+          : cls.songs.length === 1
+            ? cls.songs[0]
+            : undefined;
+
+        const baseName = song?.title
+          ? `${song.title} - ${cls.className}`
+          : cls.className;
+        const zipName = `${baseName}.mp3`;
+
+        const buffer = await r2Service.getFileBuffer(r2Key);
+        if (buffer) {
+          filesToZip.push({ buffer, zipName });
+        }
       }
     }
 
-    // Schulsong track (if applicable)
-    if (schulsongFiles.length > 0) {
-      const best = pickBestFile(schulsongFiles);
-      const extension = best.r2Key.endsWith('.mp3') ? '.mp3' : '.wav';
-      const zipName = `Schulsong${extension}`;
-
-      const buffer = await r2Service.getFileBuffer(best.r2Key);
-      if (buffer) {
-        filesToZip.push({ buffer, zipName });
+    // Schulsong
+    if (event.isSchulsong) {
+      const schulsongFiles = finalReadyFiles.filter(
+        (f: AudioFile) => f.isSchulsong
+      );
+      if (schulsongFiles.length > 0) {
+        const best = schulsongFiles[0];
+        const r2Key = best.mp3R2Key || best.r2Key;
+        const buffer = await r2Service.getFileBuffer(r2Key);
+        if (buffer) {
+          filesToZip.push({ buffer, zipName: 'Schulsong.mp3' });
+        }
       }
     }
 
@@ -106,34 +103,23 @@ export async function GET(
       );
     }
 
-    // 5. Build zip via archiver, pipe through PassThrough, convert to Web ReadableStream
-    const archive = archiver('zip', {
-      zlib: { level: 1 }, // Fast compression — audio doesn't compress much
-    });
-
+    // Build zip
+    const archive = archiver('zip', { zlib: { level: 1 } });
     const passThrough = new PassThrough();
     archive.pipe(passThrough);
 
-    // Append all files
     for (const { buffer, zipName } of filesToZip) {
       archive.append(buffer, { name: zipName });
     }
-
-    // Finalize (no more files to add)
     archive.finalize();
 
-    // Convert Node PassThrough to Web ReadableStream
     const webStream = new ReadableStream({
       start(controller) {
         passThrough.on('data', (chunk: Buffer) => {
           controller.enqueue(new Uint8Array(chunk));
         });
-        passThrough.on('end', () => {
-          controller.close();
-        });
-        passThrough.on('error', (err) => {
-          controller.error(err);
-        });
+        passThrough.on('end', () => controller.close());
+        passThrough.on('error', (err) => controller.error(err));
       },
       cancel() {
         passThrough.destroy();
@@ -141,7 +127,6 @@ export async function GET(
       },
     });
 
-    // 6. Build Content-Disposition filename
     const filename = `${event.schoolName} - Aufnahmen.zip`;
 
     return new NextResponse(webStream, {
@@ -153,20 +138,8 @@ export async function GET(
   } catch (error) {
     console.error('Error generating teacher audio ZIP:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate ZIP',
-      },
+      { success: false, error: error instanceof Error ? error.message : 'Failed to generate ZIP' },
       { status: 500 }
     );
   }
-}
-
-/**
- * Pick the best audio file from a list of candidates.
- * Prefers MP3 over WAV (smaller download for the teacher).
- */
-function pickBestFile(candidates: AudioFile[]): AudioFile {
-  const mp3 = candidates.find((f) => f.r2Key.endsWith('.mp3'));
-  return mp3 ?? candidates[0];
 }
