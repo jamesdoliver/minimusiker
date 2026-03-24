@@ -9,19 +9,17 @@ export const dynamic = 'force-dynamic';
  * GET /api/teacher/events/[eventId]/audio-downloads/[fileId]
  * Download or stream a single audio track via a signed R2 URL.
  *
- * The file must be type=final and status=ready.
+ * Prefers mp3R2Key over r2Key for smaller/faster delivery.
  *
- * ?stream=1 — returns JSON { url } for audio element playback (no download disposition).
- * Default  — redirects with Content-Disposition to trigger a file download.
+ * ?stream=1 — returns JSON { url } for audio element playback.
+ * Default  — redirects with Content-Disposition to trigger download.
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ eventId: string; fileId: string }> }
 ) {
   try {
-    // 1. Auth
     const session = verifyTeacherSession(request);
-
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -30,9 +28,7 @@ export async function GET(
     const eventId = decodeURIComponent(rawEventId);
     const teacherService = getTeacherService();
 
-    // 2. Event access
     const event = await teacherService.getTeacherEventDetail(eventId, session.email);
-
     if (!event) {
       return NextResponse.json(
         { error: 'Event not found or you do not have access to this event' },
@@ -40,7 +36,6 @@ export async function GET(
       );
     }
 
-    // 3. Fetch audio files and find the requested one
     const allAudioFiles = await teacherService.getAudioFilesByEventId(eventId);
     const audioFile = allAudioFiles.find(
       (f) => f.id === fileId && f.type === 'final' && f.status === 'ready'
@@ -55,36 +50,44 @@ export async function GET(
 
     const r2Service = getR2Service();
 
-    // 4. Stream mode: return signed URL as JSON (no download disposition)
+    // Prefer mp3R2Key over r2Key (mp3 is smaller, faster to stream/download)
+    const r2Key = audioFile.mp3R2Key || audioFile.r2Key;
+
+    // Stream mode: return signed URL as JSON
     const isStream = request.nextUrl.searchParams.get('stream') === '1';
     if (isStream) {
-      const streamUrl = await r2Service.generateSignedUrl(audioFile.r2Key, 3600);
+      const streamUrl = await r2Service.generateSignedUrl(r2Key, 3600);
       return NextResponse.json({ url: streamUrl });
     }
 
-    // 5. Download mode: redirect with Content-Disposition filename
+    // Download mode: build "SongTitle - ClassName.mp3" filename
     let baseName: string;
     if (audioFile.isSchulsong) {
       baseName = 'Schulsong';
     } else {
       const matchingClass = event.classes.find((c) => c.classId === audioFile.classId);
-      baseName = matchingClass?.className ?? 'Track';
+      const className = matchingClass?.className ?? 'Track';
+
+      // Resolve song title
+      const song = audioFile.songId && matchingClass
+        ? matchingClass.songs.find((s) => s.id === audioFile.songId)
+        : matchingClass && matchingClass.songs.length === 1
+          ? matchingClass.songs[0]
+          : undefined;
+
+      baseName = song?.title
+        ? `${song.title} - ${className}`
+        : className;
     }
 
-    const extension = audioFile.r2Key.endsWith('.wav') ? '.wav' : '.mp3';
-    const downloadFilename = `${baseName}${extension}`;
+    const downloadFilename = `${baseName}.mp3`;
+    const signedUrl = await r2Service.generateSignedUrl(r2Key, 3600, downloadFilename);
 
-    const signedUrl = await r2Service.generateSignedUrl(audioFile.r2Key, 3600, downloadFilename);
-
-    // 6. Redirect
     return NextResponse.redirect(signedUrl);
   } catch (error) {
     console.error('Error generating audio download URL:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate download URL',
-      },
+      { success: false, error: error instanceof Error ? error.message : 'Failed to generate download URL' },
       { status: 500 }
     );
   }
