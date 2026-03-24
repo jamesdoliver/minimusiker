@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { SchoolEventSummary } from '@/lib/types/airtable';
+import { useStaffEvents } from '@/lib/hooks/useStaffEvents';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import SchoolEventCard from '@/components/admin/SchoolEventCard';
 import EventStatusTabs, { EventStatus } from '@/components/admin/EventStatusTabs';
@@ -60,18 +60,9 @@ function getEventStatus(dateStr: string): 'upcoming' | 'in-progress' | 'complete
   return 'completed';
 }
 
-interface StaffInfo {
-  email: string;
-  name: string;
-  personenId?: string;
-}
-
 export default function StaffPortal() {
   const router = useRouter();
-  const [events, setEvents] = useState<SchoolEventSummary[]>([]);
-  const [staffInfo, setStaffInfo] = useState<StaffInfo | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { events, staffInfo, isLoading, isUnauthorized, error } = useStaffEvents();
 
   // Filter state
   const [activeTab, setActiveTab] = useState<EventStatus>('all');
@@ -79,34 +70,10 @@ export default function StaffPortal() {
   const [dateFilter, setDateFilter] = useState<DateFilterOption>('all');
 
   useEffect(() => {
-    checkAuthAndFetchData();
-  }, []);
-
-  const checkAuthAndFetchData = async () => {
-    try {
-      // Check authentication and fetch events
-      const response = await fetch('/api/staff/events');
-
-      if (response.status === 401) {
-        // Not authenticated, redirect to login
-        router.push('/staff-login');
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch events');
-      }
-
-      const data = await response.json();
-      setEvents(data.events || []);
-      setStaffInfo(data.staff || null);
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-    } finally {
-      setIsLoading(false);
+    if (isUnauthorized) {
+      router.push('/staff-login');
     }
-  };
+  }, [isUnauthorized, router]);
 
   const handleLogout = async () => {
     try {
