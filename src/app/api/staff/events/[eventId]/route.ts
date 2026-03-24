@@ -22,7 +22,17 @@ export async function GET(
 
     const eventId = decodeURIComponent(params.eventId);
 
-    const eventDetail = await getAirtableService().getSchoolEventDetail(eventId);
+    // Fetch event detail and songs in parallel — getSongsByEventId has its own
+    // ID resolution logic, so it can accept the raw eventId directly.
+    // Songs fetch is wrapped in .catch() to preserve error isolation:
+    // a songs failure should not prevent showing the event detail.
+    const [eventDetail, allSongs] = await Promise.all([
+      getAirtableService().getSchoolEventDetail(eventId),
+      getTeacherService().getSongsByEventId(eventId).catch((err) => {
+        console.error('Error fetching songs for staff event detail:', err);
+        return [];
+      }),
+    ]);
 
     if (!eventDetail) {
       return NextResponse.json(
@@ -37,19 +47,18 @@ export async function GET(
     // TODO: Once staff assignment is implemented, verify that this staff member
     // is assigned to this event before returning details
 
-    // Fetch songs for each class
-    try {
-      const teacherService = getTeacherService();
-      const resolvedEventId = eventDetail.eventId || eventId;
-      const allSongs = await teacherService.getSongsByEventId(resolvedEventId);
-
-      for (const cls of eventDetail.classes) {
-        cls.songs = allSongs
-          .filter(s => s.classId === cls.classId)
-          .map(s => ({ id: s.id, title: s.title, artist: s.artist, notes: s.notes, order: s.order, hiddenByEngineer: s.hiddenByEngineer }));
-      }
-    } catch (error) {
-      console.error('Error fetching songs for staff event detail:', error);
+    // Attach songs to classes
+    for (const cls of eventDetail.classes) {
+      cls.songs = allSongs
+        .filter(s => s.classId === cls.classId)
+        .map(s => ({
+          id: s.id,
+          title: s.title,
+          artist: s.artist,
+          notes: s.notes,
+          order: s.order,
+          hiddenByEngineer: s.hiddenByEngineer,
+        }));
     }
 
     return NextResponse.json({
