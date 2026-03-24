@@ -1336,9 +1336,9 @@ class TeacherService {
    */
   async clearTeacherApprovedAt(audioFileId: string): Promise<void> {
     try {
-      // Use empty string to clear the field — Airtable SDK doesn't accept null
+      // Use null to clear a DateTime field — Airtable rejects empty strings for date fields
       await this.base(AUDIO_FILES_TABLE).update(audioFileId, {
-        [AUDIO_FILES_FIELD_IDS.teacher_approved_at]: '',
+        [AUDIO_FILES_FIELD_IDS.teacher_approved_at]: null as any,
       });
     } catch (error) {
       console.error('Error clearing teacher_approved_at:', error);
