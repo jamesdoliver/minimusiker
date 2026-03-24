@@ -3739,7 +3739,7 @@ class AirtableService {
 
           // Fetch classes for this event to get class count, children, and teacher
           const linkedClassIds = (eventRecord.fields[EVENTS_FIELD_IDS.classes] as string[]) || [];
-          let classCount = linkedClassIds.length;
+          const classCount = linkedClassIds.length;
           let totalChildren = 0;
           let mainTeacher = '';
           let totalParents = 0;
