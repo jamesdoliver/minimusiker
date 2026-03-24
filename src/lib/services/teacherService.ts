@@ -1025,7 +1025,7 @@ class TeacherService {
         const [linkRecords, textRecords] = await Promise.all([
           this.base(AUDIO_FILES_TABLE)
             .select({
-              filterByFormula: `{${AUDIO_FILES_LINKED_FIELD_IDS.event_link}} = '${eventRecordId}'`,
+              filterByFormula: `{${AUDIO_FILES_LINKED_FIELD_IDS.event_link}} = '${canonicalEventId.replace(/'/g, "\\'")}'`,
               sort: [{ field: 'uploaded_at', direction: 'desc' }],
             })
             .all(),
