@@ -3982,10 +3982,9 @@ class AirtableService {
         return;
       }
 
-      // Airtable SDK doesn't accept null — use undefined to clear a field
-      const fieldValue = releasedAt ?? undefined;
-      const updates: Record<string, string | undefined> = {
-        [EVENTS_FIELD_IDS.schulsong_released_at]: fieldValue,
+      // Airtable REST API accepts null to clear fields; undefined is dropped by JSON.stringify
+      const updates: Record<string, string | null> = {
+        [EVENTS_FIELD_IDS.schulsong_released_at]: releasedAt,
       };
       if (releasedAt) {
         updates[EVENTS_FIELD_IDS.admin_approval_status] = 'approved';
@@ -3993,7 +3992,7 @@ class AirtableService {
         // Reset admin approval when clearing the release date (re-upload or rejection)
         updates[EVENTS_FIELD_IDS.admin_approval_status] = 'pending';
       }
-      await this.base(EVENTS_TABLE_ID).update(events[0].id, updates);
+      await this.base(EVENTS_TABLE_ID).update(events[0].id, updates as any);
 
       console.log(`[setSchulsongReleasedAt] Updated event ${eventId}: schulsong_released_at=${releasedAt}`);
     } catch (error) {
@@ -4018,9 +4017,10 @@ class AirtableService {
         return;
       }
 
+      // Airtable REST API accepts null to clear fields; undefined is dropped by JSON.stringify
       await this.base(EVENTS_TABLE_ID).update(events[0].id, {
-        [EVENTS_FIELD_IDS.schulsong_merch_cutoff]: cutoffDate ?? undefined,
-      });
+        [EVENTS_FIELD_IDS.schulsong_merch_cutoff]: cutoffDate,
+      } as any);
 
       console.log(`[setSchulsongMerchCutoff] Updated event ${eventId}: schulsong_merch_cutoff=${cutoffDate}`);
     } catch (error) {
@@ -6183,9 +6183,9 @@ class AirtableService {
       });
 
       // Find the Event that has this booking ID in its simplybook_booking array
-      // Note: record.get() uses field NAMES, not field IDs
+      // Try field ID first (works regardless of Airtable field display name casing)
       const matchingRecord = allRecords.find(record => {
-        const bookings = record.get('simplybook_booking') as string[] | undefined;
+        const bookings = (record.fields[EVENTS_FIELD_IDS.simplybook_booking] ?? record.fields['simplybook_booking']) as string[] | undefined;
         return bookings && bookings.includes(schoolBookingRecordId);
       });
 
@@ -6247,7 +6247,7 @@ class AirtableService {
 
       for (const record of allRecords) {
         const event = this.transformEventRecord(record);
-        const bookingIds = record.get('simplybook_booking') as string[] | undefined;
+        const bookingIds = (record.fields[EVENTS_FIELD_IDS.simplybook_booking] ?? record.fields['simplybook_booking']) as string[] | undefined;
         if (bookingIds) {
           for (const bookingId of bookingIds) {
             map.set(bookingId, event);
@@ -6372,59 +6372,67 @@ class AirtableService {
   }
 
   /**
-   * Transform an Airtable Event record to our Event type
-   * Note: record.get() uses field NAMES, not field IDs
+   * Transform an Airtable Event record to our Event type.
+   * Uses field IDs as primary lookup (works with returnFieldsByFieldId: true)
+   * and falls back to field names for backward compatibility.
    */
   private transformEventRecord(record: Airtable.Record<FieldSet>): Event {
+    // Access by field ID first (returnFieldsByFieldId mode), then by field name.
+    // Airtable reverse-lookup fields can have uppercase names (e.g. "Classes" not
+    // "classes"), so field-ID access is the only reliable approach.
+    const f = record.fields;
+    const val = (fieldId: string, fieldName: string) => f[fieldId] ?? f[fieldName];
+
+    const dealConfigRaw = val(EVENTS_FIELD_IDS.deal_config, 'deal_config') as string | undefined;
+
     return {
       id: record.id,
-      event_id: record.get('event_id') as string || '',
-      school_name: record.get('school_name') as string || '',
-      event_date: record.get('event_date') as string || '',
-      event_type: (record.get('event_type') as Event['event_type']) || 'concert',
-      assigned_staff: record.get('assigned_staff') as string[] | undefined,
-      assigned_engineer: record.get('assigned_engineer') as string[] | undefined,
-      auto_assigned_engineers: record.get('auto_assigned_engineers') as string[] | undefined,
-      created_at: record.get('created_at') as string || '',
-      legacy_booking_id: record.get('legacy_booking_id') as string | undefined,
-      simplybook_booking: record.get('simplybook_booking') as string[] | undefined,
-      access_code: record.get('access_code') as number | undefined,
+      event_id: (val(EVENTS_FIELD_IDS.event_id, 'event_id') as string) || '',
+      school_name: (val(EVENTS_FIELD_IDS.school_name, 'school_name') as string) || '',
+      event_date: (val(EVENTS_FIELD_IDS.event_date, 'event_date') as string) || '',
+      event_type: (val(EVENTS_FIELD_IDS.event_type, 'event_type') as Event['event_type']) || 'concert',
+      assigned_staff: val(EVENTS_FIELD_IDS.assigned_staff, 'assigned_staff') as string[] | undefined,
+      assigned_engineer: val(EVENTS_FIELD_IDS.assigned_engineer, 'assigned_engineer') as string[] | undefined,
+      auto_assigned_engineers: val(EVENTS_FIELD_IDS.auto_assigned_engineers, 'auto_assigned_engineers') as string[] | undefined,
+      created_at: (val(EVENTS_FIELD_IDS.created_at, 'created_at') as string) || '',
+      legacy_booking_id: val(EVENTS_FIELD_IDS.legacy_booking_id, 'legacy_booking_id') as string | undefined,
+      simplybook_booking: val(EVENTS_FIELD_IDS.simplybook_booking, 'simplybook_booking') as string[] | undefined,
+      access_code: val(EVENTS_FIELD_IDS.access_code, 'access_code') as number | undefined,
       // Status & Event Type fields for admin booking view
-      status: record.get('status') as Event['status'] | undefined,
-      is_plus: record.get('is_plus') as boolean | undefined,
-      is_kita: record.get('is_kita') as boolean | undefined,
-      is_schulsong: record.get('is_schulsong') as boolean | undefined,
-      is_minimusikertag: record.get('is_minimusikertag') as boolean | undefined,
+      status: val(EVENTS_FIELD_IDS.status, 'status') as Event['status'] | undefined,
+      is_plus: val(EVENTS_FIELD_IDS.is_plus, 'is_plus') as boolean | undefined,
+      is_kita: val(EVENTS_FIELD_IDS.is_kita, 'is_kita') as boolean | undefined,
+      is_schulsong: val(EVENTS_FIELD_IDS.is_schulsong, 'is_schulsong') as boolean | undefined,
+      is_minimusikertag: val(EVENTS_FIELD_IDS.is_minimusikertag, 'is_minimusikertag') as boolean | undefined,
       // Audio approval fields
-      all_tracks_approved: record.get('all_tracks_approved') as boolean | undefined,
-      admin_approval_status: record.get('admin_approval_status') as Event['admin_approval_status'] | undefined,
+      all_tracks_approved: val(EVENTS_FIELD_IDS.all_tracks_approved, 'all_tracks_approved') as boolean | undefined,
+      admin_approval_status: val(EVENTS_FIELD_IDS.admin_approval_status, 'admin_approval_status') as Event['admin_approval_status'] | undefined,
       // Audio pipeline
-      audio_pipeline_stage: record.get('audio_pipeline_stage') as Event['audio_pipeline_stage'] | undefined,
+      audio_pipeline_stage: val(EVENTS_FIELD_IDS.audio_pipeline_stage, 'audio_pipeline_stage') as Event['audio_pipeline_stage'] | undefined,
       // Admin notes
-      admin_notes: record.get('admin_notes') as string | undefined,
+      admin_notes: val(EVENTS_FIELD_IDS.admin_notes, 'admin_notes') as string | undefined,
       // Schulsong release date
-      schulsong_released_at: record.get('schulsong_released_at') as string | undefined,
-      schulsong_merch_cutoff: record.get('schulsong_merch_cutoff') as string | undefined,
+      schulsong_released_at: val(EVENTS_FIELD_IDS.schulsong_released_at, 'schulsong_released_at') as string | undefined,
+      schulsong_merch_cutoff: val(EVENTS_FIELD_IDS.schulsong_merch_cutoff, 'schulsong_merch_cutoff') as string | undefined,
       // Per-event timeline threshold overrides
-      timeline_overrides: record.get('timeline_overrides') as string | undefined,
+      timeline_overrides: val(EVENTS_FIELD_IDS.timeline_overrides, 'timeline_overrides') as string | undefined,
       // Under-100-kids flag and estimated children
-      is_under_100: record.get('is_under_100') as boolean | undefined,
-      estimated_children: record.get('estimated_children') as number | undefined,
-      standard_merch_override: record.get('standard_merch_override') as Event['standard_merch_override'] | undefined,
+      is_under_100: val(EVENTS_FIELD_IDS.is_under_100, 'is_under_100') as boolean | undefined,
+      estimated_children: val(EVENTS_FIELD_IDS.estimated_children, 'estimated_children') as number | undefined,
+      standard_merch_override: val(EVENTS_FIELD_IDS.standard_merch_override, 'standard_merch_override') as Event['standard_merch_override'] | undefined,
       // Deal Builder fields
-      deal_builder_enabled: record.get('deal_builder_enabled') as boolean | undefined,
-      deal_type: record.get('deal_type') as Event['deal_type'] | undefined,
+      deal_builder_enabled: val(EVENTS_FIELD_IDS.deal_builder_enabled, 'deal_builder_enabled') as boolean | undefined,
+      deal_type: val(EVENTS_FIELD_IDS.deal_type, 'deal_type') as Event['deal_type'] | undefined,
       deal_config: (() => {
-        const raw = record.get('deal_config') as string | undefined;
-        if (!raw) return undefined;
-        try { return JSON.parse(raw); } catch { return undefined; }
+        if (!dealConfigRaw) return undefined;
+        try { return JSON.parse(dealConfigRaw); } catch { return undefined; }
       })(),
       // Bulk order fields
-      scs_shirts_included: record.get('scs_shirts_included') as boolean | undefined,
-      minicard_order_enabled: record.get('minicard_order_enabled') as boolean | undefined,
-      minicard_order_quantity: record.get('minicard_order_quantity') as number | undefined,
-      // Linked classes
-      classes: record.get('classes') as string[] | undefined,
+      scs_shirts_included: val(EVENTS_FIELD_IDS.scs_shirts_included, 'scs_shirts_included') as boolean | undefined,
+      minicard_order_enabled: val(EVENTS_FIELD_IDS.minicard_order_enabled, 'minicard_order_enabled') as boolean | undefined,
+      minicard_order_quantity: val(EVENTS_FIELD_IDS.minicard_order_quantity, 'minicard_order_quantity') as number | undefined,
+      // Linked classes (Airtable field name is "Classes" with capital C)
+      classes: val(EVENTS_FIELD_IDS.classes, 'Classes') as string[] | undefined,
     };
   }
 
