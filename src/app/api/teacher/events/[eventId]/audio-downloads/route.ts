@@ -26,6 +26,7 @@ export async function GET(
     const teacherService = getTeacherService();
 
     const event = await teacherService.getTeacherEventDetail(eventId, session.email);
+    console.log(`[teacher-audio-debug] eventId=${eventId}, event found=${!!event}, classes=${event?.classes?.length ?? 'N/A'}`);
     if (!event) {
       return NextResponse.json(
         { error: 'Event not found or you do not have access to this event' },
@@ -37,12 +38,18 @@ export async function GET(
     const finalReadyFiles = allAudioFiles.filter(
       (f: AudioFile) => f.type === 'final' && f.status === 'ready'
     );
+    console.log(`[teacher-audio-debug] allAudioFiles=${allAudioFiles.length}, finalReady=${finalReadyFiles.length}`);
+    if (finalReadyFiles.length > 0) {
+      console.log(`[teacher-audio-debug] sample file: classId=${finalReadyFiles[0].classId}, type=${finalReadyFiles[0].type}, status=${finalReadyFiles[0].status}, isSchulsong=${finalReadyFiles[0].isSchulsong}`);
+    }
 
     if (finalReadyFiles.length === 0) {
+      console.log(`[teacher-audio-debug] RETURNING EMPTY — no final+ready files`);
       return NextResponse.json({ success: true, tracks: [] });
     }
 
     const nonDefaultClasses = event.classes.filter((c) => !c.isDefault);
+    console.log(`[teacher-audio-debug] nonDefaultClasses=${nonDefaultClasses.length}, classIds=${nonDefaultClasses.map(c => c.classId).join(',')}`);
 
     const tracks: {
       fileId: string;
@@ -55,10 +62,12 @@ export async function GET(
     }[] = [];
 
     // Build one track per song-level audio file
+    console.log(`[teacher-audio-debug] audioFile classIds=${[...new Set(finalReadyFiles.map(f => f.classId))].join(',')}`);
     for (const cls of nonDefaultClasses) {
       const classFiles = finalReadyFiles.filter(
         (f) => f.classId === cls.classId && !f.isSchulsong
       );
+      console.log(`[teacher-audio-debug] class=${cls.className} (${cls.classId}): matched ${classFiles.length} files`);
       if (classFiles.length === 0) continue;
 
       for (const af of classFiles) {
@@ -105,9 +114,10 @@ export async function GET(
       }
     }
 
+    console.log(`[teacher-audio-debug] RETURNING ${tracks.length} tracks`);
     return NextResponse.json({ success: true, tracks });
   } catch (error) {
-    console.error('Error fetching audio downloads for teacher:', error);
+    console.error('[teacher-audio-debug] CAUGHT ERROR:', error);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to fetch audio downloads' },
       { status: 500 }
