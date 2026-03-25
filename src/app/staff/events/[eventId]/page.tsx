@@ -66,6 +66,22 @@ export default function StaffEventDetailPage() {
     );
   }
 
+  // Categorize classes
+  const regularClasses = event.classes.filter(
+    c => !c.classType || c.classType === 'regular'
+  );
+  const choirs = event.classes.filter(c => c.classType === 'choir');
+
+  // Separate schulsong from teacher_song collections
+  const schulsongClass = event.isSchulsong
+    ? event.classes.find(c => c.className === 'Schulsong' && c.classType === 'teacher_song')
+    : null;
+  const teacherSongs = event.classes.filter(
+    c => c.classType === 'teacher_song' && c !== schulsongClass
+  );
+
+  const groups = event.groups || [];
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -120,11 +136,11 @@ export default function StaffEventDetailPage() {
           </div>
         </div>
 
-        {/* Classes Overview Section */}
+        {/* Section 1: Regular Classes Overview */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Classes Overview</h2>
 
-          {event.classes.length === 0 ? (
+          {regularClasses.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
               <div className="text-3xl mb-3">📚</div>
               <p className="text-gray-600">No classes have been added to this event yet.</p>
@@ -155,7 +171,7 @@ export default function StaffEventDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {event.classes.map((cls) => (
+                  {regularClasses.map((cls) => (
                     <tr key={cls.classId} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">{cls.className}</div>
@@ -219,6 +235,123 @@ export default function StaffEventDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Section 2: Groups */}
+        {groups.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Gruppen</h2>
+            <div className="space-y-4">
+              {groups.map(group => (
+                <div key={group.groupId} className="bg-white rounded-xl shadow-sm border border-purple-200 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                      Gruppe
+                    </span>
+                    <h3 className="text-lg font-semibold text-gray-900">{group.groupName}</h3>
+                  </div>
+                  <p className="text-sm text-gray-500 mb-3">
+                    {group.memberClasses.map(c => c.className).join(' + ')}
+                  </p>
+                  {group.songs.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {group.songs.map(song => (
+                        <span key={song.id} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+                          {song.title}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section 3: Chor */}
+        {choirs.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Chor</h2>
+            <div className="space-y-4">
+              {choirs.map(choir => (
+                <div key={choir.classId} className="bg-white rounded-xl shadow-sm border border-teal-200 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-teal-100 text-teal-700">
+                      Chor
+                    </span>
+                    <h3 className="text-lg font-semibold text-gray-900">{choir.className}</h3>
+                  </div>
+                  {choir.songs && choir.songs.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {choir.songs.map(song => (
+                        <span key={song.id} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700">
+                          {song.title}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">No songs assigned</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section 4: Lehrerlied */}
+        {teacherSongs.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Lehrerlied</h2>
+            <div className="space-y-4">
+              {teacherSongs.map(ts => (
+                <div key={ts.classId} className="bg-white rounded-xl shadow-sm border border-amber-200 p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                      Lehrerlied
+                    </span>
+                    <h3 className="text-lg font-semibold text-gray-900">{ts.className}</h3>
+                  </div>
+                  {ts.songs && ts.songs.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {ts.songs.map(song => (
+                        <span key={song.id} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700">
+                          {song.title}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">No songs assigned</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section 5: Schulsong */}
+        {schulsongClass && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Schulsong</h2>
+            <div className="bg-white rounded-xl shadow-sm border border-green-200 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                  Schulsong
+                </span>
+                <h3 className="text-lg font-semibold text-gray-900">{schulsongClass.className}</h3>
+              </div>
+              {schulsongClass.songs && schulsongClass.songs.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {schulsongClass.songs.map(song => (
+                    <span key={song.id} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
+                      {song.title}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">No songs assigned</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Logic Pro Project Upload Section */}
         <LogicProjectUploadSection eventId={event.eventId} />
