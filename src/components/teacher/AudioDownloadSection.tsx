@@ -39,14 +39,17 @@ function sortTracks(tracks: Track[]): Track[] {
     if (a.isSchulsong !== b.isSchulsong) {
       return a.isSchulsong ? 1 : -1;
     }
-    // Then alphabetical by displayName
-    return a.displayName.localeCompare(b.displayName, 'de');
+    // Then alphabetical by displayName (fallback to className for safety)
+    const aName = a.displayName || a.className || '';
+    const bName = b.displayName || b.className || '';
+    return aName.localeCompare(bName, 'de');
   });
 }
 
 export default function AudioDownloadSection({ eventId }: AudioDownloadSectionProps) {
   const [loading, setLoading] = useState(true);
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [fetchError, setFetchError] = useState(false);
   const [zipDownloading, setZipDownloading] = useState(false);
 
   // Audio player state
@@ -61,10 +64,16 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
     const fetchDownloads = async () => {
       try {
         const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/audio-downloads`);
+        if (!response.ok) {
+          console.error('Audio downloads API error:', response.status);
+          setFetchError(true);
+          return;
+        }
         const data: AudioDownloadResponse = await response.json();
         setTracks(sortTracks(data.tracks || []));
       } catch (err) {
         console.error('Error fetching audio downloads:', err);
+        setFetchError(true);
       } finally {
         setLoading(false);
       }
@@ -160,8 +169,16 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
     setCurrentTime(newTime);
   }, []);
 
-  if (loading || tracks.length === 0) {
+  if (loading || (!fetchError && tracks.length === 0)) {
     return null;
+  }
+
+  if (fetchError) {
+    return (
+      <div className="mb-8 bg-white rounded-xl border border-red-200 p-6">
+        <p className="text-sm text-red-600">Aufnahmen konnten nicht geladen werden. Bitte laden Sie die Seite neu.</p>
+      </div>
+    );
   }
 
   const handleDownloadTrack = (fileId: string) => {
@@ -249,7 +266,7 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 truncate">{track.displayName}</span>
+                    <span className="text-sm font-medium text-gray-900 truncate">{track.displayName || track.className}</span>
                     {track.isSchulsong && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 flex-shrink-0">
                         Schulsong
