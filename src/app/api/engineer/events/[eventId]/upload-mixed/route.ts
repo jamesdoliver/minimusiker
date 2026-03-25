@@ -227,7 +227,7 @@ export async function PUT(
 
       // Clear any previous release state so teacher re-approval can schedule a new release
       const airtableService = getAirtableService();
-      await airtableService.setSchulsongReleasedAt(eventId, '');
+      await airtableService.setSchulsongReleasedAt(eventId, null);
 
       // Notify teacher that a new version is available
       const event = await airtableService.getEventByEventId(eventId);
