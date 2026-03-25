@@ -974,8 +974,10 @@ class TeacherService {
       // matching getSongsByEventId() logic: legacy_booking_id, SimplyBook ID, canonical re-query
       try {
         // First, find the Events record by event_id OR legacy_booking_id
+        // MUST use returnFieldsByFieldId so we can access fields by field ID below
         let eventRecords = await this.eventsTable!.select({
           filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${eventId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${eventId.replace(/'/g, "\\'")}')`,
+          returnFieldsByFieldId: true,
           maxRecords: 1,
         }).firstPage();
 
@@ -987,6 +989,7 @@ class TeacherService {
             if (eventRecord) {
               eventRecords = await this.eventsTable!.select({
                 filterByFormula: `RECORD_ID() = '${eventRecord.id}'`,
+                returnFieldsByFieldId: true,
                 maxRecords: 1,
               }).firstPage();
             }
