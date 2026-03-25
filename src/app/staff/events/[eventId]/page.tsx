@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EventBadge from '@/components/admin/EventBadge';
 import StatsPill from '@/components/admin/StatsPill';
 import LogicProjectUploadSection from '@/components/staff/LogicProjectUploadSection';
+import StaffAudioSection from '@/components/staff/StaffAudioSection';
 
 function formatDate(dateString: string): string {
   if (!dateString) return 'No date';
@@ -352,6 +353,9 @@ export default function StaffEventDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Audio Tracks Section */}
+        <StaffAudioSection eventId={event.eventId} />
 
         {/* Logic Pro Project Upload Section */}
         <LogicProjectUploadSection eventId={event.eventId} />
