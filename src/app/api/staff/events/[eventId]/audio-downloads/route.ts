@@ -24,14 +24,22 @@ export async function GET(
     const eventId = decodeURIComponent(params.eventId);
     const teacherService = getTeacherService();
 
-    // Fetch event detail (for class names) and audio files in parallel
-    const [eventDetail, allAudioFiles] = await Promise.all([
+    // Fetch event detail, songs, and audio files in parallel
+    const [eventDetail, allSongs, allAudioFiles] = await Promise.all([
       getAirtableService().getSchoolEventDetail(eventId),
+      teacherService.getSongsByEventId(eventId).catch(() => []),
       teacherService.getAudioFilesByEventId(eventId),
     ]);
 
     if (!eventDetail) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+
+    // Attach songs to classes so we can resolve song titles for tracks
+    for (const cls of eventDetail.classes) {
+      cls.songs = allSongs
+        .filter(s => s.classId === cls.classId)
+        .map(s => ({ id: s.id, title: s.title }));
     }
 
     // Filter to final + ready files only
