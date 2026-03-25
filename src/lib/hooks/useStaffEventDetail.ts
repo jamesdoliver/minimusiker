@@ -4,9 +4,20 @@ import useSWR from 'swr';
 import { useCallback } from 'react';
 import { SchoolEventDetail } from '@/lib/types/airtable';
 
+interface StaffGroup {
+  groupId: string;
+  groupName: string;
+  memberClasses: { classId: string; className: string }[];
+  songs: { id: string; title: string; artist?: string; notes?: string; order?: number }[];
+}
+
+interface StaffEventDetailData extends SchoolEventDetail {
+  groups: StaffGroup[];
+}
+
 interface StaffEventDetailResponse {
   success: boolean;
-  data: SchoolEventDetail;
+  data: StaffEventDetailData;
   error?: string;
 }
 

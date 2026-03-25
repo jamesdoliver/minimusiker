@@ -26,10 +26,14 @@ export async function GET(
     // ID resolution logic, so it can accept the raw eventId directly.
     // Songs fetch is wrapped in .catch() to preserve error isolation:
     // a songs failure should not prevent showing the event detail.
-    const [eventDetail, allSongs] = await Promise.all([
+    const [eventDetail, allSongs, groups] = await Promise.all([
       getAirtableService().getSchoolEventDetail(eventId),
       getTeacherService().getSongsByEventId(eventId).catch((err) => {
         console.error('Error fetching songs for staff event detail:', err);
+        return [];
+      }),
+      getTeacherService().getGroupsByEventId(eventId).catch((err) => {
+        console.error('Error fetching groups for staff event detail:', err);
         return [];
       }),
     ]);
@@ -61,9 +65,22 @@ export async function GET(
         }));
     }
 
+    // Build simplified groups with songs attached
+    const groupsWithSongs = groups.map(group => ({
+      groupId: group.groupId,
+      groupName: group.groupName,
+      memberClasses: (group.memberClasses || []).map(c => ({
+        classId: c.classId,
+        className: c.className,
+      })),
+      songs: allSongs
+        .filter(s => s.classId === group.groupId)
+        .map(s => ({ id: s.id, title: s.title, artist: s.artist, notes: s.notes, order: s.order })),
+    }));
+
     return NextResponse.json({
       success: true,
-      data: eventDetail,
+      data: { ...eventDetail, groups: groupsWithSongs },
     });
   } catch (error) {
     console.error('Error fetching staff event detail:', error);
