@@ -520,7 +520,7 @@ export default function AlbumLayoutModal({
             <div className="relative">
               <button
                 onClick={isEventDayOrPast ? handleFinalize : undefined}
-                disabled={state === 'saving' || state === 'loading' || tracks.length === 0}
+                disabled={state === 'saving' || state === 'loading' || tracks.length === 0 || !isEventDayOrPast}
                 onMouseEnter={() => !isEventDayOrPast && setShowFinalizeTooltip(true)}
                 onMouseLeave={() => setShowFinalizeTooltip(false)}
                 className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${

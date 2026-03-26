@@ -51,6 +51,7 @@ export function HinweiseSection({
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Hinweise</h3>
       <div className="space-y-3">
         {rows.map((row) => (
           <div key={row.key} className="flex items-start gap-3">
