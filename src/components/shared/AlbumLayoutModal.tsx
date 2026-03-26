@@ -26,6 +26,9 @@ interface AlbumLayoutModalProps {
   classesWithoutSongs?: string[];
   onClose: () => void;
   onSave?: () => void;
+  // New props for finalization
+  tracklistFinalizedAt?: string;      // ISO datetime if already finalized
+  eventDate?: string;                  // Event date for determining if finalize button is active
 }
 
 type ModalState = 'loading' | 'ready' | 'saving' | 'error';
@@ -41,11 +44,13 @@ function SortableTrackItem({
   index,
   onTitleChange,
   onClassNameChange,
+  readOnly,
 }: {
   track: EditableTrack;
   index: number;
   onTitleChange: (songId: string, title: string) => void;
   onClassNameChange: (songId: string, className: string) => void;
+  readOnly?: boolean;
 }) {
   const {
     attributes,
@@ -74,7 +79,7 @@ function SortableTrackItem({
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 touch-none"
+        className={`cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 touch-none${readOnly ? ' invisible' : ''}`}
         title="Ziehen zum Sortieren"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,7 +95,8 @@ function SortableTrackItem({
         type="text"
         value={track.editedTitle}
         onChange={(e) => onTitleChange(track.songId, e.target.value)}
-        className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded focus:border-pink-300 focus:outline-none focus:ring-1 focus:ring-pink-200"
+        readOnly={readOnly}
+        className={`flex-1 px-2 py-1 text-sm rounded focus:border-pink-300 focus:outline-none focus:ring-1 focus:ring-pink-200 border ${readOnly ? 'border-transparent bg-transparent' : 'border-gray-200'}`}
         placeholder="Liedtitel"
       />
 
@@ -102,7 +108,8 @@ function SortableTrackItem({
         type="text"
         value={track.editedClassName}
         onChange={(e) => onClassNameChange(track.songId, e.target.value)}
-        className="w-40 px-2 py-1 text-sm border border-gray-200 rounded focus:border-pink-300 focus:outline-none focus:ring-1 focus:ring-pink-200"
+        readOnly={readOnly}
+        className={`w-40 px-2 py-1 text-sm rounded focus:border-pink-300 focus:outline-none focus:ring-1 focus:ring-pink-200 border ${readOnly ? 'border-transparent bg-transparent' : 'border-gray-200'}`}
         placeholder="Klasse"
       />
 
@@ -126,11 +133,23 @@ export default function AlbumLayoutModal({
   classesWithoutSongs,
   onClose,
   onSave,
+  tracklistFinalizedAt,
+  eventDate,
 }: AlbumLayoutModalProps) {
   const [state, setState] = useState<ModalState>('loading');
   const [tracks, setTracks] = useState<EditableTrack[]>([]);
   const [error, setError] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [showFinalizeTooltip, setShowFinalizeTooltip] = useState(false);
+  const isFinalized = Boolean(tracklistFinalizedAt);
+  const isEventDayOrPast = (() => {
+    if (!eventDate) return false;
+    const ed = new Date(eventDate);
+    const now = new Date();
+    const edOnly = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
+    const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return edOnly <= nowOnly;
+  })();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -194,6 +213,7 @@ export default function AlbumLayoutModal({
   }, [tracks, state]);
 
   const handleDragEnd = (event: DragEndEvent) => {
+    if (isFinalized) return;
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
@@ -309,6 +329,45 @@ export default function AlbumLayoutModal({
     }
   };
 
+  const handleFinalize = async () => {
+    const confirmed = confirm(
+      'Die Reihenfolge wird endgültig festgelegt und kann danach nicht mehr geändert werden. Fortfahren?'
+    );
+    if (!confirmed) return;
+
+    setState('saving');
+    setError('');
+
+    try {
+      const updates: AlbumTrackUpdate[] = tracks.map((track, index) => ({
+        songId: track.songId,
+        albumOrder: index + 1,
+        classId: track.classId,
+        ...(track.editedTitle !== track.originalTitle && { title: track.editedTitle }),
+        ...(track.editedClassName !== track.originalClassName && { className: track.editedClassName }),
+      }));
+
+      const finalizeUrl = `${apiBaseUrl}/finalize`;
+      const response = await fetch(finalizeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracks: updates }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Fehler beim Finalisieren');
+      }
+
+      onSave?.();
+      onClose();
+    } catch (err) {
+      console.error('Error finalizing tracklist:', err);
+      setError(err instanceof Error ? err.message : 'Fehler beim Finalisieren');
+      setState('ready');
+    }
+  };
+
   const missingSongs = classesWithoutSongs && classesWithoutSongs.length > 0;
 
   return (
@@ -377,10 +436,28 @@ export default function AlbumLayoutModal({
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Ziehe die Lieder in die gewünschte Reihenfolge für das gedruckte Album.
-                    Du kannst auch Titel und Klassennamen bearbeiten.
+                  <p className="text-sm text-gray-600 mb-3">
+                    Ziehe die Titel per Drag&amp;Drop in die gewünschte Reihenfolge, so wie sie
+                    auf dem Tonträger (CD, Lautsprecherbox) zu hören sein sollen. Du kannst diese
+                    Liste speichern und NACH dem Minimusikertag finalisieren, danach ist die
+                    Reihenfolge fest und nicht mehr veränderbar. Achte auch auf die korrekte
+                    Schreibweise, denn anhand dieser Informationen lassen wir die CD-Booklets drucken.
                   </p>
+
+                  {/* Finalization status indicator */}
+                  {isFinalized ? (
+                    <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-sm text-green-700 font-medium">
+                        Diese Lieder-Reihenfolge wurde final festgelegt
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <p className="text-sm text-amber-700 font-medium">
+                        Diese Lieder-Reihenfolge wurde noch nicht final festgelegt
+                      </p>
+                    </div>
+                  )}
 
                   <DndContext
                     sensors={sensors}
@@ -398,6 +475,7 @@ export default function AlbumLayoutModal({
                           index={index}
                           onTitleChange={handleTitleChange}
                           onClassNameChange={handleClassNameChange}
+                          readOnly={isFinalized}
                         />
                       ))}
                     </SortableContext>
@@ -424,16 +502,45 @@ export default function AlbumLayoutModal({
           >
             Abbrechen
           </button>
-          <button
-            onClick={handleSave}
-            disabled={state === 'saving' || state === 'loading' || !hasChanges || tracks.length === 0}
-            className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {state === 'saving' && (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            )}
-            Speichern
-          </button>
+
+          {!isFinalized && (
+            <button
+              onClick={handleSave}
+              disabled={state === 'saving' || state === 'loading' || !hasChanges || tracks.length === 0}
+              className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {state === 'saving' && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              )}
+              Speichern
+            </button>
+          )}
+
+          {!isFinalized && (
+            <div className="relative">
+              <button
+                onClick={isEventDayOrPast ? handleFinalize : undefined}
+                disabled={state === 'saving' || state === 'loading' || tracks.length === 0}
+                onMouseEnter={() => !isEventDayOrPast && setShowFinalizeTooltip(true)}
+                onMouseLeave={() => setShowFinalizeTooltip(false)}
+                className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                  isEventDayOrPast
+                    ? 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Finalisieren
+              </button>
+              {showFinalizeTooltip && !isEventDayOrPast && (
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap">
+                  Verfügbar nach dem Minimusikertag
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                    <div className="border-4 border-transparent border-t-gray-800"></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
