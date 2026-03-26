@@ -12,6 +12,9 @@ import SchulsongApprovalSection from '@/components/teacher/SchulsongApprovalSect
 import SchulClothingOrder from '@/components/shared/SchulClothingOrder';
 import AudioStatusBadge from '@/components/shared/AudioStatusBadge';
 import AudioDownloadSection from '@/components/teacher/AudioDownloadSection';
+import HinweiseSection from '@/components/teacher/HinweiseSection';
+import LiederReihenfolgeSection from '@/components/teacher/LiederReihenfolgeSection';
+import TracklistReminderPopup from '@/components/teacher/TracklistReminderPopup';
 import { deriveStageFromSimple } from '@/lib/utils/audioStatusHelpers';
 
 function formatDate(dateStr: string): string {
@@ -1199,6 +1202,7 @@ export default function TeacherEventDetailPage() {
   const [showCreateTeacherSong, setShowCreateTeacherSong] = useState(false);
 
   const [showAlbumLayoutModal, setShowAlbumLayoutModal] = useState(false);
+  const [schulsongApproved, setSchulsongApproved] = useState(false);
 
   const eventId = params.eventId as string;
 
@@ -1266,6 +1270,25 @@ export default function TeacherEventDetailPage() {
     fetchGroups();
     fetchCollections();
   };
+
+  // Fetch schulsong approval status for Hinweise
+  useEffect(() => {
+    if (!event?.isSchulsong) return;
+
+    async function fetchSchulsongStatus() {
+      try {
+        const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/schulsong-status`);
+        if (response.ok) {
+          const data = await response.json();
+          setSchulsongApproved(data.status === 'approved');
+        }
+      } catch (err) {
+        console.error('Error fetching schulsong status:', err);
+      }
+    }
+
+    fetchSchulsongStatus();
+  }, [event?.isSchulsong, eventId]);
 
   const isEditable = event?.status !== 'completed';
 
@@ -1372,6 +1395,24 @@ export default function TeacherEventDetailPage() {
           )}
         </div>
 
+        {/* Hinweise + Lieder-Reihenfolge two-column section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <HinweiseSection
+            classesWithoutSongs={
+              regularClasses
+                .filter(c => c.songs.length === 0)
+                .map(c => c.className)
+            }
+            tracklistFinalized={Boolean(event.tracklistFinalizedAt)}
+            isSchulsong={event.isSchulsong || false}
+            schulsongApproved={schulsongApproved}
+          />
+          <LiederReihenfolgeSection
+            tracklistFinalized={Boolean(event.tracklistFinalizedAt)}
+            onOpenModal={() => setShowAlbumLayoutModal(true)}
+          />
+        </div>
+
         {/* SCS Clothing Order - Only shown when scs_shirts_included is enabled */}
         {event.scsShirtsIncluded === true && (
           <div className="mb-8">
@@ -1396,16 +1437,6 @@ export default function TeacherEventDetailPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-semibold text-gray-900">Klassen & Lieder</h2>
-              <button
-                onClick={() => setShowAlbumLayoutModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                title="Album-Reihenfolge für das gedruckte Album festlegen"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                </svg>
-                Album-Reihenfolge
-              </button>
             </div>
             {isEditable && (
               <div className="flex gap-2 flex-wrap justify-end">
@@ -1646,6 +1677,18 @@ export default function TeacherEventDetailPage() {
             classesWithoutSongs={event.classes.filter(c => c.songs.length === 0).map(c => c.className)}
             onClose={() => setShowAlbumLayoutModal(false)}
             onSave={handleRefresh}
+            tracklistFinalizedAt={event.tracklistFinalizedAt}
+            eventDate={event.eventDate}
+          />
+        )}
+
+        {/* Tracklist Reminder Popup — blocking modal on/after event day */}
+        {!isLoading && event && (
+          <TracklistReminderPopup
+            eventId={event.eventId}
+            eventDate={event.eventDate}
+            tracklistFinalizedAt={event.tracklistFinalizedAt}
+            onOpenTracklistModal={() => setShowAlbumLayoutModal(true)}
           />
         )}
       </div>
