@@ -63,6 +63,15 @@ export async function PUT(
     const eventId = decodeURIComponent(params.eventId);
     const teacherService = getTeacherService();
 
+    // Check if tracklist is finalized — reject edits
+    const teacherEvent = await teacherService.getTeacherEventDetail(eventId, session.email);
+    if (teacherEvent?.tracklistFinalizedAt) {
+      return NextResponse.json(
+        { error: 'Tracklist already finalized — no changes allowed' },
+        { status: 400 }
+      );
+    }
+
     // Parse request body
     const body = await request.json();
     const { tracks } = body as { tracks: AlbumTrackUpdate[] };
