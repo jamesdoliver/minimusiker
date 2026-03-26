@@ -2818,6 +2818,7 @@ class TeacherService {
           isSchulsong: eventRecord?.is_schulsong === true,
           scsShirtsIncluded: eventRecord?.scs_shirts_included === true,
           estimatedChildren: eventRecord?.estimated_children,
+          tracklistFinalizedAt: eventRecord?.tracklist_finalized_at,
           assignedStaff,
           progress: {
             classesCount,
@@ -3053,6 +3054,7 @@ class TeacherService {
           isSchulsong: linkedEvent.is_schulsong === true,
           scsShirtsIncluded: linkedEvent.scs_shirts_included === true,
           estimatedChildren: linkedEvent.estimated_children,
+          tracklistFinalizedAt: linkedEvent.tracklist_finalized_at,
           assignedStaff,
           progress: {
             classesCount,

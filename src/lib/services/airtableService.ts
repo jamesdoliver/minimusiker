@@ -5813,6 +5813,7 @@ class AirtableService {
       minicard_order_enabled?: boolean;
       minicard_order_quantity?: number;
       event_date?: string;
+      tracklist_finalized_at?: string | null;
     }
   ): Promise<Event> {
     try {
@@ -5862,6 +5863,9 @@ class AirtableService {
       }
       if (updates.event_date !== undefined) {
         updateFields[EVENTS_FIELD_IDS.event_date] = updates.event_date;
+      }
+      if (updates.tracklist_finalized_at !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.tracklist_finalized_at] = updates.tracklist_finalized_at;
       }
 
       if (Object.keys(updateFields).length === 0) {
@@ -6171,6 +6175,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.audio_pipeline_stage,
           EVENTS_FIELD_IDS.admin_notes,
           EVENTS_FIELD_IDS.classes,
+          EVENTS_FIELD_IDS.tracklist_finalized_at,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -6234,6 +6239,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.minicard_order_enabled,
           EVENTS_FIELD_IDS.minicard_order_quantity,
           EVENTS_FIELD_IDS.classes,
+          EVENTS_FIELD_IDS.tracklist_finalized_at,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -6428,6 +6434,8 @@ class AirtableService {
       minicard_order_quantity: val(EVENTS_FIELD_IDS.minicard_order_quantity, 'minicard_order_quantity') as number | undefined,
       // Linked classes (Airtable field name is "Classes" with capital C)
       classes: val(EVENTS_FIELD_IDS.classes, 'Classes') as string[] | undefined,
+      // Tracklist finalization
+      tracklist_finalized_at: val(EVENTS_FIELD_IDS.tracklist_finalized_at, 'tracklist_finalized_at') as string | undefined,
     };
   }
 
