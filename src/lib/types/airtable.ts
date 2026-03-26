@@ -575,6 +575,8 @@ export const EVENTS_FIELD_IDS = {
   scs_shirts_included: 'fldcriEUgu7ymH2l7',            // Checkbox - enables SchulClothingOrder
   minicard_order_enabled: 'fldWGtJ7WXCK28wSt',          // Checkbox - enables bulk minicard order tracking
   minicard_order_quantity: 'fldYkBvcTuI7i6t2m',         // Number - quantity of minicards ordered
+  // Tracklist finalization
+  tracklist_finalized_at: 'fldTODO_REPLACE_ME',    // DateTime - when teacher finalized album order
 } as const;
 
 // Classes Table - 1 row per class
@@ -847,6 +849,8 @@ export interface Event {
   scs_shirts_included?: boolean;                   // Enables SchulClothingOrder UI
   minicard_order_enabled?: boolean;                 // Enables bulk minicard order tracking
   minicard_order_quantity?: number;                  // Number of minicards ordered by school
+  // Tracklist finalization
+  tracklist_finalized_at?: string;                   // ISO datetime when teacher finalized tracklist
 }
 
 /**

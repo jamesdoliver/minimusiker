@@ -258,6 +258,7 @@ export interface TeacherEventView {
   isSchulsong?: boolean; // Whether this event has a schulsong (for teacher approval workflow)
   scsShirtsIncluded?: boolean; // Whether SCS shirts are included (event-level field for clothing order form)
   estimatedChildren?: number; // Estimated children (for clothing order max quantity)
+  tracklistFinalizedAt?: string; // ISO datetime when teacher finalized album order
   assignedStaff?: AssignedStaffInfo; // Event-level assigned staff from Personen table
   // Progress tracking fields (for dashboard)
   progress?: {
