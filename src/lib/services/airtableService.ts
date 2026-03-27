@@ -4560,9 +4560,6 @@ class AirtableService {
    */
   async getBookingsForTeacher(teacherEmail: string): Promise<SchoolBooking[]> {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
       // Use returnFieldsByFieldId to match our field IDs
       const allRecords = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
         .select({
@@ -4573,8 +4570,8 @@ class AirtableService {
 
       // Filter for:
       // 1. School contact email matches teacher email
-      // 2. Start date is in the future (or today)
-      // 3. Booking is confirmed
+      // 2. Booking is confirmed
+      // Note: no date filter — teachers need access to past events for schulsong approval, audio access, etc.
       const teacherRecords = allRecords.filter(record => {
         const contactEmail = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.school_contact_email] as string | undefined;
         const startDateStr = record.fields[SCHOOL_BOOKINGS_FIELD_IDS.start_date] as string | undefined;
@@ -4588,9 +4585,7 @@ class AirtableService {
         // Check if booking is confirmed
         if (status !== 'confirmed') return false;
 
-        // Check if start date is today or in the future
-        const startDate = new Date(startDateStr);
-        return startDate >= today;
+        return true;
       });
 
       // Sort by start date
