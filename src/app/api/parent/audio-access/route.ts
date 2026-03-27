@@ -110,7 +110,10 @@ export async function GET(request: NextRequest) {
     const isReleased = releaseDate ? now >= releaseDate && !audioHidden && schulsongGatePassed : false;
 
     // 2. Check minicard purchase status
-    const hasMinicard = await hasMinicardForEvent(session.parentId, eventId);
+    // If minicard ordering is disabled for this event, all parents get audio access
+    // after the release period — no purchase required
+    const minicardDisabled = !event?.minicard_order_enabled;
+    const hasMinicard = minicardDisabled || await hasMinicardForEvent(session.parentId, eventId);
 
     // 3. Build class preview info (always included when audio exists)
     const classPreview = await buildClassPreview(r2, teacherService, eventId, classId);
