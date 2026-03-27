@@ -3776,6 +3776,28 @@ class TeacherService {
         track.albumOrder = index + 1;
       });
 
+      // Inject virtual schulsong track if event has schulsong enabled
+      if (eventRecord?.is_schulsong) {
+        const schulsongTitle = eventRecord.schulsong_tracklist_title
+          || `${eventRecord.school_name} - Schulsong`;
+
+        // Shift all existing tracks by +1
+        tracks.forEach(track => { track.albumOrder += 1; });
+
+        // Insert virtual schulsong at position 1
+        tracks.unshift({
+          songId: '__schulsong__',
+          songTitle: schulsongTitle,
+          classId: '__schulsong__',
+          className: 'Schulsong',
+          classType: 'schulsong',
+          albumOrder: 1,
+          originalTitle: schulsongTitle,
+          originalClassName: 'Schulsong',
+          isSchulsong: true,
+        });
+      }
+
       return tracks;
     } catch (error) {
       console.error('Error getting album tracks:', error);
@@ -4088,10 +4110,11 @@ export interface AlbumTrack {
   songTitle: string;
   classId: string;
   className: string;
-  classType: ClassType;
+  classType: ClassType | 'schulsong';
   albumOrder: number;
   originalTitle: string;
   originalClassName: string;
+  isSchulsong?: boolean;
 }
 
 /**
