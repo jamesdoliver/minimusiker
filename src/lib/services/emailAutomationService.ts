@@ -1102,15 +1102,7 @@ export async function processTracklistConfirmationEmails(
 
   for (const event of pending) {
     try {
-      // Dedup: check if already sent in last 24 hours
-      const dedupKey = 'tracklist_confirmation_reminder';
-      const alreadySent = await airtable.hasEmailBeenSentSince(dedupKey, event.event_id, '', 24);
-      if (alreadySent) {
-        skipped++;
-        continue;
-      }
-
-      // Get teacher email from booking
+      // Get teacher email FIRST (needed for dedup check)
       const bookingRecordId = event.simplybook_booking?.[0];
       let teacherEmail = '';
       let teacherName = '';
@@ -1121,6 +1113,14 @@ export async function processTracklistConfirmationEmails(
       }
 
       if (!teacherEmail) {
+        skipped++;
+        continue;
+      }
+
+      // Dedup: check if already sent to THIS teacher in last 24 hours
+      const dedupKey = 'tracklist_confirmation_reminder';
+      const alreadySent = await airtable.hasEmailBeenSentSince(dedupKey, event.event_id, teacherEmail, 24);
+      if (alreadySent) {
         skipped++;
         continue;
       }

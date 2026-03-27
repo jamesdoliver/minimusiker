@@ -99,8 +99,19 @@ export default function AdminLehrerStatusCard({
         <AlbumLayoutModal
           eventId={eventId}
           apiBaseUrl={`/api/admin/events/${encodeURIComponent(eventId)}/album-order`}
-          onClose={() => setShowAlbumModal(false)}
-          onSave={() => { setLocalFinalizedAt(undefined); }}
+          onClose={() => {
+            setShowAlbumModal(false);
+            // Re-fetch to get actual finalization state
+            fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, { credentials: 'include' })
+              .then(res => res.ok ? res.json() : null)
+              .then(data => {
+                if (data?.event?.tracklistFinalizedAt) {
+                  setLocalFinalizedAt(data.event.tracklistFinalizedAt);
+                }
+              })
+              .catch(() => {});
+          }}
+          onSave={() => {}}
           hideFinalize={true}
           showAdminFinalize={!localFinalizedAt}
           tracklistFinalizedAt={localFinalizedAt}

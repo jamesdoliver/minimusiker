@@ -6700,6 +6700,7 @@ class AirtableService {
         schulsong_released_at: record.fields[EVENTS_FIELD_IDS.schulsong_released_at] as string | undefined,
         schulsong_merch_cutoff: record.fields[EVENTS_FIELD_IDS.schulsong_merch_cutoff] as string | undefined,
         admin_approval_status: record.fields[EVENTS_FIELD_IDS.admin_approval_status] as Event['admin_approval_status'] | undefined,
+        tracklist_finalized_at: record.fields[EVENTS_FIELD_IDS.tracklist_finalized_at] as string | undefined,
       }));
     } catch (error) {
       console.error('Error fetching all events:', error);

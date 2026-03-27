@@ -114,7 +114,7 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
 
     // Process tracklist confirmation reminders — 1pm Berlin time
     let tracklistReminderResult: { sent: number; skipped: number; failed: number; errors: string[] } | undefined;
-    if (berlinHour === 13) {
+    if (berlinHour >= 13 && berlinHour <= 14) {
       console.log(`[Email Automation Cron] Processing tracklist confirmation reminders (Berlin hour: ${berlinHour})`);
       tracklistReminderResult = await processTracklistConfirmationEmails(isDryRun);
       if (tracklistReminderResult.errors.length > 0) {
