@@ -32,6 +32,7 @@ interface AlbumLayoutModalProps {
   readOnly?: boolean;     // Forces read-only mode regardless of finalization (for engineer)
   inline?: boolean;       // Renders without modal overlay (for Master CD embed)
   hideFinalize?: boolean; // Hides Finalisieren button entirely (for admin/engineer)
+  showAdminFinalize?: boolean; // Shows admin "Bestätigen" button (no date guard)
 }
 
 type ModalState = 'loading' | 'ready' | 'saving' | 'error';
@@ -143,6 +144,7 @@ export default function AlbumLayoutModal({
   readOnly,
   inline,
   hideFinalize,
+  showAdminFinalize,
 }: AlbumLayoutModalProps) {
   const [state, setState] = useState<ModalState>('loading');
   const [tracks, setTracks] = useState<EditableTrack[]>([]);
@@ -338,6 +340,39 @@ export default function AlbumLayoutModal({
     } catch (err) {
       console.error('Error finalizing tracklist:', err);
       setError(err instanceof Error ? err.message : 'Fehler beim Finalisieren');
+      setState('ready');
+    }
+  };
+
+  const handleAdminFinalize = async () => {
+    setState('saving');
+    setError('');
+    try {
+      const updates: AlbumTrackUpdate[] = tracks.map((track, index) => ({
+        songId: track.songId,
+        albumOrder: index + 1,
+        classId: track.classId,
+        ...(track.editedTitle !== track.originalTitle && { title: track.editedTitle }),
+        ...(track.editedClassName !== track.originalClassName && { className: track.editedClassName }),
+      }));
+
+      const finalizeUrl = `${apiBaseUrl}/finalize`;
+      const response = await fetch(finalizeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracks: updates }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Fehler beim Bestätigen');
+      }
+
+      onSave?.();
+      onClose();
+    } catch (err) {
+      console.error('Error admin-finalizing:', err);
+      setError(err instanceof Error ? err.message : 'Fehler beim Bestätigen');
       setState('ready');
     }
   };
@@ -579,6 +614,16 @@ export default function AlbumLayoutModal({
                 </div>
               )}
             </div>
+          )}
+
+          {showAdminFinalize && !isFinalized && (
+            <button
+              onClick={handleAdminFinalize}
+              disabled={state === 'saving' || state === 'loading' || tracks.length === 0}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Bestätigen
+            </button>
           )}
         </div>
       </div>
