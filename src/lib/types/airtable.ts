@@ -577,6 +577,7 @@ export const EVENTS_FIELD_IDS = {
   minicard_order_quantity: 'fldYkBvcTuI7i6t2m',         // Number - quantity of minicards ordered
   // Tracklist finalization
   tracklist_finalized_at: 'fldAAcT2sIrFJ2Jq2',    // DateTime - when teacher finalized album order
+  schulsong_tracklist_title: 'fld1A7YBxEuvp7tGZ',  // Text - custom schulsong title for CD booklet
 } as const;
 
 // Classes Table - 1 row per class
@@ -851,6 +852,7 @@ export interface Event {
   minicard_order_quantity?: number;                  // Number of minicards ordered by school
   // Tracklist finalization
   tracklist_finalized_at?: string;                   // ISO datetime when teacher finalized tracklist
+  schulsong_tracklist_title?: string;                 // Custom schulsong title for CD booklet
 }
 
 /**
