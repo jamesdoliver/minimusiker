@@ -14,7 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { processEmailAutomation, processSchulsongReleaseEmails, processSchulsongApprovalReminders, processSchulsongMerchLastChance, getCurrentBerlinHour } from '@/lib/services/emailAutomationService';
+import { processEmailAutomation, processSchulsongReleaseEmails, processSchulsongApprovalReminders, processSchulsongMerchLastChance, processTracklistConfirmationEmails, getCurrentBerlinHour } from '@/lib/services/emailAutomationService';
 import { CronAutomationResponse } from '@/lib/types/email-automation';
 
 export const dynamic = 'force-dynamic';
@@ -112,6 +112,16 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
       }
     }
 
+    // Process tracklist confirmation reminders — 1pm Berlin time
+    let tracklistReminderResult: { sent: number; skipped: number; failed: number; errors: string[] } | undefined;
+    if (berlinHour === 13) {
+      console.log(`[Email Automation Cron] Processing tracklist confirmation reminders (Berlin hour: ${berlinHour})`);
+      tracklistReminderResult = await processTracklistConfirmationEmails(isDryRun);
+      if (tracklistReminderResult.errors.length > 0) {
+        console.error('[Email Automation Cron] Tracklist reminder errors:', tracklistReminderResult.errors);
+      }
+    }
+
     const duration = Date.now() - startTime;
     console.log(`[Email Automation Cron] Completed in ${duration}ms`);
     console.log(
@@ -132,6 +142,11 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
         `[Email Automation Cron] Merch last chance: ${merchLastChanceResult.sent} sent, ${merchLastChanceResult.skipped} skipped, ${merchLastChanceResult.failed} failed`
       );
     }
+    if (tracklistReminderResult) {
+      console.log(
+        `[Email Automation Cron] Tracklist reminders: ${tracklistReminderResult.sent} sent, ${tracklistReminderResult.skipped} skipped, ${tracklistReminderResult.failed} failed`
+      );
+    }
 
     if (result.errors.length > 0) {
       console.error('[Email Automation Cron] Errors:', result.errors);
@@ -144,6 +159,7 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
       schulsongResult,
       approvalReminderResult,
       merchLastChanceResult,
+      tracklistReminderResult,
     });
   } catch (error) {
     const duration = Date.now() - startTime;

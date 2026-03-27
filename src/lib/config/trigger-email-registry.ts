@@ -1061,6 +1061,37 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
 </p>`,
     availableVariables: ['count', 'digestHtml'],
   },
+
+  // ─── Tracklist Confirmation Reminder ────────────────────────────────
+  {
+    slug: 'tracklist_confirmation_reminder',
+    name: 'Lieder-Reihenfolge Bestätigung',
+    description: 'Erinnert Lehrer nach dem Minimusikertag, die Lieder-Reihenfolge für das CD-Booklet zu bestätigen. Wird ab 13 Uhr am Eventtag alle 24 Stunden gesendet.',
+    recipientType: 'teacher',
+    defaultSubject: 'Lieder-Reihenfolge für {{schoolName}} bestätigen',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{teacherName}},
+</h2>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Euer Minimusikertag an der {{schoolName}} hat stattgefunden &mdash; vielen Dank für einen tollen Tag!
+</p>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Damit wir die CD-Booklets drucken können, benötigen wir noch die finale Bestätigung eurer Lieder-Reihenfolge. Bitte logge dich in dein Pädagogen-Portal ein und bestätige die Reihenfolge.
+</p>
+
+<div style="text-align: center; margin: 32px 0;">
+  <a href="{{loginUrl}}" style="display: inline-block; padding: 14px 28px; background-color: #e91e8c; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+    Jetzt bestätigen
+  </a>
+</div>
+
+<p style="margin: 0 0 8px 0; color: #718096; font-size: 14px; line-height: 1.5;">
+  Der Link ist 24 Stunden gültig. Falls er abgelaufen ist, kannst du dir auf der Login-Seite einen neuen Link zusenden lassen.
+</p>`,
+    availableVariables: ['teacherName', 'schoolName', 'eventDate', 'loginUrl'],
+  },
 ];
 
 /**

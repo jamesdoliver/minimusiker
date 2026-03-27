@@ -1067,6 +1067,130 @@ export async function processSchulsongMerchLastChance(
 }
 
 // =============================================================================
+// Tracklist Confirmation Reminder Processing (called by cron at 1pm Berlin)
+// =============================================================================
+
+const TRACKLIST_EMAIL_CUTOFF = '2026-03-20';
+
+export async function processTracklistConfirmationEmails(
+  dryRun: boolean = false
+): Promise<{ sent: number; skipped: number; failed: number; errors: string[] }> {
+  const airtable = getAirtableService();
+  const teacherService = getTeacherService();
+
+  const allEvents = await airtable.getAllEvents();
+  const berlinNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+  const berlinToday = new Date(berlinNow);
+  berlinToday.setHours(0, 0, 0, 0);
+
+  // Filter events: not finalized, event date >= cutoff, event today or past, not cancelled
+  const pending = allEvents.filter((e) => {
+    if (e.status === 'Cancelled' || e.status === 'Deleted') return false;
+    if (e.tracklist_finalized_at) return false;
+    if (!e.event_date) return false;
+    if (e.event_date < TRACKLIST_EMAIL_CUTOFF) return false;
+
+    const eventDate = new Date(e.event_date);
+    eventDate.setHours(0, 0, 0, 0);
+    return eventDate <= berlinToday;
+  });
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const event of pending) {
+    try {
+      // Dedup: check if already sent in last 24 hours
+      const dedupKey = 'tracklist_confirmation_reminder';
+      const alreadySent = await airtable.hasEmailBeenSentSince(dedupKey, event.event_id, '', 24);
+      if (alreadySent) {
+        skipped++;
+        continue;
+      }
+
+      // Get teacher email from booking
+      const bookingRecordId = event.simplybook_booking?.[0];
+      let teacherEmail = '';
+      let teacherName = '';
+      if (bookingRecordId) {
+        const booking = await airtable.getSchoolBookingById(bookingRecordId);
+        teacherEmail = booking?.schoolContactEmail || '';
+        teacherName = booking?.schoolContactName || '';
+      }
+
+      if (!teacherEmail) {
+        skipped++;
+        continue;
+      }
+
+      if (dryRun) {
+        console.log(`[TracklistReminder] (dry-run) Would send to ${teacherEmail} for ${event.event_id}`);
+        skipped++;
+        continue;
+      }
+
+      // Generate magic link for teacher
+      const teacher = await teacherService.getTeacherByEmail(teacherEmail);
+      let loginUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://portal.minimusiker.de';
+      if (teacher) {
+        const token = await teacherService.generateMagicLinkToken(teacher.id);
+        loginUrl = `${loginUrl}/paedagogen-login?token=${token}`;
+      } else {
+        loginUrl = `${loginUrl}/paedagogen-login`;
+      }
+
+      // Get template from registry
+      const { TRIGGER_EMAIL_REGISTRY } = await import('@/lib/config/trigger-email-registry');
+      const template = TRIGGER_EMAIL_REGISTRY.find(t => t.slug === 'tracklist_confirmation_reminder');
+      if (!template) {
+        errors.push('Template not found: tracklist_confirmation_reminder');
+        failed++;
+        continue;
+      }
+
+      // Substitute variables
+      const subject = template.defaultSubject
+        .replace(/\{\{schoolName\}\}/g, event.school_name);
+      const body = template.defaultBodyHtml
+        .replace(/\{\{teacherName\}\}/g, teacherName || 'Lehrer/in')
+        .replace(/\{\{schoolName\}\}/g, event.school_name)
+        .replace(/\{\{eventDate\}\}/g, new Date(event.event_date).toLocaleDateString('de-DE'))
+        .replace(/\{\{loginUrl\}\}/g, loginUrl);
+
+      // Send via Resend
+      const { Resend } = await import('resend');
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM || 'Minimusiker <info@minimusiker.de>',
+        to: teacherEmail,
+        subject,
+        html: body,
+      });
+
+      // Log for dedup
+      await airtable.createEmailLog({
+        templateName: dedupKey,
+        eventId: event.event_id,
+        recipientEmail: teacherEmail,
+        recipientType: 'teacher',
+        status: 'sent',
+      });
+      sent++;
+    } catch (err) {
+      const msg = `Failed for ${event.event_id}: ${err instanceof Error ? err.message : String(err)}`;
+      console.error(`[TracklistReminder] ${msg}`);
+      errors.push(msg);
+      failed++;
+    }
+  }
+
+  console.log(`[TracklistReminder] Processed ${pending.length} events: ${sent} sent, ${skipped} skipped, ${failed} failed`);
+  return { sent, skipped, failed, errors };
+}
+
+// =============================================================================
 // Utility Functions for Testing
 // =============================================================================
 
