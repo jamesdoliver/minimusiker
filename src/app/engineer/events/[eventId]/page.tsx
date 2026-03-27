@@ -10,6 +10,7 @@ import { useClientZipDownload, ZipDownloadFile } from '@/lib/hooks/useClientZipD
 import ZipDownloadModal from '@/components/engineer/ZipDownloadModal';
 import { useEngineerEventDetail } from '@/lib/hooks/useEngineerEventDetail';
 import { toast } from 'sonner';
+import AlbumLayoutModal from '@/components/shared/AlbumLayoutModal';
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return 'No date';
@@ -68,6 +69,7 @@ export default function EngineerEventDetailPage() {
   const [editingSongTitle, setEditingSongTitle] = useState('');
   const [addingSongClassId, setAddingSongClassId] = useState<string | null>(null);
   const [newSongTitle, setNewSongTitle] = useState('');
+  const [showAlbumLayoutModal, setShowAlbumLayoutModal] = useState(false);
 
   // Handle auth redirects
   useEffect(() => {
@@ -481,7 +483,7 @@ export default function EngineerEventDetailPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </Link>
-            <div>
+            <div className="flex-1">
               <h1 className="text-xl font-bold text-gray-900">{event.schoolName}</h1>
               <div className="flex items-center gap-3 text-sm text-gray-500">
                 <span>{formatDate(event.eventDate)}</span>
@@ -510,6 +512,16 @@ export default function EngineerEventDetailPage() {
                 )}
               </div>
             </div>
+            <button
+              onClick={() => setShowAlbumLayoutModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              title="Album-Reihenfolge ansehen"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              Lieder-Reihenfolge
+            </button>
           </div>
         </div>
       </header>
@@ -848,6 +860,17 @@ export default function EngineerEventDetailPage() {
           onSongProcessing={handleSongProcessing}
           onSongProcessed={handleSongProcessed}
         />
+
+        {/* Album Layout Modal (read-only) */}
+        {showAlbumLayoutModal && (
+          <AlbumLayoutModal
+            eventId={eventId}
+            apiBaseUrl={`/api/engineer/events/${encodeURIComponent(eventId)}/album-order`}
+            onClose={() => setShowAlbumLayoutModal(false)}
+            readOnly={true}
+            hideFinalize={true}
+          />
+        )}
 
         {/* ZIP Download Progress Modal */}
         <ZipDownloadModal
