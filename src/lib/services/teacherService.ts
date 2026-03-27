@@ -3823,8 +3823,15 @@ class TeacherService {
    */
   async updateAlbumOrderData(eventId: string, tracks: AlbumTrackUpdate[]): Promise<void> {
     try {
+      // Strip virtual schulsong entry — it's not a real Song record
+      const schulsongTrack = tracks.find(t => t.songId === '__schulsong__');
+      const realTracks = tracks.filter(t => t.songId !== '__schulsong__');
+
+      // Re-number real tracks starting at 1 (shifted to 2+ on read when schulsong present)
+      realTracks.forEach((t, i) => { t.albumOrder = i + 1; });
+
       // Update songs with new album order and optional title changes
-      for (const track of tracks) {
+      for (const track of realTracks) {
         const updateData: { [key: string]: string | number } = {
           [SONGS_FIELD_IDS.album_order]: track.albumOrder,
         };
@@ -3838,7 +3845,7 @@ class TeacherService {
 
       // Update class names if changed
       const classUpdates = new Map<string, string>();
-      for (const track of tracks) {
+      for (const track of realTracks) {
         if (track.className !== undefined && !track.classId.startsWith('group_')) {
           classUpdates.set(track.classId, track.className);
         }
@@ -3860,7 +3867,7 @@ class TeacherService {
       }
 
       // Update group names if changed
-      for (const track of tracks) {
+      for (const track of realTracks) {
         if (track.className !== undefined && track.classId.startsWith('group_')) {
           const groupRecords = await this.base(GROUPS_TABLE_ID)
             .select({
@@ -3879,7 +3886,7 @@ class TeacherService {
 
       // Calculate class display order based on first song position
       const classFirstPosition = new Map<string, number>();
-      for (const track of tracks) {
+      for (const track of realTracks) {
         if (!classFirstPosition.has(track.classId)) {
           classFirstPosition.set(track.classId, track.albumOrder);
         } else {
@@ -3904,6 +3911,17 @@ class TeacherService {
         if (classRecords.length > 0) {
           await this.base(CLASSES_TABLE_ID).update(classRecords[0].id, {
             [CLASSES_FIELD_IDS.display_order]: displayOrder,
+          });
+        }
+      }
+
+      // Save edited schulsong title if present
+      if (schulsongTrack?.title !== undefined) {
+        const airtable = getAirtableService();
+        const eventRecord = await airtable.getEventByEventId(eventId);
+        if (eventRecord) {
+          await airtable.updateEventFields(eventRecord.id, {
+            schulsong_tracklist_title: schulsongTrack.title,
           });
         }
       }
