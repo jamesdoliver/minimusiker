@@ -28,6 +28,7 @@ interface EventDetailWithBooking extends SchoolEventDetail {
   isPlus?: boolean;
   isKita?: boolean;
   isSchulsong?: boolean;
+  tracklistFinalizedAt?: string;
 }
 
 type EventStatus = 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted' | 'Pending';
@@ -43,6 +44,7 @@ import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfi
 import EditGroupModal from '@/components/shared/class-management/EditGroupModal';
 import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModal';
 import EventActivityTimeline from '@/components/admin/EventActivityTimeline';
+import AdminLehrerStatusCard from '@/components/admin/AdminLehrerStatusCard';
 import DateChangeModal from '@/components/admin/events/DateChangeModal';
 import AddTeacherModal from '@/components/admin/AddTeacherModal';
 import DealBuilder from '@/components/admin/DealBuilder';
@@ -1392,6 +1394,17 @@ export default function EventDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Lehrer-Status Card */}
+      {event && (
+        <AdminLehrerStatusCard
+          eventId={eventId}
+          classes={event.classes || []}
+          isSchulsong={isSchulsong}
+          tracklistFinalizedAt={event.tracklistFinalizedAt}
+          eventDate={event.eventDate}
+        />
       )}
 
       {/* Classes Section */}
