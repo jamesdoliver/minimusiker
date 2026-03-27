@@ -471,8 +471,19 @@ export default function AlbumLayoutModal({
                             {/* Separator */}
                             <span className="text-amber-400">-</span>
 
-                            {/* Class name — always read-only for schulsong */}
-                            <span className="w-40 px-2 py-1 text-sm text-amber-600">Schulsong</span>
+                            {/* Class name — editable for schulsong */}
+                            <input
+                              type="text"
+                              value={schulsongTrack.editedClassName}
+                              onChange={(e) => handleClassNameChange(schulsongTrack.songId, e.target.value)}
+                              readOnly={isReadOnly}
+                              className={`w-40 px-2 py-1 text-sm rounded ${
+                                isReadOnly
+                                  ? 'border-transparent bg-transparent text-amber-600'
+                                  : 'border border-amber-300 bg-white text-amber-800 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-400'
+                              }`}
+                              placeholder="Schulname"
+                            />
 
                             {/* Schulsong badge */}
                             <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 font-medium">
