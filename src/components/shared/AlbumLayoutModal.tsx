@@ -48,12 +48,14 @@ function SortableTrackItem({
   onTitleChange,
   onClassNameChange,
   readOnly,
+  trackNumberOffset = 0,
 }: {
   track: EditableTrack;
   index: number;
   onTitleChange: (songId: string, title: string) => void;
   onClassNameChange: (songId: string, className: string) => void;
   readOnly?: boolean;
+  trackNumberOffset?: number;
 }) {
   const {
     attributes,
@@ -91,7 +93,7 @@ function SortableTrackItem({
       </button>
 
       {/* Track number */}
-      <span className="w-8 text-sm font-medium text-gray-500">{index + 1}.</span>
+      <span className="w-8 text-sm font-medium text-gray-500">{index + 1 + trackNumberOffset}.</span>
 
       {/* Song title input */}
       <input
@@ -433,27 +435,73 @@ export default function AlbumLayoutModal({
                     </div>
                   )}
 
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext
-                      items={tracks.map((t) => t.songId)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {tracks.map((track, index) => (
-                        <SortableTrackItem
-                          key={track.songId}
-                          track={track}
-                          index={index}
-                          onTitleChange={handleTitleChange}
-                          onClassNameChange={handleClassNameChange}
-                          readOnly={isReadOnly}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
+                  {/* Pinned schulsong track with gold styling */}
+                  {(() => {
+                    const schulsongTrack = tracks.length > 0 && tracks[0].isSchulsong ? tracks[0] : null;
+                    const sortableTracks = schulsongTrack ? tracks.slice(1) : tracks;
+
+                    return (
+                      <>
+                        {schulsongTrack && (
+                          <div className="flex items-center gap-3 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg mb-3 ring-2 ring-amber-400/50">
+                            {/* Empty space where drag handle would be — preserves alignment */}
+                            <div className="w-5 h-5 flex-shrink-0" />
+
+                            {/* Track number */}
+                            <span className="w-8 text-sm font-bold text-amber-700">1.</span>
+
+                            {/* Song title input — editable unless read-only */}
+                            <input
+                              type="text"
+                              value={schulsongTrack.editedTitle}
+                              onChange={(e) => handleTitleChange(schulsongTrack.songId, e.target.value)}
+                              readOnly={isReadOnly}
+                              className={`flex-1 px-2 py-1 text-sm font-medium rounded ${
+                                isReadOnly
+                                  ? 'border-transparent bg-transparent text-amber-800'
+                                  : 'border border-amber-300 bg-white focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-400'
+                              }`}
+                              placeholder="Schulsong Titel"
+                            />
+
+                            {/* Separator */}
+                            <span className="text-amber-400">-</span>
+
+                            {/* Class name — always read-only for schulsong */}
+                            <span className="w-40 px-2 py-1 text-sm text-amber-600">Schulsong</span>
+
+                            {/* Schulsong badge */}
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 font-medium">
+                              Schulsong
+                            </span>
+                          </div>
+                        )}
+
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <SortableContext
+                            items={sortableTracks.map((t) => t.songId)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {sortableTracks.map((track, index) => (
+                              <SortableTrackItem
+                                key={track.songId}
+                                track={track}
+                                index={index}
+                                onTitleChange={handleTitleChange}
+                                onClassNameChange={handleClassNameChange}
+                                readOnly={isReadOnly}
+                                trackNumberOffset={schulsongTrack ? 1 : 0}
+                              />
+                            ))}
+                          </SortableContext>
+                        </DndContext>
+                      </>
+                    );
+                  })()}
                 </>
               )}
 
