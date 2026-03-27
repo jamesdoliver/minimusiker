@@ -3779,7 +3779,9 @@ class TeacherService {
       // Inject virtual schulsong track if event has schulsong enabled
       if (eventRecord?.is_schulsong) {
         const schulsongTitle = eventRecord.schulsong_tracklist_title
-          || `${eventRecord.school_name} - Schulsong`;
+          || 'Schulsong';
+        const schulsongClassName = eventRecord.schulsong_tracklist_class
+          || eventRecord.school_name;
 
         // Shift all existing tracks by +1
         tracks.forEach(track => { track.albumOrder += 1; });
@@ -3789,11 +3791,11 @@ class TeacherService {
           songId: '__schulsong__',
           songTitle: schulsongTitle,
           classId: '__schulsong__',
-          className: 'Schulsong',
+          className: schulsongClassName,
           classType: 'schulsong',
           albumOrder: 1,
           originalTitle: schulsongTitle,
-          originalClassName: 'Schulsong',
+          originalClassName: schulsongClassName,
           isSchulsong: true,
         });
       }
@@ -3915,14 +3917,21 @@ class TeacherService {
         }
       }
 
-      // Save edited schulsong title if present
-      if (schulsongTrack?.title !== undefined) {
+      // Save edited schulsong title and class name if present
+      if (schulsongTrack) {
         const airtable = getAirtableService();
         const eventRecord = await airtable.getEventByEventId(eventId);
         if (eventRecord) {
-          await airtable.updateEventFields(eventRecord.id, {
-            schulsong_tracklist_title: schulsongTrack.title,
-          });
+          const schulsongUpdates: Record<string, string | null> = {};
+          if (schulsongTrack.title !== undefined) {
+            schulsongUpdates.schulsong_tracklist_title = schulsongTrack.title;
+          }
+          if (schulsongTrack.className !== undefined) {
+            schulsongUpdates.schulsong_tracklist_class = schulsongTrack.className;
+          }
+          if (Object.keys(schulsongUpdates).length > 0) {
+            await airtable.updateEventFields(eventRecord.id, schulsongUpdates);
+          }
         }
       }
 

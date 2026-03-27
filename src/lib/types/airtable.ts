@@ -578,6 +578,7 @@ export const EVENTS_FIELD_IDS = {
   // Tracklist finalization
   tracklist_finalized_at: 'fldAAcT2sIrFJ2Jq2',    // DateTime - when teacher finalized album order
   schulsong_tracklist_title: 'fld1A7YBxEuvp7tGZ',  // Text - custom schulsong title for CD booklet
+  schulsong_tracklist_class: 'fldGaMcbL72bq2WXm',  // Text - custom class/school name for schulsong on CD booklet
 } as const;
 
 // Classes Table - 1 row per class
@@ -853,6 +854,7 @@ export interface Event {
   // Tracklist finalization
   tracklist_finalized_at?: string;                   // ISO datetime when teacher finalized tracklist
   schulsong_tracklist_title?: string;                 // Custom schulsong title for CD booklet
+  schulsong_tracklist_class?: string;                  // Custom class/school name for schulsong on CD booklet
 }
 
 /**

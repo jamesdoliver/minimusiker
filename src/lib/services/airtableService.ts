@@ -5815,6 +5815,7 @@ class AirtableService {
       event_date?: string;
       tracklist_finalized_at?: string | null;
       schulsong_tracklist_title?: string | null;
+      schulsong_tracklist_class?: string | null;
     }
   ): Promise<Event> {
     try {
@@ -5870,6 +5871,9 @@ class AirtableService {
       }
       if (updates.schulsong_tracklist_title !== undefined) {
         updateFields[EVENTS_FIELD_IDS.schulsong_tracklist_title] = updates.schulsong_tracklist_title;
+      }
+      if (updates.schulsong_tracklist_class !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.schulsong_tracklist_class] = updates.schulsong_tracklist_class;
       }
 
       if (Object.keys(updateFields).length === 0) {
@@ -6181,6 +6185,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.classes,
           EVENTS_FIELD_IDS.tracklist_finalized_at,
           EVENTS_FIELD_IDS.schulsong_tracklist_title,
+          EVENTS_FIELD_IDS.schulsong_tracklist_class,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -6246,6 +6251,7 @@ class AirtableService {
           EVENTS_FIELD_IDS.classes,
           EVENTS_FIELD_IDS.tracklist_finalized_at,
           EVENTS_FIELD_IDS.schulsong_tracklist_title,
+          EVENTS_FIELD_IDS.schulsong_tracklist_class,
         ],
       }).eachPage((records, fetchNextPage) => {
         allRecords.push(...records);
@@ -6443,6 +6449,7 @@ class AirtableService {
       // Tracklist finalization
       tracklist_finalized_at: val(EVENTS_FIELD_IDS.tracklist_finalized_at, 'tracklist_finalized_at') as string | undefined,
       schulsong_tracklist_title: val(EVENTS_FIELD_IDS.schulsong_tracklist_title, 'schulsong_tracklist_title') as string | undefined,
+      schulsong_tracklist_class: val(EVENTS_FIELD_IDS.schulsong_tracklist_class, 'schulsong_tracklist_class') as string | undefined,
     };
   }
 
