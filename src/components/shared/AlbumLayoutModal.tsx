@@ -29,6 +29,9 @@ interface AlbumLayoutModalProps {
   // New props for finalization
   tracklistFinalizedAt?: string;      // ISO datetime if already finalized
   eventDate?: string;                  // Event date for determining if finalize button is active
+  readOnly?: boolean;     // Forces read-only mode regardless of finalization (for engineer)
+  inline?: boolean;       // Renders without modal overlay (for Master CD embed)
+  hideFinalize?: boolean; // Hides Finalisieren button entirely (for admin/engineer)
 }
 
 type ModalState = 'loading' | 'ready' | 'saving' | 'error';
@@ -135,6 +138,9 @@ export default function AlbumLayoutModal({
   onSave,
   tracklistFinalizedAt,
   eventDate,
+  readOnly,
+  inline,
+  hideFinalize,
 }: AlbumLayoutModalProps) {
   const [state, setState] = useState<ModalState>('loading');
   const [tracks, setTracks] = useState<EditableTrack[]>([]);
@@ -142,6 +148,7 @@ export default function AlbumLayoutModal({
   const [hasChanges, setHasChanges] = useState(false);
   const [showFinalizeTooltip, setShowFinalizeTooltip] = useState(false);
   const isFinalized = Boolean(tracklistFinalizedAt);
+  const isReadOnly = readOnly || isFinalized;
   const isEventDayOrPast = (() => {
     if (!eventDate) return false;
     const ed = new Date(eventDate);
@@ -210,7 +217,7 @@ export default function AlbumLayoutModal({
   }, [tracks, state]);
 
   const handleDragEnd = (event: DragEndEvent) => {
-    if (isFinalized) return;
+    if (isReadOnly) return;
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
@@ -332,8 +339,14 @@ export default function AlbumLayoutModal({
   const missingSongs = classesWithoutSongs && classesWithoutSongs.length > 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+    <div className={inline
+      ? 'flex flex-col'
+      : 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'
+    }>
+      <div className={inline
+        ? 'bg-white rounded-xl flex flex-col'
+        : 'bg-white rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col'
+      }>
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Album-Reihenfolge</h3>
@@ -436,7 +449,7 @@ export default function AlbumLayoutModal({
                           index={index}
                           onTitleChange={handleTitleChange}
                           onClassNameChange={handleClassNameChange}
-                          readOnly={isFinalized}
+                          readOnly={isReadOnly}
                         />
                       ))}
                     </SortableContext>
@@ -464,7 +477,7 @@ export default function AlbumLayoutModal({
             Abbrechen
           </button>
 
-          {!isFinalized && (
+          {!isReadOnly && (
             <button
               onClick={handleSave}
               disabled={state === 'saving' || state === 'loading' || !hasChanges || tracks.length === 0}
@@ -477,7 +490,7 @@ export default function AlbumLayoutModal({
             </button>
           )}
 
-          {!isFinalized && (
+          {!isFinalized && !hideFinalize && (
             <div
               className="relative"
               onMouseEnter={() => !isEventDayOrPast && setShowFinalizeTooltip(true)}

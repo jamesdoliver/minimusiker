@@ -1399,7 +1399,7 @@ export default function TeacherEventDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <HinweiseSection
             classesWithoutSongs={
-              regularClasses
+              (event.classes || [])
                 .filter(c => c.songs.length === 0)
                 .map(c => c.className)
             }

@@ -2643,6 +2643,8 @@ export default function EventDetailPage() {
           classesWithoutSongs={event?.classes.filter((c: any) => (c.songs || []).length === 0).map((c: any) => c.className)}
           onClose={() => setShowAlbumLayoutModal(false)}
           onSave={fetchEventDetail}
+          hideFinalize={true}
+          eventDate={event?.eventDate}
         />
       )}
 
