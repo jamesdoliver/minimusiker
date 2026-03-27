@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
     // Only include full content when minicard buyer AND released
     if (hasMinicard && isReleased) {
       // All audio tracklist (new unified approach)
-      const allAudio = await buildAllAudio(r2, teacherService, airtableService, eventId, classId, { showAllGroups: minicardDisabled });
+      const allAudio = await buildAllAudio(r2, teacherService, airtableService, eventId, classId, { showAllGroups: true });
       if (allAudio) {
         response.allAudio = allAudio;
       }
@@ -163,11 +163,9 @@ export async function GET(request: NextRequest) {
         response.collections = collectionsWithAudio;
       }
 
-      // Groups — all groups when minicard ordering is disabled, otherwise only parent's class groups
+      // Groups — show all groups for the event (parent has full access)
       try {
-        const groupsResponse = minicardDisabled
-          ? await teacherService.getGroupsByEventId(eventId)
-          : await teacherService.getGroupsForClass(classId);
+        const groupsResponse = await teacherService.getGroupsByEventId(eventId);
         const groupsWithAudio = [];
         for (const group of groupsResponse) {
           const groupAudio = await buildGroupAudio(r2, eventId, group.groupId);
@@ -490,7 +488,7 @@ async function buildAllAudio(
       });
     }
 
-    // 4. Get groups — all groups when minicard ordering is disabled, otherwise only parent's class groups
+    // 4. Get all groups for the event (parent has full access)
     try {
       const groups = options?.showAllGroups
         ? await teacherService.getGroupsByEventId(eventId)
