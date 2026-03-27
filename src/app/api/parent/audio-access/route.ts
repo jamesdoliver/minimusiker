@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
     // Only include full content when minicard buyer AND released
     if (hasMinicard && isReleased) {
       // All audio tracklist (new unified approach)
-      const allAudio = await buildAllAudio(r2, teacherService, airtableService, eventId, classId);
+      const allAudio = await buildAllAudio(r2, teacherService, airtableService, eventId, classId, { showAllGroups: minicardDisabled });
       if (allAudio) {
         response.allAudio = allAudio;
       }
@@ -163,9 +163,11 @@ export async function GET(request: NextRequest) {
         response.collections = collectionsWithAudio;
       }
 
-      // Groups
+      // Groups — all groups when minicard ordering is disabled, otherwise only parent's class groups
       try {
-        const groupsResponse = await teacherService.getGroupsForClass(classId);
+        const groupsResponse = minicardDisabled
+          ? await teacherService.getGroupsByEventId(eventId)
+          : await teacherService.getGroupsForClass(classId);
         const groupsWithAudio = [];
         for (const group of groupsResponse) {
           const groupAudio = await buildGroupAudio(r2, eventId, group.groupId);
@@ -390,7 +392,8 @@ async function buildAllAudio(
   teacherService: ReturnType<typeof getTeacherService>,
   airtableService: ReturnType<typeof getAirtableService>,
   eventId: string,
-  parentClassId: string
+  parentClassId: string,
+  options?: { showAllGroups?: boolean }
 ): Promise<AllAudioResponse | null> {
   try {
     // 1. Bulk fetch songs + audio files for the event (2 Airtable calls)
@@ -487,9 +490,11 @@ async function buildAllAudio(
       });
     }
 
-    // 4. Get groups for parent's class
+    // 4. Get groups — all groups when minicard ordering is disabled, otherwise only parent's class groups
     try {
-      const groups = await teacherService.getGroupsForClass(parentClassId);
+      const groups = options?.showAllGroups
+        ? await teacherService.getGroupsByEventId(eventId)
+        : await teacherService.getGroupsForClass(parentClassId);
       for (const group of groups) {
         const groupTracks: TrackEntry[] = [];
 
