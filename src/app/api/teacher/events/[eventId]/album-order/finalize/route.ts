@@ -37,13 +37,15 @@ export async function POST(
       );
     }
 
-    // Server-side guard: event date must be today or past
-    const eventDate = new Date(event.eventDate);
-    const now = new Date();
-    const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // Server-side guard: event date must be today or past (in Europe/Berlin timezone)
+    const berlinFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Berlin',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    });
+    const eventDateStr = event.eventDate.split('T')[0]; // YYYY-MM-DD
+    const nowBerlin = berlinFormatter.format(new Date()); // YYYY-MM-DD in Berlin
 
-    if (eventDateOnly > nowDateOnly) {
+    if (eventDateStr > nowBerlin) {
       return NextResponse.json(
         { error: 'Cannot finalize before event day' },
         { status: 400 }
@@ -70,9 +72,17 @@ export async function POST(
 
     // Set tracklist_finalized_at on the Event record
     const finalizedAt = new Date().toISOString();
-    await airtableService.updateEventFields(eventRecord.id, {
-      tracklist_finalized_at: finalizedAt,
-    });
+    try {
+      await airtableService.updateEventFields(eventRecord.id, {
+        tracklist_finalized_at: finalizedAt,
+      });
+    } catch (tsError) {
+      console.error('Error setting tracklist_finalized_at:', tsError);
+      return NextResponse.json(
+        { error: 'Reihenfolge gespeichert, aber Finalisierung fehlgeschlagen. Bitte erneut versuchen.' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
