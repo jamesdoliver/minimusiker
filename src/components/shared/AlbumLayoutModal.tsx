@@ -153,11 +153,15 @@ export default function AlbumLayoutModal({
   const isReadOnly = readOnly || isFinalized;
   const isEventDayOrPast = (() => {
     if (!eventDate) return false;
+    const berlinNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+    const berlinHour = berlinNow.getHours();
+    const berlinToday = new Date(berlinNow);
+    berlinToday.setHours(0, 0, 0, 0);
     const ed = new Date(eventDate);
-    const now = new Date();
-    const edOnly = new Date(ed.getFullYear(), ed.getMonth(), ed.getDate());
-    const nowOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return edOnly <= nowOnly;
+    ed.setHours(0, 0, 0, 0);
+    const isEventDay = ed.getTime() === berlinToday.getTime();
+    const isPast = ed < berlinToday;
+    return isPast || (isEventDay && berlinHour >= 13);
   })();
 
   const sensors = useSensors(

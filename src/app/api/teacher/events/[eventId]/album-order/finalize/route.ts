@@ -37,17 +37,25 @@ export async function POST(
       );
     }
 
-    // Server-side guard: event date must be today or past (in Europe/Berlin timezone)
+    // Server-side guard: event date must be today (after 1pm Berlin) or past
     const berlinFormatter = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Europe/Berlin',
       year: 'numeric', month: '2-digit', day: '2-digit',
     });
-    const eventDateStr = event.eventDate.split('T')[0]; // YYYY-MM-DD
-    const nowBerlin = berlinFormatter.format(new Date()); // YYYY-MM-DD in Berlin
+    const berlinHourFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Berlin',
+      hour: 'numeric', hour12: false,
+    });
+    const eventDateStr = event.eventDate.split('T')[0];
+    const nowBerlinDate = berlinFormatter.format(new Date());
+    const nowBerlinHour = parseInt(berlinHourFormatter.format(new Date()), 10);
 
-    if (eventDateStr > nowBerlin) {
+    const isEventDay = eventDateStr === nowBerlinDate;
+    const isPast = eventDateStr < nowBerlinDate;
+
+    if (!isPast && !(isEventDay && nowBerlinHour >= 13)) {
       return NextResponse.json(
-        { error: 'Cannot finalize before event day' },
+        { error: 'Cannot finalize before 13:00 on event day' },
         { status: 400 }
       );
     }

@@ -39,18 +39,22 @@ export default function TracklistReminderPopup({
   };
 
   // Show conditions:
-  // 1. Event date is today or in the past (date-only comparison)
+  // 1. Event date is past, or it's event day and 1pm+ Berlin time
   // 2. tracklistFinalizedAt is null/undefined
   // 3. Not dismissed this session
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const event = new Date(eventDate);
-  event.setHours(0, 0, 0, 0);
-  const eventIsTodayOrPast = event <= today;
+  const berlinNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+  const berlinHour = berlinNow.getHours();
+  const berlinToday = new Date(berlinNow);
+  berlinToday.setHours(0, 0, 0, 0);
 
-  const tracklistNotFinalized = !tracklistFinalizedAt;
+  const eventDateObj = new Date(eventDate);
+  eventDateObj.setHours(0, 0, 0, 0);
 
-  if (!eventIsTodayOrPast || !tracklistNotFinalized || dismissed) {
+  const isEventDay = eventDateObj.getTime() === berlinToday.getTime();
+  const isPastEvent = eventDateObj < berlinToday;
+  const shouldShowByDate = isPastEvent || (isEventDay && berlinHour >= 13);
+
+  if (!shouldShowByDate || tracklistFinalizedAt || dismissed) {
     return null;
   }
 
