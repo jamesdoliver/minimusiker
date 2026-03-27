@@ -163,7 +163,6 @@ export default function AlbumLayoutModal({
     async function fetchTracks() {
       try {
         const url = `${apiBaseUrl}${apiBaseUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-        console.log('[AlbumLayout] GET', url);
         const response = await fetch(url, {
           cache: 'no-store',
           headers: {
@@ -178,8 +177,6 @@ export default function AlbumLayoutModal({
         }
 
         const data = await response.json();
-        console.log('[AlbumLayout] GET response:', data.tracks?.length, 'tracks',
-          data.tracks?.map((t: AlbumTrack) => `${t.albumOrder}. ${t.songTitle} [${t.className}]`));
         const editableTracks: EditableTrack[] = data.tracks.map((t: AlbumTrack) => ({
           ...t,
           editedTitle: t.songTitle,
@@ -257,51 +254,15 @@ export default function AlbumLayoutModal({
         ...(track.editedClassName !== track.originalClassName && { className: track.editedClassName }),
       }));
 
-      // Log FULL payload including title/className changes
-      const changedFields = updates.filter(u => u.title !== undefined || u.className !== undefined);
-      console.log('[AlbumLayout] PUT', apiBaseUrl, 'updates:', updates.map(u => `${u.albumOrder}. ${u.songId}`));
-      if (changedFields.length > 0) {
-        console.log('[AlbumLayout] PUT changed fields:', changedFields.map(u =>
-          `${u.songId}: ${u.title !== undefined ? `title="${u.title}"` : ''}${u.className !== undefined ? ` class="${u.className}"` : ''}`
-        ));
-      } else {
-        console.log('[AlbumLayout] PUT: only order changes, no title/className edits');
-      }
-
       const response = await fetch(apiBaseUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tracks: updates }),
       });
 
-      const putResult = await response.json();
-      console.log('[AlbumLayout] PUT response:', response.status, putResult);
-
       if (!response.ok) {
+        const putResult = await response.json();
         throw new Error(putResult.error || 'Fehler beim Speichern');
-      }
-
-      // Verification: re-fetch to confirm save persisted
-      const verifyUrl = `${apiBaseUrl}${apiBaseUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-      const verifyResponse = await fetch(verifyUrl, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
-      });
-      if (verifyResponse.ok) {
-        const verifyData = await verifyResponse.json();
-        const verifyOrder = verifyData.tracks?.map((t: AlbumTrack) => t.songId);
-        const expectedOrder = updates.map(u => u.songId);
-        const orderMatch = JSON.stringify(verifyOrder) === JSON.stringify(expectedOrder);
-        console.log('[AlbumLayout] VERIFY order:', orderMatch ? 'MATCH' : 'MISMATCH');
-        console.log('[AlbumLayout] VERIFY titles+classes:', verifyData.tracks?.map(
-          (t: AlbumTrack) => `${t.albumOrder}. ${t.songTitle} [${t.className}]`
-        ));
-        if (!orderMatch) {
-          console.error('[AlbumLayout] ORDER MISMATCH! Expected:', expectedOrder, 'Got:', verifyOrder);
-        }
       }
 
       // Update original values to reflect saved state

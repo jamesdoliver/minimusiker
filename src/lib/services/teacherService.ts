@@ -3799,18 +3799,6 @@ class TeacherService {
    */
   async updateAlbumOrderData(eventId: string, tracks: AlbumTrackUpdate[]): Promise<void> {
     try {
-      // Log what changes are being made
-      const titleChanges = tracks.filter(t => t.title !== undefined);
-      const classNameChanges = tracks.filter(t => t.className !== undefined);
-      console.log(`[updateAlbumOrderData] eventId="${eventId}", ${tracks.length} tracks, ` +
-        `${titleChanges.length} title changes, ${classNameChanges.length} className changes`);
-      if (titleChanges.length > 0) {
-        console.log(`[updateAlbumOrderData] title changes:`, titleChanges.map(t => `${t.songId}: "${t.title}"`));
-      }
-      if (classNameChanges.length > 0) {
-        console.log(`[updateAlbumOrderData] className changes:`, classNameChanges.map(t => `${t.songId}: class="${t.className}" classId=${t.classId}`));
-      }
-
       // Update songs with new album order and optional title changes
       for (const track of tracks) {
         const updateData: { [key: string]: string | number } = {
@@ -3896,7 +3884,6 @@ class TeacherService {
         }
       }
 
-      console.log(`[updateAlbumOrder] Updated ${tracks.length} tracks for event ${eventId}`);
     } catch (error) {
       console.error('Error updating album order:', error);
       throw new Error(`Failed to update album order: ${error instanceof Error ? error.message : 'Unknown error'}`);
