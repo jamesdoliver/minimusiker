@@ -169,8 +169,26 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
     setCurrentTime(newTime);
   }, []);
 
-  if (loading || (!fetchError && tracks.length === 0)) {
+  // No audio available — hide section entirely
+  if (!loading && !fetchError && tracks.length === 0) {
     return null;
+  }
+
+  // Loading state — show skeleton
+  if (loading) {
+    return (
+      <div className="mb-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+          <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />
+        </div>
+        <div className="space-y-3">
+          <div className="h-12 bg-gray-100 rounded-lg animate-pulse" />
+          <div className="h-12 bg-gray-100 rounded-lg animate-pulse" />
+          <div className="h-12 bg-gray-100 rounded-lg animate-pulse" />
+        </div>
+      </div>
+    );
   }
 
   if (fetchError) {
