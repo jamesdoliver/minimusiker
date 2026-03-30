@@ -126,6 +126,7 @@ export async function GET(
       scsShirtsIncluded?: boolean;
       minicardOrderEnabled?: boolean;
       minicardOrderQuantity?: number;
+      tracklistFinalizedAt?: string;
     } = {};
 
     try {
@@ -166,6 +167,7 @@ export async function GET(
             scsShirtsIncluded: eventRecord.scs_shirts_included,
             minicardOrderEnabled: eventRecord.minicard_order_enabled,
             minicardOrderQuantity: eventRecord.minicard_order_quantity,
+            tracklistFinalizedAt: eventRecord.tracklist_finalized_at,
           };
         }
       }

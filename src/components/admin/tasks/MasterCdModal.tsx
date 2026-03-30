@@ -94,6 +94,9 @@ export default function MasterCdModal({
   const [saveError, setSaveError] = useState<string | null>(null);
   const { state: zipState, startDownload: startZipDownload, cancel: cancelZipDownload } = useClientZipDownload();
 
+  // Finalization status
+  const [tracklistFinalizedAt, setTracklistFinalizedAt] = useState<string | null>(null);
+
   // Notes for partial completion
   const [showNotesInput, setShowNotesInput] = useState(false);
   const [notes, setNotes] = useState('');
@@ -162,6 +165,19 @@ export default function MasterCdModal({
       );
       setRemovedSongIds([]);
       setIsDirty(false);
+
+      // Fetch event's tracklist finalization status
+      try {
+        const eventRes = await fetch(`/api/admin/events/${data.eventId}`, {
+          credentials: 'include',
+        });
+        if (eventRes.ok) {
+          const eventJson = await eventRes.json();
+          setTracklistFinalizedAt(eventJson.event?.tracklist_finalized_at || null);
+        }
+      } catch {
+        // Non-critical — banner just won't show
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load tracklist');
     } finally {
@@ -176,8 +192,10 @@ export default function MasterCdModal({
   // --- Edit operations ---
 
   const moveTrack = (index: number, direction: -1 | 1) => {
+    if (editTracks[index]?.songId === '__schulsong__') return; // Can't move schulsong
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= editTracks.length) return;
+    if (editTracks[newIndex]?.songId === '__schulsong__') return; // Can't swap with schulsong
     const updated = [...editTracks];
     [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
     // Renumber
@@ -213,6 +231,7 @@ export default function MasterCdModal({
   };
 
   const removeTrack = (songId: string) => {
+    if (songId === '__schulsong__') return; // Can't remove schulsong
     setEditTracks((prev) => {
       const filtered = prev.filter((t) => t.songId !== songId);
       // Renumber
@@ -387,6 +406,24 @@ export default function MasterCdModal({
                   </span>
                 </div>
 
+                {/* Teacher finalization status */}
+                {tracklistFinalizedAt ? (
+                  <div className="mb-3 bg-green-50 border border-green-200 rounded-lg p-2.5">
+                    <p className="text-xs text-green-700 font-medium">
+                      Lieder-Reihenfolge vom Lehrer bestätigt am{' '}
+                      {new Date(tracklistFinalizedAt).toLocaleDateString('de-DE', {
+                        day: 'numeric', month: 'long', year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                    <p className="text-xs text-amber-700 font-medium">
+                      Lieder-Reihenfolge noch nicht vom Lehrer bestätigt
+                    </p>
+                  </div>
+                )}
+
                 {editTracks.length === 0 && removedSongIds.length === 0 ? (
                   <p className="text-sm text-gray-400 py-4 text-center">No tracks configured</p>
                 ) : editTracks.length === 0 && removedSongIds.length > 0 ? (
@@ -408,9 +445,14 @@ export default function MasterCdModal({
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {editTracks.map((track, index) => (
-                          <tr key={track.songId} className="hover:bg-gray-50 group">
+                          <tr key={track.songId} className={
+                            track.songId === '__schulsong__'
+                              ? 'bg-amber-50 border-l-2 border-l-amber-400 group'
+                              : 'hover:bg-gray-50 group'
+                          }>
                             {/* Up/Down arrows */}
                             <td className="px-2 py-1.5">
+                              {track.songId !== '__schulsong__' && (
                               <div className="flex flex-col items-center gap-0.5">
                                 <button
                                   type="button"
@@ -433,6 +475,7 @@ export default function MasterCdModal({
                                   </svg>
                                 </button>
                               </div>
+                              )}
                             </td>
 
                             {/* Track number */}
@@ -493,6 +536,7 @@ export default function MasterCdModal({
 
                             {/* Remove */}
                             <td className="px-2 py-1.5">
+                              {track.songId !== '__schulsong__' && (
                               <button
                                 type="button"
                                 onClick={() => removeTrack(track.songId)}
@@ -503,6 +547,7 @@ export default function MasterCdModal({
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                               </button>
+                              )}
                             </td>
                           </tr>
                         ))}

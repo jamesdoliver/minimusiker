@@ -26,6 +26,13 @@ interface AlbumLayoutModalProps {
   classesWithoutSongs?: string[];
   onClose: () => void;
   onSave?: () => void;
+  // New props for finalization
+  tracklistFinalizedAt?: string;      // ISO datetime if already finalized
+  eventDate?: string;                  // Event date for determining if finalize button is active
+  readOnly?: boolean;     // Forces read-only mode regardless of finalization (for engineer)
+  inline?: boolean;       // Renders without modal overlay (for Master CD embed)
+  hideFinalize?: boolean; // Hides Finalisieren button entirely (for admin/engineer)
+  showAdminFinalize?: boolean; // Shows admin "Bestätigen" button (no date guard)
 }
 
 type ModalState = 'loading' | 'ready' | 'saving' | 'error';
@@ -41,11 +48,15 @@ function SortableTrackItem({
   index,
   onTitleChange,
   onClassNameChange,
+  readOnly,
+  trackNumberOffset = 0,
 }: {
   track: EditableTrack;
   index: number;
   onTitleChange: (songId: string, title: string) => void;
   onClassNameChange: (songId: string, className: string) => void;
+  readOnly?: boolean;
+  trackNumberOffset?: number;
 }) {
   const {
     attributes,
@@ -74,7 +85,7 @@ function SortableTrackItem({
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 touch-none"
+        className={`cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 touch-none${readOnly ? ' invisible' : ''}`}
         title="Ziehen zum Sortieren"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,14 +94,15 @@ function SortableTrackItem({
       </button>
 
       {/* Track number */}
-      <span className="w-8 text-sm font-medium text-gray-500">{index + 1}.</span>
+      <span className="w-8 text-sm font-medium text-gray-500">{index + 1 + trackNumberOffset}.</span>
 
       {/* Song title input */}
       <input
         type="text"
         value={track.editedTitle}
         onChange={(e) => onTitleChange(track.songId, e.target.value)}
-        className="flex-1 px-2 py-1 text-sm border border-gray-200 rounded focus:border-pink-300 focus:outline-none focus:ring-1 focus:ring-pink-200"
+        readOnly={readOnly}
+        className={`flex-1 px-2 py-1 text-sm rounded focus:border-pink-300 focus:outline-none focus:ring-1 focus:ring-pink-200 border ${readOnly ? 'border-transparent bg-transparent' : 'border-gray-200'}`}
         placeholder="Liedtitel"
       />
 
@@ -102,7 +114,8 @@ function SortableTrackItem({
         type="text"
         value={track.editedClassName}
         onChange={(e) => onClassNameChange(track.songId, e.target.value)}
-        className="w-40 px-2 py-1 text-sm border border-gray-200 rounded focus:border-pink-300 focus:outline-none focus:ring-1 focus:ring-pink-200"
+        readOnly={readOnly}
+        className={`w-40 px-2 py-1 text-sm rounded focus:border-pink-300 focus:outline-none focus:ring-1 focus:ring-pink-200 border ${readOnly ? 'border-transparent bg-transparent' : 'border-gray-200'}`}
         placeholder="Klasse"
       />
 
@@ -126,11 +139,32 @@ export default function AlbumLayoutModal({
   classesWithoutSongs,
   onClose,
   onSave,
+  tracklistFinalizedAt,
+  eventDate,
+  readOnly,
+  inline,
+  hideFinalize,
+  showAdminFinalize,
 }: AlbumLayoutModalProps) {
   const [state, setState] = useState<ModalState>('loading');
   const [tracks, setTracks] = useState<EditableTrack[]>([]);
   const [error, setError] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [showFinalizeTooltip, setShowFinalizeTooltip] = useState(false);
+  const isFinalized = Boolean(tracklistFinalizedAt);
+  const isReadOnly = readOnly || isFinalized;
+  const isEventDayOrPast = (() => {
+    if (!eventDate) return false;
+    const berlinNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+    const berlinHour = berlinNow.getHours();
+    const berlinToday = new Date(berlinNow);
+    berlinToday.setHours(0, 0, 0, 0);
+    const ed = new Date(eventDate);
+    ed.setHours(0, 0, 0, 0);
+    const isEventDay = ed.getTime() === berlinToday.getTime();
+    const isPast = ed < berlinToday;
+    return isPast || (isEventDay && berlinHour >= 13);
+  })();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -144,7 +178,6 @@ export default function AlbumLayoutModal({
     async function fetchTracks() {
       try {
         const url = `${apiBaseUrl}${apiBaseUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-        console.log('[AlbumLayout] GET', url);
         const response = await fetch(url, {
           cache: 'no-store',
           headers: {
@@ -159,8 +192,6 @@ export default function AlbumLayoutModal({
         }
 
         const data = await response.json();
-        console.log('[AlbumLayout] GET response:', data.tracks?.length, 'tracks',
-          data.tracks?.map((t: AlbumTrack) => `${t.albumOrder}. ${t.songTitle} [${t.className}]`));
         const editableTracks: EditableTrack[] = data.tracks.map((t: AlbumTrack) => ({
           ...t,
           editedTitle: t.songTitle,
@@ -194,6 +225,7 @@ export default function AlbumLayoutModal({
   }, [tracks, state]);
 
   const handleDragEnd = (event: DragEndEvent) => {
+    if (isReadOnly) return;
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
@@ -237,51 +269,15 @@ export default function AlbumLayoutModal({
         ...(track.editedClassName !== track.originalClassName && { className: track.editedClassName }),
       }));
 
-      // Log FULL payload including title/className changes
-      const changedFields = updates.filter(u => u.title !== undefined || u.className !== undefined);
-      console.log('[AlbumLayout] PUT', apiBaseUrl, 'updates:', updates.map(u => `${u.albumOrder}. ${u.songId}`));
-      if (changedFields.length > 0) {
-        console.log('[AlbumLayout] PUT changed fields:', changedFields.map(u =>
-          `${u.songId}: ${u.title !== undefined ? `title="${u.title}"` : ''}${u.className !== undefined ? ` class="${u.className}"` : ''}`
-        ));
-      } else {
-        console.log('[AlbumLayout] PUT: only order changes, no title/className edits');
-      }
-
       const response = await fetch(apiBaseUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tracks: updates }),
       });
 
-      const putResult = await response.json();
-      console.log('[AlbumLayout] PUT response:', response.status, putResult);
-
       if (!response.ok) {
+        const putResult = await response.json();
         throw new Error(putResult.error || 'Fehler beim Speichern');
-      }
-
-      // Verification: re-fetch to confirm save persisted
-      const verifyUrl = `${apiBaseUrl}${apiBaseUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-      const verifyResponse = await fetch(verifyUrl, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-        },
-      });
-      if (verifyResponse.ok) {
-        const verifyData = await verifyResponse.json();
-        const verifyOrder = verifyData.tracks?.map((t: AlbumTrack) => t.songId);
-        const expectedOrder = updates.map(u => u.songId);
-        const orderMatch = JSON.stringify(verifyOrder) === JSON.stringify(expectedOrder);
-        console.log('[AlbumLayout] VERIFY order:', orderMatch ? 'MATCH' : 'MISMATCH');
-        console.log('[AlbumLayout] VERIFY titles+classes:', verifyData.tracks?.map(
-          (t: AlbumTrack) => `${t.albumOrder}. ${t.songTitle} [${t.className}]`
-        ));
-        if (!orderMatch) {
-          console.error('[AlbumLayout] ORDER MISMATCH! Expected:', expectedOrder, 'Got:', verifyOrder);
-        }
       }
 
       // Update original values to reflect saved state
@@ -309,11 +305,89 @@ export default function AlbumLayoutModal({
     }
   };
 
+  const handleFinalize = async () => {
+    const confirmed = confirm(
+      'Die Reihenfolge wird endgültig festgelegt und kann danach nicht mehr geändert werden. Fortfahren?'
+    );
+    if (!confirmed) return;
+
+    setState('saving');
+    setError('');
+
+    try {
+      const updates: AlbumTrackUpdate[] = tracks.map((track, index) => ({
+        songId: track.songId,
+        albumOrder: index + 1,
+        classId: track.classId,
+        ...(track.editedTitle !== track.originalTitle && { title: track.editedTitle }),
+        ...(track.editedClassName !== track.originalClassName && { className: track.editedClassName }),
+      }));
+
+      const finalizeUrl = `${apiBaseUrl}/finalize`;
+      const response = await fetch(finalizeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracks: updates }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Fehler beim Finalisieren');
+      }
+
+      onSave?.();
+      onClose();
+    } catch (err) {
+      console.error('Error finalizing tracklist:', err);
+      setError(err instanceof Error ? err.message : 'Fehler beim Finalisieren');
+      setState('ready');
+    }
+  };
+
+  const handleAdminFinalize = async () => {
+    setState('saving');
+    setError('');
+    try {
+      const updates: AlbumTrackUpdate[] = tracks.map((track, index) => ({
+        songId: track.songId,
+        albumOrder: index + 1,
+        classId: track.classId,
+        ...(track.editedTitle !== track.originalTitle && { title: track.editedTitle }),
+        ...(track.editedClassName !== track.originalClassName && { className: track.editedClassName }),
+      }));
+
+      const finalizeUrl = `${apiBaseUrl}/finalize`;
+      const response = await fetch(finalizeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracks: updates }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Fehler beim Bestätigen');
+      }
+
+      onSave?.();
+      onClose();
+    } catch (err) {
+      console.error('Error admin-finalizing:', err);
+      setError(err instanceof Error ? err.message : 'Fehler beim Bestätigen');
+      setState('ready');
+    }
+  };
+
   const missingSongs = classesWithoutSongs && classesWithoutSongs.length > 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+    <div className={inline
+      ? 'flex flex-col'
+      : 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'
+    }>
+      <div className={inline
+        ? 'bg-white rounded-xl flex flex-col'
+        : 'bg-white rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col'
+      }>
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Album-Reihenfolge</h3>
@@ -377,31 +451,107 @@ export default function AlbumLayoutModal({
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Ziehe die Lieder in die gewünschte Reihenfolge für das gedruckte Album.
-                    Du kannst auch Titel und Klassennamen bearbeiten.
+                  <p className="text-sm text-gray-600 mb-3">
+                    Ziehe die Titel per Drag&amp;Drop in die gewünschte Reihenfolge, so wie sie
+                    auf dem Tonträger (CD, Lautsprecherbox) zu hören sein sollen. Du kannst diese
+                    Liste speichern und NACH dem Minimusikertag finalisieren, danach ist die
+                    Reihenfolge fest und nicht mehr veränderbar. Achte auch auf die korrekte
+                    Schreibweise, denn anhand dieser Informationen lassen wir die CD-Booklets drucken.
                   </p>
 
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext
-                      items={tracks.map((t) => t.songId)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {tracks.map((track, index) => (
-                        <SortableTrackItem
-                          key={track.songId}
-                          track={track}
-                          index={index}
-                          onTitleChange={handleTitleChange}
-                          onClassNameChange={handleClassNameChange}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
+                  {/* Finalization status indicator */}
+                  {isFinalized ? (
+                    <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-sm text-green-700 font-medium">
+                        Diese Lieder-Reihenfolge wurde final festgelegt
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <p className="text-sm text-amber-700 font-medium">
+                        Diese Lieder-Reihenfolge wurde noch nicht final festgelegt
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Pinned schulsong track with gold styling */}
+                  {(() => {
+                    const schulsongTrack = tracks.length > 0 && tracks[0].isSchulsong ? tracks[0] : null;
+                    const sortableTracks = schulsongTrack ? tracks.slice(1) : tracks;
+
+                    return (
+                      <>
+                        {schulsongTrack && (
+                          <div className="flex items-center gap-3 p-3 bg-amber-50 border-2 border-amber-300 rounded-lg mb-3 ring-2 ring-amber-400/50">
+                            {/* Empty space where drag handle would be — preserves alignment */}
+                            <div className="w-5 h-5 flex-shrink-0" />
+
+                            {/* Track number */}
+                            <span className="w-8 text-sm font-bold text-amber-700">1.</span>
+
+                            {/* Song title input — editable unless read-only */}
+                            <input
+                              type="text"
+                              value={schulsongTrack.editedTitle}
+                              onChange={(e) => handleTitleChange(schulsongTrack.songId, e.target.value)}
+                              readOnly={isReadOnly}
+                              className={`flex-1 px-2 py-1 text-sm font-medium rounded ${
+                                isReadOnly
+                                  ? 'border-transparent bg-transparent text-amber-800'
+                                  : 'border border-amber-300 bg-white focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-400'
+                              }`}
+                              placeholder="Schulsong Titel"
+                            />
+
+                            {/* Separator */}
+                            <span className="text-amber-400">-</span>
+
+                            {/* Class name — editable for schulsong */}
+                            <input
+                              type="text"
+                              value={schulsongTrack.editedClassName}
+                              onChange={(e) => handleClassNameChange(schulsongTrack.songId, e.target.value)}
+                              readOnly={isReadOnly}
+                              className={`w-40 px-2 py-1 text-sm rounded ${
+                                isReadOnly
+                                  ? 'border-transparent bg-transparent text-amber-600'
+                                  : 'border border-amber-300 bg-white text-amber-800 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-400'
+                              }`}
+                              placeholder="Schulname"
+                            />
+
+                            {/* Schulsong badge */}
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 font-medium">
+                              Schulsong
+                            </span>
+                          </div>
+                        )}
+
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <SortableContext
+                            items={sortableTracks.map((t) => t.songId)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {sortableTracks.map((track, index) => (
+                              <SortableTrackItem
+                                key={track.songId}
+                                track={track}
+                                index={index}
+                                onTitleChange={handleTitleChange}
+                                onClassNameChange={handleClassNameChange}
+                                readOnly={isReadOnly}
+                                trackNumberOffset={schulsongTrack ? 1 : 0}
+                              />
+                            ))}
+                          </SortableContext>
+                        </DndContext>
+                      </>
+                    );
+                  })()}
                 </>
               )}
 
@@ -424,16 +574,57 @@ export default function AlbumLayoutModal({
           >
             Abbrechen
           </button>
-          <button
-            onClick={handleSave}
-            disabled={state === 'saving' || state === 'loading' || !hasChanges || tracks.length === 0}
-            className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {state === 'saving' && (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            )}
-            Speichern
-          </button>
+
+          {!isReadOnly && (
+            <button
+              onClick={handleSave}
+              disabled={state === 'saving' || state === 'loading' || !hasChanges || tracks.length === 0}
+              className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {state === 'saving' && (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              )}
+              Speichern
+            </button>
+          )}
+
+          {!isFinalized && !hideFinalize && (
+            <div
+              className="relative"
+              onMouseEnter={() => !isEventDayOrPast && setShowFinalizeTooltip(true)}
+              onMouseLeave={() => setShowFinalizeTooltip(false)}
+            >
+              <button
+                onClick={isEventDayOrPast ? handleFinalize : undefined}
+                disabled={state === 'saving' || state === 'loading' || tracks.length === 0 || !isEventDayOrPast}
+                className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+                  isEventDayOrPast
+                    ? 'bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Finalisieren
+              </button>
+              {showFinalizeTooltip && !isEventDayOrPast && (
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap">
+                  Verfügbar nach dem Minimusikertag
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                    <div className="border-4 border-transparent border-t-gray-800"></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {showAdminFinalize && !isFinalized && (
+            <button
+              onClick={handleAdminFinalize}
+              disabled={state === 'saving' || state === 'loading' || tracks.length === 0}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Bestätigen
+            </button>
+          )}
         </div>
       </div>
     </div>

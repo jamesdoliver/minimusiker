@@ -95,6 +95,43 @@ export async function GET(
       }
     }
 
+    // Group tracks — groups store audio with groupId as classId
+    try {
+      const groups = await teacherService.getGroupsByEventId(eventId);
+      for (const group of groups) {
+        const groupFiles = finalReadyFiles.filter(
+          (f) => f.classId === group.groupId && !f.isSchulsong
+        );
+        if (groupFiles.length === 0) continue;
+
+        for (const af of groupFiles) {
+          const song = af.songId
+            ? group.songs.find((s) => s.id === af.songId)
+            : group.songs.length === 1
+              ? group.songs[0]
+              : undefined;
+
+          const songTitle = song?.title;
+          const displayName = songTitle
+            ? `${songTitle} - ${group.groupName}`
+            : group.groupName;
+
+          tracks.push({
+            fileId: af.id,
+            className: group.groupName,
+            classType: 'group',
+            songTitle,
+            displayName,
+            fileSizeBytes: af.fileSizeBytes,
+            isSchulsong: false,
+          });
+        }
+      }
+    } catch (err) {
+      // Groups are optional — don't fail the whole request
+      console.error('[teacher-audio-debug] Error fetching group audio:', err);
+    }
+
     // Schulsong track (include if any schulsong audio exists, regardless of event flag)
     {
       const schulsongFiles = finalReadyFiles.filter(

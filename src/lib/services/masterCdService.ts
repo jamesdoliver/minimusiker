@@ -12,7 +12,7 @@
 import { getTeacherService } from './teacherService';
 import { getAirtableService } from './airtableService';
 import { getR2Service } from './r2Service';
-import type { Song, AudioFile } from '@/lib/types/teacher';
+import type { AudioFile } from '@/lib/types/teacher';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,35 +52,30 @@ class MasterCdService {
    * Get the full tracklist for a Master CD, including audio status for each track.
    *
    * Data flow:
-   * 1. Fetch songs via TeacherService.getSongsByEventId()
-   * 2. Sort songs by album_order
-   * 3. Fetch audio files via TeacherService.getAudioFilesByEventId()
-   * 4. Match final audio files to songs via song_id
-   * 5. Determine status per track
-   * 6. Fetch event details (school_name)
-   * 7. Get class names from getAlbumTracksData (reuses existing class lookup)
-   * 8. Build MasterCdData
+   * 1. Call getAlbumTracksData() as the primary track source (includes virtual schulsong)
+   * 2. Fetch audio files and build finalAudioBySongId map
+   * 3. Find schulsong audio by isSchulsong flag on AudioFile
+   * 4. Fetch event details (school_name)
+   * 5. Build MasterCdTrack[] from albumTracks, matching audio files
    */
   async getTracklist(eventId: string): Promise<MasterCdData> {
-    // 1. Fetch songs for the event, excluding songs removed from album (albumOrder === 0)
-    const allSongs = await this.teacherService.getSongsByEventId(eventId, { excludeHidden: true });
-    const songs = allSongs.filter((s) => s.albumOrder !== 0);
+    // 1. Get album tracks (includes virtual schulsong if applicable)
+    const albumTracks = await this.teacherService.getAlbumTracksData(eventId);
 
-    // 2. Sort by album_order (fallback to song order, then index)
-    const sortedSongs = [...songs].sort((a, b) => {
-      const orderA = a.albumOrder ?? a.order ?? 999;
-      const orderB = b.albumOrder ?? b.order ?? 999;
-      return orderA - orderB;
-    });
-
-    // 3. Fetch audio files for the event
+    // 2. Fetch audio files for the event
     const audioFiles = await this.teacherService.getAudioFilesByEventId(eventId);
 
-    // 4. Filter to only final audio files and index by song_id
+    // 3. Build final audio lookup by songId
     const finalAudioBySongId = new Map<string, AudioFile>();
+    let schulsongAudio: AudioFile | undefined;
+
     for (const af of audioFiles) {
-      if (af.type === 'final' && af.songId) {
-        // If multiple finals exist for the same song, prefer 'ready' ones
+      if (af.isSchulsong && af.type === 'final') {
+        // Track schulsong audio separately (not matched by songId)
+        if (!schulsongAudio || (af.status === 'ready' && schulsongAudio.status !== 'ready')) {
+          schulsongAudio = af;
+        }
+      } else if (af.type === 'final' && af.songId) {
         const existing = finalAudioBySongId.get(af.songId);
         if (!existing || (af.status === 'ready' && existing.status !== 'ready')) {
           finalAudioBySongId.set(af.songId, af);
@@ -88,26 +83,20 @@ class MasterCdService {
       }
     }
 
-    // 5-7. Get class names via getAlbumTracksData (reuses the full class/group lookup)
-    const albumTracks = await this.teacherService.getAlbumTracksData(eventId);
-    const classNameBySongId = new Map<string, string>();
-    for (const at of albumTracks) {
-      classNameBySongId.set(at.songId, at.className);
-    }
-
-    // 8. Fetch event details for school_name
+    // 4. Fetch event details for school_name
     const event = await this.airtable.getEventByEventId(eventId);
     const schoolName = event?.school_name ?? 'Unknown School';
 
-    // 9. Build tracks array
-    const tracks: MasterCdTrack[] = sortedSongs.map((song: Song, index: number) => {
-      const finalAudio = finalAudioBySongId.get(song.id);
-      const className = classNameBySongId.get(song.id) ?? 'Unknown';
+    // 5. Build tracks from albumTracks
+    const tracks: MasterCdTrack[] = albumTracks.map((albumTrack) => {
+      // Match audio: schulsong uses dedicated audio, regular tracks use songId lookup
+      const finalAudio = albumTrack.isSchulsong
+        ? schulsongAudio
+        : finalAudioBySongId.get(albumTrack.songId);
 
       let status: MasterCdTrack['status'];
       if (finalAudio) {
         status = finalAudio.status as MasterCdTrack['status'];
-        // Ensure we only use known statuses
         if (!['ready', 'pending', 'processing', 'error'].includes(status)) {
           status = 'pending';
         }
@@ -116,21 +105,15 @@ class MasterCdService {
       }
 
       return {
-        trackNumber: song.albumOrder ?? index + 1,
-        songId: song.id,
-        title: song.title,
-        className,
+        trackNumber: albumTrack.albumOrder,
+        songId: albumTrack.songId,
+        title: albumTrack.songTitle,
+        className: albumTrack.className,
         audioFileId: finalAudio?.id,
         r2Key: finalAudio?.r2Key,
         durationSeconds: finalAudio?.durationSeconds,
         status,
       };
-    });
-
-    // Re-sort and renumber by trackNumber to ensure sequential
-    tracks.sort((a, b) => a.trackNumber - b.trackNumber);
-    tracks.forEach((track, idx) => {
-      track.trackNumber = idx + 1;
     });
 
     const readyCount = tracks.filter((t) => t.status === 'ready').length;
@@ -160,8 +143,13 @@ class MasterCdService {
     // Fetch audio files to access mp3R2Key for WAV→MP3 preference
     const audioFiles = await this.teacherService.getAudioFilesByEventId(eventId);
     const finalAudioBySongId = new Map<string, AudioFile>();
+    let schulsongAudio: AudioFile | undefined;
     for (const af of audioFiles) {
-      if (af.type === 'final' && af.songId) {
+      if (af.isSchulsong && af.type === 'final') {
+        if (!schulsongAudio || (af.status === 'ready' && schulsongAudio.status !== 'ready')) {
+          schulsongAudio = af;
+        }
+      } else if (af.type === 'final' && af.songId) {
         const existing = finalAudioBySongId.get(af.songId);
         if (!existing || (af.status === 'ready' && existing.status !== 'ready')) {
           finalAudioBySongId.set(af.songId, af);
@@ -177,7 +165,9 @@ class MasterCdService {
       }
 
       // Prefer MP3 version if available, fall back to primary r2Key (may be WAV)
-      const audioFile = finalAudioBySongId.get(track.songId);
+      const audioFile = track.songId === '__schulsong__'
+        ? schulsongAudio
+        : finalAudioBySongId.get(track.songId);
       const downloadKey = audioFile?.mp3R2Key || track.r2Key;
       const isMp3 = downloadKey.toLowerCase().endsWith('.mp3') || !!audioFile?.mp3R2Key;
       const ext = isMp3 ? 'mp3' : 'wav';

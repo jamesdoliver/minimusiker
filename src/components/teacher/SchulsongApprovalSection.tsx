@@ -43,9 +43,9 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
     fetchSchulsongStatus();
   }, [eventId]);
 
-  const fetchSchulsongStatus = async () => {
+  const fetchSchulsongStatus = async (silent: boolean = false) => {
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       setError(null);
 
       const response = await fetch(`/api/teacher/events/${encodeURIComponent(eventId)}/schulsong-status`);
@@ -63,9 +63,9 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
       setRejectionComment(data.rejectionComment || null);
     } catch (err) {
       console.error('Error fetching schulsong status:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load schulsong status');
+      if (!silent) setError(err instanceof Error ? err.message : 'Failed to load schulsong status');
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -87,10 +87,13 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
         throw new Error(data.error || 'Failed to approve schulsong');
       }
 
-      // Update state with the approval
+      // Optimistic update — show approved state immediately
       setStatus('approved');
       setTeacherApprovedAt(data.approvedAt);
       setNotes('');
+
+      // Re-fetch after a short delay to pick up side effects (release date scheduling)
+      setTimeout(() => fetchSchulsongStatus(true), 2000);
     } catch (err) {
       console.error('Error approving schulsong:', err);
       setError(err instanceof Error ? err.message : 'Failed to approve schulsong');
@@ -117,9 +120,13 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
         throw new Error(data.error || 'Failed to reject schulsong');
       }
 
+      // Optimistic update — show rejected state immediately
       setStatus('rejected');
       setRejectionComment(notes || null);
       setNotes('');
+
+      // Re-fetch after a short delay to confirm server state
+      setTimeout(() => fetchSchulsongStatus(true), 1500);
     } catch (err) {
       console.error('Error rejecting schulsong:', err);
       setError(err instanceof Error ? err.message : 'Failed to reject schulsong');

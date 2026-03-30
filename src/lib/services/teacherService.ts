@@ -2719,8 +2719,8 @@ class TeacherService {
             .all();
         }
 
-        // Get songs and audio files for this event
-        const songs = await this.getSongsByEventId(eventId);
+        // Get songs and audio files for this event (exclude engineer-hidden songs)
+        const songs = await this.getSongsByEventId(eventId, { excludeHidden: true });
         const audioFiles = await this.getAudioFilesByEventId(eventId);
 
         // Build class views from Classes table
@@ -2818,6 +2818,8 @@ class TeacherService {
           isSchulsong: eventRecord?.is_schulsong === true,
           scsShirtsIncluded: eventRecord?.scs_shirts_included === true,
           estimatedChildren: eventRecord?.estimated_children,
+          tracklistFinalizedAt: eventRecord?.tracklist_finalized_at,
+          schulsongTracklistTitle: eventRecord?.schulsong_tracklist_title,
           assignedStaff,
           progress: {
             classesCount,
@@ -2855,8 +2857,8 @@ class TeacherService {
           })
           .all();
 
-        // Get songs and audio files for this event
-        const songs = await this.getSongsByEventId(eventId);
+        // Get songs and audio files for this event (exclude engineer-hidden songs)
+        const songs = await this.getSongsByEventId(eventId, { excludeHidden: true });
         const audioFiles = await this.getAudioFilesByEventId(eventId);
 
         // Build class views from Classes table
@@ -2977,8 +2979,8 @@ class TeacherService {
             .all();
         }
 
-        // Get songs and audio files for this event
-        const songs = await this.getSongsByEventId(eventId);
+        // Get songs and audio files for this event (exclude engineer-hidden songs)
+        const songs = await this.getSongsByEventId(eventId, { excludeHidden: true });
         const audioFiles = await this.getAudioFilesByEventId(eventId);
 
         // Build class views from Classes table
@@ -3053,6 +3055,8 @@ class TeacherService {
           isSchulsong: linkedEvent.is_schulsong === true,
           scsShirtsIncluded: linkedEvent.scs_shirts_included === true,
           estimatedChildren: linkedEvent.estimated_children,
+          tracklistFinalizedAt: linkedEvent.tracklist_finalized_at,
+          schulsongTracklistTitle: linkedEvent.schulsong_tracklist_title,
           assignedStaff,
           progress: {
             classesCount,
@@ -3772,6 +3776,30 @@ class TeacherService {
         track.albumOrder = index + 1;
       });
 
+      // Inject virtual schulsong track if event has schulsong enabled
+      if (eventRecord?.is_schulsong) {
+        const schulsongTitle = eventRecord.schulsong_tracklist_title
+          || 'Schulsong';
+        const schulsongClassName = eventRecord.schulsong_tracklist_class
+          || eventRecord.school_name;
+
+        // Shift all existing tracks by +1
+        tracks.forEach(track => { track.albumOrder += 1; });
+
+        // Insert virtual schulsong at position 1
+        tracks.unshift({
+          songId: '__schulsong__',
+          songTitle: schulsongTitle,
+          classId: '__schulsong__',
+          className: schulsongClassName,
+          classType: 'schulsong',
+          albumOrder: 1,
+          originalTitle: schulsongTitle,
+          originalClassName: schulsongClassName,
+          isSchulsong: true,
+        });
+      }
+
       return tracks;
     } catch (error) {
       console.error('Error getting album tracks:', error);
@@ -3797,20 +3825,15 @@ class TeacherService {
    */
   async updateAlbumOrderData(eventId: string, tracks: AlbumTrackUpdate[]): Promise<void> {
     try {
-      // Log what changes are being made
-      const titleChanges = tracks.filter(t => t.title !== undefined);
-      const classNameChanges = tracks.filter(t => t.className !== undefined);
-      console.log(`[updateAlbumOrderData] eventId="${eventId}", ${tracks.length} tracks, ` +
-        `${titleChanges.length} title changes, ${classNameChanges.length} className changes`);
-      if (titleChanges.length > 0) {
-        console.log(`[updateAlbumOrderData] title changes:`, titleChanges.map(t => `${t.songId}: "${t.title}"`));
-      }
-      if (classNameChanges.length > 0) {
-        console.log(`[updateAlbumOrderData] className changes:`, classNameChanges.map(t => `${t.songId}: class="${t.className}" classId=${t.classId}`));
-      }
+      // Strip virtual schulsong entry — it's not a real Song record
+      const schulsongTrack = tracks.find(t => t.songId === '__schulsong__');
+      const realTracks = tracks.filter(t => t.songId !== '__schulsong__');
+
+      // Re-number real tracks starting at 1 (shifted to 2+ on read when schulsong present)
+      realTracks.forEach((t, i) => { t.albumOrder = i + 1; });
 
       // Update songs with new album order and optional title changes
-      for (const track of tracks) {
+      for (const track of realTracks) {
         const updateData: { [key: string]: string | number } = {
           [SONGS_FIELD_IDS.album_order]: track.albumOrder,
         };
@@ -3824,7 +3847,7 @@ class TeacherService {
 
       // Update class names if changed
       const classUpdates = new Map<string, string>();
-      for (const track of tracks) {
+      for (const track of realTracks) {
         if (track.className !== undefined && !track.classId.startsWith('group_')) {
           classUpdates.set(track.classId, track.className);
         }
@@ -3846,7 +3869,7 @@ class TeacherService {
       }
 
       // Update group names if changed
-      for (const track of tracks) {
+      for (const track of realTracks) {
         if (track.className !== undefined && track.classId.startsWith('group_')) {
           const groupRecords = await this.base(GROUPS_TABLE_ID)
             .select({
@@ -3865,7 +3888,7 @@ class TeacherService {
 
       // Calculate class display order based on first song position
       const classFirstPosition = new Map<string, number>();
-      for (const track of tracks) {
+      for (const track of realTracks) {
         if (!classFirstPosition.has(track.classId)) {
           classFirstPosition.set(track.classId, track.albumOrder);
         } else {
@@ -3894,7 +3917,24 @@ class TeacherService {
         }
       }
 
-      console.log(`[updateAlbumOrder] Updated ${tracks.length} tracks for event ${eventId}`);
+      // Save edited schulsong title and class name if present
+      if (schulsongTrack) {
+        const airtable = getAirtableService();
+        const eventRecord = await airtable.getEventByEventId(eventId);
+        if (eventRecord) {
+          const schulsongUpdates: Record<string, string | null> = {};
+          if (schulsongTrack.title !== undefined) {
+            schulsongUpdates.schulsong_tracklist_title = schulsongTrack.title;
+          }
+          if (schulsongTrack.className !== undefined) {
+            schulsongUpdates.schulsong_tracklist_class = schulsongTrack.className;
+          }
+          if (Object.keys(schulsongUpdates).length > 0) {
+            await airtable.updateEventFields(eventRecord.id, schulsongUpdates);
+          }
+        }
+      }
+
     } catch (error) {
       console.error('Error updating album order:', error);
       throw new Error(`Failed to update album order: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -4097,10 +4137,11 @@ export interface AlbumTrack {
   songTitle: string;
   classId: string;
   className: string;
-  classType: ClassType;
+  classType: ClassType | 'schulsong';
   albumOrder: number;
   originalTitle: string;
   originalClassName: string;
+  isSchulsong?: boolean;
 }
 
 /**
