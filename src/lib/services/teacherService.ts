@@ -2719,8 +2719,8 @@ class TeacherService {
             .all();
         }
 
-        // Get songs and audio files for this event
-        const songs = await this.getSongsByEventId(eventId);
+        // Get songs and audio files for this event (exclude engineer-hidden songs)
+        const songs = await this.getSongsByEventId(eventId, { excludeHidden: true });
         const audioFiles = await this.getAudioFilesByEventId(eventId);
 
         // Build class views from Classes table
@@ -2857,8 +2857,8 @@ class TeacherService {
           })
           .all();
 
-        // Get songs and audio files for this event
-        const songs = await this.getSongsByEventId(eventId);
+        // Get songs and audio files for this event (exclude engineer-hidden songs)
+        const songs = await this.getSongsByEventId(eventId, { excludeHidden: true });
         const audioFiles = await this.getAudioFilesByEventId(eventId);
 
         // Build class views from Classes table
@@ -2979,8 +2979,8 @@ class TeacherService {
             .all();
         }
 
-        // Get songs and audio files for this event
-        const songs = await this.getSongsByEventId(eventId);
+        // Get songs and audio files for this event (exclude engineer-hidden songs)
+        const songs = await this.getSongsByEventId(eventId, { excludeHidden: true });
         const audioFiles = await this.getAudioFilesByEventId(eventId);
 
         // Build class views from Classes table
