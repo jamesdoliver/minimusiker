@@ -537,8 +537,8 @@ class TeacherService {
       title: record.fields.title || record.fields[SONGS_FIELD_IDS.title] || '',
       artist: record.fields.artist || record.fields[SONGS_FIELD_IDS.artist],
       notes: record.fields.notes || record.fields[SONGS_FIELD_IDS.notes],
-      order: record.fields.order || record.fields[SONGS_FIELD_IDS.order] || 1,
-      albumOrder: record.fields.album_order || record.fields[SONGS_FIELD_IDS.album_order],
+      order: record.fields.order ?? record.fields[SONGS_FIELD_IDS.order] ?? 1,
+      albumOrder: record.fields.album_order ?? record.fields[SONGS_FIELD_IDS.album_order],
       createdBy: record.fields.created_by || record.fields[SONGS_FIELD_IDS.created_by],
       createdAt: record.fields.created_at || record.fields[SONGS_FIELD_IDS.created_at] || record.createdTime,
       hiddenByEngineer: Boolean(record.fields[SONGS_FIELD_IDS.hidden_by_engineer] || record.fields.hidden_by_engineer),
@@ -853,7 +853,7 @@ class TeacherService {
   async excludeSongsFromAlbum(songIds: string[]): Promise<void> {
     for (const songId of songIds) {
       await this.base(SONGS_TABLE).update(songId, {
-        [SONGS_FIELD_IDS.album_order]: 0,
+        album_order: 0,
       } as Airtable.FieldSet);
     }
   }
@@ -3746,10 +3746,14 @@ class TeacherService {
       }
 
       // Build album tracks array
+      // Songs with album_order = 0 have been excluded from the album via
+      // excludeSongsFromAlbum() and should not appear in tracklists.
       const tracks: AlbumTrack[] = [];
       let defaultOrder = 1;
 
       for (const song of songs) {
+        if (song.albumOrder === 0) continue;
+
         const classInfo = classMap.get(song.classId);
         const className = classInfo?.name || 'Unknown';
         const classType = classInfo?.type || 'regular';
@@ -3760,7 +3764,7 @@ class TeacherService {
           classId: song.classId,
           className,
           classType,
-          albumOrder: song.albumOrder || defaultOrder,
+          albumOrder: song.albumOrder ?? defaultOrder,
           originalTitle: song.title,
           originalClassName: className,
         });
@@ -3833,13 +3837,14 @@ class TeacherService {
       realTracks.forEach((t, i) => { t.albumOrder = i + 1; });
 
       // Update songs with new album order and optional title changes
+      // Use field names (not field IDs) to match how getSongsByEventId reads them
       for (const track of realTracks) {
-        const updateData: { [key: string]: string | number } = {
-          [SONGS_FIELD_IDS.album_order]: track.albumOrder,
+        const updateData: Record<string, string | number> = {
+          album_order: track.albumOrder,
         };
 
         if (track.title !== undefined) {
-          updateData[SONGS_FIELD_IDS.title] = track.title;
+          updateData.title = track.title;
         }
 
         await this.base(SONGS_TABLE).update(track.songId, updateData as Airtable.FieldSet);

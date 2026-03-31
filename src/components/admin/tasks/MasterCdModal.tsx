@@ -583,28 +583,36 @@ export default function MasterCdModal({
                       <div className="flex items-center gap-2">
                         {zipState.status === 'downloading' ? (
                           <>
-                            <span className="flex items-center gap-1.5 text-xs text-gray-600">
-                              <div className="w-3 h-3 border-2 border-[#94B8B3] border-t-transparent rounded-full animate-spin" />
-                              {zipState.currentFileIndex + 1}/{zipState.totalFiles}
+                            <span className="flex items-center gap-1.5 text-xs font-medium text-blue-700">
+                              <div className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                              Downloading {zipState.currentFileIndex + 1}/{zipState.totalFiles}...
                             </span>
                             <button type="button" onClick={cancelZipDownload} className="text-xs text-gray-500 hover:text-red-600">
                               Cancel
                             </button>
                           </>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={handleDownloadAll}
-                            disabled={readyCount === 0 || isDirty}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#94B8B3] border border-[#94B8B3] rounded hover:bg-[#94B8B3]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            {zipState.status === 'complete' ? 'Download Again' :
-                             zipState.status === 'error' ? 'Retry' :
-                             `Download ZIP (${readyCount})`}
-                          </button>
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={handleDownloadAll}
+                              disabled={readyCount === 0 || isDirty}
+                              title={isDirty ? 'Save changes before downloading' : readyCount === 0 ? 'No tracks ready' : undefined}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#94B8B3] border border-[#94B8B3] rounded hover:bg-[#94B8B3]/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                              {zipState.status === 'complete' ? 'Download Again' :
+                               zipState.status === 'error' ? 'Retry' :
+                               `Download ZIP (${readyCount})`}
+                            </button>
+                            {isDirty && (
+                              <p className="absolute right-0 top-full mt-1 text-[10px] text-amber-600 whitespace-nowrap">
+                                Save changes first
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}

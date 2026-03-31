@@ -394,11 +394,12 @@ async function buildAllAudio(
   options?: { showAllGroups?: boolean }
 ): Promise<AllAudioResponse | null> {
   try {
-    // 1. Bulk fetch songs + audio files for the event (2 Airtable calls)
-    const [allSongs, allAudioFiles, eventDetail] = await Promise.all([
+    // 1. Bulk fetch songs, audio files, event detail, and album tracks
+    const [allSongs, allAudioFiles, eventDetail, albumTracks] = await Promise.all([
       teacherService.getSongsByEventId(eventId, { excludeHidden: true }),
       teacherService.getAudioFilesByEventId(eventId),
       airtableService.getSchoolEventDetail(eventId),
+      teacherService.getAlbumTracksData(eventId),
     ]);
 
     if (!eventDetail) {
@@ -410,6 +411,14 @@ async function buildAllAudio(
     const songMap = new Map<string, Song>();
     for (const song of allSongs) {
       songMap.set(song.id, song);
+    }
+
+    // Album order map: songId → { albumOrder, className }
+    const albumOrderMap = new Map<string, { albumOrder: number; className: string }>();
+    for (const at of albumTracks) {
+      if (!at.isSchulsong) {
+        albumOrderMap.set(at.songId, { albumOrder: at.albumOrder, className: at.className });
+      }
     }
 
     // Group audio files by classId (only final + ready, not schulsong)
@@ -445,9 +454,10 @@ async function buildAllAudio(
         const song = af.songId ? songMap.get(af.songId) : undefined;
         const title = song?.title || cls.className;
         const artist = song?.artist;
-        const order = song?.order || 0;
-        const downloadFilename = song
-          ? `${String(order).padStart(2, '0')} - ${title}.mp3`
+        const albumInfo = af.songId ? albumOrderMap.get(af.songId) : undefined;
+        const order = albumInfo?.albumOrder ?? song?.order ?? 0;
+        const downloadFilename = order > 0
+          ? `${String(order).padStart(2, '0')}. ${title} - ${cls.className}.mp3`
           : `${cls.className}.mp3`;
 
         const [audioUrl, downloadUrl] = await Promise.all([
@@ -473,7 +483,7 @@ async function buildAllAudio(
         if (track) tracks.push(track);
       }
 
-      // Sort tracks by order
+      // Sort tracks by album order
       tracks.sort((a, b) => a.order - b.order);
 
       const sectionType = (cls.classType === 'choir' || cls.classType === 'teacher_song')
@@ -505,8 +515,10 @@ async function buildAllAudio(
 
           const song = af.songId ? songMap.get(af.songId) : undefined;
           const title = song?.title || group.groupName;
-          const downloadFilename = song
-            ? `${String(song.order).padStart(2, '0')} - ${title}.mp3`
+          const albumInfo = af.songId ? albumOrderMap.get(af.songId) : undefined;
+          const order = albumInfo?.albumOrder ?? song?.order ?? 0;
+          const downloadFilename = order > 0
+            ? `${String(order).padStart(2, '0')}. ${title} - ${group.groupName}.mp3`
             : `${group.groupName}.mp3`;
 
           const [audioUrl, downloadUrl] = await Promise.all([
@@ -518,7 +530,7 @@ async function buildAllAudio(
             songId: af.songId,
             title,
             artist: song?.artist,
-            order: song?.order || 0,
+            order,
             durationSeconds: af.durationSeconds,
             fileSizeBytes: af.fileSizeBytes,
             audioUrl,

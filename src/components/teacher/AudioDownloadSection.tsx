@@ -33,18 +33,8 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-function sortTracks(tracks: Track[]): Track[] {
-  return [...tracks].sort((a, b) => {
-    // Schulsong last
-    if (a.isSchulsong !== b.isSchulsong) {
-      return a.isSchulsong ? 1 : -1;
-    }
-    // Then alphabetical by displayName (fallback to className for safety)
-    const aName = a.displayName || a.className || '';
-    const bName = b.displayName || b.className || '';
-    return aName.localeCompare(bName, 'de');
-  });
-}
+// Tracks are returned from the API in album tracklist order (schulsong first).
+// No client-side re-sorting needed.
 
 export default function AudioDownloadSection({ eventId }: AudioDownloadSectionProps) {
   const [loading, setLoading] = useState(true);
@@ -70,7 +60,7 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
           return;
         }
         const data: AudioDownloadResponse = await response.json();
-        setTracks(sortTracks(data.tracks || []));
+        setTracks(data.tracks || []);
       } catch (err) {
         console.error('Error fetching audio downloads:', err);
         setFetchError(true);
