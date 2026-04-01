@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService, AlbumTrackUpdate } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService } from '@/lib/services/activityService';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,6 +92,15 @@ export async function POST(
         { status: 500 }
       );
     }
+
+    // Log activity (fire-and-forget)
+    getActivityService().logActivity({
+      eventRecordId: eventRecord.id,
+      activityType: 'tracklist_confirmed',
+      description: 'Teacher confirmed tracklist',
+      actorEmail: session.email,
+      actorType: 'teacher',
+    });
 
     return NextResponse.json({
       success: true,

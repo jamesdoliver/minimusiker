@@ -1122,7 +1122,8 @@ export type EventActivityType =
   | 'clothing_order_updated'
   | 'song_renamed'
   | 'song_hidden'
-  | 'song_unhidden';
+  | 'song_unhidden'
+  | 'tracklist_confirmed';
 
 export type ActorType = 'teacher' | 'admin' | 'system' | 'engineer';
 

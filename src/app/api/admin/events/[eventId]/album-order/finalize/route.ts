@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService, AlbumTrackUpdate } from '@/lib/services/teacherService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { getActivityService } from '@/lib/services/activityService';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,6 +45,15 @@ export async function POST(
     const finalizedAt = new Date().toISOString();
     await airtableService.updateEventFields(eventRecord.id, {
       tracklist_finalized_at: finalizedAt,
+    });
+
+    // Log activity (fire-and-forget)
+    getActivityService().logActivity({
+      eventRecordId: eventRecord.id,
+      activityType: 'tracklist_confirmed',
+      description: 'Admin confirmed tracklist',
+      actorEmail: session.email,
+      actorType: 'admin',
     });
 
     return NextResponse.json({ success: true, finalizedAt });
