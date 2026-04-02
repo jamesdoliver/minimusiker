@@ -536,7 +536,8 @@ class TeacherService {
       eventId: record.fields.event_id || record.fields[SONGS_FIELD_IDS.event_id] || '',
       title: record.fields.title || record.fields[SONGS_FIELD_IDS.title] || '',
       artist: record.fields.artist || record.fields[SONGS_FIELD_IDS.artist],
-      notes: record.fields.notes || record.fields[SONGS_FIELD_IDS.notes],
+      publicNotes: record.fields.public_notes || record.fields[SONGS_FIELD_IDS.public_notes],
+      internalNotes: record.fields.internal_notes || record.fields[SONGS_FIELD_IDS.internal_notes],
       order: record.fields.order ?? record.fields[SONGS_FIELD_IDS.order] ?? 1,
       albumOrder: record.fields.album_order ?? record.fields[SONGS_FIELD_IDS.album_order],
       createdBy: record.fields.created_by || record.fields[SONGS_FIELD_IDS.created_by],
@@ -751,7 +752,8 @@ class TeacherService {
     eventId: string;
     title: string;
     artist?: string;
-    notes?: string;
+    publicNotes?: string;
+    internalNotes?: string;
     order?: number;
     createdBy?: string;
   }): Promise<Song> {
@@ -768,7 +770,8 @@ class TeacherService {
         event_id: data.eventId,
         title: data.title,
         artist: data.artist,
-        notes: data.notes,
+        public_notes: data.publicNotes,
+        internal_notes: data.internalNotes,
         order: order,
         created_by: data.createdBy,
         created_at: new Date().toISOString(),
@@ -817,7 +820,8 @@ class TeacherService {
     data: {
       title?: string;
       artist?: string;
-      notes?: string;
+      publicNotes?: string;
+      internalNotes?: string;
       order?: number;
     }
   ): Promise<Song> {
@@ -825,7 +829,8 @@ class TeacherService {
       const updateData: any = {};
       if (data.title !== undefined) updateData.title = data.title;
       if (data.artist !== undefined) updateData.artist = data.artist;
-      if (data.notes !== undefined) updateData.notes = data.notes;
+      if (data.publicNotes !== undefined) updateData.public_notes = data.publicNotes;
+      if (data.internalNotes !== undefined) updateData.internal_notes = data.internalNotes;
       if (data.order !== undefined) updateData.order = data.order;
 
       const record = await this.base(SONGS_TABLE).update(songId, updateData);
