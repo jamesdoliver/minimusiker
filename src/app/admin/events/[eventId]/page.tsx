@@ -56,7 +56,7 @@ interface ClassGroup {
   groupId: string;
   groupName: string;
   memberClasses: Array<{ classId: string; className: string }>;
-  songs: Array<{ id: string; title: string; artist?: string; notes?: string; hiddenByEngineer?: boolean }>;
+  songs: Array<{ id: string; title: string; artist?: string; publicNotes?: string; internalNotes?: string; hiddenByEngineer?: boolean }>;
   songCount: number;
 }
 
@@ -65,7 +65,7 @@ interface Collection {
   classId: string;
   className: string;
   classType: 'choir' | 'teacher_song';
-  songs: Array<{ id: string; title: string; artist?: string; notes?: string; hiddenByEngineer?: boolean }>;
+  songs: Array<{ id: string; title: string; artist?: string; publicNotes?: string; internalNotes?: string; hiddenByEngineer?: boolean }>;
   audioStatus: {
     hasRawAudio: boolean;
     hasPreview: boolean;
@@ -119,7 +119,8 @@ export default function EventDetailPage() {
     id: string;
     title: string;
     artist?: string;
-    notes?: string;
+    publicNotes?: string;
+    internalNotes?: string;
   } | null>(null);
 
   // Track which classes are expanded to show songs
@@ -591,7 +592,8 @@ export default function EventDetailPage() {
       id: song.id,
       title: song.title,
       artist: song.artist,
-      notes: song.notes,
+      publicNotes: song.publicNotes,
+      internalNotes: song.internalNotes,
     });
     setShowEditSong(true);
   };
@@ -1613,8 +1615,11 @@ export default function EventDetailPage() {
                                 {song.artist && (
                                   <div className="text-sm text-gray-500 truncate">{song.artist}</div>
                                 )}
-                                {song.notes && (
-                                  <div className="text-xs text-gray-400 mt-1 truncate">{song.notes}</div>
+                                {song.publicNotes && (
+                                  <div className="text-xs text-green-500 mt-1 truncate">Public: {song.publicNotes}</div>
+                                )}
+                                {song.internalNotes && (
+                                  <div className="text-xs text-gray-400 mt-1 truncate">Internal: {song.internalNotes}</div>
                                 )}
                               </div>
 
@@ -1839,8 +1844,11 @@ export default function EventDetailPage() {
                                 {song.artist && (
                                   <div className="text-sm text-gray-500 truncate">{song.artist}</div>
                                 )}
-                                {song.notes && (
-                                  <div className="text-xs text-gray-400 mt-1 truncate">{song.notes}</div>
+                                {song.publicNotes && (
+                                  <div className="text-xs text-green-500 mt-1 truncate">Public: {song.publicNotes}</div>
+                                )}
+                                {song.internalNotes && (
+                                  <div className="text-xs text-gray-400 mt-1 truncate">Internal: {song.internalNotes}</div>
                                 )}
                               </div>
 
@@ -2081,8 +2089,11 @@ export default function EventDetailPage() {
                                 {song.artist && (
                                   <div className="text-sm text-gray-500 truncate">{song.artist}</div>
                                 )}
-                                {song.notes && (
-                                  <div className="text-xs text-gray-400 mt-1 truncate">{song.notes}</div>
+                                {song.publicNotes && (
+                                  <div className="text-xs text-green-500 mt-1 truncate">Public: {song.publicNotes}</div>
+                                )}
+                                {song.internalNotes && (
+                                  <div className="text-xs text-gray-400 mt-1 truncate">Internal: {song.internalNotes}</div>
                                 )}
                               </div>
 
@@ -2327,8 +2338,11 @@ export default function EventDetailPage() {
                                 {song.artist && (
                                   <div className="text-sm text-gray-500 truncate">{song.artist}</div>
                                 )}
-                                {song.notes && (
-                                  <div className="text-xs text-gray-400 mt-1 truncate">{song.notes}</div>
+                                {song.publicNotes && (
+                                  <div className="text-xs text-green-500 mt-1 truncate">Public: {song.publicNotes}</div>
+                                )}
+                                {song.internalNotes && (
+                                  <div className="text-xs text-gray-400 mt-1 truncate">Internal: {song.internalNotes}</div>
                                 )}
                               </div>
 
@@ -2422,6 +2436,7 @@ export default function EventDetailPage() {
             fetchCollections(); // Also refetch collections for collection songs
           }}
           apiBasePath="/api/admin"
+          showInternalNotes={true}
         />
       )}
 
@@ -2430,7 +2445,9 @@ export default function EventDetailPage() {
           songId={selectedSong.id}
           title={selectedSong.title}
           artist={selectedSong.artist}
-          notes={selectedSong.notes}
+          publicNotes={selectedSong.publicNotes}
+          internalNotes={selectedSong.internalNotes}
+          showInternalNotes={true}
           onClose={() => {
             setShowEditSong(false);
             setSelectedSong(null);

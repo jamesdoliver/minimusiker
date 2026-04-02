@@ -328,7 +328,7 @@ function SongCard({ song, onDelete }: { song: Song; onDelete: (songId: string) =
             )}
           </p>
           {song.artist && <p className="text-sm text-gray-500">{song.artist}</p>}
-          {song.notes && <p className="text-sm text-gray-400 mt-1">{song.notes}</p>}
+          {song.publicNotes && <p className="text-sm text-gray-400 mt-1">{song.publicNotes}</p>}
         </div>
       </div>
       <button
