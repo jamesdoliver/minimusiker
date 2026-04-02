@@ -60,7 +60,7 @@ export async function PUT(
     }
 
     const songId = decodeURIComponent(params.songId);
-    const { title, artist, notes } = await request.json();
+    const { title, artist, publicNotes } = await request.json();
 
     const teacherService = getTeacherService();
 
@@ -94,7 +94,7 @@ export async function PUT(
     const updatedSong = await teacherService.updateSong(songId, {
       title: title?.trim(),
       artist: artist?.trim(),
-      notes: notes?.trim(),
+      publicNotes: publicNotes?.trim(),
     });
 
     // Log activity (fire-and-forget) - resolve eventRecordId from eventId
@@ -119,7 +119,7 @@ export async function PUT(
         }),
         actorEmail: session.email,
         actorType: 'teacher',
-        metadata: { songId, title: title?.trim(), artist, notes },
+        metadata: { songId, title: title?.trim(), artist, publicNotes },
       });
     }
 

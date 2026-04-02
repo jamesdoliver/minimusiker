@@ -141,6 +141,8 @@ export async function GET(
             songId: song.id,
             songTitle: song.title,
             artist: song.artist,
+            publicNotes: song.publicNotes,
+            internalNotes: song.internalNotes,
             order: song.order,
             hiddenByEngineer: song.hiddenByEngineer,
             previewFile: songFiles.find(f => f.type === 'preview')
@@ -175,6 +177,8 @@ export async function GET(
             songId: song.id,
             songTitle: song.title,
             artist: song.artist,
+            publicNotes: song.publicNotes,
+            internalNotes: song.internalNotes,
             order: song.order,
             hiddenByEngineer: song.hiddenByEngineer,
             previewFile: songFiles.find(f => f.type === 'preview')

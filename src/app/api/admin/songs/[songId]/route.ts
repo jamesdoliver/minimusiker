@@ -22,7 +22,7 @@ export async function PUT(
     }
 
     const songId = decodeURIComponent(params.songId);
-    const { title, artist, notes } = await request.json();
+    const { title, artist, publicNotes, internalNotes } = await request.json();
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return NextResponse.json(
@@ -41,7 +41,8 @@ export async function PUT(
     await teacherService.updateSong(songId, {
       title: title.trim(),
       artist: artist?.trim() || '',
-      notes: notes?.trim() || '',
+      publicNotes: publicNotes?.trim() || '',
+      internalNotes: internalNotes?.trim() || '',
     });
 
     // Log activity (fire-and-forget) - resolve eventRecordId from songInfo.eventId
@@ -66,7 +67,7 @@ export async function PUT(
           }),
           actorEmail: session.email,
           actorType: 'admin',
-          metadata: { songId, title: title.trim(), artist, notes },
+          metadata: { songId, title: title.trim(), artist, publicNotes, internalNotes },
         });
       }
     }

@@ -22,10 +22,10 @@ export async function PUT(
 
     const eventId = decodeURIComponent(params.eventId);
     const songId = decodeURIComponent(params.songId);
-    const { title } = await request.json();
+    const { title, publicNotes, internalNotes } = await request.json();
 
-    if (!title || typeof title !== 'string' || title.trim().length === 0) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+    if (!title && publicNotes === undefined && internalNotes === undefined) {
+      return NextResponse.json({ error: 'No update fields provided' }, { status: 400 });
     }
 
     const teacherService = getTeacherService();
@@ -38,7 +38,12 @@ export async function PUT(
     }
 
     const oldTitle = song.title;
-    const updatedSong = await teacherService.updateSong(songId, { title: title.trim() });
+    const updateFields: any = {};
+    if (title && typeof title === 'string' && title.trim().length > 0) updateFields.title = title.trim();
+    if (publicNotes !== undefined) updateFields.publicNotes = publicNotes?.trim() || '';
+    if (internalNotes !== undefined) updateFields.internalNotes = internalNotes?.trim() || '';
+
+    const updatedSong = await teacherService.updateSong(songId, updateFields);
 
     // Log activity (fire-and-forget)
     const airtableService = getAirtableService();

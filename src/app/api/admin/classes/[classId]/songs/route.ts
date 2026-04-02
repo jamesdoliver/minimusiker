@@ -22,7 +22,7 @@ export async function POST(
     }
 
     const classId = decodeURIComponent(params.classId);
-    const { title, artist, notes, eventId } = await request.json();
+    const { title, artist, publicNotes, internalNotes, eventId } = await request.json();
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return NextResponse.json(
@@ -80,7 +80,8 @@ export async function POST(
       eventId,
       title: title.trim(),
       artist: artist?.trim() || '',
-      notes: notes?.trim() || '',
+      publicNotes: publicNotes?.trim() || '',
+      internalNotes: internalNotes?.trim() || '',
     });
 
     // Resolve eventRecordId for activity logging
