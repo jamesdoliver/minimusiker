@@ -190,11 +190,11 @@ export async function processAudioFile(
     //    We extract duration from ffmpeg stderr output
     const durationSeconds = await getAudioDuration(ffmpeg, sourceMp3Path);
 
-    // 4. Generate 10-second preview with 1-second fade-out
+    // 4. Generate 30-second preview with 1-second fade-out
     await execFileAsync(ffmpeg, [
       '-i', sourceMp3Path,
-      '-t', '10',
-      '-af', 'afade=t=out:st=9:d=1',
+      '-t', '30',
+      '-af', 'afade=t=out:st=29:d=1',
       '-b:a', '192k',
       '-y',
       previewPath,
