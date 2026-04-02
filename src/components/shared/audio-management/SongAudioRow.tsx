@@ -159,8 +159,11 @@ export default function SongAudioRow({
           {song.artist && (
             <p className="text-sm text-gray-500 truncate">{song.artist}</p>
           )}
-          {song.notes && (
-            <p className="text-xs text-gray-400 mt-1 line-clamp-2">{song.notes}</p>
+          {song.publicNotes && (
+            <p className="text-xs text-green-500 mt-1 line-clamp-2">Public: {song.publicNotes}</p>
+          )}
+          {song.internalNotes && (
+            <p className="text-xs text-gray-400 mt-1 line-clamp-2">Internal: {song.internalNotes}</p>
           )}
 
           {/* Existing Audio Files */}

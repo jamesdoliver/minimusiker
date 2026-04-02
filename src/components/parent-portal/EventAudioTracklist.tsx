@@ -144,6 +144,9 @@ export default function EventAudioTracklist({ allAudio, schoolName }: EventAudio
                               {track.artist && (
                                 <span className="text-xs text-gray-500">{track.artist}</span>
                               )}
+                              {track.publicNotes && (
+                                <p className="text-xs text-gray-500 mt-0.5">{track.publicNotes}</p>
+                              )}
                             </div>
 
                             {/* Download button */}
