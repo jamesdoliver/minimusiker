@@ -45,21 +45,23 @@ export async function PUT(
 
     const updatedSong = await teacherService.updateSong(songId, updateFields);
 
-    // Log activity (fire-and-forget)
-    const airtableService = getAirtableService();
-    const eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
-    if (eventRecordId) {
-      getActivityService().logActivity({
-        eventRecordId,
-        activityType: 'song_renamed',
-        description: ActivityService.generateDescription('song_renamed', {
-          oldTitle,
-          newTitle: title.trim(),
-        }),
-        actorEmail: session.email,
-        actorType: 'engineer',
-        metadata: { songId, oldTitle, newTitle: title.trim() },
-      });
+    // Log activity (fire-and-forget) — only log rename if title was changed
+    if (title && title.trim() !== oldTitle) {
+      const airtableService = getAirtableService();
+      const eventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
+      if (eventRecordId) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'song_renamed',
+          description: ActivityService.generateDescription('song_renamed', {
+            oldTitle,
+            newTitle: title.trim(),
+          }),
+          actorEmail: session.email,
+          actorType: 'engineer',
+          metadata: { songId, oldTitle, newTitle: title.trim() },
+        });
+      }
     }
 
     return NextResponse.json({ success: true, song: updatedSong });
