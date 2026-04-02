@@ -59,7 +59,7 @@ export async function GET(
           id: s.id,
           title: s.title,
           artist: s.artist,
-          notes: s.notes,
+          publicNotes: s.publicNotes,
           order: s.order,
           hiddenByEngineer: s.hiddenByEngineer,
         }));
@@ -75,7 +75,7 @@ export async function GET(
       })),
       songs: allSongs
         .filter(s => s.classId === group.groupId)
-        .map(s => ({ id: s.id, title: s.title, artist: s.artist, notes: s.notes, order: s.order })),
+        .map(s => ({ id: s.id, title: s.title, artist: s.artist, publicNotes: s.publicNotes, order: s.order })),
     }));
 
     return NextResponse.json({

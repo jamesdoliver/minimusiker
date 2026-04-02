@@ -102,7 +102,7 @@ export async function GET(
         ...eventDetail,
         classes: eventDetail.classes.map((cls) => ({
           ...cls,
-          songs: (songsByClass[cls.classId] || []).map((s) => ({ id: s.id, title: s.title, artist: s.artist, notes: s.notes, order: s.order, hiddenByEngineer: s.hiddenByEngineer })),
+          songs: (songsByClass[cls.classId] || []).map((s) => ({ id: s.id, title: s.title, artist: s.artist, publicNotes: s.publicNotes, internalNotes: s.internalNotes, order: s.order, hiddenByEngineer: s.hiddenByEngineer })),
         })),
       };
     }

@@ -181,7 +181,7 @@ interface AddSongModalProps {
 function AddSongModal({ classId, eventId, onClose, onSongAdded }: AddSongModalProps) {
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
-  const [notes, setNotes] = useState('');
+  const [publicNotes, setPublicNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -199,7 +199,7 @@ function AddSongModal({ classId, eventId, onClose, onSongAdded }: AddSongModalPr
       const response = await fetch(`/api/teacher/classes/${classId}/songs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), artist: artist.trim(), notes: notes.trim(), eventId }),
+        body: JSON.stringify({ title: title.trim(), artist: artist.trim(), publicNotes: publicNotes.trim(), eventId }),
       });
 
       if (!response.ok) {
@@ -266,8 +266,8 @@ function AddSongModal({ classId, eventId, onClose, onSongAdded }: AddSongModalPr
               Anmerkungen
             </label>
             <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              value={publicNotes}
+              onChange={(e) => setPublicNotes(e.target.value)}
               rows={3}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/50 focus:border-pink-500"
               placeholder="z.B. Mit Bewegungen, langsames Tempo..."
