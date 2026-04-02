@@ -894,8 +894,8 @@ class TeacherService {
       status: (record.fields.status || record.fields[AUDIO_FILES_FIELD_IDS.status] || 'pending') as AudioFileStatus,
       isSchulsong: record.fields.is_schulsong ?? record.fields[AUDIO_FILES_FIELD_IDS.is_schulsong] ?? false,
       // Admin approval fields
-      approvalStatus: (record.fields[AUDIO_FILES_FIELD_IDS.approval_status] || 'pending') as AudioApprovalStatus,
-      rejectionComment: record.fields[AUDIO_FILES_FIELD_IDS.rejection_comment],
+      approvalStatus: (record.fields.approval_status || record.fields[AUDIO_FILES_FIELD_IDS.approval_status] || 'pending') as AudioApprovalStatus,
+      rejectionComment: record.fields.rejection_comment || record.fields[AUDIO_FILES_FIELD_IDS.rejection_comment],
       // Teacher approval for schulsong
       teacherApprovedAt: record.fields.teacher_approved_at || record.fields[AUDIO_FILES_FIELD_IDS.teacher_approved_at],
       // Audio processing fields
