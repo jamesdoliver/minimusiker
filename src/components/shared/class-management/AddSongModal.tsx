@@ -8,6 +8,7 @@ interface AddSongModalProps {
   onClose: () => void;
   onSuccess: () => void;
   apiBasePath: string; // '/api/teacher' or '/api/admin'
+  showInternalNotes?: boolean;
 }
 
 export default function AddSongModal({
@@ -16,10 +17,12 @@ export default function AddSongModal({
   onClose,
   onSuccess,
   apiBasePath,
+  showInternalNotes,
 }: AddSongModalProps) {
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
-  const [notes, setNotes] = useState('');
+  const [publicNotes, setPublicNotes] = useState('');
+  const [internalNotes, setInternalNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -40,7 +43,8 @@ export default function AddSongModal({
         body: JSON.stringify({
           title: title.trim(),
           artist: artist.trim(),
-          notes: notes.trim(),
+          publicNotes: publicNotes.trim(),
+          ...(showInternalNotes && { internalNotes: internalNotes.trim() }),
           eventId,
         }),
       });
@@ -106,16 +110,30 @@ export default function AddSongModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Notes
+              Public Notes
             </label>
             <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
+              value={publicNotes}
+              onChange={(e) => setPublicNotes(e.target.value)}
+              rows={2}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-              placeholder="e.g., With actions, slow tempo..."
+              placeholder="Visible to parents, e.g., With actions, slow tempo..."
             />
           </div>
+          {showInternalNotes && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Internal Notes
+              </label>
+              <textarea
+                value={internalNotes}
+                onChange={(e) => setInternalNotes(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+                placeholder="Only visible to admin &amp; engineer..."
+              />
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <button
