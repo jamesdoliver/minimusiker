@@ -8,6 +8,7 @@ interface TrackEntry {
   songId?: string;
   title: string;
   artist?: string;
+  publicNotes?: string;
   order: number;
   durationSeconds?: number;
   fileSizeBytes?: number;

@@ -29,6 +29,7 @@ interface TrackEntry {
   songId?: string;
   title: string;
   artist?: string;
+  publicNotes?: string;
   order: number;
   durationSeconds?: number;
   fileSizeBytes?: number;
@@ -469,6 +470,7 @@ async function buildAllAudio(
           songId: af.songId,
           title,
           artist,
+          publicNotes: song?.publicNotes,
           order,
           durationSeconds: af.durationSeconds,
           fileSizeBytes: af.fileSizeBytes,
@@ -530,6 +532,7 @@ async function buildAllAudio(
             songId: af.songId,
             title,
             artist: song?.artist,
+            publicNotes: song?.publicNotes,
             order,
             durationSeconds: af.durationSeconds,
             fileSizeBytes: af.fileSizeBytes,

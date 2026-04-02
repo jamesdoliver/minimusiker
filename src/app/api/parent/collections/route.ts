@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         id: s.id,
         title: s.title,
         artist: s.artist,
+        publicNotes: s.publicNotes,
       })),
       audioStatus: collection.audioStatus,
     }));
