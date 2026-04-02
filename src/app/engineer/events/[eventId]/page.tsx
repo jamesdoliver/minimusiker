@@ -67,6 +67,9 @@ export default function EngineerEventDetailPage() {
   const [processedSongIds, setProcessedSongIds] = useState<Set<string>>(new Set());
   const [editingSongId, setEditingSongId] = useState<string | null>(null);
   const [editingSongTitle, setEditingSongTitle] = useState('');
+  const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
+  const [editingPublicNotes, setEditingPublicNotes] = useState('');
+  const [editingInternalNotes, setEditingInternalNotes] = useState('');
   const [addingSongClassId, setAddingSongClassId] = useState<string | null>(null);
   const [newSongTitle, setNewSongTitle] = useState('');
   const [showAlbumLayoutModal, setShowAlbumLayoutModal] = useState(false);
@@ -379,6 +382,26 @@ export default function EngineerEventDetailPage() {
       fetchEventDetail();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to rename song');
+    }
+  };
+
+  const handleSaveNotes = async (songId: string) => {
+    try {
+      await fetch(
+        `/api/engineer/events/${encodeURIComponent(eventId)}/songs/${encodeURIComponent(songId)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            publicNotes: editingPublicNotes.trim(),
+            internalNotes: editingInternalNotes.trim(),
+          }),
+        }
+      );
+      setEditingNotesId(null);
+      fetchEventDetail();
+    } catch (error) {
+      console.error('Error saving notes:', error);
     }
   };
 
@@ -840,6 +863,14 @@ export default function EngineerEventDetailPage() {
                   onStartEdit={(id, title) => { setEditingSongId(id); setEditingSongTitle(title); }}
                   onEditTitleChange={setEditingSongTitle}
                   onCancelEdit={() => setEditingSongId(null)}
+                  editingNotesId={editingNotesId}
+                  editingPublicNotes={editingPublicNotes}
+                  editingInternalNotes={editingInternalNotes}
+                  onStartEditNotes={(id, pub, int) => { setEditingNotesId(id); setEditingPublicNotes(pub); setEditingInternalNotes(int); }}
+                  onEditPublicNotesChange={setEditingPublicNotes}
+                  onEditInternalNotesChange={setEditingInternalNotes}
+                  onSaveNotes={handleSaveNotes}
+                  onCancelEditNotes={() => setEditingNotesId(null)}
                   addingSongClassId={addingSongClassId}
                   newSongTitle={newSongTitle}
                   onNewSongTitleChange={setNewSongTitle}
@@ -994,6 +1025,14 @@ interface ClassCardProps {
   onStartEdit: (songId: string, currentTitle: string) => void;
   onEditTitleChange: (title: string) => void;
   onCancelEdit: () => void;
+  editingNotesId: string | null;
+  editingPublicNotes: string;
+  editingInternalNotes: string;
+  onStartEditNotes: (songId: string, publicNotes: string, internalNotes: string) => void;
+  onEditPublicNotesChange: (value: string) => void;
+  onEditInternalNotesChange: (value: string) => void;
+  onSaveNotes: (songId: string) => void;
+  onCancelEditNotes: () => void;
   addingSongClassId: string | null;
   newSongTitle: string;
   onNewSongTitleChange: (title: string) => void;
@@ -1017,6 +1056,14 @@ function ClassCard({
   onStartEdit,
   onEditTitleChange,
   onCancelEdit,
+  editingNotesId,
+  editingPublicNotes,
+  editingInternalNotes,
+  onStartEditNotes,
+  onEditPublicNotesChange,
+  onEditInternalNotesChange,
+  onSaveNotes,
+  onCancelEditNotes,
   addingSongClassId,
   newSongTitle,
   onNewSongTitleChange,
@@ -1062,6 +1109,14 @@ function ClassCard({
                 onStartEdit={onStartEdit}
                 onEditTitleChange={onEditTitleChange}
                 onCancelEdit={onCancelEdit}
+                isEditingNotes={editingNotesId === song.songId}
+                editingPublicNotes={editingPublicNotes}
+                editingInternalNotes={editingInternalNotes}
+                onStartEditNotes={onStartEditNotes}
+                onEditPublicNotesChange={onEditPublicNotesChange}
+                onEditInternalNotesChange={onEditInternalNotesChange}
+                onSaveNotes={onSaveNotes}
+                onCancelEditNotes={onCancelEditNotes}
               />
             ))}
         </div>
@@ -1126,6 +1181,14 @@ interface SongRowProps {
   onStartEdit: (songId: string, currentTitle: string) => void;
   onEditTitleChange: (title: string) => void;
   onCancelEdit: () => void;
+  isEditingNotes: boolean;
+  editingPublicNotes: string;
+  editingInternalNotes: string;
+  onStartEditNotes: (songId: string, publicNotes: string, internalNotes: string) => void;
+  onEditPublicNotesChange: (value: string) => void;
+  onEditInternalNotesChange: (value: string) => void;
+  onSaveNotes: (songId: string) => void;
+  onCancelEditNotes: () => void;
 }
 
 function SongRow({
@@ -1143,6 +1206,14 @@ function SongRow({
   onStartEdit,
   onEditTitleChange,
   onCancelEdit,
+  isEditingNotes,
+  editingPublicNotes,
+  editingInternalNotes,
+  onStartEditNotes,
+  onEditPublicNotesChange,
+  onEditInternalNotesChange,
+  onSaveNotes,
+  onCancelEditNotes,
 }: SongRowProps) {
   const uploadTypeLabel =
     uploadState?.uploadType === 'final-mp3' ? 'Final MP3' :
@@ -1179,18 +1250,64 @@ function SongRow({
             </p>
           )}
           {song.artist && <p className="text-xs text-gray-500">{song.artist}</p>}
+          {/* Notes display / inline edit */}
+          {isEditingNotes ? (
+            <div className="mt-2 space-y-2">
+              <div>
+                <label className="text-xs text-gray-500">Public Notes</label>
+                <input
+                  type="text"
+                  value={editingPublicNotes}
+                  onChange={(e) => onEditPublicNotesChange(e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Visible to parents..."
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Internal Notes</label>
+                <input
+                  type="text"
+                  value={editingInternalNotes}
+                  onChange={(e) => onEditInternalNotesChange(e.target.value)}
+                  className="w-full text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Admin/engineer only..."
+                />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => onSaveNotes(song.songId)} className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">Save</button>
+                <button onClick={onCancelEditNotes} className="px-2 py-0.5 text-gray-500 text-xs hover:text-gray-700">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {song.publicNotes && <p className="text-xs text-green-500 mt-1">Public: {song.publicNotes}</p>}
+              {song.internalNotes && <p className="text-xs text-gray-400 mt-1">Internal: {song.internalNotes}</p>}
+            </>
+          )}
         </div>
         {/* Song management buttons */}
-        {!isEditing && (
-          <button
-            onClick={() => onStartEdit(song.songId, song.songTitle)}
-            className="p-1 text-gray-300 hover:text-gray-600 rounded transition-colors"
-            title="Rename song"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
+        {!isEditing && !isEditingNotes && (
+          <>
+            <button
+              onClick={() => onStartEdit(song.songId, song.songTitle)}
+              className="p-1 text-gray-300 hover:text-gray-600 rounded transition-colors"
+              title="Rename song"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => onStartEditNotes(song.songId, song.publicNotes || '', song.internalNotes || '')}
+              className="p-1 text-gray-300 hover:text-gray-600 rounded transition-colors"
+              title="Edit notes"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+              </svg>
+            </button>
+          </>
         )}
         <button
           onClick={() => onToggleHidden(song.songId, !song.hiddenByEngineer)}
