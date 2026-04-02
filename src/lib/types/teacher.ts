@@ -36,7 +36,8 @@ export const SONGS_FIELD_IDS = {
   class_id: 'fldK4wCT5oKZDN6sE', // Links to class (class_id)
   event_id: 'fldCKN3IXHPczIWfs', // Links to event (booking_id)
   artist: 'fld8kOwPLIscK51yH', // Original artist
-  notes: 'fldZRLk0JP05VRDm6', // Special notes/arrangement details
+  internal_notes: 'fldZRLk0JP05VRDm6', // Internal notes (was 'notes') — admin/engineer only
+  public_notes: 'fldy10NWRYpSnCr2P', // Public notes — visible to parents
   order: 'fld2RSJGY8pAqBaej', // Position in class setlist
   album_order: 'fldj1xXfAhsaWcEE7', // Global album track order for printed album
   created_by: 'fldva8udIq88Syq0p', // Teacher record ID who added it
@@ -118,7 +119,8 @@ export interface Song {
   eventId: string; // Links to event (booking_id)
   title: string; // Song title
   artist?: string; // Original artist
-  notes?: string; // Special notes/arrangement details
+  publicNotes?: string; // Public notes — visible to parents
+  internalNotes?: string; // Internal notes — admin/engineer only
   order: number; // Position in class setlist (1, 2, 3...)
   albumOrder?: number; // Global album track order for printed album
   createdBy?: string; // Teacher record ID who added it
@@ -217,7 +219,8 @@ export interface VerifyTokenRequest {
 export interface UpsertSongRequest {
   title: string;
   artist?: string;
-  notes?: string;
+  publicNotes?: string;
+  internalNotes?: string;
   order?: number;
 }
 
