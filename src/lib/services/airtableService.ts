@@ -6003,9 +6003,10 @@ class AirtableService {
     if (linkedBookingIds?.length) {
       bookingRecordId = linkedBookingIds[0];
       try {
-        await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecordId, {
-          [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status]: 'deleted',
-        });
+        await this.base(SCHOOL_BOOKINGS_TABLE_ID).update([{
+          id: bookingRecordId,
+          fields: { [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status]: 'deleted' },
+        }], { typecast: true });
       } catch (err) {
         console.error('Warning: Could not soft-delete linked SchoolBooking:', err);
       }
@@ -6019,9 +6020,10 @@ class AirtableService {
    * Sets simplybook_status to 'deleted' so it's filtered from the bookings list.
    */
   async softDeleteSchoolBooking(bookingRecordId: string): Promise<void> {
-    await this.base(SCHOOL_BOOKINGS_TABLE_ID).update(bookingRecordId, {
-      [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status]: 'deleted',
-    } as Partial<FieldSet>);
+    await this.base(SCHOOL_BOOKINGS_TABLE_ID).update([{
+      id: bookingRecordId,
+      fields: { [SCHOOL_BOOKINGS_FIELD_IDS.simplybook_status]: 'deleted' },
+    }], { typecast: true });
   }
 
   /**
