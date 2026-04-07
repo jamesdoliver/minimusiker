@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
  *
  * After rejection:
  * - Clears any scheduled release date
- * - Sends notification to engineer (fire-and-forget)
+ * - Sends notification to assigned engineers and admins (awaited, logged)
  *
  * Returns:
  * - success: boolean
@@ -56,36 +56,49 @@ export async function POST(
         await airtableService.setSchulsongMerchCutoff(eventId, null);
       }
 
-      // Notify engineer and admins (fire-and-forget)
       if (event) {
-        triggerSchulsongTeacherActionNotification({
-          schoolName: event.school_name,
-          eventDate: event.event_date,
-          eventId,
-          action: 'rejected',
-          teacherNotes: notes,
-        }).catch((err) => {
-          console.error('[schulsong-reject] Failed to send engineer notification:', err);
-        });
+        // Resolve assigned engineers from event
+        const engineers: Array<{ email: string; name: string }> = [];
+        if (event.assigned_engineer?.length) {
+          for (const engineerId of event.assigned_engineer) {
+            const person = await airtableService.getPersonById(engineerId);
+            if (person?.email) {
+              engineers.push({ email: person.email, name: person.staff_name });
+            }
+          }
+        }
 
-        triggerSchulsongTeacherRejectedNotification({
-          schoolName: event.school_name,
-          eventDate: event.event_date,
-          eventId,
-          teacherNotes: notes,
-        }).catch((err) => {
-          console.error('[schulsong-reject] Failed to send admin notification:', err);
-        });
+        // Notify engineers and admins (awaited so results are logged)
+        const [engineerResult, adminResult] = await Promise.all([
+          triggerSchulsongTeacherActionNotification({
+            schoolName: event.school_name,
+            eventDate: event.event_date,
+            eventId,
+            action: 'rejected',
+            teacherNotes: notes,
+            engineers,
+          }),
+          triggerSchulsongTeacherRejectedNotification({
+            schoolName: event.school_name,
+            eventDate: event.event_date,
+            eventId,
+            teacherNotes: notes,
+          }),
+        ]);
 
-        // Log activity (fire-and-forget)
-        getActivityService().logActivity({
+        // Log activity with notification results
+        const activityService = getActivityService();
+        await activityService.logActivity({
           eventRecordId: event.id,
           activityType: 'schulsong_rejected',
           description: 'Schulsong rejected by teacher',
           actorEmail: session.email,
           actorType: 'teacher',
-        }).catch((err: unknown) => {
-          console.error('[schulsong-reject] Failed to log activity:', err);
+          metadata: {
+            engineerNotification: engineerResult.sent ? 'sent' : `failed: ${engineerResult.error}`,
+            adminNotification: adminResult.sent ? 'sent' : `failed: ${adminResult.error}`,
+            engineerEmails: engineers.map(e => e.email).join(', ') || 'none resolved',
+          },
         });
       }
     } catch (postRejectionError) {

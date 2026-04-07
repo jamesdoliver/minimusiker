@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
  * - Event must have is_schulsong = true
  * - Schulsong file must exist (type=final, status=ready)
  *
- * After approval, sends email to admins (fire-and-forget).
+ * After approval, sends email to admins and assigned engineers (awaited, logged).
  *
  * Returns:
  * - success: boolean
@@ -65,32 +65,47 @@ export async function POST(
         await airtableService.setSchulsongMerchCutoff(eventId, merchCutoff.toISOString());
       }
       if (event) {
-        triggerSchulsongTeacherApprovedNotification({
-          schoolName: event.school_name,
-          eventDate: event.event_date,
-          eventId,
-        }).catch((err) => {
-          console.error('[schulsong-approve] Failed to send notification:', err);
-        });
+        // Resolve assigned engineers from event
+        const engineers: Array<{ email: string; name: string }> = [];
+        if (event.assigned_engineer?.length) {
+          for (const engineerId of event.assigned_engineer) {
+            const person = await airtableService.getPersonById(engineerId);
+            if (person?.email) {
+              engineers.push({ email: person.email, name: person.staff_name });
+            }
+          }
+        }
 
-        // Notify engineer of teacher's decision (fire-and-forget)
-        triggerSchulsongTeacherActionNotification({
-          schoolName: event.school_name,
-          eventDate: event.event_date,
-          eventId,
-          action: 'approved',
-          teacherNotes: notes,
-        }).catch((err) => {
-          console.error('[schulsong-approve] Failed to send engineer notification:', err);
-        });
+        // Notify admins and engineers (awaited so results are logged)
+        const [adminResult, engineerResult] = await Promise.all([
+          triggerSchulsongTeacherApprovedNotification({
+            schoolName: event.school_name,
+            eventDate: event.event_date,
+            eventId,
+          }),
+          triggerSchulsongTeacherActionNotification({
+            schoolName: event.school_name,
+            eventDate: event.event_date,
+            eventId,
+            action: 'approved',
+            teacherNotes: notes,
+            engineers,
+          }),
+        ]);
 
-        // Log activity (fire-and-forget)
-        getActivityService().logActivity({
+        // Log activity with notification results
+        const activityService = getActivityService();
+        await activityService.logActivity({
           eventRecordId: event.id,
           activityType: 'schulsong_approved',
           description: 'Schulsong approved by teacher',
           actorEmail: session.email,
           actorType: 'teacher',
+          metadata: {
+            engineerNotification: engineerResult.sent ? 'sent' : `failed: ${engineerResult.error}`,
+            adminNotification: adminResult.sent ? 'sent' : `failed: ${adminResult.error}`,
+            engineerEmails: engineers.map(e => e.email).join(', ') || 'none resolved',
+          },
         });
       }
     } catch (postApprovalError) {

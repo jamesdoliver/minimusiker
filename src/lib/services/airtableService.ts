@@ -3950,7 +3950,8 @@ class AirtableService {
    * Auto-assign engineer to event based on schulsong status
    * - If hasSchulsongTracks is true, assign Micha (ENGINEER_IDS.MICHA)
    * - Otherwise, assign Jakob (ENGINEER_IDS.JAKOB)
-   * - Does NOT override existing assignment
+   * - Appends to existing assignments (combined events need both engineers)
+   * - Skips if this specific engineer is already assigned
    * @param eventId - The event_id to assign
    * @param hasSchulsongTracks - Whether the upload contains schulsong tracks
    * @returns true if assignment was made, false if already assigned or no engineer configured
@@ -3975,13 +3976,8 @@ class AirtableService {
       }
 
       const eventRecord = events[0];
-      const existingEngineer = eventRecord.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[] | undefined;
-
-      // Don't override existing assignment
-      if (existingEngineer && existingEngineer.length > 0) {
-        console.log(`[autoAssignEngineer] Event ${eventId} already has engineer assigned: ${existingEngineer[0]}`);
-        return false;
-      }
+      const existingEngineers = eventRecord.fields[EVENTS_FIELD_IDS.assigned_engineer] as string[] || [];
+      const autoAssigned = eventRecord.fields[EVENTS_FIELD_IDS.auto_assigned_engineers] as string[] || [];
 
       // Get appropriate engineer based on schulsong flag
       const engineerId = getEngineerIdForTrack(hasSchulsongTracks);
@@ -3991,12 +3987,23 @@ class AirtableService {
         return false;
       }
 
-      // Assign the engineer
-      await this.eventsTable!.update(eventRecord.id, {
-        [EVENTS_FIELD_IDS.assigned_engineer]: [engineerId],
-      });
+      // Skip if this specific engineer is already assigned
+      if (existingEngineers.includes(engineerId)) {
+        console.log(`[autoAssignEngineer] Engineer ${engineerId} already assigned to event ${eventId}`);
+        return false;
+      }
 
-      console.log(`[autoAssignEngineer] Assigned engineer ${engineerId} to event ${eventId} (schulsong=${hasSchulsongTracks})`);
+      // Append engineer to existing assignments
+      const updates: Record<string, string[]> = {
+        [EVENTS_FIELD_IDS.assigned_engineer]: [...existingEngineers, engineerId],
+      };
+      if (!autoAssigned.includes(engineerId)) {
+        updates[EVENTS_FIELD_IDS.auto_assigned_engineers] = [...autoAssigned, engineerId];
+      }
+
+      await this.eventsTable!.update(eventRecord.id, updates);
+
+      console.log(`[autoAssignEngineer] Added engineer ${engineerId} to event ${eventId} (schulsong=${hasSchulsongTracks}, total engineers: ${existingEngineers.length + 1})`);
       return true;
     } catch (error) {
       console.error('[autoAssignEngineer] Error:', error);

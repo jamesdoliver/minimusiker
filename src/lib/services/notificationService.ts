@@ -340,42 +340,52 @@ export async function triggerSchulsongApprovalReminder(
 }
 
 /**
- * Notify engineer (Micha) when teacher approves or rejects schulsong
- * Looks up engineer via ENGINEER_MICHA_ID env var -> Personen table
+ * Notify assigned engineers when teacher approves or rejects schulsong.
+ * Engineers are passed directly by the caller (resolved from event.assigned_engineer).
  */
 export async function triggerSchulsongTeacherActionNotification(
-  data: { schoolName: string; eventDate: string; eventId: string; action: 'approved' | 'rejected'; teacherNotes?: string }
+  data: {
+    schoolName: string;
+    eventDate: string;
+    eventId: string;
+    action: 'approved' | 'rejected';
+    teacherNotes?: string;
+    engineers: Array<{ email: string; name: string }>;
+  }
 ): Promise<{ sent: boolean; error?: string }> {
   try {
-    const engineerId = process.env.ENGINEER_MICHA_ID;
-    if (!engineerId) {
-      console.warn('[NotificationService] ENGINEER_MICHA_ID not configured');
-      return { sent: false, error: 'ENGINEER_MICHA_ID not configured' };
-    }
-
-    const airtable = getAirtableService();
-    const engineer = await airtable.getPersonById(engineerId);
-    if (!engineer || !engineer.email) {
-      console.warn(`[NotificationService] Engineer ${engineerId} has no email`);
-      return { sent: false, error: 'Engineer email not found' };
+    if (data.engineers.length === 0) {
+      console.warn('[NotificationService] No engineers provided for schulsong teacher action notification');
+      return { sent: false, error: 'No engineers provided' };
     }
 
     const { sendSchulsongTeacherActionEmail } = await import('./resendService');
-    const result = await sendSchulsongTeacherActionEmail(engineer.email, engineer.staff_name, {
-      schoolName: data.schoolName,
-      eventDate: data.eventDate,
-      eventId: data.eventId,
-      action: data.action,
-      teacherNotes: data.teacherNotes,
-    });
+    const results: Array<{ email: string; success: boolean; error?: string }> = [];
 
-    if (result.success) {
-      console.log(`[NotificationService] Schulsong teacher ${data.action} notification sent to ${engineer.email}`);
-      return { sent: true };
-    } else {
-      console.error('[NotificationService] Failed to send schulsong teacher action notification:', result.error);
-      return { sent: false, error: result.error };
+    for (const engineer of data.engineers) {
+      const result = await sendSchulsongTeacherActionEmail(engineer.email, engineer.name, {
+        schoolName: data.schoolName,
+        eventDate: data.eventDate,
+        eventId: data.eventId,
+        action: data.action,
+        teacherNotes: data.teacherNotes,
+      });
+      results.push({ email: engineer.email, success: result.success, error: result.error });
     }
+
+    const sent = results.filter(r => r.success);
+    const failed = results.filter(r => !r.success);
+
+    if (sent.length > 0) {
+      console.log(`[NotificationService] Schulsong teacher ${data.action} notification sent to ${sent.map(r => r.email).join(', ')}`);
+    }
+    if (failed.length > 0) {
+      console.error(`[NotificationService] Schulsong teacher ${data.action} notification failed for: ${failed.map(r => `${r.email} (${r.error})`).join(', ')}`);
+    }
+
+    return sent.length > 0
+      ? { sent: true }
+      : { sent: false, error: failed.map(r => r.error).join('; ') };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[NotificationService] Error in triggerSchulsongTeacherActionNotification:', error);
