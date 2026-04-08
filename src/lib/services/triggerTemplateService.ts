@@ -159,12 +159,15 @@ export function renderTriggerTemplate(
   let result = template;
   for (const [key, value] of Object.entries(variables)) {
     if (value !== undefined && value !== null) {
-      const pattern = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-      result = result.replace(pattern, value);
+      // Handle triple braces first ({{{key}}} — Mustache-style unescaped HTML), then double braces
+      const triplePattern = new RegExp(`\\{\\{\\{${key}\\}\\}\\}`, 'g');
+      result = result.replace(triplePattern, value);
+      const doublePattern = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+      result = result.replace(doublePattern, value);
     }
   }
-  // Remove any remaining unsubstituted placeholders
-  result = result.replace(/\{\{[^}]+\}\}/g, '');
+  // Remove any remaining unsubstituted placeholders (both {{x}} and {{{x}}})
+  result = result.replace(/\{\{\{?[^}]+\}\}\}?/g, '');
   return result;
 }
 

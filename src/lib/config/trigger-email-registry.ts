@@ -969,7 +969,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   Bitte weise manuell einen Mitarbeiter zu.
 </p>
 
-{{{eventListHtml}}}
+{{eventListHtml}}
 
 <p style="margin: 24px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
   Bitte melde dich im Admin-Portal an, um die Zuordnungen vorzunehmen.
@@ -994,7 +994,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   Das Event wurde möglicherweise nicht automatisch erstellt. Bitte prüfe und erstelle die Events manuell.
 </p>
 
-{{{eventListHtml}}}
+{{eventListHtml}}
 
 <p style="margin: 24px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
   Bitte melde dich im Admin-Portal an, um die fehlenden Events zu erstellen.
@@ -1019,7 +1019,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   Damit alles reibungslos abläuft, fehlen noch ein paar Vorbereitungen:
 </p>
 
-{{{checklistHtml}}}
+{{checklistHtml}}
 
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 24px 0;">
   <tr>
@@ -1054,7 +1054,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   Bei {{count}} Events innerhalb der nächsten 42 Tage fehlen noch Vorbereitungen durch die Lehrkräfte.
 </p>
 
-{{{digestHtml}}}
+{{digestHtml}}
 
 <p style="margin: 24px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
   Die betroffenen Lehrkräfte wurden automatisch per E-Mail erinnert.
