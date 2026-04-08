@@ -5984,6 +5984,20 @@ class AirtableService {
   }
 
   /**
+   * Ensure a booking is linked to an event via simplybook_booking.
+   * Adds the booking ID to the existing array if not already present.
+   */
+  async linkBookingToEvent(eventRecordId: string, bookingRecordId: string): Promise<void> {
+    const record = await this.base(EVENTS_TABLE_ID).find(eventRecordId);
+    const existing = (record.fields[EVENTS_FIELD_IDS.simplybook_booking] as string[] | undefined) || [];
+    if (existing.includes(bookingRecordId)) return;
+    await this.base(EVENTS_TABLE_ID).update(eventRecordId, {
+      [EVENTS_FIELD_IDS.simplybook_booking]: [...existing, bookingRecordId],
+    });
+    console.log(`[linkBookingToEvent] Linked booking ${bookingRecordId} to event ${eventRecordId}`);
+  }
+
+  /**
    * Soft-delete an event by setting Event status to "Deleted" and SchoolBooking status to "deleted"
    */
   async softDeleteEvent(eventRecordId: string): Promise<{

@@ -45,6 +45,12 @@ export async function POST(
     // 3. Check if event already exists (fast formula query by event_id)
     const existingEvent = await airtableService.getEventByEventId(eventId);
     if (existingEvent) {
+      // Backfill simplybook_booking link so the booking overview can find this event
+      try {
+        await airtableService.linkBookingToEvent(existingEvent.id, bookingId);
+      } catch (linkError) {
+        console.warn('[CreateEvent] Could not backfill simplybook_booking link:', linkError);
+      }
       return NextResponse.json({
         success: true,
         message: 'Event already exists',
