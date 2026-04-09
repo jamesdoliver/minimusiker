@@ -2821,6 +2821,7 @@ class TeacherService {
           schoolAddress: booking.schoolAddress,
           schoolPhone: booking.schoolPhone,
           isSchulsong: eventRecord?.is_schulsong === true,
+          isSchulsongOnly: eventRecord?.is_schulsong === true && eventRecord?.is_minimusikertag !== true && eventRecord?.is_plus !== true,
           scsShirtsIncluded: eventRecord?.scs_shirts_included === true,
           estimatedChildren: eventRecord?.estimated_children,
           tracklistFinalizedAt: eventRecord?.tracklist_finalized_at,
@@ -3058,6 +3059,7 @@ class TeacherService {
           simplybookHash: undefined,  // No booking for directly linked events
           bookingRecordId: undefined, // No booking for directly linked events
           isSchulsong: linkedEvent.is_schulsong === true,
+          isSchulsongOnly: linkedEvent.is_schulsong === true && linkedEvent.is_minimusikertag !== true && linkedEvent.is_plus !== true,
           scsShirtsIncluded: linkedEvent.scs_shirts_included === true,
           estimatedChildren: linkedEvent.estimated_children,
           tracklistFinalizedAt: linkedEvent.tracklist_finalized_at,

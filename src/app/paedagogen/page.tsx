@@ -130,6 +130,9 @@ export default function TeacherDashboard() {
   // Derive assigned staff from current event
   const currentAssignedStaff: AssignedStaffInfo | null = currentEvent?.assignedStaff ?? null;
 
+  // Schulsong-only events hide class-related sections (resources, shop, tips)
+  const isSchulsongOnly = currentEvent?.isSchulsongOnly ?? false;
+
   // Reset index when filter changes
   useEffect(() => {
     setCurrentEventIndex(0);
@@ -213,17 +216,19 @@ export default function TeacherDashboard() {
         {/* Contact Section */}
         <ContactSection />
 
-        {/* Resources Section */}
-        <ResourcesSection
-          eventDate={filteredEvents[currentEventIndex]?.eventDate}
-          eventId={filteredEvents[currentEventIndex]?.eventId}
-        />
+        {/* Resources, Shop Access, and Tips — hidden for schulsong-only events */}
+        {!isSchulsongOnly && (
+          <>
+            <ResourcesSection
+              eventDate={filteredEvents[currentEventIndex]?.eventDate}
+              eventId={filteredEvents[currentEventIndex]?.eventId}
+            />
 
-        {/* Shop Access Section */}
-        <ShopAccessSection discountCode={discountCode} />
+            <ShopAccessSection discountCode={discountCode} />
 
-        {/* Tips Section */}
-        <TipsSection />
+            <TipsSection />
+          </>
+        )}
       </main>
 
       {/* Edit School Info Modal */}

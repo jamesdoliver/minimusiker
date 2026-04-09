@@ -259,6 +259,7 @@ export interface TeacherEventView {
   schoolAddress?: string; // From SchoolBookings - per-booking address
   schoolPhone?: string; // From SchoolBookings - per-booking phone
   isSchulsong?: boolean; // Whether this event has a schulsong (for teacher approval workflow)
+  isSchulsongOnly?: boolean; // Schulsong without Minimusikertag — hides class-related sections
   scsShirtsIncluded?: boolean; // Whether SCS shirts are included (event-level field for clothing order form)
   estimatedChildren?: number; // Estimated children (for clothing order max quantity)
   tracklistFinalizedAt?: string; // ISO datetime when teacher finalized album order
