@@ -122,6 +122,13 @@ export const TRIGGER_EVENT_CATALOG: TriggerEvent[] = [
     availableVariables: ['count', 'digestHtml'],
     recipientMode: 'configurable',
   },
+  {
+    key: 'cron:post_wave2_orders_digest',
+    name: 'CRON: Wöchentliche Nachzügler-Bestellungen (Admin)',
+    description: 'Läuft jeden Montag um 7 Uhr. Listet alle offenen Bestellungen für Events, deren Welle-2-Frist (Event +14 Tage) abgelaufen ist.',
+    availableVariables: ['orderCount', 'eventCount', 'totalValue', 'ordersTableHtml'],
+    recipientMode: 'configurable',
+  },
 ];
 
 export function getTriggerEvent(key: string): TriggerEvent | undefined {

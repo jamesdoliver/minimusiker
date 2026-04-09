@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkNoStaffAssigned, checkClassesAndSongs, checkBookingsWithoutEvent } from '@/lib/services/eventReadinessService';
+import { checkNoStaffAssigned, checkClassesAndSongs, checkBookingsWithoutEvent, checkPostWave2Orders } from '@/lib/services/eventReadinessService';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +28,7 @@ interface CronResult {
   noStaff?: { sent: number; skipped: number; failed: number; errors: string[] };
   noEvent?: { sent: number; skipped: number; failed: number; errors: string[] };
   classesAndSongs?: { sent: number; skipped: number; failed: number; errors: string[] };
+  postWave2Orders?: { sent: number; skipped: number; failed: number; errors: string[] };
   weeklySkipped?: boolean;
 }
 
@@ -50,13 +51,17 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
   const noEventResult = await checkBookingsWithoutEvent(isDryRun);
   console.log('[Event Readiness Cron] No event check:', noEventResult);
 
-  // Weekly check: only on Mondays (or if forced)
+  // Weekly checks: only on Mondays (or if forced)
   const isMonday = new Date().getDay() === 1;
   let classesAndSongsResult = null;
+  let postWave2OrdersResult = null;
 
   if (isMonday || forceWeekly) {
     classesAndSongsResult = await checkClassesAndSongs(isDryRun);
     console.log('[Event Readiness Cron] Classes & songs check:', classesAndSongsResult);
+
+    postWave2OrdersResult = await checkPostWave2Orders(isDryRun);
+    console.log('[Event Readiness Cron] Post-Wave 2 orders check:', postWave2OrdersResult);
   } else {
     console.log('[Event Readiness Cron] Skipping weekly checks (not Monday)');
   }
@@ -66,6 +71,7 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
     noStaff: noStaffResult,
     noEvent: noEventResult,
     classesAndSongs: classesAndSongsResult || undefined,
+    postWave2Orders: postWave2OrdersResult || undefined,
     weeklySkipped: !isMonday && !forceWeekly,
   });
 }

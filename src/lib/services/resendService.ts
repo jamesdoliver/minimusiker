@@ -348,6 +348,23 @@ export async function sendEventReadinessAdminDigestEmail(
   }, 'Event readiness: admin weekly digest');
 }
 
+/**
+ * Send weekly "post-Wave 2 orders" admin digest
+ */
+export async function sendPostWave2OrdersDigestEmail(
+  recipients: string[],
+  data: { orderCount: number; eventCount: number; totalValue: string; ordersTableHtml: string }
+): Promise<SendEmailResult> {
+  if (recipients.length === 0) return { success: true, messageId: 'no-recipients' };
+
+  return sendTriggerEmail(recipients, 'post_wave2_orders_digest', {
+    orderCount: String(data.orderCount),
+    eventCount: String(data.eventCount),
+    totalValue: data.totalValue,
+    ordersTableHtml: data.ordersTableHtml,
+  }, 'Post-Wave 2 orders digest');
+}
+
 // ============================================================================
 // SCHULSONG TEACHER APPROVED NOTIFICATION
 // ============================================================================

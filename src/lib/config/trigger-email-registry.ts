@@ -1062,6 +1062,31 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     availableVariables: ['count', 'digestHtml'],
   },
 
+  // ─── Post-Wave 2 Orders Digest (Admin Weekly) ──────────────────────
+  {
+    slug: 'post_wave2_orders_digest',
+    name: 'CRON: Wöchentliche Nachzügler-Bestellungen (Admin)',
+    description: 'Läuft jeden Montag um 7 Uhr. Listet alle offenen Bestellungen für Events, deren Welle-2-Frist abgelaufen ist.',
+    recipientType: 'admin',
+    triggerEventKey: 'cron:post_wave2_orders_digest',
+    defaultSubject: 'Nachzügler-Bestellungen — {{orderCount}} Bestellungen bei {{eventCount}} Events',
+    defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Bestellungen nach Welle 2
+</h2>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Die folgenden <strong>{{orderCount}} Bestellungen</strong> bei <strong>{{eventCount}} Events</strong> (Gesamtwert: {{totalValue}}) sind nach Ablauf der Welle-2-Frist eingegangen oder noch nicht versendet.
+  Diese Bestellungen werden nicht automatisch erfasst und erfordern manuelle Bearbeitung.
+</p>
+
+{{ordersTableHtml}}
+
+<p style="margin: 24px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Bitte melde dich im Admin-Portal an, um die Bestellungen zu bearbeiten.
+</p>`,
+    availableVariables: ['orderCount', 'eventCount', 'totalValue', 'ordersTableHtml'],
+  },
+
   // ─── Tracklist Confirmation Reminder ────────────────────────────────
   {
     slug: 'tracklist_confirmation_reminder',
