@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
 import ConfirmPrintablesModal from './ConfirmPrintablesModal';
@@ -59,52 +59,37 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
 
   // Admin notes state
   const [notesText, setNotesText] = useState(booking.adminNotes || '');
-  const [notesSaveStatus, setNotesSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const notesTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [savedNotesText, setSavedNotesText] = useState(booking.adminNotes || '');
+  const [notesSaveStatus, setNotesSaveStatus] = useState<'idle' | 'saving'>('idle');
+  const isNotesDirty = notesText !== savedNotesText;
 
   // Sync notes from prop when booking changes
   useEffect(() => {
     setNotesText(booking.adminNotes || '');
+    setSavedNotesText(booking.adminNotes || '');
   }, [booking.adminNotes]);
 
-  const handleNotesChange = useCallback((value: string) => {
-    setNotesText(value);
-    setNotesSaveStatus('idle');
-
-    if (notesTimerRef.current) {
-      clearTimeout(notesTimerRef.current);
-    }
-
-    notesTimerRef.current = setTimeout(async () => {
-      setNotesSaveStatus('saving');
-      try {
-        const res = await fetch(`/api/admin/events/${encodeURIComponent(booking.code)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ admin_notes: value }),
-        });
-        if (res.ok) {
-          setNotesSaveStatus('saved');
-          onNotesUpdate?.(booking.id, value);
-        } else {
-          setNotesSaveStatus('idle');
-          toast.error('Failed to save notes');
-        }
-      } catch {
+  const handleNotesSave = useCallback(async () => {
+    setNotesSaveStatus('saving');
+    try {
+      const res = await fetch(`/api/admin/events/${encodeURIComponent(booking.code)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_notes: notesText }),
+      });
+      if (res.ok) {
+        setSavedNotesText(notesText);
+        setNotesSaveStatus('idle');
+        onNotesUpdate?.(booking.id, notesText);
+      } else {
         setNotesSaveStatus('idle');
         toast.error('Failed to save notes');
       }
-    }, 1000);
-  }, [booking.code, booking.id, onNotesUpdate]);
-
-  // Cleanup debounce timer
-  useEffect(() => {
-    return () => {
-      if (notesTimerRef.current) {
-        clearTimeout(notesTimerRef.current);
-      }
-    };
-  }, []);
+    } catch {
+      setNotesSaveStatus('idle');
+      toast.error('Failed to save notes');
+    }
+  }, [booking.code, booking.id, notesText, onNotesUpdate]);
 
   // Fetch audio status on mount
   useEffect(() => {
@@ -566,15 +551,22 @@ export default function BookingDetailsBreakdown({ booking, onEventDeleted, onNot
           <div className="bg-white rounded-lg border border-gray-200 p-4 flex flex-col flex-1">
             <textarea
               value={notesText}
-              onChange={(e) => handleNotesChange(e.target.value)}
+              onChange={(e) => setNotesText(e.target.value)}
               className="w-full text-sm text-gray-900 border border-gray-300 rounded-md px-3 py-2 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 min-h-[140px] flex-1"
               placeholder="Add notes about this booking..."
             />
-            {notesSaveStatus !== 'idle' && (
-              <p className={`text-xs mt-1 ${notesSaveStatus === 'saving' ? 'text-gray-400' : 'text-green-600'}`}>
-                {notesSaveStatus === 'saving' ? 'Saving...' : 'Saved'}
-              </p>
-            )}
+            <button
+              type="button"
+              onClick={handleNotesSave}
+              disabled={notesSaveStatus === 'saving' || !isNotesDirty}
+              className={`mt-2 w-full py-1.5 px-3 rounded-md text-xs font-medium transition-colors ${
+                isNotesDirty && notesSaveStatus !== 'saving'
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {notesSaveStatus === 'saving' ? 'Saving...' : 'Save Notes'}
+            </button>
           </div>
         </div>
 

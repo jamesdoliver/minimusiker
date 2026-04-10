@@ -127,6 +127,7 @@ export async function GET(
       minicardOrderEnabled?: boolean;
       minicardOrderQuantity?: number;
       tracklistFinalizedAt?: string;
+      adminNotes?: string;
     } = {};
 
     try {
@@ -168,6 +169,7 @@ export async function GET(
             minicardOrderEnabled: eventRecord.minicard_order_enabled,
             minicardOrderQuantity: eventRecord.minicard_order_quantity,
             tracklistFinalizedAt: eventRecord.tracklist_finalized_at,
+            adminNotes: eventRecord.admin_notes,
           };
         }
       }

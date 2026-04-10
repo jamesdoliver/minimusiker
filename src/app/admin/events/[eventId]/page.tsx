@@ -181,6 +181,12 @@ export default function EventDetailPage() {
   const [standardMerchOverride, setStandardMerchOverride] = useState<'auto' | 'force-standard' | 'force-personalized'>('auto');
   const [isUpdatingDeal, setIsUpdatingDeal] = useState(false);
 
+  // Admin notes state
+  const [adminNotes, setAdminNotes] = useState('');
+  const [savedNotes, setSavedNotes] = useState('');
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const isNoteDirty = adminNotes !== savedNotes;
+
   // Bulk school order state
   const [scsShirtsIncluded, setScsShirtsIncluded] = useState(false);
   const [minicardOrderEnabled, setMinicardOrderEnabled] = useState(false);
@@ -241,6 +247,9 @@ export default function EventDetailPage() {
       setScsShirtsIncluded(data.data?.scsShirtsIncluded || false);
       setMinicardOrderEnabled(data.data?.minicardOrderEnabled || false);
       setMinicardOrderQuantity(data.data?.minicardOrderQuantity || 0);
+      // Admin notes
+      setAdminNotes(data.data?.adminNotes || '');
+      setSavedNotes(data.data?.adminNotes || '');
     } catch (err) {
       console.error('Error fetching event detail:', err);
       setError(err instanceof Error ? err.message : 'Failed to load event details');
@@ -476,6 +485,25 @@ export default function EventDetailPage() {
       toast.error(err instanceof Error ? err.message : 'Failed to save deal');
     } finally {
       setIsUpdatingDeal(false);
+    }
+  };
+
+  // Admin notes handler
+  const handleNotesSave = async () => {
+    setIsSavingNotes(true);
+    try {
+      const res = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_notes: adminNotes }),
+      });
+      if (!res.ok) throw new Error('Failed to save notes');
+      setSavedNotes(adminNotes);
+      toast.success('Notes saved');
+    } catch {
+      toast.error('Failed to save notes');
+    } finally {
+      setIsSavingNotes(false);
     }
   };
 
@@ -1036,11 +1064,9 @@ export default function EventDetailPage() {
         </div>
       )}
 
-      {/* Cards 2 + 3: Event Configuration + Deal Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-        {/* Card 2: Event Configuration (60%) */}
-        <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Event Configuration</h2>
+      {/* Event Configuration — full width */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Event Configuration</h2>
 
           {/* Event Type Toggles */}
           <div>
@@ -1289,19 +1315,42 @@ export default function EventDetailPage() {
               />
             </div>
           )}
-        </div>
+      </div>
 
-        {/* Card 3: Deal Summary (40%) */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      {/* Deal Builder + Admin Notes — side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Deal Builder */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <DealBuilder
             dealConfig={dealConfig}
-            isPlus={isPlus}
-            scsShirtsIncluded={scsShirtsIncluded}
-            minicardOrderEnabled={minicardOrderEnabled}
-            minicardOrderQuantity={minicardOrderQuantity}
             onSave={handleDealSave}
             isUpdating={isUpdatingDeal}
           />
+        </div>
+
+        {/* Admin Notes */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col">
+          <div className="pb-3 border-b border-gray-100 mb-4">
+            <span className="text-lg font-semibold text-gray-900">Notes</span>
+          </div>
+          <textarea
+            value={adminNotes}
+            onChange={(e) => setAdminNotes(e.target.value)}
+            className="w-full text-sm text-gray-900 border border-gray-300 rounded-md px-3 py-2 resize-y focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 min-h-[200px] flex-1"
+            placeholder="Add notes about this booking..."
+          />
+          <button
+            type="button"
+            onClick={handleNotesSave}
+            disabled={isSavingNotes || !isNoteDirty}
+            className={`mt-3 w-full py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              isNoteDirty && !isSavingNotes
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {isSavingNotes ? 'Saving...' : 'Save Notes'}
+          </button>
         </div>
       </div>
 

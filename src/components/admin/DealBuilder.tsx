@@ -6,10 +6,6 @@ import { DealConfig, DealConfigPreset } from '@/lib/types/airtable';
 // ─── Props ───────────────────────────────────────────────────────────
 interface DealBuilderProps {
   dealConfig: DealConfig;
-  isPlus?: boolean;
-  scsShirtsIncluded?: boolean;
-  minicardOrderEnabled?: boolean;
-  minicardOrderQuantity?: number;
   onSave: (config: DealConfig) => void;
   isUpdating?: boolean;
 }
@@ -212,10 +208,6 @@ function CustomFeesSection({
 
 export default function DealBuilder({
   dealConfig,
-  isPlus,
-  scsShirtsIncluded,
-  minicardOrderEnabled,
-  minicardOrderQuantity,
   onSave,
   isUpdating,
 }: DealBuilderProps) {
@@ -285,13 +277,6 @@ export default function DealBuilder({
       ...localConfig,
       calculated_fee: total,
       fee_breakdown: { base: 0, items: breakdownItems, total },
-      // Store Zusatzinformationen snapshot
-      info_tshirts_included: scsShirtsIncluded,
-      info_tshirts_quantity: localConfig.info_tshirts_quantity,
-      info_minicards_included: minicardOrderEnabled,
-      info_minicards_quantity: localConfig.info_minicards_quantity,
-      info_scs: scsShirtsIncluded,
-      info_plus: isPlus,
     };
     onSave(configToSave);
     setIsDirty(false);
@@ -329,7 +314,7 @@ export default function DealBuilder({
           disabled={isUpdating}
         />
 
-        {/* ── Zusatzinformationen (read-only from Event Config + note quantities) */}
+        {/* ── Zusatzinformationen ─────────────────────────────── */}
         <div className="space-y-2">
           <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Zusatzinformationen</h4>
           <div className="space-y-2">
@@ -337,11 +322,12 @@ export default function DealBuilder({
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={scsShirtsIncluded || false}
-                disabled
-                className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+                checked={localConfig.info_tshirts_included || false}
+                onChange={(e) => updateConfig({ info_tshirts_included: e.target.checked })}
+                disabled={isUpdating}
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600 cursor-pointer focus:ring-emerald-500"
               />
-              <span className={`text-sm flex-1 ${scsShirtsIncluded ? 'text-gray-800' : 'text-gray-400'}`}>T-Shirts inkl.</span>
+              <span className={`text-sm flex-1 ${localConfig.info_tshirts_included ? 'text-gray-800' : 'text-gray-400'}`}>T-Shirts inkl.</span>
               <span className="text-xs text-gray-400">Anzahl</span>
               <input
                 type="number"
@@ -359,16 +345,17 @@ export default function DealBuilder({
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={minicardOrderEnabled || false}
-                disabled
-                className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+                checked={localConfig.info_minicards_included || false}
+                onChange={(e) => updateConfig({ info_minicards_included: e.target.checked })}
+                disabled={isUpdating}
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600 cursor-pointer focus:ring-emerald-500"
               />
-              <span className={`text-sm flex-1 ${minicardOrderEnabled ? 'text-gray-800' : 'text-gray-400'}`}>Minicards inkl.</span>
+              <span className={`text-sm flex-1 ${localConfig.info_minicards_included ? 'text-gray-800' : 'text-gray-400'}`}>Minicards inkl.</span>
               <span className="text-xs text-gray-400">Anzahl</span>
               <input
                 type="number"
                 min="0"
-                value={localConfig.info_minicards_quantity ?? minicardOrderQuantity ?? 0}
+                value={localConfig.info_minicards_quantity ?? 0}
                 onChange={(e) => {
                   updateConfig({ info_minicards_quantity: parseInt(e.target.value) || 0 });
                 }}
@@ -381,22 +368,24 @@ export default function DealBuilder({
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={scsShirtsIncluded || false}
-                disabled
-                className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+                checked={localConfig.info_scs || false}
+                onChange={(e) => updateConfig({ info_scs: e.target.checked })}
+                disabled={isUpdating}
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600 cursor-pointer focus:ring-emerald-500"
               />
-              <span className={`text-sm ${scsShirtsIncluded ? 'text-gray-800' : 'text-gray-400'}`}>Start-Chancen-Schule</span>
+              <span className={`text-sm ${localConfig.info_scs ? 'text-gray-800' : 'text-gray-400'}`}>Start-Chancen-Schule</span>
             </div>
 
             {/* Plus-Preise */}
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={isPlus || false}
-                disabled
-                className="w-4 h-4 rounded border-gray-300 text-emerald-600"
+                checked={localConfig.info_plus || false}
+                onChange={(e) => updateConfig({ info_plus: e.target.checked })}
+                disabled={isUpdating}
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600 cursor-pointer focus:ring-emerald-500"
               />
-              <span className={`text-sm ${isPlus ? 'text-gray-800' : 'text-gray-400'}`}>Plus-Preise</span>
+              <span className={`text-sm ${localConfig.info_plus ? 'text-gray-800' : 'text-gray-400'}`}>Plus-Preise</span>
             </div>
           </div>
         </div>
