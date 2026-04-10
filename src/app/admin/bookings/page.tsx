@@ -223,13 +223,22 @@ export default function AdminBookings() {
       );
     }
 
-    // Sort confirmed bookings by date ascending (oldest/closest to completion first)
-    // Only apply this sort when confirmed is the only active status
-    if (activeStatuses.size === 1 && activeStatuses.has('confirmed')) {
-      filtered = [...filtered].sort((a, b) =>
-        new Date(a.bookingDate).getTime() - new Date(b.bookingDate).getTime()
-      );
-    }
+    // Sort by booking date.
+    // - Confirmed-only view: ascending (soonest upcoming event first — actionable)
+    // - Every other view (Completed, Pending, On Hold, or any multi-status combo):
+    //   descending, so the most recent row is on top and the list works back into the past
+    // - Rows without a bookingDate (some Pending / On Hold) are pushed to the bottom
+    const confirmedOnly = activeStatuses.size === 1 && activeStatuses.has('confirmed');
+    filtered = [...filtered].sort((a, b) => {
+      const aTime = a.bookingDate ? new Date(a.bookingDate).getTime() : NaN;
+      const bTime = b.bookingDate ? new Date(b.bookingDate).getTime() : NaN;
+      const aHasDate = !Number.isNaN(aTime);
+      const bHasDate = !Number.isNaN(bTime);
+      if (!aHasDate && !bHasDate) return 0;
+      if (!aHasDate) return 1;
+      if (!bHasDate) return -1;
+      return confirmedOnly ? aTime - bTime : bTime - aTime;
+    });
 
     return filtered;
   }, [bookings, activeStatuses, activeTypes, staffFilter, regionFilter, monthFilter, childrenFilter, searchQuery]);
