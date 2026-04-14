@@ -187,14 +187,15 @@ export function PrintableEditor({
   // Handle updating a text element (position, size, text, fontSize, color)
   const handleUpdateTextElement = useCallback(
     (elementId: string, updates: Partial<TextElement>) => {
-      onEditorStateChange({
-        ...editorState,
-        textElements: editorState.textElements.map((el) =>
+      const current = editorStateRef.current;
+      onEditorStateChangeRef.current({
+        ...current,
+        textElements: current.textElements.map((el) =>
           el.id === elementId ? { ...el, ...updates } : el
         ),
       });
     },
-    [editorState, onEditorStateChange]
+    []
   );
 
   // Handle text position change - CSS values stored directly
@@ -216,49 +217,53 @@ export function PrintableEditor({
   // Handle QR position change - CSS values stored directly
   const handleQrPositionChange = useCallback(
     (position: { x: number; y: number }) => {
-      if (!editorState.qrPosition) return;
-      onEditorStateChange({
-        ...editorState,
+      const current = editorStateRef.current;
+      if (!current.qrPosition) return;
+      onEditorStateChangeRef.current({
+        ...current,
         qrPosition: {
-          ...editorState.qrPosition,
+          ...current.qrPosition,
           x: position.x,
           y: position.y,
         },
       });
     },
-    [editorState, onEditorStateChange]
+    []
   );
 
   // Handle QR size change - CSS values stored directly
   const handleQrSizeChange = useCallback(
     (size: number) => {
-      if (!editorState.qrPosition) return;
-      onEditorStateChange({
-        ...editorState,
+      const current = editorStateRef.current;
+      if (!current.qrPosition) return;
+      onEditorStateChangeRef.current({
+        ...current,
         qrPosition: {
-          ...editorState.qrPosition,
+          ...current.qrPosition,
           size,
         },
       });
     },
-    [editorState, onEditorStateChange]
+    []
   );
 
   // Handle QR resize - combined position + size update to avoid stale closure race
   const handleQrResize = useCallback(
     (position: { x: number; y: number }, size: number) => {
-      if (!editorState.qrPosition) return;
-      onEditorStateChange({
-        ...editorState,
+      const current = editorStateRef.current;
+      if (!current.qrPosition) return;
+      onEditorStateChangeRef.current({
+        ...current,
         qrPosition: { x: position.x, y: position.y, size },
       });
     },
-    [editorState, onEditorStateChange]
+    []
   );
 
   // Handle reset to default (re-create flyer defaults for flyer fronts, clear all for others)
   const handleResetToDefault = useCallback(() => {
     const type = itemConfig.type;
+    const current = editorStateRef.current;
     if (FLYER_FRONT_TYPES.includes(type as FlyerFrontType) && canvasDimensions) {
       const flyerType = type as FlyerFrontType;
       const flyerDefaults = FLYER_TEXT_DEFAULTS[flyerType];
@@ -285,26 +290,27 @@ export function PrintableEditor({
         };
       });
 
-      onEditorStateChange({
-        ...editorState,
+      onEditorStateChangeRef.current({
+        ...current,
         textElements: newElements,
       });
     } else {
-      onEditorStateChange({
-        ...editorState,
+      onEditorStateChangeRef.current({
+        ...current,
         textElements: [],
       });
     }
     setSelectedElementId(null);
-  }, [editorState, onEditorStateChange, itemConfig.type, canvasDimensions, schoolName, eventDate]);
+  }, [itemConfig.type, canvasDimensions, schoolName, eventDate]);
 
   // Handle reset position for logo type (snap back to default position)
   const handleResetLogoPosition = useCallback(() => {
-    if (!canvasDimensions || editorState.textElements.length === 0) return;
+    const current = editorStateRef.current;
+    if (!canvasDimensions || current.textElements.length === 0) return;
     const scale = canvasDimensions.scale;
-    const element = editorState.textElements[0];
-    onEditorStateChange({
-      ...editorState,
+    const element = current.textElements[0];
+    onEditorStateChangeRef.current({
+      ...current,
       textElements: [{
         ...element,
         position: {
@@ -318,7 +324,7 @@ export function PrintableEditor({
         fontSize: TSHIRT_HOODIE_TEXT_DEFAULTS.fontSize * scale,
       }],
     });
-  }, [canvasDimensions, editorState, onEditorStateChange]);
+  }, [canvasDimensions]);
 
   const qrUrl = accessCode ? `minimusiker.app/e/${accessCode}` : undefined;
   const fontFamily = getFontFamilyForType(itemConfig.type);
