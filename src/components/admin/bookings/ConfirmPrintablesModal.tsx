@@ -730,7 +730,13 @@ export default function ConfirmPrintablesModal({
       const result = await response.json();
 
       if (result.success && result.url) {
-        window.open(result.url, '_blank');
+        const link = document.createElement('a');
+        link.href = result.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       } else {
         throw new Error('No preview URL returned');
       }
