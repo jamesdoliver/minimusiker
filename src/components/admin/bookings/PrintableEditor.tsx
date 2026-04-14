@@ -12,7 +12,6 @@ import {
   TextElement,
   TextElementType,
   createTextElement,
-  getFontFamilyForType,
   fontFamilyToCss,
   TSHIRT_HOODIE_TEXT_DEFAULTS,
   FLYER_TEXT_DEFAULTS,
@@ -327,7 +326,7 @@ export function PrintableEditor({
   }, [canvasDimensions]);
 
   const qrUrl = accessCode ? `minimusiker.app/e/${accessCode}` : undefined;
-  const fontFamily = getFontFamilyForType(itemConfig.type);
+  const fontFamily = 'Springwood Display, cursive';
   const isLogoType = itemConfig.type === 'tshirt' || itemConfig.type === 'hoodie';
 
   return (
