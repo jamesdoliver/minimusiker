@@ -2872,12 +2872,13 @@ class AirtableService {
     if (this.useNormalizedTables()) {
       // NEW: Query Events table directly
       try {
+        // Use a generous cutoff (6 months) so parents can still register
+        // for past events to purchase audio or merch, without fetching
+        // the entire history (which causes N+1 query amplification downstream)
         const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - 3);
+        cutoffDate.setMonth(cutoffDate.getMonth() - 6);
         const cutoff = cutoffDate.toISOString().split('T')[0];
 
-        // Get all events with recent/future dates and matching school name
-        // Use returnFieldsByFieldId: true so we can read results using field IDs
         const events = await this.eventsTable!.select({
           filterByFormula: `AND(
             IS_AFTER({${EVENTS_FIELD_IDS.event_date}}, '${cutoff}'),
@@ -2911,11 +2912,13 @@ class AirtableService {
     } else {
       // LEGACY: Query parent_journey_table
       try {
+        // Use a generous cutoff (6 months) so parents can still register
+        // for past events to purchase audio or merch, without fetching
+        // the entire table (which has no server-side search filter)
         const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - 3);
+        cutoffDate.setMonth(cutoffDate.getMonth() - 6);
         const cutoff = cutoffDate.toISOString().split('T')[0];
 
-        // Get all records with recent/future booking dates
         const allRecords = await this.query({
           filterByFormula: `IS_AFTER({booking_date}, '${cutoff}')`,
         });
@@ -2970,12 +2973,13 @@ class AirtableService {
     if (this.useNormalizedTables()) {
       // NEW: Query Events table and fetch class details
       try {
+        // Use a generous cutoff (6 months) so parents can still register
+        // for past events to purchase audio or merch, without triggering
+        // excessive N+1 queries for classes/registrations on old events
         const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - 3);
+        cutoffDate.setMonth(cutoffDate.getMonth() - 6);
         const cutoff = cutoffDate.toISOString().split('T')[0];
 
-        // Get all events for this school with recent/future dates
-        // Use returnFieldsByFieldId: true so we can read results using field IDs
         const events = await this.eventsTable!.select({
           filterByFormula: `AND(
             {${EVENTS_FIELD_IDS.school_name}} = '${schoolName.replace(/'/g, "\\'")}',
@@ -3069,11 +3073,13 @@ class AirtableService {
     } else {
       // LEGACY: Query parent_journey_table
       try {
+        // Use a generous cutoff (6 months) so parents can still register
+        // for past events to purchase audio or merch, without fetching
+        // the entire history for this school
         const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - 3);
+        cutoffDate.setMonth(cutoffDate.getMonth() - 6);
         const cutoff = cutoffDate.toISOString().split('T')[0];
 
-        // Get all records for this school with recent/future dates
         const records = await this.query({
           filterByFormula: `AND(
             {school_name} = '${schoolName.replace(/'/g, "\\'")}',
