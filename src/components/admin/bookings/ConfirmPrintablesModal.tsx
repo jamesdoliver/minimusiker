@@ -115,6 +115,9 @@ export default function ConfirmPrintablesModal({
     return status;
   });
 
+  // Items that have been verified as generated in R2 (PDF exists)
+  const [r2ConfirmedItems, setR2ConfirmedItems] = useState<Set<PrintableItemType>>(new Set());
+
   // Loading state for fetching existing status
   const [isLoadingStatus, setIsLoadingStatus] = useState(false);
 
@@ -251,6 +254,7 @@ export default function ConfirmPrintablesModal({
       setGenerationResult(null);
       setHealthCheck(null);
       setHealthError(null);
+      setR2ConfirmedItems(new Set());
 
       // Run health check, then load existing printable status from R2
       (async () => {
@@ -379,6 +383,14 @@ export default function ConfirmPrintablesModal({
           });
           return merged;
         });
+
+        const confirmedFromR2 = new Set<PrintableItemType>();
+        PRINTABLE_ITEMS.forEach((item) => {
+          if (data.status[item.type] === 'confirmed') {
+            confirmedFromR2.add(item.type);
+          }
+        });
+        setR2ConfirmedItems(confirmedFromR2);
 
         // Jump to the first pending/skipped item, but only if the user hasn't
         // already navigated or if we didn't restore a previous session.
@@ -1170,7 +1182,7 @@ export default function ConfirmPrintablesModal({
           )}
 
           {/* Already generated indicator for confirmed items */}
-          {currentItemStatus === 'confirmed' && (
+          {r2ConfirmedItems.has(currentItem.type) && (
             <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -1301,7 +1313,7 @@ export default function ConfirmPrintablesModal({
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Generate {confirmedCount} PDFs
+                      {confirmedCount > 0 ? `Generate ${confirmedCount} PDFs` : 'Save Skipped Items'}
                     </>
                   )}
                 </button>
