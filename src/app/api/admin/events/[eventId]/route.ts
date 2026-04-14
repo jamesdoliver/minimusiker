@@ -58,15 +58,19 @@ export async function GET(
           assignedStaffId: booking.assignedStaff?.[0],
           // Include booking info for display
           bookingInfo: {
+            contactPerson: booking.schoolContactName,
             contactEmail: booking.schoolContactEmail,
             contactPhone: booking.schoolPhone,
             address: booking.schoolAddress,
             postalCode: booking.schoolPostalCode,
+            city: booking.city,
             region: booking.region,
             startTime: booking.startTime,
             endTime: booking.endTime,
             status: booking.simplybookStatus,
             costCategory: booking.schoolSizeCategory,
+            bookingCode: booking.simplybookId,
+            discountCode: booking.simplybookHash,
           },
         } as SchoolEventDetail & { bookingInfo?: Record<string, unknown> };
       }
@@ -129,6 +133,7 @@ export async function GET(
       tracklistFinalizedAt?: string;
       adminNotes?: string;
     } = {};
+    let resolvedEventRecord: Awaited<ReturnType<typeof airtableService.getEventById>> = null;
 
     try {
       // Try to find Event record by event_id or legacy_booking_id
@@ -146,30 +151,30 @@ export async function GET(
       }
 
       if (eventRecordId) {
-        const eventRecord = await airtableService.getEventById(eventRecordId);
-        if (eventRecord) {
+        resolvedEventRecord = await airtableService.getEventById(eventRecordId);
+        if (resolvedEventRecord) {
           // Determine if this is a Kita event based on event_type or is_kita flag
-          const isKitaFromEventType = eventRecord.event_type === 'Minimusikertag Kita';
+          const isKitaFromEventType = resolvedEventRecord.event_type === 'Minimusikertag Kita';
 
           eventStatusAndType = {
-            eventStatus: eventRecord.status,
-            isPlus: eventRecord.is_plus,
-            isKita: eventRecord.is_kita || isKitaFromEventType,
-            isSchulsong: eventRecord.is_schulsong,
-            isMinimusikertag: eventRecord.is_minimusikertag === true,
-            dealBuilderEnabled: eventRecord.deal_builder_enabled,
-            dealType: eventRecord.deal_type || null,
-            dealConfig: eventRecord.deal_config || null,
-            estimatedChildren: eventRecord.estimated_children,
-            isUnder100: eventRecord.is_under_100,
-            standardMerchOverride: eventRecord.standard_merch_override,
-            schulsongReleasedAt: eventRecord.schulsong_released_at,
-            schulsongMerchCutoff: eventRecord.schulsong_merch_cutoff,
-            scsShirtsIncluded: eventRecord.scs_shirts_included,
-            minicardOrderEnabled: eventRecord.minicard_order_enabled,
-            minicardOrderQuantity: eventRecord.minicard_order_quantity,
-            tracklistFinalizedAt: eventRecord.tracklist_finalized_at,
-            adminNotes: eventRecord.admin_notes,
+            eventStatus: resolvedEventRecord.status,
+            isPlus: resolvedEventRecord.is_plus,
+            isKita: resolvedEventRecord.is_kita || isKitaFromEventType,
+            isSchulsong: resolvedEventRecord.is_schulsong,
+            isMinimusikertag: resolvedEventRecord.is_minimusikertag === true,
+            dealBuilderEnabled: resolvedEventRecord.deal_builder_enabled,
+            dealType: resolvedEventRecord.deal_type || null,
+            dealConfig: resolvedEventRecord.deal_config || null,
+            estimatedChildren: resolvedEventRecord.estimated_children,
+            isUnder100: resolvedEventRecord.is_under_100,
+            standardMerchOverride: resolvedEventRecord.standard_merch_override,
+            schulsongReleasedAt: resolvedEventRecord.schulsong_released_at,
+            schulsongMerchCutoff: resolvedEventRecord.schulsong_merch_cutoff,
+            scsShirtsIncluded: resolvedEventRecord.scs_shirts_included,
+            minicardOrderEnabled: resolvedEventRecord.minicard_order_enabled,
+            minicardOrderQuantity: resolvedEventRecord.minicard_order_quantity,
+            tracklistFinalizedAt: resolvedEventRecord.tracklist_finalized_at,
+            adminNotes: resolvedEventRecord.admin_notes,
           };
         }
       }
@@ -177,11 +182,41 @@ export async function GET(
       console.warn('Could not fetch Event status/type fields:', err);
     }
 
+    // Enrich with booking info if not already present (fallback path already has it)
+    let bookingInfo = (eventDetail as any).bookingInfo;
+    if (!bookingInfo) {
+      try {
+        const booking = await airtableService.getSchoolBookingBySimplybookId(eventId);
+        if (booking) {
+          const accessCode = resolvedEventRecord?.access_code;
+          bookingInfo = {
+            contactPerson: booking.schoolContactName,
+            contactEmail: booking.schoolContactEmail,
+            contactPhone: booking.schoolPhone,
+            address: booking.schoolAddress,
+            postalCode: booking.schoolPostalCode,
+            city: booking.city,
+            region: booking.region,
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            status: booking.simplybookStatus,
+            costCategory: booking.schoolSizeCategory,
+            bookingCode: booking.simplybookId,
+            discountCode: booking.simplybookHash,
+            shortUrl: accessCode ? `minimusiker.app/e/${accessCode}` : undefined,
+          };
+        }
+      } catch (err) {
+        console.warn('Could not fetch booking info:', err);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         ...eventDetail,
         ...eventStatusAndType,
+        ...(bookingInfo ? { bookingInfo } : {}),
       },
     });
   } catch (error) {

@@ -13,15 +13,20 @@ import { deriveStageFromSimple } from '@/lib/utils/audioStatusHelpers';
 // Extended type that includes booking info from API fallback
 interface EventDetailWithBooking extends SchoolEventDetail {
   bookingInfo?: {
+    contactPerson?: string;
     contactEmail?: string;
     contactPhone?: string;
     address?: string;
     postalCode?: string;
+    city?: string;
     region?: string;
     startTime?: string;
     endTime?: string;
     status?: string;
     costCategory?: string;
+    bookingCode?: string;
+    discountCode?: string;
+    shortUrl?: string;
   };
   // Event status and type fields
   eventStatus?: 'Confirmed' | 'On Hold' | 'Cancelled' | 'Deleted' | 'Pending';
@@ -187,6 +192,9 @@ export default function EventDetailPage() {
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const isNoteDirty = adminNotes !== savedNotes;
 
+  // Booking info copy state
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
   // Bulk school order state
   const [scsShirtsIncluded, setScsShirtsIncluded] = useState(false);
   const [minicardOrderEnabled, setMinicardOrderEnabled] = useState(false);
@@ -345,6 +353,13 @@ export default function EventDetailPage() {
       name: collection.className,
     });
     setShowDeleteConfirm(true);
+  };
+
+  // Copy to clipboard helper for booking info section
+  const handleCopyBookingField = (value: string, fieldName: string) => {
+    navigator.clipboard.writeText(value);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   // Refresh teacher handler - syncs contact person to class main_teacher
@@ -1002,6 +1017,130 @@ export default function EventDetailPage() {
         </div>
       </div>
 
+      {/* Booking Information */}
+      {event.bookingInfo && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">Booking Information</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4">
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Contact Person</label>
+              <p className="text-sm font-medium text-gray-900">{event.bookingInfo.contactPerson || '-'}</p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Email</label>
+              <p className="text-sm text-gray-900">
+                {event.bookingInfo.contactEmail ? (
+                  <a href={`mailto:${event.bookingInfo.contactEmail}`} className="text-blue-600 hover:underline">
+                    {event.bookingInfo.contactEmail}
+                  </a>
+                ) : '-'}
+              </p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Phone</label>
+              <p className="text-sm text-gray-900">
+                {event.bookingInfo.contactPhone ? (
+                  <a href={`tel:${event.bookingInfo.contactPhone}`} className="text-blue-600 hover:underline">
+                    {event.bookingInfo.contactPhone}
+                  </a>
+                ) : '-'}
+              </p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Address</label>
+              <p className="text-sm text-gray-900">
+                {event.bookingInfo.address || '-'}
+                {(event.bookingInfo.postalCode || event.bookingInfo.city) && (
+                  <>, {[event.bookingInfo.postalCode, event.bookingInfo.city].filter(Boolean).join(' ')}</>
+                )}
+              </p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Region</label>
+              <p className="text-sm text-gray-900">
+                {event.bookingInfo.region || '-'}
+              </p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Booking Code</label>
+              <p className="text-sm font-mono text-gray-900">{event.bookingInfo.bookingCode || '-'}</p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Event Code</label>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-mono text-gray-900">{event.eventId || '-'}</p>
+                {event.eventId && (
+                  <button
+                    onClick={() => handleCopyBookingField(event.eventId, 'eventCode')}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Copy event code"
+                  >
+                    {copiedField === 'eventCode' ? (
+                      <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+            {event.bookingInfo.discountCode && (
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">Discount Code</label>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-mono text-gray-900">{event.bookingInfo.discountCode}</p>
+                  <button
+                    onClick={() => handleCopyBookingField(event.bookingInfo?.discountCode ?? '', 'discount')}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Copy discount code"
+                  >
+                    {copiedField === 'discount' ? (
+                      <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="text-xs text-gray-500 uppercase tracking-wide">Time</label>
+              <p className="text-sm text-gray-900">
+                {event.bookingInfo.startTime && event.bookingInfo.endTime
+                  ? `${event.bookingInfo.startTime} - ${event.bookingInfo.endTime}`
+                  : event.bookingInfo.startTime || '-'}
+              </p>
+            </div>
+            {event.bookingInfo.shortUrl && (
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wide">Access Link</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleCopyBookingField(event.bookingInfo?.shortUrl ?? '', 'accessLink')}
+                    className="text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
+                    title="Click to copy"
+                  >
+                    {copiedField === 'accessLink' ? (
+                      <span className="text-green-600 font-sans">Copied!</span>
+                    ) : (
+                      event.bookingInfo.shortUrl
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Schulsong Status Banners */}
       {isSchulsong && schulsongFileExists && schulsongApprovalStatus === 'pending' && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
@@ -1353,99 +1492,6 @@ export default function EventDetailPage() {
           </button>
         </div>
       </div>
-
-      {/* Booking Info Section - shown when no classes exist */}
-      {event.bookingInfo && event.classes.length === 0 && (
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Booking Information</h2>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Contact Info */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Contact</h3>
-                <div className="space-y-2">
-                  {event.bookingInfo.contactEmail && (
-                    <div>
-                      <span className="text-xs text-gray-500 uppercase">Email</span>
-                      <p className="text-sm">
-                        <a href={`mailto:${event.bookingInfo.contactEmail}`} className="text-blue-600 hover:underline">
-                          {event.bookingInfo.contactEmail}
-                        </a>
-                      </p>
-                    </div>
-                  )}
-                  {event.bookingInfo.contactPhone && (
-                    <div>
-                      <span className="text-xs text-gray-500 uppercase">Phone</span>
-                      <p className="text-sm">
-                        <a href={`tel:${event.bookingInfo.contactPhone}`} className="text-blue-600 hover:underline">
-                          {event.bookingInfo.contactPhone}
-                        </a>
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Location */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Location</h3>
-                <div className="space-y-2">
-                  {event.bookingInfo.address && (
-                    <div>
-                      <span className="text-xs text-gray-500 uppercase">Address</span>
-                      <p className="text-sm text-gray-900">{event.bookingInfo.address}</p>
-                    </div>
-                  )}
-                  {(event.bookingInfo.postalCode || event.bookingInfo.region) && (
-                    <div>
-                      <span className="text-xs text-gray-500 uppercase">Region</span>
-                      <p className="text-sm text-gray-900">
-                        {[event.bookingInfo.postalCode, event.bookingInfo.region].filter(Boolean).join(', ')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Event Details */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Event Details</h3>
-                <div className="space-y-2">
-                  {(event.bookingInfo.startTime || event.bookingInfo.endTime) && (
-                    <div>
-                      <span className="text-xs text-gray-500 uppercase">Time</span>
-                      <p className="text-sm text-gray-900">
-                        {event.bookingInfo.startTime}{event.bookingInfo.endTime ? ` - ${event.bookingInfo.endTime}` : ''}
-                      </p>
-                    </div>
-                  )}
-                  {event.bookingInfo.status && (
-                    <div>
-                      <span className="text-xs text-gray-500 uppercase">Status</span>
-                      <p className="text-sm">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          event.bookingInfo.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                          event.bookingInfo.status === 'pending' ? 'bg-orange-100 text-orange-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {event.bookingInfo.status.charAt(0).toUpperCase() + event.bookingInfo.status.slice(1)}
-                        </span>
-                      </p>
-                    </div>
-                  )}
-                  {event.bookingInfo.costCategory && (
-                    <div>
-                      <span className="text-xs text-gray-500 uppercase">Size</span>
-                      <p className="text-sm text-gray-900">{event.bookingInfo.costCategory}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Lehrer-Status Card */}
       {event && (
