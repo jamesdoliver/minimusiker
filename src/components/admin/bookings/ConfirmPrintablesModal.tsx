@@ -955,9 +955,15 @@ export default function ConfirmPrintablesModal({
                     onClick={() => { stepSetByUser.current = true; setCurrentStep(index); }}
                     className={`w-3 h-3 rounded-full transition-all ${dotClass} ${
                       isCurrent ? 'ring-2 ring-[#F4A261] ring-offset-1 scale-125' : ''
-                    }`}
-                    title={`${item.name} (${status})`}
-                  />
+                    } flex items-center justify-center`}
+                    title={`${item.name} (${status}${r2ConfirmedItems.has(item.type) ? ' - PDF exists' : ''})`}
+                  >
+                    {r2ConfirmedItems.has(item.type) && (
+                      <svg className="w-2 h-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={4}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
                 );
               })}
             </div>
