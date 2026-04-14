@@ -1061,14 +1061,14 @@ export default function EventDetailPage() {
                 {event.bookingInfo.region || '-'}
               </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="text-xs text-gray-500 uppercase tracking-wide">Booking Code</label>
-              <p className="text-sm font-mono text-gray-900">{event.bookingInfo.bookingCode || '-'}</p>
+              <p className="text-sm font-mono text-gray-900 truncate">{event.bookingInfo.bookingCode || '-'}</p>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="text-xs text-gray-500 uppercase tracking-wide">Event Code</label>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-mono text-gray-900">{event.eventId || '-'}</p>
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="text-sm font-mono text-gray-900 truncate">{event.eventId || '-'}</p>
                 {event.eventId && (
                   <button
                     onClick={() => handleCopyBookingField(event.eventId, 'eventCode')}
@@ -1089,10 +1089,10 @@ export default function EventDetailPage() {
               </div>
             </div>
             {event.bookingInfo.discountCode && (
-              <div>
+              <div className="min-w-0">
                 <label className="text-xs text-gray-500 uppercase tracking-wide">Discount Code</label>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-mono text-gray-900">{event.bookingInfo.discountCode}</p>
+                <div className="flex items-center gap-2 min-w-0">
+                  <p className="text-sm font-mono text-gray-900 truncate">{event.bookingInfo.discountCode}</p>
                   <button
                     onClick={() => handleCopyBookingField(event.bookingInfo?.discountCode ?? '', 'discount')}
                     className="text-gray-400 hover:text-gray-600 transition-colors"
