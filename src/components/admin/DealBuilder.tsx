@@ -11,7 +11,7 @@ interface DealBuilderProps {
 }
 
 // ─── Preset definitions ──────────────────────────────────────────────
-type PresetKey = 'pauschale' | 'distance_surcharge' | 'kleine_einrichtung' | 'schulsong_vorlage' | 'schulsong_individuell';
+type PresetKey = 'pauschale' | 'distance_surcharge' | 'kleine_einrichtung' | 'schulsong_vorlage' | 'schulsong_individuell' | 'schulsong_noten' | 'schulsong_material' | 'schulsong_aufnahmetag' | 'schulsong_streaming';
 
 interface PresetDef {
   key: PresetKey;
@@ -26,6 +26,10 @@ const PRESET_DEFS: PresetDef[] = [
   { key: 'kleine_einrichtung',     label: 'Zuschlag für kleine Einrichtungen',  defaultAmount: 0 },
   { key: 'schulsong_vorlage',      label: 'Schulsong (nach Vorlage)',           defaultAmount: 1000 },
   { key: 'schulsong_individuell',  label: 'Schulsong (individuell)',            defaultAmount: 1800 },
+  { key: 'schulsong_noten',        label: 'Noten',                             defaultAmount: 75 },
+  { key: 'schulsong_material',     label: 'Material',                          defaultAmount: 75 },
+  { key: 'schulsong_aufnahmetag',  label: 'Aufnahmetag',                       defaultAmount: 500 },
+  { key: 'schulsong_streaming',    label: 'Streaming',                         defaultAmount: 89 },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────

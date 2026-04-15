@@ -782,6 +782,10 @@ export interface DealConfig {
     // v3 presets
     schulsong_vorlage?: DealConfigPreset;
     schulsong_individuell?: DealConfigPreset;
+    schulsong_noten?: DealConfigPreset;
+    schulsong_material?: DealConfigPreset;
+    schulsong_aufnahmetag?: DealConfigPreset;
+    schulsong_streaming?: DealConfigPreset;
   };
   // Zusatzinformationen (note-only, stored in deal_config)
   info_tshirts_included?: boolean;
