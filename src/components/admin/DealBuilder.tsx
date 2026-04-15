@@ -291,7 +291,7 @@ export default function DealBuilder({
     <div>
       {/* Header */}
       <div className="pb-3 border-b border-gray-100">
-        <span className="text-lg font-semibold text-gray-900">Deal Builder</span>
+        <span className="text-lg font-semibold text-gray-900">Deal Memo</span>
       </div>
 
       <div className="pt-4 space-y-5">
