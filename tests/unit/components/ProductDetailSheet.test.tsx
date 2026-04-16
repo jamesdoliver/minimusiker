@@ -31,7 +31,7 @@ jest.mock('next/image', () => ({
 }));
 
 import { NextIntlClientProvider } from 'next-intl';
-import { CartProvider } from '@/lib/contexts/CartContext';
+import { CartProvider, useCart } from '@/lib/contexts/CartContext';
 import ProductDetailSheet from '@/components/shop/ProductDetailSheet';
 import type { Product } from '@/lib/types/airtable';
 
@@ -125,5 +125,31 @@ describe('ProductDetailSheet', () => {
   it('hides pagination dots when product has only one image', () => {
     renderSheet(baseProduct);
     expect(screen.queryByLabelText('Go to image 1')).not.toBeInTheDocument();
+  });
+
+  it('adds item to cart when Add to Cart is clicked in the footer', async () => {
+    let cartItems: any[] = [];
+    function CartSpy() {
+      const cart = useCart();
+      cartItems = cart.cart.items;
+      return null;
+    }
+
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <CartProvider>
+          <CartSpy />
+          <ProductDetailSheet product={baseProduct} open={true} onOpenChange={() => {}} />
+        </CartProvider>
+      </NextIntlClientProvider>
+    );
+
+    const addButton = screen.getByRole('button', { name: /add to cart/i });
+    addButton.click();
+
+    // Wait a tick for state to settle
+    await new Promise((r) => setTimeout(r, 10));
+    expect(cartItems.length).toBe(1);
+    expect(cartItems[0].variant.id).toBe('gid://shopify/ProductVariant/1');
   });
 });
