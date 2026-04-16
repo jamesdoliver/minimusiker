@@ -67,7 +67,11 @@ export default function ProductCard({ product }: ProductCardProps) {
       tabIndex={0}
       aria-label={tSheet('ariaLabel', { title: product.title })}
       aria-haspopup="dialog"
-      onClick={() => setIsSheetOpen(true)}
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('button:disabled, [aria-disabled="true"]')) return;
+        setIsSheetOpen(true);
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
