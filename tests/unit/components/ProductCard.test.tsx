@@ -70,6 +70,15 @@ const product: Product = {
       image: null,
       selectedOptions: [{ name: 'Size', value: 'L' }],
     } as any,
+    {
+      id: 'gid://shopify/ProductVariant/3',
+      title: 'Size XL',
+      availableForSale: false,
+      price: { amount: '40.00', currencyCode: 'EUR' },
+      compareAtPrice: null,
+      image: null,
+      selectedOptions: [{ name: 'Size', value: 'XL' }],
+    } as any,
   ],
 };
 
@@ -140,12 +149,33 @@ describe('ProductCard with detail sheet', () => {
     );
 
     // First button matching add-to-cart will be the card's CTA (sheet is closed so its footer button isn't rendered).
-    const cardCta = screen.getAllByRole('button', { name: /add to cart/i })[0];
-    fireEvent.click(cardCta);
+    const ctas = screen.getAllByRole('button', { name: /add to cart/i });
+    expect(ctas).toHaveLength(1);
+    fireEvent.click(ctas[0]);
 
     expect(
       screen.queryByRole('heading', { level: 2, name: 'Test Hoodie' })
     ).not.toBeInTheDocument();
     expect(cartItems.length).toBe(1);
+  });
+
+  it('does not open the sheet when a disabled size button is clicked', () => {
+    renderCard();
+    // XL is unavailable; clicking it should be a no-op for both selection and sheet
+    const xlButton = screen.getByRole('button', { name: 'XL' });
+    expect(xlButton).toBeDisabled();
+    fireEvent.click(xlButton);
+    expect(
+      screen.queryByRole('heading', { level: 2, name: 'Test Hoodie' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the sheet when Enter is pressed on the focused card', () => {
+    renderCard();
+    const card = screen.getByRole('button', { name: /product details for test hoodie/i });
+    fireEvent.keyDown(card, { key: 'Enter' });
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Test Hoodie' })
+    ).toBeInTheDocument();
   });
 });
