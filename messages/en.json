@@ -248,7 +248,10 @@
     "productSheet": {
       "close": "Close",
       "descriptionFallback": "More details coming soon.",
-      "ariaLabel": "Product details for {title}"
+      "ariaLabel": "Product details for {title}",
+      "previousImage": "Previous image",
+      "nextImage": "Next image",
+      "goToImage": "Go to image {index}"
     },
     "cart": {
       "title": "Your Cart ({count})",

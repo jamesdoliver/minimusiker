@@ -103,13 +103,13 @@ export default function ProductDetailSheet({ product, open, onOpenChange }: Prod
                     {/* Prev / next overlay tap zones */}
                     <button
                       type="button"
-                      aria-label="Previous image"
+                      aria-label={t('previousImage')}
                       onClick={() => setActiveImageIndex((i) => (i - 1 + images.length) % images.length)}
                       className="absolute left-0 top-0 bottom-0 w-1/3"
                     />
                     <button
                       type="button"
-                      aria-label="Next image"
+                      aria-label={t('nextImage')}
                       onClick={() => setActiveImageIndex((i) => (i + 1) % images.length)}
                       className="absolute right-0 top-0 bottom-0 w-1/3"
                     />
@@ -119,7 +119,7 @@ export default function ProductDetailSheet({ product, open, onOpenChange }: Prod
                         <button
                           key={i}
                           type="button"
-                          aria-label={`Go to image ${i + 1}`}
+                          aria-label={t('goToImage', { index: i + 1 })}
                           onClick={() => setActiveImageIndex(i)}
                           className={`w-2 h-2 rounded-full transition-colors ${
                             i === activeImageIndex ? 'bg-sage-700' : 'bg-gray-300'
@@ -134,9 +134,14 @@ export default function ProductDetailSheet({ product, open, onOpenChange }: Prod
 
             {/* Title + price */}
             <div className="px-6 pt-5 pb-3">
-              <h2 className="font-heading text-2xl text-minimusik-heading mb-2">
-                {product.title}
-              </h2>
+              <Drawer.Title asChild>
+                <h2 className="font-heading text-2xl text-minimusik-heading mb-2">
+                  {product.title}
+                </h2>
+              </Drawer.Title>
+              <Drawer.Description className="sr-only">
+                {t('ariaLabel', { title: product.title })}
+              </Drawer.Description>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-sage-700">
                   {formatPrice(price * 100)}

@@ -248,7 +248,10 @@
     "productSheet": {
       "close": "Schließen",
       "descriptionFallback": "Weitere Details folgen in Kürze.",
-      "ariaLabel": "Produktdetails für {title}"
+      "ariaLabel": "Produktdetails für {title}",
+      "previousImage": "Vorheriges Bild",
+      "nextImage": "Nächstes Bild",
+      "goToImage": "Zu Bild {index} wechseln"
     },
     "cart": {
       "title": "Ihr Warenkorb ({count})",
