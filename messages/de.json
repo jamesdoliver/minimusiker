@@ -242,7 +242,13 @@
       "size": "Größe",
       "quantity": "Menge",
       "adding": "Wird hinzugefügt...",
-      "addToCart": "In den Warenkorb"
+      "addToCart": "In den Warenkorb",
+      "productDetails": "Produktdetails"
+    },
+    "productSheet": {
+      "close": "Schließen",
+      "descriptionFallback": "Weitere Details folgen in Kürze.",
+      "ariaLabel": "Produktdetails für {title}"
     },
     "cart": {
       "title": "Ihr Warenkorb ({count})",

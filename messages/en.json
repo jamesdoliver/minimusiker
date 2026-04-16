@@ -242,7 +242,13 @@
       "size": "Size",
       "quantity": "Quantity",
       "adding": "Adding...",
-      "addToCart": "Add to Cart"
+      "addToCart": "Add to Cart",
+      "productDetails": "Product Details"
+    },
+    "productSheet": {
+      "close": "Close",
+      "descriptionFallback": "More details coming soon.",
+      "ariaLabel": "Product details for {title}"
     },
     "cart": {
       "title": "Your Cart ({count})",
