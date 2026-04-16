@@ -77,11 +77,12 @@ class ShopifyService {
               id
               title
               description
+              descriptionHtml
               productType
               handle
               tags
               availableForSale
-              images(first: 5) {
+              images(first: 10) {
                 edges {
                   node {
                     id
@@ -666,6 +667,7 @@ class ShopifyService {
       id: shopifyProduct.id,
       title: shopifyProduct.title,
       description: shopifyProduct.description,
+      descriptionHtml: shopifyProduct.descriptionHtml,
       productType: shopifyProduct.productType,
       handle: shopifyProduct.handle,
       tags: shopifyProduct.tags,
