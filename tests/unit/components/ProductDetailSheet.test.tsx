@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import enMessages from '../../../messages/en.json';
 
@@ -127,7 +127,7 @@ describe('ProductDetailSheet', () => {
     expect(screen.queryByLabelText('Go to image 1')).not.toBeInTheDocument();
   });
 
-  it('adds item to cart when Add to Cart is clicked in the footer', async () => {
+  it('adds item to cart when Add to Cart is clicked in the footer', () => {
     let cartItems: any[] = [];
     function CartSpy() {
       const cart = useCart();
@@ -144,12 +144,10 @@ describe('ProductDetailSheet', () => {
       </NextIntlClientProvider>
     );
 
-    const addButton = screen.getByRole('button', { name: /add to cart/i });
-    addButton.click();
+    fireEvent.click(screen.getByRole('button', { name: /add to cart/i }));
 
-    // Wait a tick for state to settle
-    await new Promise((r) => setTimeout(r, 10));
     expect(cartItems.length).toBe(1);
     expect(cartItems[0].variant.id).toBe('gid://shopify/ProductVariant/1');
+    expect(cartItems[0].quantity).toBe(1);
   });
 });
