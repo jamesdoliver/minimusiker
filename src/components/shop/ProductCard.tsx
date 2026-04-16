@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { Product, ProductVariant } from '@/lib/types/airtable';
 import { useCart } from '@/lib/contexts/CartContext';
 import { formatPrice } from '@/lib/utils';
+import ProductDetailSheet from './ProductDetailSheet';
 
 interface ProductCardProps {
   product: Product;
@@ -17,6 +18,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant>(product.variants[0]);
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   // Get unique size options from variants
   const sizeOptions = product.variants
@@ -58,7 +60,19 @@ export default function ProductCard({ product }: ProductCardProps) {
   const selectedSize = selectedVariant.selectedOptions.find((opt) => opt.name === 'Size')?.value;
 
   return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden group flex flex-col h-full">
+    <>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => setIsSheetOpen(true)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setIsSheetOpen(true);
+        }
+      }}
+      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden group flex flex-col h-full text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-sage-500"
+    >
       {/* Product Image */}
       <div className="relative aspect-square overflow-hidden bg-cream-100 p-4">
         {primaryImage ? (
@@ -123,6 +137,20 @@ export default function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
 
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsSheetOpen(true);
+          }}
+          className="self-start mb-4 text-sm font-medium text-sage-700 hover:text-sage-800 inline-flex items-center gap-1"
+        >
+          {t('productDetails')}
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+
         {/* Size Selector */}
         {sizeOptions.length > 1 && (
           <div className="mb-4">
@@ -140,7 +168,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 return (
                   <button
                     key={size}
-                    onClick={() => handleSizeSelect(size)}
+                    onClick={(e) => { e.stopPropagation(); handleSizeSelect(size); }}
                     disabled={!isAvailable}
                     className={`
                       px-3 py-1.5 text-sm rounded border transition-colors
@@ -168,14 +196,14 @@ export default function ProductCard({ product }: ProductCardProps) {
           </label>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              onClick={(e) => { e.stopPropagation(); setQuantity(Math.max(1, quantity - 1)); }}
               className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50"
             >
               -
             </button>
             <span className="w-8 text-center font-medium">{quantity}</span>
             <button
-              onClick={() => setQuantity(quantity + 1)}
+              onClick={(e) => { e.stopPropagation(); setQuantity(quantity + 1); }}
               className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50"
             >
               +
@@ -185,7 +213,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Add to Cart Button */}
         <button
-          onClick={handleAddToCart}
+          onClick={(e) => { e.stopPropagation(); handleAddToCart(); }}
           disabled={!selectedVariant.availableForSale || isAdding}
           className={`
             w-full py-3 rounded-lg font-button font-bold uppercase tracking-wide
@@ -225,5 +253,11 @@ export default function ProductCard({ product }: ProductCardProps) {
         </button>
       </div>
     </div>
+    <ProductDetailSheet
+      product={product}
+      open={isSheetOpen}
+      onOpenChange={setIsSheetOpen}
+    />
+    </>
   );
 }
