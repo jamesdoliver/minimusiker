@@ -106,4 +106,24 @@ describe('ProductDetailSheet', () => {
     renderSheet(baseProduct, false);
     expect(screen.queryByRole('heading', { name: 'MiniMusiker T-Shirt' })).not.toBeInTheDocument();
   });
+
+  it('renders pagination dots when product has multiple images', () => {
+    const multiImage = {
+      ...baseProduct,
+      images: [
+        { id: 'img1', url: 'https://cdn.shopify.com/img1.jpg', altText: 'Front' },
+        { id: 'img2', url: 'https://cdn.shopify.com/img2.jpg', altText: 'Back' },
+        { id: 'img3', url: 'https://cdn.shopify.com/img3.jpg', altText: 'Detail' },
+      ],
+    };
+    renderSheet(multiImage);
+    expect(screen.getByLabelText('Go to image 1')).toBeInTheDocument();
+    expect(screen.getByLabelText('Go to image 2')).toBeInTheDocument();
+    expect(screen.getByLabelText('Go to image 3')).toBeInTheDocument();
+  });
+
+  it('hides pagination dots when product has only one image', () => {
+    renderSheet(baseProduct);
+    expect(screen.queryByLabelText('Go to image 1')).not.toBeInTheDocument();
+  });
 });
