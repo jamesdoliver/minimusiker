@@ -14,6 +14,7 @@ interface ProductCardProps {
 
 export default function ProductCard({ product }: ProductCardProps) {
   const t = useTranslations('shop.productCard');
+  const tSheet = useTranslations('shop.productSheet');
   const { addItem } = useCart();
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant>(product.variants[0]);
   const [quantity, setQuantity] = useState(1);
@@ -64,6 +65,8 @@ export default function ProductCard({ product }: ProductCardProps) {
     <div
       role="button"
       tabIndex={0}
+      aria-label={tSheet('ariaLabel', { title: product.title })}
+      aria-haspopup="dialog"
       onClick={() => setIsSheetOpen(true)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -146,7 +149,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           className="self-start mb-4 text-sm font-medium text-sage-700 hover:text-sage-800 inline-flex items-center gap-1"
         >
           {t('productDetails')}
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
@@ -168,6 +171,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 return (
                   <button
                     key={size}
+                    type="button"
                     onClick={(e) => { e.stopPropagation(); handleSizeSelect(size); }}
                     disabled={!isAvailable}
                     className={`
@@ -196,6 +200,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           </label>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); setQuantity(Math.max(1, quantity - 1)); }}
               className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50"
             >
@@ -203,6 +208,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             </button>
             <span className="w-8 text-center font-medium">{quantity}</span>
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); setQuantity(quantity + 1); }}
               className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50"
             >
@@ -213,6 +219,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Add to Cart Button */}
         <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); handleAddToCart(); }}
           disabled={!selectedVariant.availableForSale || isAdding}
           className={`
