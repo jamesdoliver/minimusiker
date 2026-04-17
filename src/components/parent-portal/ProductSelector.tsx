@@ -497,25 +497,6 @@ export default function ProductSelector({
   );
 
   // Audio selection handlers
-  const handleAudioToggle = (productId: string) => {
-    setSelection((prev) => {
-      const exists = prev.audioProducts.find(p => p.productId === productId);
-      if (exists) {
-        // Remove product
-        return {
-          ...prev,
-          audioProducts: prev.audioProducts.filter(p => p.productId !== productId)
-        };
-      } else {
-        // Add product with quantity 1
-        return {
-          ...prev,
-          audioProducts: [...prev.audioProducts, { productId: productId as AudioProductId, quantity: 1 }]
-        };
-      }
-    });
-  };
-
   const handleAudioQuantityChange = (productId: string, quantity: number) => {
     if (quantity <= 0) {
       setSelection((prev) => ({
