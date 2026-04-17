@@ -152,6 +152,10 @@ export async function PUT(
       // Reset approval status from 'rejected' to 'pending'
       await teacherService.updateAudioFileApprovalStatus(audioFileId, 'pending', '');
 
+      // Increment schulsong version
+      const newVersion = (audioFile.schulsongVersion || 0) + 1;
+      await teacherService.updateAudioFile(audioFileId, { schulsongVersion: newVersion });
+
       // Look up school contact email for teacher notification
       const event = await airtableService.getEventByEventId(resolvedEventId);
       const bookingRecordId = event?.simplybook_booking?.[0];

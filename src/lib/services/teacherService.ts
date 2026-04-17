@@ -906,6 +906,7 @@ class TeacherService {
       // Audio processing fields
       previewR2Key: record.fields.preview_r2_key || record.fields[AUDIO_FILES_FIELD_IDS.preview_r2_key],
       mp3R2Key: record.fields.mp3_r2_key || record.fields[AUDIO_FILES_FIELD_IDS.mp3_r2_key],
+      schulsongVersion: record.fields.schulsong_version || record.fields[AUDIO_FILES_FIELD_IDS.schulsong_version],
     };
   }
 
@@ -1289,6 +1290,7 @@ class TeacherService {
       isSchulsong?: boolean;
       previewR2Key?: string;
       mp3R2Key?: string;
+      schulsongVersion?: number;
     }
   ): Promise<AudioFile> {
     try {
@@ -1302,6 +1304,7 @@ class TeacherService {
       if (data.isSchulsong !== undefined) updateData.is_schulsong = data.isSchulsong;
       if (data.previewR2Key !== undefined) updateData.preview_r2_key = data.previewR2Key;
       if (data.mp3R2Key !== undefined) updateData.mp3_r2_key = data.mp3R2Key;
+      if (data.schulsongVersion !== undefined) updateData.schulsong_version = data.schulsongVersion;
       // Update uploaded_at timestamp
       updateData.uploaded_at = new Date().toISOString();
 
@@ -3977,6 +3980,8 @@ class TeacherService {
     teacherApprovedAt?: string;
     availableToParentsAt?: string;
     rejectionComment?: string;
+    version?: number;
+    uploadedAt?: string;
   }> {
     try {
       // Get event to check if schulsong feature is enabled
@@ -4023,6 +4028,8 @@ class TeacherService {
           audioUrl: schulsongFile.r2Key, // Will be signed by API route
           teacherApprovedAt: schulsongFile.teacherApprovedAt,
           availableToParentsAt,
+          version: schulsongFile.schulsongVersion,
+          uploadedAt: schulsongFile.uploadedAt,
         };
       }
 
@@ -4031,6 +4038,8 @@ class TeacherService {
         hasSchulsong: true,
         status: 'ready_for_approval',
         audioUrl: schulsongFile.r2Key, // Will be signed by API route
+        version: schulsongFile.schulsongVersion,
+        uploadedAt: schulsongFile.uploadedAt,
       };
     } catch (error) {
       console.error('Error getting schulsong status for teacher:', error);

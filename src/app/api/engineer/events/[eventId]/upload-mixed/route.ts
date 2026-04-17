@@ -229,6 +229,18 @@ export async function PUT(
       const airtableService = getAirtableService();
       await airtableService.setSchulsongReleasedAt(eventId, null);
 
+      // Reset approval status so teacher can re-review the new version
+      await teacherService.updateAudioFileApprovalStatus(audioFile.id, 'pending', '');
+      await teacherService.clearTeacherApprovedAt(audioFile.id);
+
+      // Set schulsong version (max of old versions + 1, default to 1)
+      const maxOldVersion = oldSchulsongFiles.reduce(
+        (max, f) => Math.max(max, f.schulsongVersion || 0), 0
+      );
+      const currentVersion = audioFile.schulsongVersion || 0;
+      const newVersion = Math.max(maxOldVersion, currentVersion) + 1;
+      await teacherService.updateAudioFile(audioFile.id, { schulsongVersion: newVersion });
+
       // Notify teacher that a new version is available
       const event = await airtableService.getEventByEventId(eventId);
       if (event) {

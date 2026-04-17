@@ -16,6 +16,8 @@ interface SchulsongStatusResponse {
   teacherApprovedAt?: string;
   availableToParentsAt?: string;
   rejectionComment?: string;
+  version?: number;
+  uploadedAt?: string;
   error?: string;
 }
 
@@ -31,6 +33,8 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
   const [notes, setNotes] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectionComment, setRejectionComment] = useState<string | null>(null);
+  const [version, setVersion] = useState<number | null>(null);
+  const [uploadedAt, setUploadedAt] = useState<string | null>(null);
 
   // Audio player state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -61,6 +65,8 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
       setTeacherApprovedAt(data.teacherApprovedAt || null);
       setAvailableToParentsAt(data.availableToParentsAt || null);
       setRejectionComment(data.rejectionComment || null);
+      setVersion(data.version || null);
+      setUploadedAt(data.uploadedAt || null);
     } catch (err) {
       console.error('Error fetching schulsong status:', err);
       if (!silent) setError(err instanceof Error ? err.message : 'Failed to load schulsong status');
@@ -332,6 +338,25 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
             </div>
           )}
 
+          {/* Version & Upload Date */}
+          {(version || uploadedAt) && (
+            <div className="flex items-center gap-2 text-sm">
+              {version && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                  V{version}
+                </span>
+              )}
+              {version && uploadedAt && (
+                <span className="text-gray-300">&middot;</span>
+              )}
+              {uploadedAt && (
+                <span className="text-gray-500">
+                  Hochgeladen am {formatDate(uploadedAt)}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Notes Textarea */}
           <div>
             <label htmlFor="schulsong-notes" className="block text-sm font-medium text-gray-700 mb-1">
@@ -477,6 +502,25 @@ export default function SchulsongApprovalSection({ eventId }: SchulsongApprovalS
                 preload="metadata"
                 className="hidden"
               />
+            </div>
+          )}
+
+          {/* Version & Upload Date */}
+          {(version || uploadedAt) && (
+            <div className="flex items-center gap-2 text-sm">
+              {version && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                  V{version}
+                </span>
+              )}
+              {version && uploadedAt && (
+                <span className="text-gray-300">&middot;</span>
+              )}
+              {uploadedAt && (
+                <span className="text-gray-500">
+                  Hochgeladen am {formatDate(uploadedAt)}
+                </span>
+              )}
             </div>
           )}
 

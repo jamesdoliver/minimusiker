@@ -66,6 +66,7 @@ export const AUDIO_FILES_FIELD_IDS = {
   // Audio processing fields
   preview_r2_key: 'fldpnarwGzEyVjmpC', // R2 key for the 10-second preview snippet
   mp3_r2_key: 'fldzADPZjKEZbfy2i', // R2 key for the encoded MP3 (when original is WAV)
+  schulsong_version: 'fldZdmNUQ3kUx1q7H', // Version number for schulsong (incremented on each re-upload)
 } as const;
 
 export const TEACHER_INVITES_FIELD_IDS = {
@@ -169,6 +170,7 @@ export interface AudioFile {
   // Audio processing fields
   previewR2Key?: string; // R2 key for the 10-second preview snippet
   mp3R2Key?: string; // R2 key for the encoded MP3 (when original is WAV)
+  schulsongVersion?: number; // Version number for schulsong (incremented on each re-upload)
 }
 
 /**
