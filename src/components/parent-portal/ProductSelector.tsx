@@ -273,6 +273,80 @@ function findProductByVariantId(products: Product[], variantIdSubstring: string)
   return null;
 }
 
+function ClothingSheetFooter({
+  productId,
+  showTshirtSize,
+  showHoodieSize,
+  onAdd,
+  onClose,
+}: {
+  productId: string;
+  showTshirtSize: boolean;
+  showHoodieSize: boolean;
+  onAdd: (productId: string, tshirtSize: TshirtSize | null, hoodieSize: HoodieSize | null, quantity: number) => void;
+  onClose: () => void;
+}) {
+  const [tshirtSize, setTshirtSize] = useState<TshirtSize>(TSHIRT_SIZES[2]);
+  const [hoodieSize, setHoodieSize] = useState<HoodieSize>(HOODIE_SIZES[1]);
+  const [quantity, setQuantity] = useState(1);
+
+  return (
+    <div className="space-y-3">
+      {showTshirtSize && (
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-600">
+            {showHoodieSize ? 'T-Shirt Größe' : 'Größe wählen'}
+          </label>
+          <select
+            value={tshirtSize}
+            onChange={(e) => setTshirtSize(e.target.value as TshirtSize)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+          >
+            {TSHIRT_SIZES.map((size) => (
+              <option key={size} value={size}>{size}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {showHoodieSize && (
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-600">
+            {showTshirtSize ? 'Hoodie Größe' : 'Größe wählen'}
+          </label>
+          <select
+            value={hoodieSize}
+            onChange={(e) => setHoodieSize(e.target.value as HoodieSize)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+          >
+            {HOODIE_SIZES.map((size) => (
+              <option key={size} value={size}>{size}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))}
+            className="w-9 h-9 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50">-</button>
+          <span className="w-8 text-center font-medium">{quantity}</span>
+          <button type="button" onClick={() => setQuantity(Math.min(10, quantity + 1))}
+            className="w-9 h-9 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50">+</button>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            onAdd(productId, showTshirtSize ? tshirtSize : null, showHoodieSize ? hoodieSize : null, quantity);
+            onClose();
+          }}
+          className="flex-1 py-3 rounded-lg font-bold uppercase tracking-wide text-sm bg-gradient-to-r from-sage-500 to-sage-700 text-white hover:from-sage-600 hover:to-sage-800 transition-all duration-200"
+        >
+          Hinzufügen
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ProductSelector({
   eventId,
   eventDate,
@@ -778,19 +852,39 @@ export default function ProductSelector({
 
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {activeClothingProducts.map((product) => (
-            <ClothingProductCard
-              key={product.id}
-              productId={product.id}
-              name={product.name}
-              description={product.description}
-              price={product.price}
-              imageSrc={clothingImages[product.id as keyof typeof clothingImages]}
-              savings={product.savings}
-              showTshirtSize={product.showTshirtSize}
-              showHoodieSize={product.showHoodieSize}
-              onAdd={handleAddClothing}
-              className={product.id === 'tshirt-hoodie' ? 'col-span-2 lg:col-span-1' : ''}
-            />
+            <React.Fragment key={product.id}>
+              <ClothingProductCard
+                productId={product.id}
+                name={shopifyLookup[product.id]?.title || product.name}
+                price={product.price}
+                imageSrc={shopifyLookup[product.id]?.images?.[0]?.url || clothingImages[product.id as keyof typeof clothingImages]}
+                savings={product.savings}
+                showTshirtSize={product.showTshirtSize}
+                showHoodieSize={product.showHoodieSize}
+                onAdd={handleAddClothing}
+                onCardClick={() => setActiveDetailProduct({ type: 'clothing', id: product.id })}
+                className={product.id === 'tshirt-hoodie' ? 'col-span-2 lg:col-span-1' : ''}
+              />
+              {activeDetailProduct?.type === 'clothing' && activeDetailProduct.id === product.id && (
+                <ParentPortalDetailSheet
+                  title={shopifyLookup[product.id]?.title || product.name}
+                  descriptionHtml={shopifyLookup[product.id]?.descriptionHtml}
+                  images={shopifyLookup[product.id]?.images || []}
+                  price={product.price}
+                  open={true}
+                  onOpenChange={(open) => { if (!open) setActiveDetailProduct(null); }}
+                  footer={
+                    <ClothingSheetFooter
+                      productId={product.id}
+                      showTshirtSize={product.showTshirtSize}
+                      showHoodieSize={product.showHoodieSize}
+                      onAdd={handleAddClothing}
+                      onClose={() => setActiveDetailProduct(null)}
+                    />
+                  }
+                />
+              )}
+            </React.Fragment>
           ))}
         </div>
 
