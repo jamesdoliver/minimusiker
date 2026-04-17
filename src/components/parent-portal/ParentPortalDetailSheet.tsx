@@ -61,7 +61,7 @@ export default function ParentPortalDetailSheet({
           <div className="flex-1 overflow-y-auto">
             {/* Image carousel */}
             {images.length > 0 && (
-              <div className="relative w-full aspect-square bg-cream-100">
+              <div className="relative w-full aspect-square md:aspect-[4/3] bg-cream-100">
                 <Image
                   src={images[activeImageIndex]?.url || ''}
                   alt={images[activeImageIndex]?.altText || title}
