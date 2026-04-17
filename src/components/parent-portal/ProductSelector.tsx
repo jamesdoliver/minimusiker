@@ -260,6 +260,17 @@ function findProductImageByVariantId(products: Product[], variantIdSubstring: st
   return null;
 }
 
+// Helper to find the full Shopify Product by variant ID
+function findProductByVariantId(products: Product[], variantIdSubstring: string): Product | null {
+  for (const product of products) {
+    if (product.variants) {
+      const hasVariant = product.variants.some(v => v.id.includes(variantIdSubstring));
+      if (hasVariant) return product;
+    }
+  }
+  return null;
+}
+
 export default function ProductSelector({
   eventId,
   eventDate,
@@ -370,6 +381,35 @@ export default function ProductSelector({
       'tshirt-hoodie': bundleImage || '/images/familie_portal/Hoodie and T-Shirt Picture.jpeg',
     };
   }, [shopifyProducts, showPersonalized, shopProfile]);
+
+  // Build map: parent-portal product ID → full Shopify Product (for title, images, descriptionHtml)
+  const shopifyLookup = useMemo(() => {
+    const map: Record<string, Product | null> = {};
+    if (!shopifyProducts?.length) return map;
+
+    // Audio products: direct variant map key
+    for (const product of shopProfile.audioProducts) {
+      const variantGid = shopProfile.shopifyVariantMap[product.id];
+      const numericId = variantGid ? extractVariantNumericId(variantGid) : null;
+      map[product.id] = numericId ? findProductByVariantId(shopifyProducts, numericId) : null;
+    }
+
+    // Clothing products: find variant key matching product id + current variant prefix
+    const variantPrefix = showPersonalized ? 'personalized' : 'standard';
+    for (const product of activeClothingProducts) {
+      const variantKey = Object.keys(shopProfile.shopifyVariantMap)
+        .find(k => k.startsWith(`${product.id}-${variantPrefix}-`));
+      if (variantKey) {
+        const variantGid = shopProfile.shopifyVariantMap[variantKey];
+        const numericId = variantGid ? extractVariantNumericId(variantGid) : null;
+        map[product.id] = numericId ? findProductByVariantId(shopifyProducts, numericId) : null;
+      } else {
+        map[product.id] = null;
+      }
+    }
+
+    return map;
+  }, [shopifyProducts, shopProfile, activeClothingProducts, showPersonalized]);
 
   const totals = useMemo(
     () => calculateTotal(selection, shopProfile.audioProducts, activeClothingProducts, isWithinEarlyBird),
