@@ -346,5 +346,10 @@
       "useDifferentEmail": "Andere E-Mail verwenden",
       "back": "Zurück"
     }
+  },
+  "parentPortalCard": {
+    "addToCart": "In den Warenkorb",
+    "details": "Details",
+    "added": "Hinzugefügt"
   }
 }
