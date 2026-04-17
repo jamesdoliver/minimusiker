@@ -286,6 +286,7 @@ function ClothingSheetFooter({
   onAdd: (productId: string, tshirtSize: TshirtSize | null, hoodieSize: HoodieSize | null, quantity: number) => void;
   onClose: () => void;
 }) {
+  const t = useTranslations('parentPortalCard');
   const [tshirtSize, setTshirtSize] = useState<TshirtSize>(TSHIRT_SIZES[2]);
   const [hoodieSize, setHoodieSize] = useState<HoodieSize>(HOODIE_SIZES[1]);
   const [quantity, setQuantity] = useState(1);
@@ -295,7 +296,7 @@ function ClothingSheetFooter({
       {showTshirtSize && (
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-gray-600">
-            {showHoodieSize ? 'T-Shirt Größe' : 'Größe wählen'}
+            {showHoodieSize ? t('tshirtSize') : t('chooseSize')}
           </label>
           <select
             value={tshirtSize}
@@ -311,7 +312,7 @@ function ClothingSheetFooter({
       {showHoodieSize && (
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-gray-600">
-            {showTshirtSize ? 'Hoodie Größe' : 'Größe wählen'}
+            {showTshirtSize ? t('hoodieSize') : t('chooseSize')}
           </label>
           <select
             value={hoodieSize}
@@ -340,7 +341,7 @@ function ClothingSheetFooter({
           }}
           className="flex-1 py-3 rounded-lg font-bold uppercase tracking-wide text-sm bg-gradient-to-r from-sage-500 to-sage-700 text-white hover:from-sage-600 hover:to-sage-800 transition-all duration-200"
         >
-          Hinzufügen
+          {t('addItem')}
         </button>
       </div>
     </div>
@@ -361,6 +362,7 @@ export default function ProductSelector({
   isStandardMerchOnly = false,
 }: ProductSelectorProps) {
   const t = useTranslations('productSelector');
+  const tCard = useTranslations('parentPortalCard');
   const [selection, setSelection] = useState<ProductSelection>({
     audioProducts: [],
     clothing: [],
@@ -706,7 +708,7 @@ export default function ProductSelector({
   // Get audio product quantity
   const getAudioQuantity = (productId: AudioProductId) => {
     const item = selection.audioProducts.find(p => p.productId === productId);
-    return item?.quantity || 1;
+    return item?.quantity ?? 0;
   };
 
   return (
@@ -806,7 +808,7 @@ export default function ProductSelector({
                             : 'bg-gradient-to-r from-sage-500 to-sage-700 text-white hover:from-sage-600 hover:to-sage-800'
                         }`}
                       >
-                        {isAudioSelected(product.id) ? '✓ Hinzugefügt' : 'In den Warenkorb'}
+                        {isAudioSelected(product.id) ? `✓ ${tCard('added')}` : tCard('addToCart')}
                       </button>
                     </div>
                   }

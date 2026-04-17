@@ -349,8 +349,13 @@
   },
   "parentPortalCard": {
     "addToCart": "In den Warenkorb",
+    "addItem": "Hinzufügen",
     "details": "Details",
     "added": "Hinzugefügt",
-    "schoolSong": "Euer Schulsong"
+    "savings": "Spare {amount}€",
+    "schoolSong": "Euer Schulsong",
+    "tshirtSize": "T-Shirt Größe",
+    "hoodieSize": "Hoodie Größe",
+    "chooseSize": "Größe wählen"
   }
 }

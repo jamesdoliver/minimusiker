@@ -48,7 +48,9 @@ export default function AudioProductCard({
       }}
       className={cn(
         'relative flex flex-col p-5 rounded-xl border-2 transition-all duration-200 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-sage-500',
-        featured
+        featured && isInCart
+          ? 'border-amber-400 bg-amber-50/30 shadow-[0_0_20px_rgba(245,158,11,0.25)] ring-2 ring-sage-200'
+          : featured
           ? 'border-amber-400 bg-amber-50/30 shadow-[0_0_20px_rgba(245,158,11,0.25)] hover:shadow-[0_0_25px_rgba(245,158,11,0.35)]'
           : isInCart
           ? 'border-sage-600 bg-sage-50 shadow-md ring-2 ring-sage-200'
@@ -58,7 +60,7 @@ export default function AudioProductCard({
       {/* Savings Badge */}
       {savings && savings > 0 && (
         <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm z-10">
-          Spare {savings.toFixed(0)}€
+          {t('savings', { amount: savings.toFixed(0) })}
         </div>
       )}
 

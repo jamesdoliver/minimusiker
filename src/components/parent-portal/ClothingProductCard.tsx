@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/stock';
 
@@ -39,6 +40,7 @@ export default function ClothingProductCard({
   isAdded = false,
   className = ''
 }: ClothingProductCardProps) {
+  const t = useTranslations('parentPortalCard');
   const [tshirtSize, setTshirtSize] = useState<TshirtSize>(TSHIRT_SIZES[2]);
   const [hoodieSize, setHoodieSize] = useState<HoodieSize>(HOODIE_SIZES[1]);
   const [quantity, setQuantity] = useState(1);
@@ -76,7 +78,7 @@ export default function ClothingProductCard({
       {/* Savings Badge */}
       {savings && savings > 0 && (
         <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm z-10">
-          Spare {savings.toFixed(0)}€
+          {t('savings', { amount: savings.toFixed(0) })}
         </div>
       )}
 
@@ -157,6 +159,7 @@ export default function ClothingProductCard({
           {/* Quantity Controls */}
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); setQuantity(Math.max(1, quantity - 1)); }}
               className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center hover:bg-gray-50 hover:border-sage-400 transition-colors"
               disabled={quantity <= 1}
@@ -167,6 +170,7 @@ export default function ClothingProductCard({
             </button>
             <span className="font-medium w-6 text-center">{quantity}</span>
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); setQuantity(Math.min(10, quantity + 1)); }}
               className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center hover:bg-gray-50 hover:border-sage-400 transition-colors"
               disabled={quantity >= 10}
@@ -179,13 +183,14 @@ export default function ClothingProductCard({
 
           {/* Add to Cart Button */}
           <button
+            type="button"
             onClick={(e) => { e.stopPropagation(); handleAdd(); }}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-sage-600 text-white font-medium rounded-lg hover:bg-sage-700 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Hinzufügen
+            {t('addItem')}
           </button>
         </div>
       </div>
