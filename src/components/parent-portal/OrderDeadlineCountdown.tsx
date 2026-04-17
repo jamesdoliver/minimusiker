@@ -78,9 +78,9 @@ export default function OrderDeadlineCountdown({
   const discountLabel = locale === 'de' ? 'RABATT' : 'OFF';
 
   return (
-    <div className="bg-gradient-to-r from-sage-500 to-sage-700 rounded-xl py-5 px-6 mb-6 ring-2 ring-sage-300 animate-pulse">
-      <div className="flex flex-col sm:flex-row items-center gap-4 text-white">
-        {/* Discount badge — left side */}
+    <div className="bg-gradient-to-r from-sage-500 to-sage-700 rounded-xl py-5 px-6 mb-6">
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-white">
+        {/* Discount badge */}
         {isEarlyBird && (
           <div className="flex-shrink-0 bg-white/20 rounded-lg px-4 py-2 text-center">
             <div className="text-3xl sm:text-4xl font-bold leading-none">10%</div>
@@ -88,10 +88,10 @@ export default function OrderDeadlineCountdown({
           </div>
         )}
 
-        {/* Message + countdown — right side */}
-        <div className="flex-1 text-center sm:text-left">
+        {/* Message + countdown */}
+        <div className="text-center">
           <p className="text-sm sm:text-base font-medium opacity-90">{message}</p>
-          <div className="flex items-baseline justify-center sm:justify-start gap-1.5 mt-1">
+          <div className="flex items-baseline justify-center gap-1.5 mt-1">
             <span className="text-2xl sm:text-3xl font-bold tabular-nums">
               {countdown.days}
             </span>
