@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
@@ -12,6 +13,7 @@ import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 import { ShopProfile, AudioProductId, ClothingProductId, AudioProduct, ClothingProduct } from '@/lib/config/shopProfiles';
 import AudioProductCard from './AudioProductCard';
 import ClothingProductCard from './ClothingProductCard';
+import ParentPortalDetailSheet from './ParentPortalDetailSheet';
 
 // ============================================================================
 // TYPES
@@ -290,6 +292,10 @@ export default function ProductSelector({
     clothing: [],
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeDetailProduct, setActiveDetailProduct] = useState<{
+    type: 'audio' | 'clothing';
+    id: string;
+  } | null>(null);
 
   // Derive isSchulsongOnly from profile
   const isSchulsongOnly = shopProfile.audioProducts.length === 0;
@@ -437,12 +443,37 @@ export default function ProductSelector({
   };
 
   const handleAudioQuantityChange = (productId: string, quantity: number) => {
-    setSelection((prev) => ({
-      ...prev,
-      audioProducts: prev.audioProducts.map(p =>
-        p.productId === productId ? { ...p, quantity } : p
-      )
-    }));
+    if (quantity <= 0) {
+      setSelection((prev) => ({
+        ...prev,
+        audioProducts: prev.audioProducts.filter(p => p.productId !== productId),
+      }));
+    } else {
+      setSelection((prev) => ({
+        ...prev,
+        audioProducts: prev.audioProducts.map(p =>
+          p.productId === productId ? { ...p, quantity } : p
+        ),
+      }));
+    }
+  };
+
+  const handleAudioAdd = (productId: string) => {
+    setSelection((prev) => {
+      const exists = prev.audioProducts.find(p => p.productId === productId);
+      if (exists) {
+        return {
+          ...prev,
+          audioProducts: prev.audioProducts.map(p =>
+            p.productId === productId ? { ...p, quantity: p.quantity + 1 } : p
+          ),
+        };
+      }
+      return {
+        ...prev,
+        audioProducts: [...prev.audioProducts, { productId: productId as AudioProductId, quantity: 1 }],
+      };
+    });
   };
 
   // Clothing handlers
@@ -656,20 +687,77 @@ export default function ProductSelector({
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {shopProfile.audioProducts.map((product) => (
-            <AudioProductCard
-              key={product.id}
-              productId={product.id}
-              name={product.name}
-              description={product.description}
-              price={product.price}
-              imageSrc={audioImages[product.id] || undefined}
-              imageEmoji={product.imageEmoji}
-              isSelected={isAudioSelected(product.id)}
-              quantity={getAudioQuantity(product.id)}
-              savings={product.savings}
-              onToggle={handleAudioToggle}
-              onQuantityChange={handleAudioQuantityChange}
-            />
+            <React.Fragment key={product.id}>
+              <AudioProductCard
+                productId={product.id}
+                name={shopifyLookup[product.id]?.title || product.name}
+                price={product.price}
+                imageSrc={shopifyLookup[product.id]?.images?.[0]?.url || audioImages[product.id] || undefined}
+                imageEmoji={!shopifyLookup[product.id]?.images?.[0]?.url ? product.imageEmoji : undefined}
+                savings={product.savings}
+                featured={product.featured}
+                isInCart={isAudioSelected(product.id)}
+                quantity={isAudioSelected(product.id) ? getAudioQuantity(product.id) : 0}
+                onCardClick={() => setActiveDetailProduct({ type: 'audio', id: product.id })}
+                onAdd={() => handleAudioAdd(product.id)}
+                onQuantityChange={handleAudioQuantityChange}
+              />
+              {activeDetailProduct?.type === 'audio' && activeDetailProduct.id === product.id && (
+                <ParentPortalDetailSheet
+                  title={shopifyLookup[product.id]?.title || product.name}
+                  descriptionHtml={shopifyLookup[product.id]?.descriptionHtml}
+                  images={shopifyLookup[product.id]?.images || []}
+                  price={product.price}
+                  open={true}
+                  onOpenChange={(open) => { if (!open) setActiveDetailProduct(null); }}
+                  footer={
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleAudioQuantityChange(product.id, (isAudioSelected(product.id) ? getAudioQuantity(product.id) : 0) - 1)}
+                          className="w-9 h-9 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50"
+                        >
+                          -
+                        </button>
+                        <span className="w-8 text-center font-medium">
+                          {isAudioSelected(product.id) ? getAudioQuantity(product.id) : 0}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!isAudioSelected(product.id)) {
+                              handleAudioAdd(product.id);
+                            } else {
+                              handleAudioQuantityChange(product.id, getAudioQuantity(product.id) + 1);
+                            }
+                          }}
+                          className="w-9 h-9 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isAudioSelected(product.id)) {
+                            handleAudioAdd(product.id);
+                          }
+                          setActiveDetailProduct(null);
+                        }}
+                        className={`flex-1 py-3 rounded-lg font-bold uppercase tracking-wide transition-all duration-200 text-sm ${
+                          isAudioSelected(product.id)
+                            ? 'bg-sage-100 text-sage-700 border border-sage-300'
+                            : 'bg-gradient-to-r from-sage-500 to-sage-700 text-white hover:from-sage-600 hover:to-sage-800'
+                        }`}
+                      >
+                        {isAudioSelected(product.id) ? '✓ Hinzugefügt' : 'In den Warenkorb'}
+                      </button>
+                    </div>
+                  }
+                />
+              )}
+            </React.Fragment>
           ))}
         </div>
       </div>
