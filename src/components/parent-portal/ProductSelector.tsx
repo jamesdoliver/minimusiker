@@ -848,11 +848,25 @@ export default function ProductSelector({
                 onCardClick={() => setActiveDetailProduct({ type: 'clothing', id: product.id })}
                 className={product.id === 'tshirt-hoodie' ? 'col-span-2 lg:col-span-1' : ''}
               />
-              {activeDetailProduct?.type === 'clothing' && activeDetailProduct.id === product.id && (
+              {activeDetailProduct?.type === 'clothing' && activeDetailProduct.id === product.id && (() => {
+                // Bundle: combine tshirt + hoodie Shopify data since the bundle isn't a real Shopify product
+                const isBundle = product.id === 'tshirt-hoodie';
+                const sheetTitle = isBundle
+                  ? product.name
+                  : (shopifyLookup[product.id]?.title || product.name);
+                const sheetDescription = isBundle
+                  ? [shopifyLookup['tshirt']?.descriptionHtml, shopifyLookup['hoodie']?.descriptionHtml]
+                      .filter(Boolean)
+                      .join('<hr class="my-4 border-gray-200" />') || undefined
+                  : shopifyLookup[product.id]?.descriptionHtml;
+                const sheetImages = isBundle
+                  ? [...(shopifyLookup['tshirt']?.images || []), ...(shopifyLookup['hoodie']?.images || [])]
+                  : (shopifyLookup[product.id]?.images || []);
+                return (
                 <ParentPortalDetailSheet
-                  title={shopifyLookup[product.id]?.title || product.name}
-                  descriptionHtml={shopifyLookup[product.id]?.descriptionHtml}
-                  images={shopifyLookup[product.id]?.images || []}
+                  title={sheetTitle}
+                  descriptionHtml={sheetDescription}
+                  images={sheetImages}
                   price={product.price}
                   open={true}
                   onOpenChange={(open) => { if (!open) setActiveDetailProduct(null); }}
@@ -866,7 +880,8 @@ export default function ProductSelector({
                     />
                   }
                 />
-              )}
+                );
+              })()}
             </React.Fragment>
           ))}
         </div>
