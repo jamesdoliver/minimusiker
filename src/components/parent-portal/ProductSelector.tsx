@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useState, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { ParentSessionChild } from '@/types/airtable';
@@ -13,7 +14,7 @@ import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 import { ShopProfile, AudioProductId, ClothingProductId, AudioProduct, ClothingProduct } from '@/lib/config/shopProfiles';
 import AudioProductCard from './AudioProductCard';
 import ClothingProductCard from './ClothingProductCard';
-import ParentPortalDetailSheet from './ParentPortalDetailSheet';
+const ParentPortalDetailSheet = dynamic(() => import('./ParentPortalDetailSheet'), { ssr: false });
 
 // ============================================================================
 // TYPES

@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { Product, ProductVariant } from '@/lib/types/airtable';
 import { useCart } from '@/lib/contexts/CartContext';
 import { formatPrice } from '@/lib/utils';
-import ProductDetailSheet from './ProductDetailSheet';
+const ProductDetailSheet = dynamic(() => import('./ProductDetailSheet'), { ssr: false });
 
 interface ProductCardProps {
   product: Product;
