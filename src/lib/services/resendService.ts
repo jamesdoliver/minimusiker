@@ -523,9 +523,13 @@ export interface StaffBookingAlertData {
   schoolName: string;
   contactName: string;
   contactEmail: string;
+  contactPhone?: string;
   bookingDate: string;
   estimatedChildren: number;
   region?: string;
+  schoolAddress?: string;
+  schoolPostalCode?: string;
+  city?: string;
 }
 
 export interface EngineerAudioUploadedData {
@@ -541,6 +545,8 @@ export interface StaffReassignmentData {
   schoolName: string;
   eventDate: string;
   schoolAddress?: string;
+  schoolPostalCode?: string;
+  city?: string;
   contactPerson?: string;
   contactEmail?: string;
   contactPhone?: string;
@@ -569,14 +575,17 @@ export async function sendStaffBookingAlertEmail(
   name: string,
   data: StaffBookingAlertData
 ): Promise<SendEmailResult> {
+  const fullAddress = [data.schoolAddress, [data.schoolPostalCode, data.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   return sendTriggerEmail(email, 'staff_booking_alert', {
     staffName: data.staffName,
     schoolName: data.schoolName,
     contactName: data.contactName,
     contactEmail: data.contactEmail,
+    contactPhone: data.contactPhone || '',
     bookingDate: data.bookingDate,
     estimatedChildren: data.estimatedChildren.toString(),
     region: data.region || '',
+    schoolAddress: fullAddress,
   }, 'Staff booking alert');
 }
 
@@ -588,11 +597,12 @@ export async function sendStaffReassignmentEmail(
   name: string,
   data: StaffReassignmentData
 ): Promise<SendEmailResult> {
+  const fullAddress = [data.schoolAddress, [data.schoolPostalCode, data.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
   return sendTriggerEmail(email, 'staff_reassignment', {
     staffName: data.staffName,
     schoolName: data.schoolName,
     eventDate: data.eventDate,
-    schoolAddress: data.schoolAddress || '',
+    schoolAddress: fullAddress,
     contactPerson: data.contactPerson || '',
     contactEmail: data.contactEmail || '',
     contactPhone: data.contactPhone || '',

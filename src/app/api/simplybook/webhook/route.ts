@@ -309,9 +309,13 @@ export async function POST(request: Request) {
               schoolName: mappedData.schoolName,
               contactName: mappedData.contactPerson,
               contactEmail: mappedData.contactEmail,
+              contactPhone: mappedData.phone,
               bookingDate: booking.start_date,
               estimatedChildren: mappedData.numberOfChildren,
               region: mappedData.region,
+              schoolAddress: mappedData.address,
+              schoolPostalCode: mappedData.postalCode,
+              city: mappedData.city,
             }
           );
 

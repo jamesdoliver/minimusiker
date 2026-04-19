@@ -561,6 +561,18 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   </tr>
   <tr>
     <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Telefon:</strong>
+      <span style="color: #4a5568; float: right;">{{contactPhone}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Adresse:</strong>
+      <span style="color: #4a5568; float: right;">{{schoolAddress}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
       <strong style="color: #2F4858;">Datum:</strong>
       <span style="color: #4a5568; float: right;">{{bookingDate}}</span>
     </td>
@@ -582,7 +594,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
 <p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
   Bitte prüfe die Details und bereite dich auf den Termin vor.
 </p>`,
-    availableVariables: ['staffName', 'schoolName', 'contactName', 'contactEmail', 'bookingDate', 'estimatedChildren', 'region'],
+    availableVariables: ['staffName', 'schoolName', 'contactName', 'contactEmail', 'contactPhone', 'bookingDate', 'estimatedChildren', 'region', 'schoolAddress'],
   },
 
   // ─── 8. Staff Reassignment (migrated from Brevo) ───────────────────

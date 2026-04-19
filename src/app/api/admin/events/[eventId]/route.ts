@@ -584,6 +584,8 @@ export async function PATCH(
                 // Get booking info for the event to include in email
                 let schoolAddress = existingEvent?.school_address || '';
                 let schoolPhone = existingEvent?.school_phone || '';
+                let schoolPostalCode = '';
+                let city = '';
                 let contactPerson = '';
                 let contactEmail = '';
 
@@ -594,6 +596,8 @@ export async function PATCH(
                     if (booking) {
                       schoolAddress = schoolAddress || booking.schoolAddress || '';
                       schoolPhone = schoolPhone || booking.schoolPhone || '';
+                      schoolPostalCode = booking.schoolPostalCode || '';
+                      city = booking.city || '';
                       contactPerson = booking.schoolContactName || '';
                       contactEmail = booking.schoolContactEmail || '';
                     }
@@ -621,6 +625,8 @@ export async function PATCH(
                       schoolName: existingEvent?.school_name || '',
                       eventDate: formattedDate,
                       schoolAddress,
+                      schoolPostalCode,
+                      city,
                       contactPerson,
                       contactEmail,
                       contactPhone: schoolPhone,
