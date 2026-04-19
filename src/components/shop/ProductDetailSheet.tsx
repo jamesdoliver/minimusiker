@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { Drawer } from 'vaul';
-import DOMPurify from 'isomorphic-dompurify';
 import { useTranslations } from 'next-intl';
 import type { Product, ProductVariant } from '@/lib/types/airtable';
 import { useCart } from '@/lib/contexts/CartContext';
@@ -37,6 +36,9 @@ export default function ProductDetailSheet({ product, open, onOpenChange }: Prod
     : null;
   const hasDiscount = compareAtPrice && compareAtPrice > price;
 
+  // Lazy require to avoid jsdom's readFileSync during SSR/prerender
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const DOMPurify = require('isomorphic-dompurify').default;
   const sanitizedHtml = product.descriptionHtml
     ? DOMPurify.sanitize(product.descriptionHtml, { USE_PROFILES: { html: true } })
     : '';
