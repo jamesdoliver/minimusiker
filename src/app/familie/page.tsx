@@ -11,7 +11,7 @@ import ProductSelector from '@/components/parent-portal/ProductSelector';
 import OrderDeadlineCountdown from '@/components/parent-portal/OrderDeadlineCountdown';
 import HeroIntroSection from '@/components/parent-portal/HeroIntroSection';
 import PreparationSection from '@/components/parent-portal/PreparationSection';
-import SchulsongSection from '@/components/parent-portal/SchulsongSection';
+import CompactSongPlayer from '@/components/parent-portal/CompactSongPlayer';
 import MinicardUpsell from '@/components/parent-portal/MinicardUpsell';
 import EventAudioTracklist from '@/components/parent-portal/EventAudioTracklist';
 // Note: VideoCard removed - video is now handled in HeroIntroSection
@@ -88,6 +88,7 @@ function ParentPortalContent() {
   const tChild = useTranslations('childSelector');
   const tBanner = useTranslations('schoolBanner');
   const tPreview = useTranslations('recordingPreview');
+  const tCard = useTranslations('parentPortalCard');
   const [session, setSession] = useState<ParentSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +99,10 @@ function ParentPortalContent() {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [timelineOverrides, setTimelineOverrides] = useState<string | null>(null);
   const [isStandardMerchOnly, setIsStandardMerchOnly] = useState(false);
+  const [hasSchulsongAudio, setHasSchulsongAudio] = useState(false);
+  const [schulsongAudioUrl, setSchulsongAudioUrl] = useState<string | null>(null);
+  const [schulsongDownloadUrl, setSchulsongDownloadUrl] = useState<string | null>(null);
+  const [isPlayingSchulsong, setIsPlayingSchulsong] = useState(false);
 
   useEffect(() => {
     verifySessionAndLoadData();
@@ -225,6 +230,12 @@ function ParentPortalContent() {
             setTimelineOverrides(data.timelineOverrides);
           }
           setIsStandardMerchOnly(data.isStandardMerchOnly === true);
+          // Store schulsong audio data for inline rendering
+          if (data.isSchulsong && data.hasAudio) {
+            setHasSchulsongAudio(true);
+            setSchulsongAudioUrl(data.audioUrl || null);
+            setSchulsongDownloadUrl(data.downloadUrl || null);
+          }
         }
       } catch (err) {
         console.error('Error fetching schulsong status:', err);
@@ -302,6 +313,11 @@ function ParentPortalContent() {
   const eventType = selectedChild?.eventType || session?.eventType || 'Minimusiker';
   const eventDate = selectedChild?.bookingDate || session?.bookingDate;
   const className = selectedChild?.class || '';
+
+  // Hide preparation sections the calendar day after the event
+  const isPostEvent = eventDate
+    ? new Date(new Date().toDateString()) > new Date(new Date(eventDate).toDateString())
+    : false;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -414,13 +430,46 @@ function ParentPortalContent() {
       </div>
 
       {/* Hero Intro Section - Video and Introduction (hidden for Schulsong-only) */}
-      {!isSchulsongOnly && <HeroIntroSection />}
+      {!isSchulsongOnly && !isPostEvent && <HeroIntroSection />}
 
       {/* Preparation Section - Yellow PDF Download (hidden for Schulsong-only) */}
-      {!isSchulsongOnly && <PreparationSection />}
+      {!isSchulsongOnly && !isPostEvent && <PreparationSection />}
 
-      {/* Schulsong Section - Free school song with waveform player */}
-      {eventId && <SchulsongSection eventId={eventId} />}
+      {/* Schulsong — inline in audio section, golden glow, always first when available */}
+      {hasSchulsongAudio && schulsongAudioUrl && (
+        <section className="bg-white pt-8 pb-4">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="border-2 border-amber-400 bg-amber-50/30 shadow-[0_0_20px_rgba(245,158,11,0.25)] rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="px-2.5 py-0.5 bg-amber-500 text-white text-xs font-bold rounded-full">
+                  {tCard('schoolSong')}
+                </span>
+              </div>
+              <CompactSongPlayer
+                audioUrl={schulsongAudioUrl}
+                isActive={isPlayingSchulsong}
+                isPlaying={isPlayingSchulsong}
+                onTogglePlay={() => setIsPlayingSchulsong((prev) => !prev)}
+                onEnded={() => setIsPlayingSchulsong(false)}
+              />
+              {schulsongDownloadUrl && (
+                <div className="mt-3 flex justify-end">
+                  <a
+                    href={schulsongDownloadUrl}
+                    download
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-800 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Download
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ================================================================
           AUDIO SECTION — Conditional rendering based on access level

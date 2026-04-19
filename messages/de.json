@@ -242,7 +242,16 @@
       "size": "Größe",
       "quantity": "Menge",
       "adding": "Wird hinzugefügt...",
-      "addToCart": "In den Warenkorb"
+      "addToCart": "In den Warenkorb",
+      "productDetails": "Produktdetails"
+    },
+    "productSheet": {
+      "close": "Schließen",
+      "descriptionFallback": "Weitere Details folgen in Kürze.",
+      "ariaLabel": "Produktdetails für {title}",
+      "previousImage": "Vorheriges Bild",
+      "nextImage": "Nächstes Bild",
+      "goToImage": "Zu Bild {index} wechseln"
     },
     "cart": {
       "title": "Ihr Warenkorb ({count})",
@@ -270,7 +279,7 @@
   },
   "orderDeadline": {
     "clothingMessage": "Schul-Shirts und Schul-Hoodies nur noch bestellbar für",
-    "earlyBirdMessage": "10% Rabatt nur noch für"
+    "earlyBirdMessage": "10% Rabatt – Bestelle vor:"
   },
   "parentPortal": {
     "manageChildren": {
@@ -337,5 +346,16 @@
       "useDifferentEmail": "Andere E-Mail verwenden",
       "back": "Zurück"
     }
+  },
+  "parentPortalCard": {
+    "addToCart": "In den Warenkorb",
+    "addItem": "Hinzufügen",
+    "details": "Details",
+    "added": "Hinzugefügt",
+    "savings": "Spare {amount}€",
+    "schoolSong": "Euer Schulsong",
+    "tshirtSize": "T-Shirt Größe",
+    "hoodieSize": "Hoodie Größe",
+    "chooseSize": "Größe wählen"
   }
 }

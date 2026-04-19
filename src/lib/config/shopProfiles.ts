@@ -20,6 +20,7 @@ export interface AudioProduct {
   price: number;
   imageEmoji: string;
   savings?: number;
+  featured?: boolean;
 }
 
 export interface ClothingProduct {
@@ -123,6 +124,14 @@ const PERSONALIZED_CLOTHING: ClothingProduct[] = [
 
 const MINIMUSIKERTAG_AUDIO: AudioProduct[] = [
   {
+    id: 'bluetooth-box',
+    name: 'Kinderliederbox',
+    description: 'BT-Lautsprecher inkl. aller Songs',
+    price: 39.00,
+    imageEmoji: '🔊',
+    featured: true,
+  },
+  {
     id: 'minicard',
     name: 'Minicard',
     description: 'Kompakte Karte mit QR-Code zum Abspielen',
@@ -143,13 +152,6 @@ const MINIMUSIKERTAG_AUDIO: AudioProduct[] = [
     price: 27.00,
     savings: 9,
     imageEmoji: '🎁',
-  },
-  {
-    id: 'bluetooth-box',
-    name: 'Kinderliederbox',
-    description: 'BT-Lautsprecher inkl. aller Songs',
-    price: 39.00,
-    imageEmoji: '🔊',
   },
 ];
 
@@ -204,6 +206,14 @@ export const MINIMUSIKERTAG_PROFILE: ShopProfile = {
 
 const PLUS_AUDIO: AudioProduct[] = [
   {
+    id: 'bluetooth-box',
+    name: 'Kinderliederbox',
+    description: 'BT-Lautsprecher inkl. aller Songs',
+    price: 34.00,
+    imageEmoji: '🔊',
+    featured: true,
+  },
+  {
     id: 'minicard',
     name: 'Minicard',
     description: 'Kompakte Karte mit QR-Code zum Abspielen',
@@ -224,13 +234,6 @@ const PLUS_AUDIO: AudioProduct[] = [
     price: 19.00,
     savings: 3,
     imageEmoji: '🎁',
-  },
-  {
-    id: 'bluetooth-box',
-    name: 'Kinderliederbox',
-    description: 'BT-Lautsprecher inkl. aller Songs',
-    price: 34.00,
-    imageEmoji: '🔊',
   },
 ];
 
@@ -272,35 +275,37 @@ export const SCHULSONG_ONLY_PROFILE: ShopProfile = {
 // SCS audio: CD, Kinderliederbox only — NO Minicard, NO MC+CD bundle
 const SCS_AUDIO: AudioProduct[] = [
   {
+    id: 'bluetooth-box',
+    name: 'Kinderliederbox',
+    description: 'BT-Lautsprecher inkl. aller Songs',
+    price: 39.00,
+    imageEmoji: '🔊',
+    featured: true,
+  },
+  {
     id: 'cd',
     name: 'CD',
     description: 'Die klassische CD für deinen CD-Player - im plastikfreien Digifile mit Liederliste',
     price: 19.00,
     imageEmoji: '💿',
   },
-  {
-    id: 'bluetooth-box',
-    name: 'Kinderliederbox',
-    description: 'BT-Lautsprecher inkl. aller Songs',
-    price: 39.00,
-    imageEmoji: '🔊',
-  },
 ];
 
 const SCS_PLUS_AUDIO: AudioProduct[] = [
-  {
-    id: 'cd',
-    name: 'CD',
-    description: 'Die klassische CD für deinen CD-Player - im plastikfreien Digifile mit Liederliste',
-    price: 13.00,
-    imageEmoji: '💿',
-  },
   {
     id: 'bluetooth-box',
     name: 'Kinderliederbox',
     description: 'BT-Lautsprecher inkl. aller Songs',
     price: 34.00,
     imageEmoji: '🔊',
+    featured: true,
+  },
+  {
+    id: 'cd',
+    name: 'CD',
+    description: 'Die klassische CD für deinen CD-Player - im plastikfreien Digifile mit Liederliste',
+    price: 13.00,
+    imageEmoji: '💿',
   },
 ];
 

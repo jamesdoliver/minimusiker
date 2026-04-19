@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { TSHIRT_SIZES, HOODIE_SIZES, TshirtSize, HoodieSize } from '@/lib/types/stock';
 
 interface ClothingProductCardProps {
   productId: string;
   name: string;
-  description: string;
   price: number;
   imageSrc?: string;
   imageEmoji?: string;
@@ -21,6 +21,7 @@ interface ClothingProductCardProps {
     hoodieSize: HoodieSize | null,
     quantity: number
   ) => void;
+  onCardClick?: () => void;
   isAdded?: boolean;
   className?: string;
 }
@@ -28,7 +29,6 @@ interface ClothingProductCardProps {
 export default function ClothingProductCard({
   productId,
   name,
-  description,
   price,
   imageSrc,
   imageEmoji,
@@ -36,9 +36,11 @@ export default function ClothingProductCard({
   showTshirtSize,
   showHoodieSize,
   onAdd,
+  onCardClick,
   isAdded = false,
   className = ''
 }: ClothingProductCardProps) {
+  const t = useTranslations('parentPortalCard');
   const [tshirtSize, setTshirtSize] = useState<TshirtSize>(TSHIRT_SIZES[2]);
   const [hoodieSize, setHoodieSize] = useState<HoodieSize>(HOODIE_SIZES[1]);
   const [quantity, setQuantity] = useState(1);
@@ -56,8 +58,17 @@ export default function ClothingProductCard({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onCardClick?.()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onCardClick?.();
+        }
+      }}
       className={cn(
-        'relative flex flex-col p-6 rounded-xl border-2 transition-all duration-200 bg-white',
+        'relative flex flex-col p-6 rounded-xl border-2 transition-all duration-200 bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-sage-500',
         isAdded
           ? 'border-sage-400 shadow-md'
           : 'border-gray-200 hover:border-sage-300 hover:shadow-md',
@@ -67,7 +78,7 @@ export default function ClothingProductCard({
       {/* Savings Badge */}
       {savings && savings > 0 && (
         <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm z-10">
-          Spare {savings.toFixed(0)}€
+          {t('savings', { amount: savings.toFixed(0) })}
         </div>
       )}
 
@@ -97,15 +108,12 @@ export default function ClothingProductCard({
       <h4 className="font-semibold text-gray-900 text-center text-base">
         {name}
       </h4>
-      <p className="text-sm text-gray-500 text-center mt-1 leading-snug">
-        {description}
-      </p>
       <p className="text-xl font-bold text-gray-900 text-center mt-3">
         €{price.toFixed(2)}
       </p>
 
       {/* Size Selectors */}
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-3" onClick={(e) => e.stopPropagation()}>
         {showTshirtSize && (
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-600">
@@ -151,7 +159,8 @@ export default function ClothingProductCard({
           {/* Quantity Controls */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setQuantity(Math.max(1, quantity - 1)); }}
               className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center hover:bg-gray-50 hover:border-sage-400 transition-colors"
               disabled={quantity <= 1}
             >
@@ -161,7 +170,8 @@ export default function ClothingProductCard({
             </button>
             <span className="font-medium w-6 text-center">{quantity}</span>
             <button
-              onClick={() => setQuantity(Math.min(10, quantity + 1))}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setQuantity(Math.min(10, quantity + 1)); }}
               className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center hover:bg-gray-50 hover:border-sage-400 transition-colors"
               disabled={quantity >= 10}
             >
@@ -173,13 +183,14 @@ export default function ClothingProductCard({
 
           {/* Add to Cart Button */}
           <button
-            onClick={handleAdd}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAdd(); }}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-sage-600 text-white font-medium rounded-lg hover:bg-sage-700 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Hinzufügen
+            {t('addItem')}
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
@@ -12,6 +13,7 @@ import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 import { ShopProfile, AudioProductId, ClothingProductId, AudioProduct, ClothingProduct } from '@/lib/config/shopProfiles';
 import AudioProductCard from './AudioProductCard';
 import ClothingProductCard from './ClothingProductCard';
+import ParentPortalDetailSheet from './ParentPortalDetailSheet';
 
 // ============================================================================
 // TYPES
@@ -260,6 +262,92 @@ function findProductImageByVariantId(products: Product[], variantIdSubstring: st
   return null;
 }
 
+// Helper to find the full Shopify Product by variant ID
+function findProductByVariantId(products: Product[], variantIdSubstring: string): Product | null {
+  for (const product of products) {
+    if (product.variants) {
+      const hasVariant = product.variants.some(v => v.id.includes(variantIdSubstring));
+      if (hasVariant) return product;
+    }
+  }
+  return null;
+}
+
+function ClothingSheetFooter({
+  productId,
+  showTshirtSize,
+  showHoodieSize,
+  onAdd,
+  onClose,
+}: {
+  productId: string;
+  showTshirtSize: boolean;
+  showHoodieSize: boolean;
+  onAdd: (productId: string, tshirtSize: TshirtSize | null, hoodieSize: HoodieSize | null, quantity: number) => void;
+  onClose: () => void;
+}) {
+  const t = useTranslations('parentPortalCard');
+  const [tshirtSize, setTshirtSize] = useState<TshirtSize>(TSHIRT_SIZES[2]);
+  const [hoodieSize, setHoodieSize] = useState<HoodieSize>(HOODIE_SIZES[1]);
+  const [quantity, setQuantity] = useState(1);
+
+  return (
+    <div className="space-y-3">
+      {showTshirtSize && (
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-600">
+            {showHoodieSize ? t('tshirtSize') : t('chooseSize')}
+          </label>
+          <select
+            value={tshirtSize}
+            onChange={(e) => setTshirtSize(e.target.value as TshirtSize)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+          >
+            {TSHIRT_SIZES.map((size) => (
+              <option key={size} value={size}>{size}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {showHoodieSize && (
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-gray-600">
+            {showTshirtSize ? t('hoodieSize') : t('chooseSize')}
+          </label>
+          <select
+            value={hoodieSize}
+            onChange={(e) => setHoodieSize(e.target.value as HoodieSize)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-sage-500 focus:border-sage-500"
+          >
+            {HOODIE_SIZES.map((size) => (
+              <option key={size} value={size}>{size}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))}
+            className="w-9 h-9 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50">-</button>
+          <span className="w-8 text-center font-medium">{quantity}</span>
+          <button type="button" onClick={() => setQuantity(Math.min(10, quantity + 1))}
+            className="w-9 h-9 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50">+</button>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            onAdd(productId, showTshirtSize ? tshirtSize : null, showHoodieSize ? hoodieSize : null, quantity);
+            onClose();
+          }}
+          className="flex-1 py-3 rounded-lg font-bold uppercase tracking-wide text-sm bg-gradient-to-r from-sage-500 to-sage-700 text-white hover:from-sage-600 hover:to-sage-800 transition-all duration-200"
+        >
+          {t('addItem')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ProductSelector({
   eventId,
   eventDate,
@@ -274,11 +362,16 @@ export default function ProductSelector({
   isStandardMerchOnly = false,
 }: ProductSelectorProps) {
   const t = useTranslations('productSelector');
+  const tCard = useTranslations('parentPortalCard');
   const [selection, setSelection] = useState<ProductSelection>({
     audioProducts: [],
     clothing: [],
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeDetailProduct, setActiveDetailProduct] = useState<{
+    type: 'audio' | 'clothing';
+    id: string;
+  } | null>(null);
 
   // Derive isSchulsongOnly from profile
   const isSchulsongOnly = shopProfile.audioProducts.length === 0;
@@ -371,38 +464,73 @@ export default function ProductSelector({
     };
   }, [shopifyProducts, showPersonalized, shopProfile]);
 
+  // Build map: parent-portal product ID → full Shopify Product (for title, images, descriptionHtml)
+  const shopifyLookup = useMemo(() => {
+    const map: Record<string, Product | null> = {};
+    if (!shopifyProducts?.length) return map;
+
+    // Audio products: direct variant map key
+    for (const product of shopProfile.audioProducts) {
+      const variantGid = shopProfile.shopifyVariantMap[product.id];
+      const numericId = variantGid ? extractVariantNumericId(variantGid) : null;
+      map[product.id] = numericId ? findProductByVariantId(shopifyProducts, numericId) : null;
+    }
+
+    // Clothing products: find variant key matching product id + current variant prefix
+    const variantPrefix = showPersonalized ? 'personalized' : 'standard';
+    for (const product of activeClothingProducts) {
+      const variantKey = Object.keys(shopProfile.shopifyVariantMap)
+        .find(k => k.startsWith(`${product.id}-${variantPrefix}-`));
+      if (variantKey) {
+        const variantGid = shopProfile.shopifyVariantMap[variantKey];
+        const numericId = variantGid ? extractVariantNumericId(variantGid) : null;
+        map[product.id] = numericId ? findProductByVariantId(shopifyProducts, numericId) : null;
+      } else {
+        map[product.id] = null;
+      }
+    }
+
+    return map;
+  }, [shopifyProducts, shopProfile, activeClothingProducts, showPersonalized]);
+
   const totals = useMemo(
     () => calculateTotal(selection, shopProfile.audioProducts, activeClothingProducts, isWithinEarlyBird),
     [selection, shopProfile.audioProducts, activeClothingProducts, isWithinEarlyBird]
   );
 
   // Audio selection handlers
-  const handleAudioToggle = (productId: string) => {
+  const handleAudioQuantityChange = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      setSelection((prev) => ({
+        ...prev,
+        audioProducts: prev.audioProducts.filter(p => p.productId !== productId),
+      }));
+    } else {
+      setSelection((prev) => ({
+        ...prev,
+        audioProducts: prev.audioProducts.map(p =>
+          p.productId === productId ? { ...p, quantity } : p
+        ),
+      }));
+    }
+  };
+
+  const handleAudioAdd = (productId: string) => {
     setSelection((prev) => {
       const exists = prev.audioProducts.find(p => p.productId === productId);
       if (exists) {
-        // Remove product
         return {
           ...prev,
-          audioProducts: prev.audioProducts.filter(p => p.productId !== productId)
-        };
-      } else {
-        // Add product with quantity 1
-        return {
-          ...prev,
-          audioProducts: [...prev.audioProducts, { productId: productId as AudioProductId, quantity: 1 }]
+          audioProducts: prev.audioProducts.map(p =>
+            p.productId === productId ? { ...p, quantity: p.quantity + 1 } : p
+          ),
         };
       }
+      return {
+        ...prev,
+        audioProducts: [...prev.audioProducts, { productId: productId as AudioProductId, quantity: 1 }],
+      };
     });
-  };
-
-  const handleAudioQuantityChange = (productId: string, quantity: number) => {
-    setSelection((prev) => ({
-      ...prev,
-      audioProducts: prev.audioProducts.map(p =>
-        p.productId === productId ? { ...p, quantity } : p
-      )
-    }));
   };
 
   // Clothing handlers
@@ -580,7 +708,7 @@ export default function ProductSelector({
   // Get audio product quantity
   const getAudioQuantity = (productId: AudioProductId) => {
     const item = selection.audioProducts.find(p => p.productId === productId);
-    return item?.quantity || 1;
+    return item?.quantity ?? 0;
   };
 
   return (
@@ -616,20 +744,77 @@ export default function ProductSelector({
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {shopProfile.audioProducts.map((product) => (
-            <AudioProductCard
-              key={product.id}
-              productId={product.id}
-              name={product.name}
-              description={product.description}
-              price={product.price}
-              imageSrc={audioImages[product.id] || undefined}
-              imageEmoji={product.imageEmoji}
-              isSelected={isAudioSelected(product.id)}
-              quantity={getAudioQuantity(product.id)}
-              savings={product.savings}
-              onToggle={handleAudioToggle}
-              onQuantityChange={handleAudioQuantityChange}
-            />
+            <React.Fragment key={product.id}>
+              <AudioProductCard
+                productId={product.id}
+                name={shopifyLookup[product.id]?.title || product.name}
+                price={product.price}
+                imageSrc={shopifyLookup[product.id]?.images?.[0]?.url || audioImages[product.id] || undefined}
+                imageEmoji={!shopifyLookup[product.id]?.images?.[0]?.url ? product.imageEmoji : undefined}
+                savings={product.savings}
+                featured={product.featured}
+                isInCart={isAudioSelected(product.id)}
+                quantity={isAudioSelected(product.id) ? getAudioQuantity(product.id) : 0}
+                onCardClick={() => setActiveDetailProduct({ type: 'audio', id: product.id })}
+                onAdd={() => handleAudioAdd(product.id)}
+                onQuantityChange={handleAudioQuantityChange}
+              />
+              {activeDetailProduct?.type === 'audio' && activeDetailProduct.id === product.id && (
+                <ParentPortalDetailSheet
+                  title={shopifyLookup[product.id]?.title || product.name}
+                  descriptionHtml={shopifyLookup[product.id]?.descriptionHtml}
+                  images={shopifyLookup[product.id]?.images || []}
+                  price={product.price}
+                  open={true}
+                  onOpenChange={(open) => { if (!open) setActiveDetailProduct(null); }}
+                  footer={
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleAudioQuantityChange(product.id, (isAudioSelected(product.id) ? getAudioQuantity(product.id) : 0) - 1)}
+                          className="w-9 h-9 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50"
+                        >
+                          -
+                        </button>
+                        <span className="w-8 text-center font-medium">
+                          {isAudioSelected(product.id) ? getAudioQuantity(product.id) : 0}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!isAudioSelected(product.id)) {
+                              handleAudioAdd(product.id);
+                            } else {
+                              handleAudioQuantityChange(product.id, getAudioQuantity(product.id) + 1);
+                            }
+                          }}
+                          className="w-9 h-9 flex items-center justify-center border border-gray-300 rounded hover:bg-gray-50"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isAudioSelected(product.id)) {
+                            handleAudioAdd(product.id);
+                          }
+                          setActiveDetailProduct(null);
+                        }}
+                        className={`flex-1 py-3 rounded-lg font-bold uppercase tracking-wide transition-all duration-200 text-sm ${
+                          isAudioSelected(product.id)
+                            ? 'bg-sage-100 text-sage-700 border border-sage-300'
+                            : 'bg-gradient-to-r from-sage-500 to-sage-700 text-white hover:from-sage-600 hover:to-sage-800'
+                        }`}
+                      >
+                        {isAudioSelected(product.id) ? `✓ ${tCard('added')}` : tCard('addToCart')}
+                      </button>
+                    </div>
+                  }
+                />
+              )}
+            </React.Fragment>
           ))}
         </div>
       </div>
@@ -650,19 +835,54 @@ export default function ProductSelector({
 
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
           {activeClothingProducts.map((product) => (
-            <ClothingProductCard
-              key={product.id}
-              productId={product.id}
-              name={product.name}
-              description={product.description}
-              price={product.price}
-              imageSrc={clothingImages[product.id as keyof typeof clothingImages]}
-              savings={product.savings}
-              showTshirtSize={product.showTshirtSize}
-              showHoodieSize={product.showHoodieSize}
-              onAdd={handleAddClothing}
-              className={product.id === 'tshirt-hoodie' ? 'col-span-2 lg:col-span-1' : ''}
-            />
+            <React.Fragment key={product.id}>
+              <ClothingProductCard
+                productId={product.id}
+                name={shopifyLookup[product.id]?.title || product.name}
+                price={product.price}
+                imageSrc={shopifyLookup[product.id]?.images?.[0]?.url || clothingImages[product.id as keyof typeof clothingImages]}
+                savings={product.savings}
+                showTshirtSize={product.showTshirtSize}
+                showHoodieSize={product.showHoodieSize}
+                onAdd={handleAddClothing}
+                onCardClick={() => setActiveDetailProduct({ type: 'clothing', id: product.id })}
+                className={product.id === 'tshirt-hoodie' ? 'col-span-2 lg:col-span-1' : ''}
+              />
+              {activeDetailProduct?.type === 'clothing' && activeDetailProduct.id === product.id && (() => {
+                // Bundle: combine tshirt + hoodie Shopify data since the bundle isn't a real Shopify product
+                const isBundle = product.id === 'tshirt-hoodie';
+                const sheetTitle = isBundle
+                  ? product.name
+                  : (shopifyLookup[product.id]?.title || product.name);
+                const sheetDescription = isBundle
+                  ? [shopifyLookup['tshirt']?.descriptionHtml, shopifyLookup['hoodie']?.descriptionHtml]
+                      .filter(Boolean)
+                      .join('<hr class="my-4 border-gray-200" />') || undefined
+                  : shopifyLookup[product.id]?.descriptionHtml;
+                const sheetImages = isBundle
+                  ? [...(shopifyLookup['tshirt']?.images || []), ...(shopifyLookup['hoodie']?.images || [])]
+                  : (shopifyLookup[product.id]?.images || []);
+                return (
+                <ParentPortalDetailSheet
+                  title={sheetTitle}
+                  descriptionHtml={sheetDescription}
+                  images={sheetImages}
+                  price={product.price}
+                  open={true}
+                  onOpenChange={(open) => { if (!open) setActiveDetailProduct(null); }}
+                  footer={
+                    <ClothingSheetFooter
+                      productId={product.id}
+                      showTshirtSize={product.showTshirtSize}
+                      showHoodieSize={product.showHoodieSize}
+                      onAdd={handleAddClothing}
+                      onClose={() => setActiveDetailProduct(null)}
+                    />
+                  }
+                />
+                );
+              })()}
+            </React.Fragment>
           ))}
         </div>
 

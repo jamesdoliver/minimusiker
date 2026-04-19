@@ -75,29 +75,32 @@ export default function OrderDeadlineCountdown({
 
   const message = isSchulsong ? t('clothingMessage') : t('earlyBirdMessage');
 
+  const discountLabel = locale === 'de' ? 'RABATT' : 'OFF';
+
   return (
-    <div className="bg-gradient-to-r from-sage-500 to-sage-700 rounded-xl py-3 px-4 mb-6">
-      <div className="flex items-center justify-center gap-2 text-white text-sm sm:text-base">
-        {/* Shopping bag icon */}
-        <svg
-          className="w-5 h-5 flex-shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-          />
-        </svg>
-        <span>
-          {message}{' '}
-          <span className="font-bold tabular-nums">
-            {countdown.days} {dayLabel} {pad(countdown.hours)}:{pad(countdown.minutes)}:{pad(countdown.seconds)}
-          </span>
-        </span>
+    <div className="bg-gradient-to-r from-sage-500 to-sage-700 rounded-xl py-5 px-6 mb-6">
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-white">
+        {/* Discount badge */}
+        {isEarlyBird && (
+          <div className="flex-shrink-0 bg-white/20 rounded-lg px-4 py-2 text-center">
+            <div className="text-3xl sm:text-4xl font-bold leading-none">10%</div>
+            <div className="text-xs font-bold uppercase tracking-wider mt-0.5">{discountLabel}</div>
+          </div>
+        )}
+
+        {/* Message + countdown */}
+        <div className="text-center">
+          <p className="text-sm sm:text-base font-medium opacity-90">{message}</p>
+          <div className="flex items-baseline justify-center gap-1.5 mt-1">
+            <span className="text-2xl sm:text-3xl font-bold tabular-nums">
+              {countdown.days}
+            </span>
+            <span className="text-xs opacity-75 mr-2">{dayLabel}</span>
+            <span className="text-2xl sm:text-3xl font-bold tabular-nums">
+              {pad(countdown.hours)}:{pad(countdown.minutes)}:{pad(countdown.seconds)}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
