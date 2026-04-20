@@ -58,9 +58,26 @@ export async function GET(
       );
     }
 
+    // Build download filename: SCHOOLNAME-STAFFNAME-DATE-PROJECTTYPE.zip
+    const airtableService = getAirtableService();
+    const event = await airtableService.getEventByEventId(eventId);
+    let downloadFilename: string | undefined;
+    if (event) {
+      const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9äöüÄÖÜß-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      const schoolPart = sanitize(event.school_name || 'Schule');
+      const datePart = event.event_date || 'kein-datum';
+      let staffPart = '';
+      if (event.assigned_staff?.[0]) {
+        const staffMember = await airtableService.getPersonById(event.assigned_staff[0]);
+        staffPart = staffMember?.staff_name ? sanitize(staffMember.staff_name) : '';
+      }
+      const parts = [schoolPart, staffPart, datePart, projectType].filter(Boolean);
+      downloadFilename = `${parts.join('-')}.zip`;
+    }
+
     // Generate signed download URL (3-hour expiry)
     const r2Service = getR2Service();
-    const downloadUrl = await r2Service.generateLogicProjectDownloadUrl(projectFile.r2Key);
+    const downloadUrl = await r2Service.generateLogicProjectDownloadUrl(projectFile.r2Key, downloadFilename);
 
     return NextResponse.json({
       success: true,

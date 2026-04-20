@@ -931,8 +931,8 @@ class R2Service {
   /**
    * Generate presigned download URL for a Logic Pro project
    */
-  async generateLogicProjectDownloadUrl(key: string): Promise<string> {
-    return this.generateSignedUrl(key, 10800);
+  async generateLogicProjectDownloadUrl(key: string, downloadFilename?: string): Promise<string> {
+    return this.generateSignedUrl(key, 10800, downloadFilename);
   }
 
   // ========================================
