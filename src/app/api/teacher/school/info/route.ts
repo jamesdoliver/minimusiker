@@ -5,6 +5,9 @@ import {
   updateSchoolBookingInfo,
   updateSchoolBookingById,
 } from '@/lib/services/teacherService';
+import { getActivityService } from '@/lib/services/activityService';
+import { getAirtableService } from '@/lib/services/airtableService';
+import { triggerSchoolInfoChangedNotification } from '@/lib/services/notificationService';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +68,19 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Resolve linked event BEFORE updating (so we can capture old values for the notification)
+    let linkedEvent: Awaited<ReturnType<ReturnType<typeof getAirtableService>['getEventBySchoolBookingId']>> = null;
+    if (bookingId) {
+      try {
+        linkedEvent = await getAirtableService().getEventBySchoolBookingId(bookingId);
+      } catch (err) {
+        console.warn('[school/info] Could not resolve linked event:', err);
+      }
+    }
+
+    const oldAddress = linkedEvent?.school_address || '';
+    const oldPhone = linkedEvent?.school_phone || '';
+
     // Update school info in Teachers table (for backward compatibility)
     await updateTeacherSchoolInfo(session.email, {
       address,
@@ -85,6 +101,49 @@ export async function PUT(request: NextRequest) {
         address,
         phone,
       });
+    }
+
+    // Activity log + notification (fire-and-forget)
+    if (linkedEvent) {
+      const changes: string[] = [];
+      if (address) changes.push(`address to "${address}"`);
+      if (phone) changes.push(`phone to "${phone}"`);
+
+      // Activity log
+      getActivityService().logActivity({
+        eventRecordId: linkedEvent.id,
+        activityType: 'school_info_updated',
+        description: `Teacher updated school ${changes.join(' and ')}`,
+        actorEmail: session.email,
+        actorType: 'teacher',
+        metadata: { bookingId, address, phone, oldAddress, oldPhone },
+      });
+
+      // Email notification to admins + assigned staff
+      const addressChanged = address && address !== oldAddress;
+      const phoneChanged = phone && phone !== oldPhone;
+
+      if (addressChanged || phoneChanged) {
+        const eventDate = linkedEvent.event_date
+          ? new Date(linkedEvent.event_date).toLocaleDateString('de-DE', {
+              weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            })
+          : '';
+
+        triggerSchoolInfoChangedNotification(
+          {
+            schoolName: linkedEvent.school_name || '',
+            eventDate,
+            contactName: session.name || session.email,
+            contactEmail: session.email,
+            oldAddress: oldAddress || 'Nicht angegeben',
+            newAddress: address || oldAddress,
+            oldPhone,
+            newPhone: phone,
+          },
+          linkedEvent.assigned_staff?.[0]
+        ).catch((err) => console.error('[school/info] Notification error:', err));
+      }
     }
 
     return NextResponse.json({

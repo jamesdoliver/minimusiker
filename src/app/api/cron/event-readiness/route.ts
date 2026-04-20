@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkNoStaffAssigned, checkClassesAndSongs, checkBookingsWithoutEvent, checkPostWave2Orders } from '@/lib/services/eventReadinessService';
+import { checkNoStaffAssigned, checkClassesAndSongs, checkBookingsWithoutEvent, checkPostWave2Orders, checkStaffEventReminder } from '@/lib/services/eventReadinessService';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +27,7 @@ interface CronResult {
   status: string;
   noStaff?: { sent: number; skipped: number; failed: number; errors: string[] };
   noEvent?: { sent: number; skipped: number; failed: number; errors: string[] };
+  staffReminder?: { sent: number; skipped: number; failed: number; errors: string[] };
   classesAndSongs?: { sent: number; skipped: number; failed: number; errors: string[] };
   postWave2Orders?: { sent: number; skipped: number; failed: number; errors: string[] };
   weeklySkipped?: boolean;
@@ -51,6 +52,10 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
   const noEventResult = await checkBookingsWithoutEvent(isDryRun);
   console.log('[Event Readiness Cron] No event check:', noEventResult);
 
+  // Daily check: staff event reminder (7 days before)
+  const staffReminderResult = await checkStaffEventReminder(isDryRun);
+  console.log('[Event Readiness Cron] Staff reminder check:', staffReminderResult);
+
   // Weekly checks: only on Mondays (or if forced)
   const isMonday = new Date().getDay() === 1;
   let classesAndSongsResult = null;
@@ -70,6 +75,7 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
     status: 'ok',
     noStaff: noStaffResult,
     noEvent: noEventResult,
+    staffReminder: staffReminderResult,
     classesAndSongs: classesAndSongsResult || undefined,
     postWave2Orders: postWave2OrdersResult || undefined,
     weeklySkipped: !isMonday && !forceWeekly,

@@ -56,6 +56,8 @@ const ACTIVITY_CONFIG: Record<
   song_hidden: { icon: '🙈', color: 'text-amber-600', bgColor: 'bg-amber-100' },
   song_unhidden: { icon: '👁️', color: 'text-green-600', bgColor: 'bg-green-100' },
   tracklist_confirmed: { icon: '✅', color: 'text-green-600', bgColor: 'bg-green-100' },
+  school_info_updated: { icon: '🏫', color: 'text-blue-600', bgColor: 'bg-blue-100' },
+  staff_event_reminder: { icon: '📬', color: 'text-purple-600', bgColor: 'bg-purple-100' },
 };
 
 function formatRelativeTime(dateString: string): string {

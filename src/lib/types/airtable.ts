@@ -1128,7 +1128,9 @@ export type EventActivityType =
   | 'song_renamed'
   | 'song_hidden'
   | 'song_unhidden'
-  | 'tracklist_confirmed';
+  | 'tracklist_confirmed'
+  | 'school_info_updated'
+  | 'staff_event_reminder';
 
 export type ActorType = 'teacher' | 'admin' | 'system' | 'engineer';
 

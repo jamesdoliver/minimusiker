@@ -11,6 +11,7 @@ import {
   DateChangeNotificationData,
   CancellationNotificationData,
   UnassignedStaffNotificationData,
+  SchoolInfoChangedNotificationData,
 } from '@/lib/types/notification-settings';
 import {
   sendNewBookingNotification,
@@ -21,6 +22,7 @@ import {
   sendEngineerSchulsongUploadedEmail,
   sendEngineerMinimusikerUploadedEmail,
   sendUnassignedStaffAlertEmail,
+  sendSchoolInfoChangedNotification,
 } from './resendService';
 import { getAirtableService } from './airtableService';
 
@@ -211,6 +213,58 @@ export async function triggerUnassignedStaffNotification(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[NotificationService] Error in triggerUnassignedStaffNotification:', error);
+    return { sent: false, error: errorMessage };
+  }
+}
+
+/**
+ * Send school info changed notification to admins + assigned staff
+ */
+export async function triggerSchoolInfoChangedNotification(
+  data: SchoolInfoChangedNotificationData,
+  assignedStaffId?: string
+): Promise<{ sent: boolean; error?: string }> {
+  try {
+    const settings = await getNotificationSettings('school_info_changed');
+
+    if (!settings || !settings.enabled) {
+      console.log('[NotificationService] School info changed notification disabled or not configured');
+      return { sent: false };
+    }
+
+    // Start with admin recipients from settings
+    const recipients = new Set(parseRecipientEmails(settings.recipientEmails));
+
+    // Also send to assigned staff if available
+    if (assignedStaffId) {
+      try {
+        const airtableService = getAirtableService();
+        const staff = await airtableService.getPersonById(assignedStaffId);
+        if (staff?.email) {
+          recipients.add(staff.email);
+        }
+      } catch (err) {
+        console.warn('[NotificationService] Could not resolve staff email:', err);
+      }
+    }
+
+    if (recipients.size === 0) {
+      console.log('[NotificationService] No recipients for school info changed notification');
+      return { sent: false };
+    }
+
+    const result = await sendSchoolInfoChangedNotification([...recipients], data);
+
+    if (result.success) {
+      console.log(`[NotificationService] School info changed notification sent to ${recipients.size} recipients`);
+      return { sent: true };
+    } else {
+      console.error('[NotificationService] Failed to send school info changed notification:', result.error);
+      return { sent: false, error: result.error };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[NotificationService] Error in triggerSchoolInfoChangedNotification:', error);
     return { sent: false, error: errorMessage };
   }
 }

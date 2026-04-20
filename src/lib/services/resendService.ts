@@ -9,6 +9,7 @@ import {
   DateChangeNotificationData,
   CancellationNotificationData,
   UnassignedStaffNotificationData,
+  SchoolInfoChangedNotificationData,
 } from '@/lib/types/notification-settings';
 import {
   getTriggerTemplate,
@@ -266,6 +267,59 @@ export async function sendCancellationNotification(
       : 'Diese Buchung wurde aus dem System gelöscht.',
     reasonText: isCancelled ? 'Storniert' : 'Gelöscht',
   }, 'Cancellation notification');
+}
+
+/**
+ * Send school info changed notification to admin + staff recipients
+ */
+export async function sendSchoolInfoChangedNotification(
+  recipients: string[],
+  data: SchoolInfoChangedNotificationData
+): Promise<SendEmailResult> {
+  if (recipients.length === 0) return { success: true, messageId: 'no-recipients' };
+
+  return sendTriggerEmail(recipients, 'school_info_changed', {
+    schoolName: data.schoolName,
+    eventDate: formatDateGerman(data.eventDate),
+    contactName: data.contactName,
+    contactEmail: data.contactEmail,
+    oldAddress: data.oldAddress || 'Nicht angegeben',
+    newAddress: data.newAddress,
+  }, 'School info changed notification');
+}
+
+/**
+ * Send staff event reminder (7 days before event)
+ */
+export interface StaffEventReminderData {
+  staffName: string;
+  schoolName: string;
+  eventDate: string;
+  eventType: string;
+  schoolAddress: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  estimatedChildren: string;
+  staffPortalUrl: string;
+}
+
+export async function sendStaffEventReminderEmail(
+  email: string,
+  data: StaffEventReminderData
+): Promise<SendEmailResult> {
+  return sendTriggerEmail(email, 'staff_event_reminder', {
+    staffName: data.staffName,
+    schoolName: data.schoolName,
+    eventDate: formatDateGerman(data.eventDate),
+    eventType: data.eventType || 'MiniMusiker',
+    schoolAddress: data.schoolAddress || 'Nicht angegeben',
+    contactName: data.contactName || '—',
+    contactEmail: data.contactEmail || '—',
+    contactPhone: data.contactPhone || '—',
+    estimatedChildren: data.estimatedChildren || '—',
+    staffPortalUrl: data.staffPortalUrl,
+  }, 'Staff event reminder');
 }
 
 /**

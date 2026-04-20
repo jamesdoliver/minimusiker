@@ -15,7 +15,9 @@ import {
   sendEventReadinessAdminDigestEmail,
   sendEventReadinessNoEventEmail,
   sendPostWave2OrdersDigestEmail,
+  sendStaffEventReminderEmail,
 } from './resendService';
+import { getActivityService } from './activityService';
 import Airtable from 'airtable';
 import { ORDERS_TABLE_ID, ORDERS_FIELD_IDS } from '@/lib/types/airtable';
 import { buildClassToEventMap, resolveOrderEventId } from '@/lib/utils/orderEventResolver';
@@ -641,6 +643,129 @@ export async function checkPostWave2Orders(dryRun = false): Promise<ReadinessRes
     result.failed = 1;
     result.errors.push(error instanceof Error ? error.message : 'Unknown error');
     console.error('[EventReadiness] Error in checkPostWave2Orders:', error);
+  }
+
+  return result;
+}
+
+const STAFF_REMINDER_DAYS_BEFORE = 7;
+
+/**
+ * Send a reminder email to assigned staff 7 days before their event.
+ * Runs daily. Only sends for events exactly 7 days out (date match, not range)
+ * so each event is only processed once.
+ */
+export async function checkStaffEventReminder(dryRun = false): Promise<ReadinessResult> {
+  const result: ReadinessResult = { sent: 0, skipped: 0, failed: 0, errors: [] };
+
+  try {
+    const airtable = getAirtableService();
+    const allEvents = await airtable.getAllEvents();
+
+    // Find events exactly 7 days from now
+    const now = new Date();
+    const targetDate = new Date(now);
+    targetDate.setDate(now.getDate() + STAFF_REMINDER_DAYS_BEFORE);
+    const targetDateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    const eventsIn7Days = allEvents.filter((event) => {
+      if (!event.event_date) return false;
+      if (event.status !== 'Confirmed') return false;
+      if (!event.assigned_staff || event.assigned_staff.length === 0) return false;
+      return event.event_date.split('T')[0] === targetDateStr;
+    });
+
+    if (eventsIn7Days.length === 0) {
+      console.log(`[EventReadiness] No staffed events on ${targetDateStr}`);
+      result.skipped = 1;
+      return result;
+    }
+
+    console.log(`[EventReadiness] Found ${eventsIn7Days.length} event(s) in 7 days for staff reminder`);
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
+
+    for (const event of eventsIn7Days) {
+      const staffId = event.assigned_staff![0];
+
+      // Resolve staff person
+      let staff: { id: string; staff_name: string; email?: string } | null = null;
+      try {
+        staff = await airtable.getPersonById(staffId);
+      } catch (err) {
+        console.warn(`[EventReadiness] Could not resolve staff ${staffId}:`, err);
+      }
+
+      if (!staff?.email) {
+        console.warn(`[EventReadiness] Staff ${staffId} has no email, skipping reminder for event ${event.event_id}`);
+        result.skipped++;
+        continue;
+      }
+
+      // Get booking details for contact info
+      let contactName = '—';
+      let contactEmail = '—';
+      let contactPhone = '—';
+      let estimatedChildren = '—';
+
+      if (event.simplybook_booking?.[0]) {
+        try {
+          const booking = await airtable.getSchoolBookingById(event.simplybook_booking[0]);
+          if (booking) {
+            contactName = booking.schoolContactName || '—';
+            contactEmail = booking.schoolContactEmail || '—';
+            contactPhone = booking.schoolPhone || '—';
+            estimatedChildren = booking.estimatedChildren?.toString() || '—';
+          }
+        } catch (err) {
+          console.warn(`[EventReadiness] Could not fetch booking for event ${event.event_id}:`, err);
+        }
+      }
+
+      if (dryRun) {
+        console.log(`[EventReadiness] DRY RUN: Would send staff reminder to ${staff.email} for ${event.school_name} on ${event.event_date}`);
+        result.skipped++;
+        continue;
+      }
+
+      try {
+        const emailResult = await sendStaffEventReminderEmail(staff.email, {
+          staffName: staff.staff_name,
+          schoolName: event.school_name,
+          eventDate: event.event_date,
+          eventType: event.event_type || 'MiniMusiker',
+          schoolAddress: event.school_address || '',
+          contactName,
+          contactEmail,
+          contactPhone,
+          estimatedChildren,
+          staffPortalUrl: `${baseUrl}/staff/events/${event.event_id}`,
+        });
+
+        if (emailResult.success) {
+          result.sent++;
+
+          // Log activity for audit trail
+          getActivityService().logActivity({
+            eventRecordId: event.id,
+            activityType: 'staff_event_reminder',
+            description: `7-day event reminder sent to ${staff.staff_name} (${staff.email})`,
+            actorEmail: 'system',
+            actorType: 'system',
+          });
+        } else {
+          result.failed++;
+          result.errors.push(`Staff reminder failed for ${event.event_id}: ${emailResult.error}`);
+        }
+      } catch (error) {
+        result.failed++;
+        result.errors.push(`Staff reminder error for ${event.event_id}: ${error instanceof Error ? error.message : 'Unknown'}`);
+      }
+    }
+  } catch (error) {
+    result.failed = 1;
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    console.error('[EventReadiness] Error in checkStaffEventReminder:', error);
   }
 
   return result;

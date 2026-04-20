@@ -2,6 +2,42 @@
 
 import { useState, useEffect } from 'react';
 
+/**
+ * Parse a combined address string into street, postalCode, city.
+ * Tries common German formats:
+ *   "Musterstraße 12, 12345 Berlin"
+ *   "Musterstraße 12, 12345, Berlin"
+ *   "Musterstraße 12\n12345 Berlin"
+ * Falls back to putting everything in street if parsing fails.
+ */
+function parseAddress(raw: string): { street: string; postalCode: string; city: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { street: '', postalCode: '', city: '' };
+
+  // Normalise newlines to ", "
+  const normalised = trimmed.replace(/\n+/g, ', ');
+
+  // Try to match: <street>, <5-digit PLZ> <city>
+  const match = normalised.match(/^(.+?),\s*(\d{5})\s+(.+)$/);
+  if (match) {
+    return { street: match[1].trim(), postalCode: match[2], city: match[3].replace(/,\s*$/, '').trim() };
+  }
+
+  // Try: <street>, <5-digit PLZ>, <city>
+  const match2 = normalised.match(/^(.+?),\s*(\d{5}),\s*(.+)$/);
+  if (match2) {
+    return { street: match2[1].trim(), postalCode: match2[2], city: match2[3].trim() };
+  }
+
+  // Fallback: put everything in street
+  return { street: trimmed, postalCode: '', city: '' };
+}
+
+function combineAddress(street: string, postalCode: string, city: string): string {
+  const parts = [street.trim(), [postalCode.trim(), city.trim()].filter(Boolean).join(' ')].filter(Boolean);
+  return parts.join(', ');
+}
+
 export interface EditSchoolInfoModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,14 +55,20 @@ export function EditSchoolInfoModal({
   bookingId,
   onSuccess,
 }: EditSchoolInfoModalProps) {
-  const [address, setAddress] = useState(currentAddress);
+  const parsed = parseAddress(currentAddress);
+  const [street, setStreet] = useState(parsed.street);
+  const [postalCode, setPostalCode] = useState(parsed.postalCode);
+  const [city, setCity] = useState(parsed.city);
   const [phone, setPhone] = useState(currentPhone);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Update local state when props change
   useEffect(() => {
-    setAddress(currentAddress);
+    const p = parseAddress(currentAddress);
+    setStreet(p.street);
+    setPostalCode(p.postalCode);
+    setCity(p.city);
     setPhone(currentPhone);
   }, [currentAddress, currentPhone]);
 
@@ -42,10 +84,20 @@ export function EditSchoolInfoModal({
     setError(null);
 
     // Validation
-    if (!address || address.length < 10) {
-      setError('Die Adresse muss mindestens 10 Zeichen lang sein');
+    if (!street.trim()) {
+      setError('Bitte geben Sie die Straße und Hausnummer ein');
       return;
     }
+    if (!postalCode.trim() || !/^\d{5}$/.test(postalCode.trim())) {
+      setError('Bitte geben Sie eine gültige 5-stellige PLZ ein');
+      return;
+    }
+    if (!city.trim()) {
+      setError('Bitte geben Sie den Ort ein');
+      return;
+    }
+
+    const address = combineAddress(street, postalCode, city);
 
     if (phone) {
       // German phone format validation
@@ -98,24 +150,60 @@ export function EditSchoolInfoModal({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Address Field */}
+          {/* Address Fields */}
           <div>
-            <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-              Adresse *
+            <label htmlFor="street" className="block text-sm font-medium text-gray-700 mb-1">
+              Straße & Hausnummer *
             </label>
-            <textarea
-              id="address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              rows={3}
+            <input
+              type="text"
+              id="street"
+              value={street}
+              onChange={(e) => setStreet(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg
                 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent
                 disabled:bg-gray-100 disabled:cursor-not-allowed"
-              placeholder="Straße, Hausnummer, PLZ, Ort"
+              placeholder="Musterstraße 12"
               disabled={isLoading}
               required
             />
-            <p className="text-xs text-gray-500 mt-1">Mindestens 10 Zeichen</p>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700 mb-1">
+                PLZ *
+              </label>
+              <input
+                type="text"
+                id="postalCode"
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                maxLength={5}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg
+                  focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent
+                  disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder="12345"
+                disabled={isLoading}
+                required
+              />
+            </div>
+            <div className="col-span-2">
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                Ort *
+              </label>
+              <input
+                type="text"
+                id="city"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg
+                  focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent
+                  disabled:bg-gray-100 disabled:cursor-not-allowed"
+                placeholder="Berlin"
+                disabled={isLoading}
+                required
+              />
+            </div>
           </div>
 
           {/* Phone Field */}

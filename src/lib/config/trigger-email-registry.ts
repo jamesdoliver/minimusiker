@@ -1129,6 +1129,145 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
 </p>`,
     availableVariables: ['teacherName', 'schoolName', 'eventDate', 'loginUrl'],
   },
+
+  // ─── School Info Changed (Admin + Staff) ─────────────────────────
+  {
+    slug: 'school_info_changed',
+    name: 'Schuladresse geändert',
+    description: 'Wird an Admins und zugewiesene Mitarbeiter gesendet, wenn ein Lehrer die Schuladresse oder Telefonnummer ändert.',
+    recipientType: 'admin',
+    triggerEventKey: 'teacher:school_info_changed',
+    defaultSubject: 'Adressänderung: {{schoolName}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Schuladresse geändert
+</h2>
+
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Ein Lehrer hat die Kontaktdaten für <strong>{{schoolName}}</strong> ({{eventDate}}) im Pädagogen-Portal aktualisiert.
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Schule:</strong>
+      <span style="color: #4a5568; float: right;">{{schoolName}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Datum:</strong>
+      <span style="color: #4a5568; float: right;">{{eventDate}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Kontaktperson:</strong>
+      <span style="color: #4a5568; float: right;">{{contactName}} ({{contactEmail}})</span>
+    </td>
+  </tr>
+</table>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px; background-color: #FFF3CD; border-radius: 8px;">
+  <tr>
+    <td style="padding: 16px;">
+      <p style="margin: 0 0 8px 0; color: #856404; font-size: 14px;">
+        <strong>Alte Adresse:</strong> <span style="text-decoration: line-through;">{{oldAddress}}</span>
+      </p>
+      <p style="margin: 0; color: #155724; font-size: 16px; font-weight: 600;">
+        <strong>Neue Adresse:</strong> {{newAddress}}
+      </p>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Die Änderung wurde automatisch im System übernommen.
+</p>`,
+    availableVariables: ['schoolName', 'eventDate', 'contactName', 'contactEmail', 'oldAddress', 'newAddress'],
+  },
+
+  // ─── Staff Event Reminder (7 days before) ────────────────────────
+  {
+    slug: 'staff_event_reminder',
+    name: 'Staff Event-Erinnerung',
+    description: 'Wird 7 Tage vor einem Event an den zugewiesenen Mitarbeiter gesendet mit allen Event-Details und einem Link zum Staff-Portal.',
+    recipientType: 'staff',
+    triggerEventKey: 'cron:staff_event_reminder',
+    defaultSubject: 'Erinnerung: {{schoolName}} am {{eventDate}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{staffName}},
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  In einer Woche steht dein Event an! Hier nochmal alle Details:
+</p>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Schule:</strong>
+      <span style="color: #4a5568; float: right;">{{schoolName}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Datum:</strong>
+      <span style="color: #4a5568; float: right;">{{eventDate}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Typ:</strong>
+      <span style="color: #4a5568; float: right;">{{eventType}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Adresse:</strong>
+      <span style="color: #4a5568; float: right;">{{schoolAddress}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Kontaktperson:</strong>
+      <span style="color: #4a5568; float: right;">{{contactName}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">E-Mail:</strong>
+      <span style="color: #4a5568; float: right;">{{contactEmail}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Telefon:</strong>
+      <span style="color: #4a5568; float: right;">{{contactPhone}}</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding: 12px 0; border-bottom: 1px solid #e8e8e8;">
+      <strong style="color: #2F4858;">Geschätzte Kinderzahl:</strong>
+      <span style="color: #4a5568; float: right;">{{estimatedChildren}}</span>
+    </td>
+  </tr>
+</table>
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+  <tr>
+    <td align="center" style="padding: 8px 0;">
+      <a href="{{staffPortalUrl}}" style="display: inline-block; padding: 14px 32px; background-color: #1e3a4c; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+        Im Staff-Portal ansehen
+      </a>
+    </td>
+  </tr>
+</table>
+
+<p style="margin: 16px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Bitte prüfe die Details und bereite dich auf den Termin vor.
+</p>`,
+    availableVariables: ['staffName', 'schoolName', 'eventDate', 'eventType', 'schoolAddress', 'contactName', 'contactEmail', 'contactPhone', 'estimatedChildren', 'staffPortalUrl'],
+  },
 ];
 
 /**
