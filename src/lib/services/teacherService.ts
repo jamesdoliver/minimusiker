@@ -361,7 +361,12 @@ class TeacherService {
       const teacher = await this.getTeacherByEmail(teacherEmail);
 
       if (!teacher) {
-        throw new Error(`Teacher not found: ${teacherEmail}`);
+        // No Teachers record (e.g. admin preview session, or teacher never accepted an invite).
+        // The primary update runs via updateSchoolBookingById — skip this legacy sync.
+        console.warn(
+          `[updateTeacherSchoolInfo] No Teachers record for ${teacherEmail} — skipping Teachers table update`
+        );
+        return;
       }
 
       // Build update object using field IDs
