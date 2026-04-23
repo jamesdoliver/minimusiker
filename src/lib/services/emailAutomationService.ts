@@ -52,10 +52,19 @@ export function getTemplateTier(template: { is_minimusikertag: boolean; is_plus:
 }
 
 /**
- * Check if an event matches a template's tier (exact match).
+ * Check if an event matches a template's tier.
+ *
+ * Hierarchy: PLUS ⊇ Minimusikertag (PLUS is a pricing tier of the same
+ * base product, so PLUS events receive Minimusikertag-tier templates too).
+ * Schulsong is a separate product and does not participate in the hierarchy.
  */
 export function eventMatchesTemplate(event: EventThresholdMatch, template: EmailTemplate): boolean {
-  if (getEventTier(event) !== getTemplateTier(template)) return false;
+  const eventTier = getEventTier(event);
+  const templateTier = getTemplateTier(template);
+  const tierMatches =
+    eventTier === templateTier ||
+    (eventTier === 'plus' && templateTier === 'minimusikertag');
+  if (!tierMatches) return false;
   if (template.only_under_100 && !event.isUnder100) return false;
   return true;
 }
