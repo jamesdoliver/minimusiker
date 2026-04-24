@@ -8,7 +8,7 @@ jest.mock('airtable', () => ({
   },
 }));
 
-import { eventMatchesTemplate } from './emailAutomationService';
+import { eventMatchesTemplate, getEventTier } from './emailAutomationService';
 import { EventThresholdMatch, EmailTemplate } from '@/lib/types/email-automation';
 
 function makeEvent(overrides: Partial<EventThresholdMatch> = {}): EventThresholdMatch {
@@ -100,5 +100,47 @@ describe('eventMatchesTemplate — tier hierarchy', () => {
     const smallTemplate = makeTemplate({ is_minimusikertag: true, only_under_100: true });
 
     expect(eventMatchesTemplate(largePlusEvent, smallTemplate)).toBe(false);
+  });
+});
+
+describe('getEventTier — invalid-flag-combo guard', () => {
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it('logs a warning when isPlus AND isMinimusikertag are both true', () => {
+    // isPlus and isMinimusikertag are meant to be mutually exclusive.
+    // If both land true the API normalisation has been bypassed (e.g.
+    // direct Airtable edit). We want loud logs so this surfaces in
+    // Vercel within one cron cycle instead of weeks later via a complaint.
+    getEventTier({ isPlus: true, isMinimusikertag: true });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid flag combo'),
+      expect.any(Object)
+    );
+  });
+
+  it('does NOT log a warning for valid tier combinations', () => {
+    getEventTier({ isPlus: true });
+    getEventTier({ isMinimusikertag: true });
+    getEventTier({ isSchulsong: true });
+    getEventTier({ isMinimusikertag: true, isSchulsong: true });
+    getEventTier({ isPlus: true, isSchulsong: true });
+    getEventTier({});
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('still returns a tier (does not throw) when the invalid combo is detected', () => {
+    // The guard is a tripwire, not a gate. It logs and lets the existing
+    // priority chain pick a tier so downstream code keeps working.
+    const tier = getEventTier({ isPlus: true, isMinimusikertag: true });
+    expect(tier).toBe('plus');
   });
 });

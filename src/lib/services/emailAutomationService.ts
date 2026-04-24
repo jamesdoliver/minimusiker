@@ -34,7 +34,23 @@ const RATE_LIMIT_DELAY_MS = 500; // 500ms delay between emails to respect Resend
  * Derive the effective tier for an event (highest wins).
  * Hierarchy: PLUS > Minimusikertag > Schulsong
  */
-export function getEventTier(event: { isMinimusikertag?: boolean; isPlus?: boolean; isSchulsong?: boolean }): EventTier {
+export function getEventTier(event: {
+  isMinimusikertag?: boolean;
+  isPlus?: boolean;
+  isSchulsong?: boolean;
+  eventId?: string;
+  schoolName?: string;
+}): EventTier {
+  // Tripwire: isPlus and isMinimusikertag are mutually exclusive. Both true
+  // means the API normalisation was bypassed (typically a direct Airtable
+  // edit). Log loudly so it surfaces within one cron cycle instead of
+  // weeks later via a school complaint.
+  if (event.isPlus && event.isMinimusikertag) {
+    console.warn('[getEventTier] Invalid flag combo — isPlus and isMinimusikertag both true', {
+      eventId: event.eventId,
+      schoolName: event.schoolName,
+    });
+  }
   if (event.isPlus) return 'plus';
   if (event.isMinimusikertag) return 'minimusikertag';
   if (event.isSchulsong) return 'schulsong';
