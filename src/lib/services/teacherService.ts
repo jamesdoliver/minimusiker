@@ -324,6 +324,69 @@ class TeacherService {
   }
 
   /**
+   * Self-heal: if a teacher row is missing for an email but a SchoolBooking
+   * exists for that email, create the teacher row from the booking data.
+   *
+   * Returns the Teacher (newly created or already existing), or null if no
+   * matching SchoolBooking is found. Called from the magic-link request flow
+   * to recover from cases where the SimplyBook → Teachers creation step was
+   * missed (e.g. webhook delivery failure before the daily booking-sync cron).
+   */
+  async selfHealFromBooking(email: string): Promise<Teacher | null> {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return null;
+
+    let matchedBookingId: string | undefined;
+    let matchedSimplybookId: string | undefined;
+    try {
+      const bookings = await this.base(SCHOOL_BOOKINGS_TABLE_ID)
+        .select({
+          filterByFormula: `LOWER({${SCHOOL_BOOKINGS_FIELD_IDS.school_contact_email}}) = '${normalizedEmail.replace(/'/g, "\\'")}'`,
+          maxRecords: 1,
+          returnFieldsByFieldId: true,
+        })
+        .firstPage();
+
+      if (bookings.length === 0) return null;
+
+      const b = bookings[0];
+      matchedBookingId = b.id;
+      const f = b.fields as Record<string, unknown>;
+      const schoolName = (f[SCHOOL_BOOKINGS_FIELD_IDS.school_name] as string) || '';
+      const contactName = (f[SCHOOL_BOOKINGS_FIELD_IDS.school_contact_name] as string) || '';
+      const schoolAddress = (f[SCHOOL_BOOKINGS_FIELD_IDS.school_address] as string) || undefined;
+      const schoolPhone = (f[SCHOOL_BOOKINGS_FIELD_IDS.school_phone] as string) || undefined;
+      const rawSimplybookId = f[SCHOOL_BOOKINGS_FIELD_IDS.simplybook_id];
+      matchedSimplybookId = rawSimplybookId != null ? String(rawSimplybookId) : undefined;
+      const regionLink = f[SCHOOL_BOOKINGS_FIELD_IDS.region] as string[] | undefined;
+      const regionRecordId = Array.isArray(regionLink) && regionLink.length > 0 ? regionLink[0] : undefined;
+
+      console.log(`[selfHeal] Creating Teacher row for ${normalizedEmail} from SchoolBooking ${b.id} (sb${matchedSimplybookId ?? '?'})`);
+
+      return await this.findOrCreateTeacher({
+        email: normalizedEmail,
+        name: contactName || schoolName,
+        schoolName,
+        simplybookBookingId: matchedSimplybookId,
+        schoolAddress,
+        schoolPhone,
+        regionRecordId,
+      });
+    } catch (error) {
+      // Surface enough context for support: the email + which booking we matched (if any)
+      // before the error. A real teacher hits the magic-link button → silent generic
+      // "if account exists" is what the user sees, so this log is the only signal.
+      console.error(
+        `[selfHeal] FAILED for ${normalizedEmail}` +
+        (matchedBookingId ? ` (matched SchoolBooking ${matchedBookingId} sb${matchedSimplybookId ?? '?'})` : ' (no SchoolBooking matched)') +
+        ':',
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
    * Link an event to an existing teacher
    * Appends the event ID to the teacher's linked_events field
    */
