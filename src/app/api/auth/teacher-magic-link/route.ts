@@ -30,7 +30,14 @@ export async function POST(request: NextRequest) {
     const teacherService = getTeacherService();
 
     // Find teacher by email
-    const teacher = await teacherService.getTeacherByEmail(normalizedEmail);
+    let teacher = await teacherService.getTeacherByEmail(normalizedEmail);
+
+    // Self-heal: if no Teacher row but a SchoolBooking exists for this email,
+    // create the Teacher row on the fly. Closes the gap between a missed
+    // SimplyBook → Teachers creation and the next daily booking-sync cron run.
+    if (!teacher) {
+      teacher = await teacherService.selfHealFromBooking(normalizedEmail);
+    }
 
     if (!teacher) {
       // Don't reveal whether email exists for security
