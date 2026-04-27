@@ -142,7 +142,8 @@ export default function MonetaryCompletion({
               id="monetary-amount"
               type="number"
               step="0.01"
-              min="0"
+              min="0.01"
+              inputMode="decimal"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
@@ -233,58 +234,64 @@ export default function MonetaryCompletion({
 
         {/* Warning (non-blocking) */}
         {warning && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+          <div
+            role="status"
+            aria-live="polite"
+            className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800"
+          >
             {warning}
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+          <div
+            role="alert"
+            className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700"
+          >
             {error}
           </div>
         )}
-      </form>
 
-      {/* Footer */}
-      <div className="px-6 py-4 border-t border-gray-200">
-        <button
-          type="submit"
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className={cn(
-            'w-full px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors',
-            'bg-[#94B8B3] hover:bg-[#7da39e]',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            'flex items-center justify-center'
-          )}
-        >
-          {isSubmitting ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-              Completing...
-            </>
-          ) : (
-            <>
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              Mark Complete
-            </>
-          )}
-        </button>
-      </div>
+        {/* Footer */}
+        <div className="-mx-6 -mb-6 mt-2 px-6 py-4 border-t border-gray-200">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={cn(
+              'w-full px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors',
+              'bg-[#94B8B3] hover:bg-[#7da39e]',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+              'flex items-center justify-center'
+            )}
+          >
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                Completing...
+              </>
+            ) : (
+              <>
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                Mark Complete
+              </>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
