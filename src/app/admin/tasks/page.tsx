@@ -343,6 +343,12 @@ export default function AdminTasks() {
             isLoading={isMatrixLoading}
             onTaskAction={async (action, eventId, templateId, taskId, data) => {
               try {
+                if (action === 'refresh') {
+                  // Popover-driven completion handled the API call itself.
+                  // Just refetch the matrix.
+                  await fetchMatrixRows();
+                  return;
+                }
                 if (action === 'complete') {
                   const completionData = (data?.completion_data as Record<string, unknown>) || {};
                   if (taskId) {

@@ -32,6 +32,158 @@ interface TaskMatrixPopoverProps {
 }
 
 // ---------------------------------------------------------------------------
+// PopoverMonetaryQuickComplete — inline form for monetary tasks
+// ---------------------------------------------------------------------------
+
+interface PopoverMonetaryQuickCompleteProps {
+  taskId: string | null;
+  eventId: string;
+  templateId: string;
+  onCompleted: () => void;
+}
+
+function PopoverMonetaryQuickComplete({
+  taskId,
+  eventId,
+  templateId,
+  onCompleted,
+}: PopoverMonetaryQuickCompleteProps) {
+  const [amount, setAmount] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const amountNum = parseFloat(amount);
+    if (!amount || !Number.isFinite(amountNum) || amountNum <= 0) {
+      setError('Please enter a valid positive amount');
+      return;
+    }
+
+    const completionData: { amount: number; notes?: string } = {
+      amount: amountNum,
+      ...(notes.trim() ? { notes: notes.trim() } : {}),
+    };
+
+    setIsSubmitting(true);
+
+    try {
+      let response: Response;
+      if (taskId) {
+        response = await fetch(`/api/admin/tasks/${taskId}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ completion_data: completionData }),
+        });
+      } else {
+        response = await fetch('/api/admin/tasks/matrix/complete', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            eventId,
+            templateId,
+            completion_data: completionData,
+          }),
+        });
+      }
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error || `Failed to complete task (${response.status})`,
+        );
+      }
+
+      onCompleted();
+    } catch (err) {
+      console.error('Error completing monetary task:', err);
+      setError(err instanceof Error ? err.message : 'Failed to complete task');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="border-t border-gray-100 pt-2.5 mt-2.5 space-y-2"
+    >
+      <div>
+        <label
+          htmlFor="popover-monetary-amount"
+          className="block text-xs font-medium text-gray-600 mb-1"
+        >
+          Order Cost (EUR) <span className="text-red-500">*</span>
+        </label>
+        <div className="relative">
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">
+            €
+          </span>
+          <input
+            id="popover-monetary-amount"
+            type="number"
+            step="0.01"
+            min="0.01"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            disabled={isSubmitting}
+            required
+            className="w-full pl-6 pr-2 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#94B8B3] focus:border-[#94B8B3] disabled:opacity-50"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label
+          htmlFor="popover-monetary-notes"
+          className="block text-xs font-medium text-gray-600 mb-1"
+        >
+          Notes (optional)
+        </label>
+        <textarea
+          id="popover-monetary-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          placeholder="Add any notes..."
+          disabled={isSubmitting}
+          className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#94B8B3] focus:border-[#94B8B3] resize-none disabled:opacity-50"
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="w-full px-3 py-1.5 text-xs text-white font-medium rounded bg-[#94B8B3] hover:bg-[#7da39e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+      >
+        {isSubmitting ? (
+          <>
+            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1.5" />
+            Completing...
+          </>
+        ) : (
+          'Mark Complete'
+        )}
+      </button>
+
+      {error && (
+        <p role="alert" className="text-xs text-red-600">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -318,6 +470,38 @@ export default function TaskMatrixPopover({
           </div>
         )}
 
+        {/* Completion dispatcher: monetary inline form, others redirect */}
+        {canComplete && entry && !showNotesInput && (() => {
+          switch (entry.completion) {
+            case 'monetary':
+              return (
+                <PopoverMonetaryQuickComplete
+                  taskId={cell.taskId}
+                  eventId={eventId}
+                  templateId={templateId}
+                  onCompleted={() => {
+                    onAction('refresh');
+                  }}
+                />
+              );
+            case 'tracklist':
+            case 'quantity_checkbox':
+            case 'orchestrated':
+              return (
+                <div className="border-t border-gray-100 pt-2.5 mt-2.5">
+                  <Link
+                    href={`/admin/tasks/${eventId}`}
+                    className="block w-full text-center px-3 py-2 bg-[#94B8B3] text-white text-sm font-medium rounded-lg hover:bg-[#7da39e] transition-colors"
+                  >
+                    Open completion panel →
+                  </Link>
+                </div>
+              );
+            default:
+              return null;
+          }
+        })()}
+
         {/* Notes input for partial completion */}
         {showNotesInput && (
           <div className="border-t border-gray-100 pt-2.5 mt-2.5 space-y-2">
@@ -378,13 +562,6 @@ export default function TaskMatrixPopover({
                   className="px-2.5 py-1.5 text-xs text-orange-600 hover:text-orange-800 font-medium rounded hover:bg-orange-50 transition-colors"
                 >
                   Partial
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAction('complete')}
-                  className="px-3 py-1.5 text-xs text-white font-medium rounded bg-[#94B8B3] hover:bg-[#7da39e] transition-colors"
-                >
-                  Complete
                 </button>
               </>
             )}
