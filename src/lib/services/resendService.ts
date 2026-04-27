@@ -419,6 +419,43 @@ export async function sendPostWave2OrdersDigestEmail(
   }, 'Post-Wave 2 orders digest');
 }
 
+/**
+ * Send weekly "post-Wave 2 breakdown" admin email — categorized view of
+ * orders created or updated in the last 7 days (refunds / test / fulfillment / new).
+ */
+export async function sendPostWave2BreakdownEmail(
+  recipients: string[],
+  data: {
+    totalCount: number;
+    refundCount: number;
+    refundValue: string;
+    newOrderCount: number;
+    newOrderValue: string;
+    fulfillmentCount: number;
+    testCount: number;
+    refundsHtml: string;
+    newOrdersHtml: string;
+    fulfillmentHtml: string;
+    testOrdersHtml: string;
+  }
+): Promise<SendEmailResult> {
+  if (recipients.length === 0) return { success: true, messageId: 'no-recipients' };
+
+  return sendTriggerEmail(recipients, 'post_wave2_breakdown', {
+    totalCount: String(data.totalCount),
+    refundCount: String(data.refundCount),
+    refundValue: data.refundValue,
+    newOrderCount: String(data.newOrderCount),
+    newOrderValue: data.newOrderValue,
+    fulfillmentCount: String(data.fulfillmentCount),
+    testCount: String(data.testCount),
+    refundsHtml: data.refundsHtml,
+    newOrdersHtml: data.newOrdersHtml,
+    fulfillmentHtml: data.fulfillmentHtml,
+    testOrdersHtml: data.testOrdersHtml,
+  }, 'Post-Wave 2 weekly breakdown');
+}
+
 // ============================================================================
 // SCHULSONG TEACHER APPROVED NOTIFICATION
 // ============================================================================

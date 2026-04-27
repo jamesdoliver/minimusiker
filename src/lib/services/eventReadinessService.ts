@@ -15,6 +15,7 @@ import {
   sendEventReadinessAdminDigestEmail,
   sendEventReadinessNoEventEmail,
   sendPostWave2OrdersDigestEmail,
+  sendPostWave2BreakdownEmail,
   sendStaffEventReminderEmail,
 } from './resendService';
 import { getActivityService } from './activityService';
@@ -447,14 +448,27 @@ export async function checkPostWave2Orders(dryRun = false): Promise<ReadinessRes
     const base = airtable.getBase();
     const ordersTable = base(ORDERS_TABLE_ID);
 
-    // Fetch pending/partial orders (server-side filtered) + class→event map + all events
+    // Fetch pending/partial orders (server-side filtered) + class→event map + all events.
+    // refund_amount is the load-bearing refund check — payment_status can lag behind
+    // when Shopify's orders/updated webhook misses a beat, but refund_amount is always
+    // recomputed from total_price - current_total_price.
+    // is_test excludes Bogus-Gateway test orders (treated as unchecked when blank).
     const filterFormula = `AND(
       OR(
         {${ORDERS_FIELD_IDS.fulfillment_status}} = 'pending',
         {${ORDERS_FIELD_IDS.fulfillment_status}} = 'partial'
       ),
       {${ORDERS_FIELD_IDS.payment_status}} != 'refunded',
-      {${ORDERS_FIELD_IDS.payment_status}} != 'voided'
+      {${ORDERS_FIELD_IDS.payment_status}} != 'partially_refunded',
+      {${ORDERS_FIELD_IDS.payment_status}} != 'voided',
+      OR(
+        {${ORDERS_FIELD_IDS.refund_amount}} = BLANK(),
+        {${ORDERS_FIELD_IDS.refund_amount}} = 0
+      ),
+      OR(
+        {${ORDERS_FIELD_IDS.is_test}} = BLANK(),
+        {${ORDERS_FIELD_IDS.is_test}} = FALSE()
+      )
     )`;
 
     const [pendingOrders, classToEvent, allEvents] = await Promise.all([
@@ -643,6 +657,225 @@ export async function checkPostWave2Orders(dryRun = false): Promise<ReadinessRes
     result.failed = 1;
     result.errors.push(error instanceof Error ? error.message : 'Unknown error');
     console.error('[EventReadiness] Error in checkPostWave2Orders:', error);
+  }
+
+  return result;
+}
+
+const RECENT_CHANGES_WINDOW_DAYS = 7;
+
+// Narrower distribution than the post-Wave 2 digest — only the two recipients
+// who own the financial follow-up. Edit this list to change the routing; the
+// digest itself still goes to all event_readiness recipients.
+const BREAKDOWN_RECIPIENTS = [
+  'gian.koehler@guesstimate.de',
+  'jordan.baker@guesstimate.de',
+];
+
+/**
+ * Build a categorized breakdown of orders created or updated in the last 7 days
+ * and email it to admin recipients. Runs weekly (Mondays) alongside the digest.
+ *
+ * Categorization mirrors scripts/report-orders-status.ts:
+ *   - refunds:    refund_amount > 0 OR payment_status in (refunded, partially_refunded, voided)
+ *   - test:       is_test === true and not in refunds
+ *   - new:        order_date within the window and not in refunds/test
+ *   - fulfillment: everything else updated in the window (older orders touched)
+ */
+export async function checkRecentOrderChanges(dryRun = false): Promise<ReadinessResult> {
+  const result: ReadinessResult = { sent: 0, skipped: 0, failed: 0, errors: [] };
+
+  try {
+    const airtable = getAirtableService();
+    const base = airtable.getBase();
+    const ordersTable = base(ORDERS_TABLE_ID);
+
+    const since = new Date();
+    since.setDate(since.getDate() - RECENT_CHANGES_WINDOW_DAYS);
+    const sinceIso = since.toISOString();
+
+    // Server-side filter: anything updated in the last 7 days. Each loop iteration
+    // re-classifies based on current state, so we don't need to track diffs.
+    const filterFormula = `IS_AFTER({${ORDERS_FIELD_IDS.updated_at}}, '${sinceIso}')`;
+
+    const records = await ordersTable
+      .select({ filterByFormula: filterFormula, returnFieldsByFieldId: true })
+      .all();
+
+    interface OrderRow {
+      orderNumber: string;
+      schoolName: string;
+      orderDate: string;
+      paymentStatus: string;
+      fulfillmentStatus: string;
+      totalAmount: number;
+      refundAmount: number;
+      cancelReason: string;
+      isTest: boolean;
+    }
+
+    const all: OrderRow[] = records.map((r) => ({
+      orderNumber: (r.get(ORDERS_FIELD_IDS.order_number) as string) || '—',
+      schoolName: (r.get(ORDERS_FIELD_IDS.school_name) as string) || '—',
+      orderDate: (r.get(ORDERS_FIELD_IDS.order_date) as string) || '',
+      paymentStatus: (r.get(ORDERS_FIELD_IDS.payment_status) as string) || '',
+      fulfillmentStatus: (r.get(ORDERS_FIELD_IDS.fulfillment_status) as string) || '',
+      totalAmount: (r.get(ORDERS_FIELD_IDS.total_amount) as number) || 0,
+      refundAmount: (r.get(ORDERS_FIELD_IDS.refund_amount) as number) || 0,
+      cancelReason: (r.get(ORDERS_FIELD_IDS.cancel_reason) as string) || '',
+      isTest: r.get(ORDERS_FIELD_IDS.is_test) === true,
+    }));
+
+    const refunds: OrderRow[] = [];
+    const tests: OrderRow[] = [];
+    const fulfillment: OrderRow[] = [];
+    const newOrders: OrderRow[] = [];
+
+    for (const o of all) {
+      const isRefund =
+        o.refundAmount > 0.01 ||
+        o.paymentStatus === 'refunded' ||
+        o.paymentStatus === 'partially_refunded' ||
+        o.paymentStatus === 'voided';
+      if (isRefund) {
+        refunds.push(o);
+        continue;
+      }
+      if (o.isTest) {
+        tests.push(o);
+        continue;
+      }
+      if (o.orderDate && new Date(o.orderDate) >= since) {
+        newOrders.push(o);
+        continue;
+      }
+      fulfillment.push(o);
+    }
+
+    if (all.length === 0) {
+      console.log('[EventReadiness] No order changes in the last 7 days');
+      result.skipped = 1;
+      return result;
+    }
+
+    const recipients = BREAKDOWN_RECIPIENTS;
+
+    const refundValue = refunds.reduce((acc, o) => acc + o.refundAmount, 0);
+    const newOrderValue = newOrders.reduce((acc, o) => acc + o.totalAmount, 0);
+
+    const sortBy = <T extends OrderRow>(rows: T[]): T[] =>
+      [...rows].sort((a, b) => a.orderNumber.localeCompare(b.orderNumber));
+
+    const refundRow = (o: OrderRow): string => {
+      const status = o.paymentStatus === 'partially_refunded' ? 'Teilerstattung' : 'Erstattung';
+      return `<tr>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${o.orderNumber}</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${o.schoolName}</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${formatDateGerman(o.orderDate)}</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${o.totalAmount.toFixed(2)} €</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #c53030;">${o.refundAmount.toFixed(2)} €</td>
+        <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${status}${o.cancelReason ? ` (${o.cancelReason})` : ''}</td>
+      </tr>`;
+    };
+
+    const simpleRow = (o: OrderRow, statusLabel: string): string => `<tr>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${o.orderNumber}</td>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${o.schoolName}</td>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${formatDateGerman(o.orderDate)}</td>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${o.totalAmount.toFixed(2)} €</td>
+      <td style="padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #4a5568;">${statusLabel}</td>
+    </tr>`;
+
+    const wrap = (title: string, headers: string[], bodyRows: string): string => `
+      <h3 style="margin: 24px 0 8px 0; color: #2F4858; font-size: 16px; font-weight: 600;">${title}</h3>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 8px; font-size: 14px; border-collapse: collapse;">
+        <tr style="background-color: #edf2f7;">
+          ${headers.map((h) => `<th style="padding: 6px 10px; text-align: left; color: #2F4858; font-weight: 600; border-bottom: 2px solid #cbd5e0;">${h}</th>`).join('')}
+        </tr>
+        ${bodyRows}
+      </table>`;
+
+    const refundsHtml = refunds.length
+      ? wrap(
+          `Erstattungen (${refunds.length}, ${refundValue.toFixed(2)} € erstattet)`,
+          ['Bestell-Nr.', 'Schule', 'Bestellt am', 'Gesamt', 'Erstattet', 'Status'],
+          sortBy(refunds).map(refundRow).join('\n')
+        )
+      : '';
+    const newOrdersHtml = newOrders.length
+      ? wrap(
+          `Neue Bestellungen (${newOrders.length}, ${newOrderValue.toFixed(2)} €)`,
+          ['Bestell-Nr.', 'Schule', 'Bestellt am', 'Gesamt', 'Versand'],
+          sortBy(newOrders)
+            .map((o) =>
+              simpleRow(
+                o,
+                o.fulfillmentStatus === 'fulfilled' ? 'Versendet' : 'Ausstehend'
+              )
+            )
+            .join('\n')
+        )
+      : '';
+    const fulfillmentHtml = fulfillment.length
+      ? wrap(
+          `Versand-Updates an älteren Bestellungen (${fulfillment.length})`,
+          ['Bestell-Nr.', 'Schule', 'Bestellt am', 'Gesamt', 'Versand'],
+          sortBy(fulfillment)
+            .map((o) =>
+              simpleRow(
+                o,
+                o.fulfillmentStatus === 'fulfilled'
+                  ? 'Versendet'
+                  : o.fulfillmentStatus === 'partial'
+                    ? 'Teilversand'
+                    : 'Ausstehend'
+              )
+            )
+            .join('\n')
+        )
+      : '';
+    const testOrdersHtml = tests.length
+      ? wrap(
+          `Test-Bestellungen markiert (${tests.length})`,
+          ['Bestell-Nr.', 'Schule', 'Bestellt am', 'Gesamt', 'Versand'],
+          sortBy(tests)
+            .map((o) => simpleRow(o, o.fulfillmentStatus || '—'))
+            .join('\n')
+        )
+      : '';
+
+    if (dryRun) {
+      console.log(
+        `[EventReadiness] DRY RUN: Would send breakdown — refunds=${refunds.length} (${refundValue.toFixed(2)} €), new=${newOrders.length} (${newOrderValue.toFixed(2)} €), fulfillment=${fulfillment.length}, test=${tests.length} → ${recipients.length} recipients`
+      );
+      result.skipped = 1;
+      return result;
+    }
+
+    const emailResult = await sendPostWave2BreakdownEmail(recipients, {
+      totalCount: all.length,
+      refundCount: refunds.length,
+      refundValue: `${refundValue.toFixed(2)} €`,
+      newOrderCount: newOrders.length,
+      newOrderValue: `${newOrderValue.toFixed(2)} €`,
+      fulfillmentCount: fulfillment.length,
+      testCount: tests.length,
+      refundsHtml,
+      newOrdersHtml,
+      fulfillmentHtml,
+      testOrdersHtml,
+    });
+
+    if (emailResult.success) {
+      result.sent = 1;
+    } else {
+      result.failed = 1;
+      result.errors.push(emailResult.error || 'Unknown email error');
+    }
+  } catch (error) {
+    result.failed = 1;
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    console.error('[EventReadiness] Error in checkRecentOrderChanges:', error);
   }
 
   return result;

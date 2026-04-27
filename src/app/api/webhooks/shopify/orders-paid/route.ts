@@ -246,6 +246,7 @@ export async function POST(request: NextRequest) {
       [ORDERS_FIELD_IDS.line_items]: JSON.stringify(lineItems),
       [ORDERS_FIELD_IDS.fulfillment_status]: mapFulfillmentStatus(order.fulfillment_status),
       [ORDERS_FIELD_IDS.payment_status]: mapFinancialStatus(order.financial_status),
+      [ORDERS_FIELD_IDS.is_test]: order.test === true,
       [ORDERS_FIELD_IDS.digital_delivered]: false,
       [ORDERS_FIELD_IDS.created_at]: new Date().toISOString(),
       [ORDERS_FIELD_IDS.updated_at]: new Date().toISOString(),

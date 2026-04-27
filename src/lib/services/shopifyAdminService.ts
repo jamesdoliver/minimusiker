@@ -96,6 +96,17 @@ export interface ParsedOrder {
   }>;
 }
 
+// Snapshot of fields the orders/updated webhook mirrors to Airtable —
+// raw GraphQL strings so callers can map them with shared logic.
+export interface OrderSyncSnapshot {
+  gid: string;
+  test: boolean;
+  cancelReason: string | null;
+  displayFinancialStatus: string | null;
+  displayFulfillmentStatus: string | null;
+  totalRefunded: number;
+}
+
 // Revenue stats for an event
 export interface EventRevenueStats {
   eventId: string;
@@ -432,6 +443,90 @@ class ShopifyAdminService {
         productType: node.variant?.product.productType,
       })),
     };
+  }
+
+  /**
+   * Fetch the `test` flag for many orders in a single GraphQL request.
+   * Returns a Map of admin_graphql_api_id → test boolean. IDs that don't resolve
+   * (deleted orders, wrong type) are omitted. Caller is responsible for chunking
+   * when the input list exceeds Shopify's bulk node limit.
+   */
+  async getOrdersTestFlags(ids: string[]): Promise<Map<string, boolean>> {
+    const result = new Map<string, boolean>();
+    if (ids.length === 0) return result;
+
+    const graphqlQuery = `
+      query GetOrdersTestFlags($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          ... on Order {
+            id
+            test
+          }
+        }
+      }
+    `;
+
+    const data = await this.query<{
+      nodes: Array<{ id: string; test: boolean } | null>;
+    }>(graphqlQuery, { ids });
+
+    for (const node of data.nodes) {
+      if (node && node.id) {
+        result.set(node.id, node.test === true);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Fetch the canonical sync snapshot for many orders — the fields the
+   * orders/updated webhook would mirror to Airtable. Returns Map of GID →
+   * snapshot. IDs that don't resolve are omitted. Caller chunks input.
+   */
+  async getOrdersSyncSnapshot(ids: string[]): Promise<Map<string, OrderSyncSnapshot>> {
+    const result = new Map<string, OrderSyncSnapshot>();
+    if (ids.length === 0) return result;
+
+    const graphqlQuery = `
+      query GetOrdersSyncSnapshot($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          ... on Order {
+            id
+            test
+            cancelReason
+            displayFinancialStatus
+            displayFulfillmentStatus
+            totalRefundedSet { shopMoney { amount } }
+          }
+        }
+      }
+    `;
+
+    const data = await this.query<{
+      nodes: Array<{
+        id: string;
+        test: boolean;
+        cancelReason: string | null;
+        displayFinancialStatus: string | null;
+        displayFulfillmentStatus: string | null;
+        totalRefundedSet: { shopMoney: { amount: string } } | null;
+      } | null>;
+    }>(graphqlQuery, { ids });
+
+    for (const node of data.nodes) {
+      if (!node || !node.id) continue;
+      result.set(node.id, {
+        gid: node.id,
+        test: node.test === true,
+        cancelReason: node.cancelReason,
+        displayFinancialStatus: node.displayFinancialStatus,
+        displayFulfillmentStatus: node.displayFulfillmentStatus,
+        totalRefunded: parseFloat(node.totalRefundedSet?.shopMoney?.amount || '0'),
+      });
+    }
+
+    return result;
   }
 
   /**

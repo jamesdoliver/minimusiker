@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkNoStaffAssigned, checkClassesAndSongs, checkBookingsWithoutEvent, checkPostWave2Orders, checkStaffEventReminder } from '@/lib/services/eventReadinessService';
+import { checkNoStaffAssigned, checkClassesAndSongs, checkBookingsWithoutEvent, checkPostWave2Orders, checkRecentOrderChanges, checkStaffEventReminder } from '@/lib/services/eventReadinessService';
 import { checkDataIntegrityFlags } from '@/lib/services/dataIntegrityService';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +31,7 @@ interface CronResult {
   staffReminder?: { sent: number; skipped: number; failed: number; errors: string[] };
   classesAndSongs?: { sent: number; skipped: number; failed: number; errors: string[] };
   postWave2Orders?: { sent: number; skipped: number; failed: number; errors: string[] };
+  recentOrderChanges?: { sent: number; skipped: number; failed: number; errors: string[] };
   dataIntegrity?: { sent: number; skipped: number; failed: number; errors: string[]; invalidCount?: number };
   weeklySkipped?: boolean;
 }
@@ -62,6 +63,7 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
   const isMonday = new Date().getDay() === 1;
   let classesAndSongsResult = null;
   let postWave2OrdersResult = null;
+  let recentOrderChangesResult = null;
   let dataIntegrityResult = null;
 
   if (isMonday || forceWeekly) {
@@ -70,6 +72,9 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
 
     postWave2OrdersResult = await checkPostWave2Orders(isDryRun);
     console.log('[Event Readiness Cron] Post-Wave 2 orders check:', postWave2OrdersResult);
+
+    recentOrderChangesResult = await checkRecentOrderChanges(isDryRun);
+    console.log('[Event Readiness Cron] Recent order changes check:', recentOrderChangesResult);
 
     dataIntegrityResult = await checkDataIntegrityFlags(isDryRun);
     console.log('[Event Readiness Cron] Data integrity check:', dataIntegrityResult);
@@ -84,6 +89,7 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
     staffReminder: staffReminderResult,
     classesAndSongs: classesAndSongsResult || undefined,
     postWave2Orders: postWave2OrdersResult || undefined,
+    recentOrderChanges: recentOrderChangesResult || undefined,
     dataIntegrity: dataIntegrityResult || undefined,
     weeklySkipped: !isMonday && !forceWeekly,
   });

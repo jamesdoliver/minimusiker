@@ -143,19 +143,22 @@ async function syncOrderStatus(order: ShopifyWebhookOrder): Promise<boolean> {
   const rawRefundAmount = parseFloat(order.total_price) - parseFloat(order.current_total_price);
   const newRefundAmount = isNaN(rawRefundAmount) ? 0 : Math.max(0, rawRefundAmount);
   const newCancelReason = order.cancel_reason || '';
+  const newIsTest = order.test === true;
 
   // Read existing values
   const existingPaymentStatus = existingFields[ORDERS_FIELD_IDS.payment_status];
   const existingFulfillmentStatus = existingFields[ORDERS_FIELD_IDS.fulfillment_status];
   const existingRefundAmount = existingFields[ORDERS_FIELD_IDS.refund_amount] || 0;
   const existingCancelReason = existingFields[ORDERS_FIELD_IDS.cancel_reason] || '';
+  const existingIsTest = existingFields[ORDERS_FIELD_IDS.is_test] === true;
 
   // Check if anything changed
   const hasChanges =
     newPaymentStatus !== existingPaymentStatus ||
     newFulfillmentStatus !== existingFulfillmentStatus ||
     Math.abs(newRefundAmount - existingRefundAmount) > 0.001 ||
-    newCancelReason !== existingCancelReason;
+    newCancelReason !== existingCancelReason ||
+    newIsTest !== existingIsTest;
 
   if (!hasChanges) {
     return false;
@@ -166,6 +169,7 @@ async function syncOrderStatus(order: ShopifyWebhookOrder): Promise<boolean> {
     fulfillmentStatus: `${existingFulfillmentStatus} → ${newFulfillmentStatus}`,
     refundAmount: `${existingRefundAmount} → ${newRefundAmount}`,
     cancelReason: existingCancelReason !== newCancelReason ? `${existingCancelReason} → ${newCancelReason}` : 'unchanged',
+    isTest: existingIsTest !== newIsTest ? `${existingIsTest} → ${newIsTest}` : 'unchanged',
   });
 
   // Build update fields — always write cancel_reason so it can be cleared
@@ -174,6 +178,7 @@ async function syncOrderStatus(order: ShopifyWebhookOrder): Promise<boolean> {
     [ORDERS_FIELD_IDS.fulfillment_status]: newFulfillmentStatus,
     [ORDERS_FIELD_IDS.refund_amount]: newRefundAmount,
     [ORDERS_FIELD_IDS.cancel_reason]: newCancelReason,
+    [ORDERS_FIELD_IDS.is_test]: newIsTest,
     [ORDERS_FIELD_IDS.updated_at]: new Date().toISOString(),
   };
 

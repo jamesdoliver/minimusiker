@@ -428,6 +428,7 @@ export interface MinimusikanRepresentative {
 // Class detail within an event for the detail page
 export interface EventClassDetail {
   classId: string;
+  classRecordId?: string;  // Airtable record ID — distinguishes duplicate-classId records
   className: string;
   classType?: string;  // 'regular' | 'choir' | 'teacher_song'
   mainTeacher?: string;
@@ -673,14 +674,15 @@ export const ORDERS_FIELD_IDS = {
   tax_amount: 'fldbImGVnC7SvMPyn',         // Tax charged
   shipping_amount: 'fldRENpTADdrTSf2p',    // Shipping charged
   line_items: 'fld9iRwg7rV6nMWrN',         // JSON array of products
-  fulfillment_status: 'fldAipl3jqPM46q5y', // pending, fulfilled, partial, restocked
-  payment_status: 'fld1zfZ9ouEPJv8ju',     // pending, paid, refunded, voided
+  fulfillment_status: 'fldAipl3jqPM46q5y', // pending, fulfilled, partial
+  payment_status: 'fld1zfZ9ouEPJv8ju',     // pending, paid, refunded, partially_refunded, voided
   digital_delivered: 'fldj92CkKEXZutMsS',  // Has digital content been delivered?
   created_at: 'fldfmBl2c5pJ6zxL4',         // Record creation timestamp
   updated_at: 'fldXyxRPkMSztS8Ff',         // Last update timestamp
   refund_amount: 'flddqjKgaydkFL5HG',      // Amount refunded (EUR)
   cancel_reason: 'fld768qHuCqNujx8c',      // Shopify cancel reason
   shipment_wave: 'fldW8dHkHV4lB8YW0',
+  is_test: 'fldX58K3ahfzF1Tu2',            // Checkbox — true if Shopify order.test === true
 } as const;
 
 // SchulClothingOrders Table — SCS t-shirt size tracking (one order per event)

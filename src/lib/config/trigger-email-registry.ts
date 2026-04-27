@@ -1099,6 +1099,52 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     availableVariables: ['orderCount', 'eventCount', 'totalValue', 'ordersTableHtml'],
   },
 
+  // ─── Post-Wave 2 Weekly Breakdown (Admin Weekly) ───────────────────
+  {
+    slug: 'post_wave2_breakdown',
+    name: 'CRON: Wöchentliche Bestellübersicht (Admin)',
+    description: 'Läuft jeden Montag um 7 Uhr nach dem Nachzügler-Digest. Kategorisiert die Bestellungen, die in den letzten 7 Tagen erstellt oder aktualisiert wurden (Erstattungen, Test-Bestellungen, Versand-Updates, Neubestellungen).',
+    recipientType: 'admin',
+    triggerEventKey: 'cron:post_wave2_breakdown',
+    defaultSubject: 'Bestell-Übersicht der Woche — {{totalCount}} Änderungen ({{refundCount}} Erstattungen, {{newOrderCount}} neu)',
+    defaultBodyHtml: `<h2 style="margin: 0 0 24px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Bestell-Übersicht der Woche
+</h2>
+
+<p style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  In den letzten 7 Tagen wurden <strong>{{totalCount}} Bestellungen</strong> erstellt oder aktualisiert. Aufgeschlüsselt:
+</p>
+
+<ul style="margin: 0 0 24px 0; padding-left: 20px; color: #4a5568; font-size: 16px; line-height: 1.8;">
+  <li><strong>{{refundCount}}</strong> Erstattungen / Teilerstattungen ({{refundValue}} erstattet)</li>
+  <li><strong>{{newOrderCount}}</strong> neue Bestellungen ({{newOrderValue}})</li>
+  <li><strong>{{fulfillmentCount}}</strong> Versand-Updates an älteren Bestellungen</li>
+  <li><strong>{{testCount}}</strong> Test-Bestellungen markiert</li>
+</ul>
+
+{{refundsHtml}}
+{{newOrdersHtml}}
+{{fulfillmentHtml}}
+{{testOrdersHtml}}
+
+<p style="margin: 24px 0 0 0; color: #718096; font-size: 14px; line-height: 1.6;">
+  Die Welle-2-Nachzügler-Liste wird separat per E-Mail versendet.
+</p>`,
+    availableVariables: [
+      'totalCount',
+      'refundCount',
+      'refundValue',
+      'newOrderCount',
+      'newOrderValue',
+      'fulfillmentCount',
+      'testCount',
+      'refundsHtml',
+      'newOrdersHtml',
+      'fulfillmentHtml',
+      'testOrdersHtml',
+    ],
+  },
+
   // ─── Tracklist Confirmation Reminder ────────────────────────────────
   {
     slug: 'tracklist_confirmation_reminder',
