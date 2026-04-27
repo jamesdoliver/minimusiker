@@ -775,8 +775,8 @@ class TeacherService {
         event_id: data.eventId,
         title: data.title,
         artist: data.artist,
-        public_notes: data.publicNotes,
-        internal_notes: data.internalNotes,
+        [SONGS_FIELD_IDS.public_notes]: data.publicNotes,
+        [SONGS_FIELD_IDS.internal_notes]: data.internalNotes,
         order: order,
         created_by: data.createdBy,
         created_at: new Date().toISOString(),
@@ -834,8 +834,8 @@ class TeacherService {
       const updateData: any = {};
       if (data.title !== undefined) updateData.title = data.title;
       if (data.artist !== undefined) updateData.artist = data.artist;
-      if (data.publicNotes !== undefined) updateData.public_notes = data.publicNotes;
-      if (data.internalNotes !== undefined) updateData.internal_notes = data.internalNotes;
+      if (data.publicNotes !== undefined) updateData[SONGS_FIELD_IDS.public_notes] = data.publicNotes;
+      if (data.internalNotes !== undefined) updateData[SONGS_FIELD_IDS.internal_notes] = data.internalNotes;
       if (data.order !== undefined) updateData.order = data.order;
 
       const record = await this.base(SONGS_TABLE).update(songId, updateData);
