@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import Link from 'next/link';
 import { cn, formatDate } from '@/lib/utils';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -46,40 +46,40 @@ export default function EventDetailPage({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchEventData() {
-      try {
-        setIsLoading(true);
-        setError(null);
+  const fetchEventData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
 
-        const res = await fetch(`/api/admin/tasks/events/${eventId}`, {
-          credentials: 'include',
-        });
+      const res = await fetch(`/api/admin/tasks/events/${eventId}`, {
+        credentials: 'include',
+      });
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(
-            errData.error || `Failed to load event (${res.status})`
-          );
-        }
-
-        const json = await res.json();
-
-        if (!json.success) {
-          throw new Error(json.error || 'Failed to load event data');
-        }
-
-        setData(json.data);
-      } catch (err) {
-        console.error('Error fetching event detail:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load event');
-      } finally {
-        setIsLoading(false);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(
+          errData.error || `Failed to load event (${res.status})`
+        );
       }
-    }
 
-    fetchEventData();
+      const json = await res.json();
+
+      if (!json.success) {
+        throw new Error(json.error || 'Failed to load event data');
+      }
+
+      setData(json.data);
+    } catch (err) {
+      console.error('Error fetching event detail:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load event');
+    } finally {
+      setIsLoading(false);
+    }
   }, [eventId]);
+
+  useEffect(() => {
+    fetchEventData();
+  }, [fetchEventData]);
 
   // ---------------------------------------------------------------------------
   // Loading state
@@ -205,7 +205,11 @@ export default function EventDetailPage({
       {/* ----------------------------------------------------------------- */}
       {/* Section 2 — Timeline                                               */}
       {/* ----------------------------------------------------------------- */}
-      <EventDetailTimeline tasks={tasks} eventDate={event.eventDate} />
+      <EventDetailTimeline
+        tasks={tasks}
+        eventDate={event.eventDate}
+        onTaskRefresh={fetchEventData}
+      />
 
       {/* ----------------------------------------------------------------- */}
       {/* Section 3 — Welle Breakdown                                        */}
