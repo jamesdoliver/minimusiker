@@ -1,5 +1,15 @@
 /**
- * Shared input validators for API route handlers.
+ * API-layer validation helpers — guards designed to validate untrusted query
+ * or body params before they're interpolated into formulas, used in branching
+ * logic, or persisted.
+ *
+ * Distinct from:
+ * - `@/lib/utils/validators` — pure ID/string format validators (e.g. event ID,
+ *   class ID) that don't model an API boundary.
+ * - `@/lib/validators/*` — domain-specific multi-field validation (e.g.
+ *   registration form rules).
+ *
+ * Add new helpers here when they handle untrusted input at an API boundary.
  *
  * Pure module — no Next.js or service imports. Safe to use anywhere on the
  * server (route handlers, services, jobs) and trivial to unit-test.

@@ -80,10 +80,12 @@ export async function GET(request: NextRequest) {
     const rawStatus = searchParams.get('status');
     const status = rawStatus && rawStatus.length > 0 ? rawStatus : null;
     if (status !== null && !isValidPaymentStatus(status)) {
+      // NOTE: This route's other error responses still use the legacy `{ error }` shape.
+      // Phase 3 Task 3.4 normalizes admin response shapes to `{ success, error?, data? }`.
       return NextResponse.json(
         {
           success: false,
-          error: `Invalid status. Expected one of: ${VALID_PAYMENT_STATUSES.join(', ')}.`,
+          error: `Invalid status. Expected one of: ${VALID_PAYMENT_STATUSES.join(', ')}. Omit the parameter to skip filtering.`,
         },
         { status: 400 },
       );
