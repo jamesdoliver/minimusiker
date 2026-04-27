@@ -104,7 +104,7 @@ export default function EventDetailPage({
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
           <p className="text-red-600">Error: {error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => fetchEventData()}
             className="mt-2 text-sm text-red-700 underline hover:no-underline"
           >
             Try again

@@ -11,7 +11,7 @@ interface CdProductionCompletionProps {
 
 export default function CdProductionCompletion({
   taskId,
-  eventId,
+  eventId: _eventId,
   onComplete,
 }: CdProductionCompletionProps) {
   const [quantity, setQuantity] = useState<number | null>(null);
@@ -26,7 +26,9 @@ export default function CdProductionCompletion({
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/admin/tasks/${taskId}/cd-quantity`);
+        const response = await fetch(`/api/admin/tasks/${taskId}/cd-quantity`, {
+          credentials: 'include',
+        });
         const data = await response.json();
 
         if (!data.success) {
@@ -51,6 +53,7 @@ export default function CdProductionCompletion({
     try {
       const response = await fetch(`/api/admin/tasks/${taskId}`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           completion_data: { quantity_confirmed: true },
