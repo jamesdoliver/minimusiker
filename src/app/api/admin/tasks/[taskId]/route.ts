@@ -5,6 +5,24 @@ import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 
 export const dynamic = 'force-dynamic';
 
+const VALID_STATUS_OVERRIDES = ['cancelled', 'skipped', 'partial', 'pending'] as const;
+type ValidStatusOverride = typeof VALID_STATUS_OVERRIDES[number];
+
+/**
+ * Pure helper exported for unit testing. Returns true when `status` is one of
+ * the explicit override values handled by the PATCH branches, or undefined
+ * (which routes to the default completion path). Anything else must be
+ * rejected so unknown/typo'd values don't silently complete a task.
+ *
+ * Note: this is exported from a Next.js route file. Next.js only serves the
+ * HTTP method exports (GET/PATCH/etc); arbitrary additional exports are
+ * permitted and not exposed as endpoints.
+ */
+export function isValidStatusOverride(status: unknown): boolean {
+  if (status === undefined) return true;
+  return VALID_STATUS_OVERRIDES.includes(status as ValidStatusOverride);
+}
+
 /**
  * GET /api/admin/tasks/[taskId]
  * Get a single task with full details
@@ -67,6 +85,16 @@ export async function PATCH(
 
     const { taskId } = await params;
     const body = await request.json();
+
+    if (!isValidStatusOverride(body.status)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid status. Expected one of: ${VALID_STATUS_OVERRIDES.join(', ')} or omit for completion.`,
+        },
+        { status: 400 },
+      );
+    }
 
     const adminEmail = admin.email;
 
