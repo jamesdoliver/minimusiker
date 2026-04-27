@@ -19,8 +19,15 @@ import {
   ShopifyOrderLineItem,
 } from '@/lib/types/airtable';
 import { resolveEventRecordId } from '@/lib/services/ordersHelper';
+import { createWhitelistGuard } from '@/lib/api/validators';
 
 export const dynamic = 'force-dynamic';
+
+// Whitelist of payment_status values accepted by the `status` query param.
+// Anything outside this list is rejected with a 400 — see GET handler — to
+// prevent formula injection into the Airtable filterByFormula string.
+const VALID_PAYMENT_STATUSES = ['paid', 'pending', 'refunded', 'authorized', 'voided'] as const;
+const isValidPaymentStatus = createWhitelistGuard(VALID_PAYMENT_STATUSES);
 
 interface OrderRecord {
   id: string;
@@ -66,7 +73,21 @@ export async function GET(request: NextRequest) {
     // Parse query params
     const { searchParams } = new URL(request.url);
     const eventId = searchParams.get('eventId');
-    const status = searchParams.get('status');
+    // Treat empty string as "not provided" to keep backward compat with clients
+    // that always send `?status=` even when no filter is desired. Any non-empty
+    // string must be in the whitelist, otherwise we 400 — never silently drop
+    // a value the caller asked us to filter on.
+    const rawStatus = searchParams.get('status');
+    const status = rawStatus && rawStatus.length > 0 ? rawStatus : null;
+    if (status !== null && !isValidPaymentStatus(status)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Invalid status. Expected one of: ${VALID_PAYMENT_STATUSES.join(', ')}.`,
+        },
+        { status: 400 },
+      );
+    }
     const limit = parseInt(searchParams.get('limit') || '100', 10);
 
     // If filtering by event, look up Event record ID first
