@@ -4,13 +4,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import TaskMatrix from '@/components/admin/tasks/TaskMatrix';
 import TaskDateView from '@/components/admin/tasks/TaskDateView';
-import TaskCompletionModal from '@/components/admin/tasks/TaskCompletionModal';
 import CompletedTasksView from '@/components/admin/tasks/CompletedTasksView';
 import TaskSearchBar from '@/components/admin/tasks/TaskSearchBar';
 import IncomingOrdersView from '@/components/admin/tasks/IncomingOrdersView';
 import {
   TaskWithEventDetails,
-  TaskCompletionData,
   TaskMatrixRow,
 } from '@/lib/types/tasks';
 
@@ -41,9 +39,6 @@ export default function AdminTasks() {
 
   // Shared
   const [error, setError] = useState<string | null>(null);
-  const [selectedTask, setSelectedTask] =
-    useState<TaskWithEventDetails | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Fetch: Matrix rows (by-event view)
@@ -182,31 +177,6 @@ export default function AdminTasks() {
       fetchMatrixRows();
     }
     // by-date view self-fetches; incoming/completed have their own refresh
-  };
-
-  const handleCompleteClick = (task: TaskWithEventDetails) => {
-    setSelectedTask(task);
-    setIsModalOpen(true);
-  };
-
-  const handleCompleteTask = async (
-    taskId: string,
-    data: TaskCompletionData
-  ) => {
-    const response = await fetch(`/api/admin/tasks/${taskId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ completion_data: data }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to complete task');
-    }
-
-    // Refresh matrix data after completion
-    await fetchMatrixRows();
   };
 
   const handleSearch = (query: string) => {
@@ -469,18 +439,6 @@ export default function AdminTasks() {
         </div>
       )}
 
-      {/* Completion Modal */}
-      {selectedTask && (
-        <TaskCompletionModal
-          task={selectedTask}
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false);
-            setSelectedTask(null);
-          }}
-          onComplete={handleCompleteTask}
-        />
-      )}
     </div>
   );
 }
