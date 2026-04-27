@@ -8,13 +8,18 @@ import Airtable from 'airtable';
 
 export const dynamic = 'force-dynamic';
 
-// Helper to get class info including eventRecordId
-async function getClassInfo(classId: string): Promise<{ className: string; eventRecordId: string | null } | null> {
+// Helper to get class info including eventRecordId. Accepts either a record ID (rec*)
+// or a class_id text slug.
+async function getClassInfo(idOrText: string): Promise<{ className: string; eventRecordId: string | null } | null> {
   try {
     const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID!);
+    const isRecordId = /^rec[A-Za-z0-9]{14,17}$/.test(idOrText);
+    const filter = isRecordId
+      ? `RECORD_ID() = '${idOrText}'`
+      : `{${CLASSES_FIELD_IDS.class_id}} = '${idOrText.replace(/'/g, "\\'")}'`;
     const records = await base(CLASSES_TABLE_ID)
       .select({
-        filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId}'`,
+        filterByFormula: filter,
         maxRecords: 1,
       })
       .firstPage();
@@ -90,6 +95,16 @@ export async function PUT(
     });
   } catch (error) {
     console.error('Error updating class (admin):', error);
+    if (error instanceof Error && error.message === 'AMBIGUOUS_CLASS_ID') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Multiple classes share this ID — pass the Airtable record ID to disambiguate.',
+          code: 'AMBIGUOUS_CLASS_ID',
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       {
         success: false,
@@ -170,6 +185,17 @@ export async function DELETE(
           registrationCount: typedError.registrationCount || 0,
         },
         { status: 400 }
+      );
+    }
+
+    if (error instanceof Error && error.message === 'AMBIGUOUS_CLASS_ID') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Multiple classes share this ID — pass the Airtable record ID to disambiguate.',
+          code: 'AMBIGUOUS_CLASS_ID',
+        },
+        { status: 409 }
       );
     }
 

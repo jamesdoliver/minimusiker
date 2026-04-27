@@ -2491,6 +2491,7 @@ class AirtableService {
 
           classes.push({
             classId,
+            classRecordId: classRecord.id,
             className,
             classType,
             mainTeacher: classMainTeacher,

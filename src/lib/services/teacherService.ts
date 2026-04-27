@@ -1659,6 +1659,21 @@ class TeacherService {
         console.warn('createClass: Missing schoolName or bookingDate, using fallback class_id format');
       }
 
+      // generateClassId is deterministic over (schoolName, bookingDate, className), so two
+      // classes with the same name on one event produce the same class_id text. That collision
+      // is what corrupted Grundschule Südstadt's Klasse 2c — we now force a unique slug.
+      const collisions = await this.base(CLASSES_TABLE_ID)
+        .select({
+          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
+          maxRecords: 5,
+        })
+        .firstPage();
+      if (collisions.length > 0) {
+        const suffix = Math.random().toString(36).slice(2, 6);
+        classId = `${classId}_${suffix}`;
+        console.warn(`createClass: class_id collision detected, suffixing to ${classId}`);
+      }
+
       // Create Class record in normalized Classes table
       const classFields: Airtable.FieldSet = {
         [CLASSES_FIELD_IDS.class_id]: classId,
@@ -1843,36 +1858,58 @@ class TeacherService {
   }
 
   /**
-   * Update a class
+   * Resolve a class identifier (Airtable record ID OR class_id text) to a single record.
+   * Throws AMBIGUOUS_CLASS_ID if a text classId matches multiple records — caller must
+   * pass the record ID explicitly to disambiguate. Record IDs (rec*) always resolve uniquely.
+   */
+  private async resolveClassRecord(
+    idOrText: string,
+  ): Promise<Airtable.Record<Airtable.FieldSet>> {
+    const isRecordId = /^rec[A-Za-z0-9]{14,17}$/.test(idOrText);
+    const filter = isRecordId
+      ? `RECORD_ID() = '${idOrText}'`
+      : `{${CLASSES_FIELD_IDS.class_id}} = '${idOrText.replace(/'/g, "\\'")}'`;
+    const records = await this.base(CLASSES_TABLE_ID)
+      .select({
+        filterByFormula: filter,
+        maxRecords: isRecordId ? 1 : 10,
+        returnFieldsByFieldId: true,
+      })
+      .firstPage();
+
+    if (records.length === 0) {
+      throw new Error('Class not found');
+    }
+    if (!isRecordId && records.length > 1) {
+      const err = new Error('AMBIGUOUS_CLASS_ID') as Error & { recordIds?: string[] };
+      err.recordIds = records.map(r => r.id);
+      throw err;
+    }
+    return records[0];
+  }
+
+  /**
+   * Update a class — accepts either a class record ID (rec*) or a class_id text slug.
    */
   async updateClass(
-    classId: string,
+    idOrText: string,
     data: {
       className?: string;
       numChildren?: number;
     }
   ): Promise<void> {
     try {
-      // Find the class record in Classes table
-      const classRecords = await this.base(CLASSES_TABLE_ID)
-        .select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
-          maxRecords: 1,
-        })
-        .firstPage();
+      const classRecord = await this.resolveClassRecord(idOrText);
 
-      if (classRecords.length === 0) {
-        throw new Error('Class not found');
-      }
-
-      // Build updates for Classes table
       const updates: Airtable.FieldSet = {};
       if (data.className !== undefined) updates[CLASSES_FIELD_IDS.class_name] = data.className;
       if (data.numChildren !== undefined) updates[CLASSES_FIELD_IDS.total_children] = data.numChildren;
 
-      // Update the Classes table record
-      await this.base(CLASSES_TABLE_ID).update(classRecords[0].id, updates);
+      await this.base(CLASSES_TABLE_ID).update(classRecord.id, updates);
     } catch (error) {
+      if (error instanceof Error && error.message === 'AMBIGUOUS_CLASS_ID') {
+        throw error;
+      }
       console.error('Error updating class:', error);
       throw new Error(`Failed to update class: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -1913,42 +1950,37 @@ class TeacherService {
   }
 
   /**
-   * Delete a class
+   * Delete a class — accepts either a class record ID (rec*) or a class_id text slug.
    * - Cannot delete the default "Alle Kinder" class
-   * - If songs or registrations exist and confirmMove is false, throws DATA_ATTACHED error with counts
-   * - If confirmMove is true, moves all data to "Alle Kinder" before deleting
+   * - Throws AMBIGUOUS_CLASS_ID if a text classId matches multiple records (caller must pass the record ID)
+   * - If songs or registrations exist and confirmMove is false, throws DATA_ATTACHED with counts
+   * - If confirmMove is true, moves the THIS-record-only data to "Alle Kinder" before deleting
+   *   (data on other records that share the same class_id text is left untouched)
    */
-  async deleteClass(classId: string, options?: { confirmMove?: boolean }): Promise<void> {
+  async deleteClass(idOrText: string, options?: { confirmMove?: boolean }): Promise<void> {
     try {
-      // Find the class record in Classes table
-      const classRecords = await this.base(CLASSES_TABLE_ID)
-        .select({
-          filterByFormula: `{${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}'`,
-          maxRecords: 1,
-          returnFieldsByFieldId: true,
-        })
-        .firstPage();
-
-      if (classRecords.length === 0) {
-        throw new Error('Class not found');
-      }
-
-      const classRecord = classRecords[0];
+      const classRecord = await this.resolveClassRecord(idOrText);
       const classRecordId = classRecord.id;
       const classFields = classRecord.fields as Record<string, unknown>;
+      const classIdText = classFields[CLASSES_FIELD_IDS.class_id] as string;
 
-      // Check if this is a default class (cannot be deleted)
       const isDefault = Boolean(classFields[CLASSES_FIELD_IDS.is_default]);
       const className = classFields[CLASSES_FIELD_IDS.class_name] as string;
       if (isDefault || className === 'Alle Kinder') {
         throw new Error('Die Standardklasse kann nicht gelöscht werden. Eltern können sich hier registrieren, bevor Sie Klassen einrichten.');
       }
 
-      // Check what data needs to be moved
-      const songs = await this.getSongsByClassId(classId);
-      const registrations = await this.getRegistrationsForClass(classRecordId, classId);
+      // Songs scoped to THIS class record (not all records that share the class_id text)
+      const songs = await this.getSongsForClassRecord(classRecordId, classIdText);
 
-      // If data exists and no confirmation, throw error with counts for frontend dialog
+      // Registrations from the class's reverse-link — exact, no formula needed
+      const linkedRegistrationIds =
+        (classFields[CLASSES_FIELD_IDS.registrations] as string[] | undefined) || [];
+      const registrations = linkedRegistrationIds.map(id => ({
+        id,
+        table: 'normalized' as const,
+      }));
+
       if ((songs.length > 0 || registrations.length > 0) && !options?.confirmMove) {
         const error = new Error('DATA_ATTACHED') as Error & { songCount: number; registrationCount: number };
         error.songCount = songs.length;
@@ -1956,36 +1988,61 @@ class TeacherService {
         throw error;
       }
 
-      // Move data to "Alle Kinder" before deleting (if confirmed)
       if (songs.length > 0 || registrations.length > 0) {
-        // Get the event record ID from the class
         const eventRecordId = await this.getEventRecordIdForClass(classRecordId);
-
-        // Get or create the default class for this event
         const defaultClass = await this.getOrCreateDefaultClassForEvent(eventRecordId);
 
-        // Move songs to default class
         if (songs.length > 0) {
           await this.moveSongsToClass(songs, defaultClass.recordId, defaultClass.classId);
-          console.log(`Moved ${songs.length} songs from ${classId} to ${defaultClass.classId}`);
+          console.log(`Moved ${songs.length} songs from ${classRecordId} to ${defaultClass.classId}`);
         }
 
-        // Move registrations to default class
         if (registrations.length > 0) {
           await this.moveRegistrationsToClass(registrations, defaultClass.recordId, defaultClass.classId);
-          console.log(`Moved ${registrations.length} registrations from ${classId} to ${defaultClass.classId}`);
+          console.log(`Moved ${registrations.length} registrations from ${classRecordId} to ${defaultClass.classId}`);
         }
       }
 
-      // Delete the class from Classes table
       await this.base(CLASSES_TABLE_ID).destroy(classRecordId);
     } catch (error) {
-      // Re-throw DATA_ATTACHED errors as-is (they're expected)
-      if (error instanceof Error && error.message === 'DATA_ATTACHED') {
+      if (error instanceof Error && (error.message === 'DATA_ATTACHED' || error.message === 'AMBIGUOUS_CLASS_ID')) {
         throw error;
       }
       console.error('Error deleting class:', error);
       throw new Error(`Failed to delete class: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get songs that are linked specifically to a Class record (not just sharing the same class_id text).
+   * Falls back to the text-only filter if the song lacks a class_link, since older songs
+   * may only have the text class_id set.
+   */
+  private async getSongsForClassRecord(classRecordId: string, classIdText: string): Promise<Song[]> {
+    if (!this.useNormalizedTables()) {
+      return this.getSongsByClassId(classIdText);
+    }
+    this.ensureNormalizedTablesInitialized();
+    try {
+      // Pull all songs that share the class_id text, then filter to those whose class_link
+      // points specifically at THIS record. Songs without a class_link still match (legacy).
+      const records = await this.base(SONGS_TABLE)
+        .select({
+          filterByFormula: `{class_id} = '${classIdText.replace(/'/g, "\\'")}'`,
+          sort: [{ field: 'order', direction: 'asc' }],
+        })
+        .all();
+      const filtered = records.filter(record => {
+        const link = (record.fields as Record<string, unknown>)[SONGS_LINKED_FIELD_IDS.class_link] as
+          | string[]
+          | undefined;
+        if (!link || link.length === 0) return true;
+        return link.includes(classRecordId);
+      });
+      return filtered.map(record => this.transformSongRecord(record));
+    } catch (error) {
+      console.error('Error getting songs for class record:', error);
+      return [];
     }
   }
 

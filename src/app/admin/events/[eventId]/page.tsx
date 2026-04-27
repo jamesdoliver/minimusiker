@@ -607,8 +607,9 @@ export default function EventDetailPage() {
   };
 
   const handleEditClass = (cls: any) => {
+    // Prefer the Airtable record ID so duplicates with the same class_id text don't collide
     setSelectedClass({
-      id: cls.classId,
+      id: cls.classRecordId || cls.classId,
       name: cls.className,
       numChildren: cls.totalChildren,
     });
@@ -618,7 +619,7 @@ export default function EventDetailPage() {
   const handleDeleteClass = (cls: any) => {
     setDeleteTarget({
       type: 'class',
-      id: cls.classId,
+      id: cls.classRecordId || cls.classId,
       name: cls.className,
     });
     setShowDeleteConfirm(true);
@@ -1569,17 +1570,18 @@ export default function EventDetailPage() {
         ) : (
           <div className="space-y-4">
             {regularClasses.map((cls: any) => {
-              const isExpanded = expandedClasses.has(cls.classId);
+              const isExpanded = expandedClasses.has(cls.classRecordId || cls.classId);
               const songs = cls.songs || [];
 
+              const expandKey = cls.classRecordId || cls.classId;
               return (
                 <div
-                  key={cls.classId}
+                  key={expandKey}
                   className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group"
                 >
                   {/* Class Header - Clickable to expand */}
                   <button
-                    onClick={() => toggleClassExpanded(cls.classId)}
+                    onClick={() => toggleClassExpanded(expandKey)}
                     className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-4 flex-1">
