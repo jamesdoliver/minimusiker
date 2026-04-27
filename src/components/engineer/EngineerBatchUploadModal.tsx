@@ -643,9 +643,14 @@ export default function EngineerBatchUploadModal({
             <div className="text-center py-12">
               <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
               <p className="mt-4 text-gray-600">
-                Processing audio {processingProgress.current} of {processingProgress.total}...
+                Konvertierung läuft: Datei {processingProgress.current} von {processingProgress.total}
               </p>
-              <p className="mt-1 text-xs text-gray-500">Encoding MP3 + generating preview snippets</p>
+              <p className="mt-1 text-xs text-gray-500">
+                WAV → MP3 + 30-Sekunden-Vorschau. Pro Datei ca. 5–15 Sekunden.
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Dateien sind hochgeladen, werden aber erst für Lehrer/Eltern sichtbar nach erfolgreicher Konvertierung.
+              </p>
               <div className="mt-4 w-64 mx-auto bg-gray-200 rounded-full h-2">
                 <div
                   className="bg-blue-600 h-2 rounded-full transition-all duration-300"
@@ -653,10 +658,18 @@ export default function EngineerBatchUploadModal({
                 />
               </div>
               {processingProgress.errors.length > 0 && (
-                <div className="mt-4 max-w-md mx-auto text-left">
+                <div className="mt-4 max-w-md mx-auto text-left p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm font-medium text-red-700 mb-2">
+                    Konvertierung für {processingProgress.errors.length} Datei(en) fehlgeschlagen:
+                  </p>
                   {processingProgress.errors.map((err, i) => (
-                    <p key={i} className="text-sm text-red-600">{err}</p>
+                    <p key={i} className="text-xs text-red-600">• {err}</p>
                   ))}
+                  <p className="text-xs text-red-700 mt-2">
+                    Diese Dateien sind im Speicher, aber für Lehrer/Eltern noch nicht sichtbar.
+                    Modal schließen und Dateien einzeln neu hochladen, oder warten — der tägliche
+                    Audit (18:00 Berlin) versucht es automatisch erneut.
+                  </p>
                 </div>
               )}
             </div>

@@ -1,6 +1,7 @@
 import Airtable from 'airtable';
 import crypto from 'crypto';
 import { generateClassId } from '@/lib/utils/eventIdentifiers';
+import { assertReadyEligible } from '@/lib/utils/audioFileInvariants';
 import {
   Teacher,
   Song,
@@ -1222,6 +1223,14 @@ class TeacherService {
       fields.status = data.status ?? 'pending';
       fields.is_schulsong = data.isSchulsong ?? false;
 
+      // Invariant: don't allow creating an AudioFile in 'ready' state if it
+      // would violate the WAV-needs-mp3R2Key rule. mp3R2Key isn't a creation
+      // field, so a fresh 'ready' record from a .wav source is impossible by
+      // design — assert it here so future signature changes can't bypass.
+      if (fields.status === 'ready') {
+        assertReadyEligible({ r2Key: data.r2Key, mp3R2Key: null });
+      }
+
       // If using normalized tables, also populate linked record fields
       if (this.useNormalizedTables()) {
         this.ensureNormalizedTablesInitialized();
@@ -1299,6 +1308,18 @@ class TeacherService {
     }
   ): Promise<AudioFile> {
     try {
+      // Invariant: any update that sets status='ready' must result in a state
+      // where the file is actually playable (mp3 source or mp3R2Key present).
+      // We need the existing record to know fields that aren't being changed.
+      if (data.status === 'ready') {
+        const existing = await this.getAudioFileById(audioFileId);
+        const postUpdate = {
+          r2Key: data.r2Key ?? existing?.r2Key ?? '',
+          mp3R2Key: data.mp3R2Key !== undefined ? data.mp3R2Key : existing?.mp3R2Key,
+        };
+        assertReadyEligible(postUpdate);
+      }
+
       const updateData: Record<string, string | number | boolean | undefined> = {};
       if (data.r2Key !== undefined) updateData.r2_key = data.r2Key;
       if (data.filename !== undefined) updateData.filename = data.filename;
@@ -1549,6 +1570,11 @@ class TeacherService {
     isSchulsong?: boolean;
   }): Promise<AudioFile> {
     try {
+      const status = data.status || 'ready';
+      // Same invariant as createAudioFile — see updateAudioFile docstring.
+      if (status === 'ready') {
+        assertReadyEligible({ r2Key: data.r2Key, mp3R2Key: null });
+      }
       const fields: any = {
         song_id: data.songId,
         class_id: data.classId,
@@ -1560,7 +1586,7 @@ class TeacherService {
         uploaded_at: new Date().toISOString(),
         duration_seconds: data.durationSeconds,
         file_size_bytes: data.fileSizeBytes,
-        status: data.status || 'ready',
+        status,
         [AUDIO_FILES_FIELD_IDS.is_schulsong]: data.isSchulsong || false,
       };
 

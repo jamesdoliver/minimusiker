@@ -122,6 +122,8 @@ export async function GET(
 }
 
 function pickBestFile(candidates: AudioFile[]): AudioFile {
-  const mp3 = candidates.find((f) => f.r2Key.endsWith('.mp3'));
-  return mp3 ?? candidates[0];
+  // Prefer files where the user will actually receive an MP3:
+  // either the source is .mp3, or a converted derivative exists at mp3R2Key.
+  const playable = candidates.find((f) => f.mp3R2Key || f.r2Key.toLowerCase().endsWith('.mp3'));
+  return playable ?? candidates[0];
 }

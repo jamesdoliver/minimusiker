@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/event-readiness",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/audit-mp3r2key",
+      "schedule": "0 16 * * *"
     }
   ],
   "functions": {
@@ -39,6 +43,9 @@
       "maxDuration": 120
     },
     "src/app/api/cron/event-readiness/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/cron/audit-mp3r2key/route.ts": {
       "maxDuration": 300
     },
     "src/app/api/audio/process/route.ts": {

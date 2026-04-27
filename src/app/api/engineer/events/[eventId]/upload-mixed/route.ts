@@ -185,6 +185,12 @@ export async function PUT(
     const existingFiles = await teacherService.getAudioFilesByClassId(classId);
     const existingFile = existingFiles.find((f) => f.type === type && f.r2Key === r2Key);
 
+    // Final uploads need processing (WAV→MP3 + preview snippet) before they're
+    // playable for parents. Mark as 'processing' here; /api/audio/process flips
+    // to 'ready' once mp3R2Key is set. Read endpoints filter status='ready', so
+    // a processing record is invisible to teachers/parents until conversion is done.
+    const initialStatus = type === 'final' ? 'processing' : 'ready';
+
     let audioFile;
     if (existingFile) {
       // Update existing record
@@ -194,7 +200,7 @@ export async function PUT(
         uploadedBy: session.engineerId,
         fileSizeBytes,
         durationSeconds,
-        status: 'ready',
+        status: initialStatus,
         isSchulsong: isSchulsong ?? undefined,
       });
     } else {
@@ -209,7 +215,7 @@ export async function PUT(
         uploadedBy: session.engineerId,
         fileSizeBytes,
         durationSeconds,
-        status: 'ready',
+        status: initialStatus,
         isSchulsong: isSchulsong ?? undefined,
       });
     }

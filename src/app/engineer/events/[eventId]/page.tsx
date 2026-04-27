@@ -36,6 +36,11 @@ interface SongUploadState {
   uploadType: 'preview' | 'final-mp3' | 'final-wav' | null;
   progress: number;
   error: string | null;
+  /** Which step of the pipeline are we in */
+  phase?: 'uploading' | 'processing';
+  /** Set when /api/audio/process failed; allows the UI to offer a retry without
+   * re-uploading the file (it's already in R2). */
+  retryProcessing?: { eventId: string; classId: string; songId?: string; r2Key: string };
 }
 
 export default function EngineerEventDetailPage() {
@@ -204,7 +209,7 @@ export default function EngineerEventDetailPage() {
     const uploadType = type === 'preview' ? 'preview' : (`final-${format}` as 'final-mp3' | 'final-wav');
     setUploadStates((prev) => ({
       ...prev,
-      [stateKey]: { isUploading: true, uploadType, progress: 0, error: null },
+      [stateKey]: { isUploading: true, uploadType, progress: 0, error: null, phase: 'uploading' },
     }));
 
     const contentType = format === 'wav' ? 'audio/wav' : 'audio/mpeg';
@@ -278,6 +283,63 @@ export default function EngineerEventDetailPage() {
         throw new Error('Failed to confirm upload');
       }
 
+      // Step 4: Encode WAV→MP3 + generate preview (only for final uploads).
+      // The AudioFile is in 'processing' status until this succeeds; downloads
+      // filter on status='ready' so it stays invisible to teachers/parents.
+      // If this fails, the cron audit at 18:00 Berlin will auto-heal within a day,
+      // but we also expose a retry button so the engineer can fix it immediately.
+      if (type === 'final') {
+        setUploadStates((prev) => ({
+          ...prev,
+          [stateKey]: { ...prev[stateKey], progress: 85, phase: 'processing' },
+        }));
+        try {
+          const processResponse = await fetch('/api/audio/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              eventId,
+              classId,
+              songId: songId || undefined,
+              r2Key,
+            }),
+          });
+          if (!processResponse.ok) {
+            const detail = await processResponse.json().catch(() => ({}));
+            const message = detail.error || `Konvertierung fehlgeschlagen (${processResponse.status})`;
+            console.error('[upload] /api/audio/process failed:', message);
+            setUploadStates((prev) => ({
+              ...prev,
+              [stateKey]: {
+                isUploading: false,
+                uploadType: null,
+                progress: 70,
+                phase: 'processing',
+                error: `${message} — Datei ist hochgeladen, aber Konvertierung muss noch laufen.`,
+                retryProcessing: { eventId, classId, songId, r2Key },
+              },
+            }));
+            fetchEventDetail();
+            return;
+          }
+        } catch (procErr) {
+          console.error('[upload] /api/audio/process threw:', procErr);
+          setUploadStates((prev) => ({
+            ...prev,
+            [stateKey]: {
+              isUploading: false,
+              uploadType: null,
+              progress: 70,
+              phase: 'processing',
+              error: 'Konvertierung fehlgeschlagen — Datei ist hochgeladen, bitte erneut versuchen.',
+              retryProcessing: { eventId, classId, songId, r2Key },
+            },
+          }));
+          fetchEventDetail();
+          return;
+        }
+      }
+
       setUploadStates((prev) => ({
         ...prev,
         [stateKey]: { isUploading: false, uploadType: null, progress: 100, error: null },
@@ -294,6 +356,44 @@ export default function EngineerEventDetailPage() {
           uploadType: null,
           progress: 0,
           error: err instanceof Error ? err.message : 'Upload failed',
+        },
+      }));
+    }
+  };
+
+  const handleRetryProcessing = async (
+    stateKey: string,
+    payload: { eventId: string; classId: string; songId?: string; r2Key: string }
+  ) => {
+    setUploadStates((prev) => ({
+      ...prev,
+      [stateKey]: { ...prev[stateKey], isUploading: true, progress: 85, phase: 'processing', error: null },
+    }));
+    try {
+      const res = await fetch('/api/audio/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const detail = await res.json().catch(() => ({}));
+        throw new Error(detail.error || `Konvertierung fehlgeschlagen (${res.status})`);
+      }
+      setUploadStates((prev) => ({
+        ...prev,
+        [stateKey]: { isUploading: false, uploadType: null, progress: 100, error: null },
+      }));
+      fetchEventDetail();
+    } catch (err) {
+      setUploadStates((prev) => ({
+        ...prev,
+        [stateKey]: {
+          isUploading: false,
+          uploadType: null,
+          progress: 70,
+          phase: 'processing',
+          error: err instanceof Error ? err.message : 'Konvertierung erneut fehlgeschlagen',
+          retryProcessing: payload,
         },
       }));
     }
@@ -720,6 +820,17 @@ export default function EngineerEventDetailPage() {
                 {uploadStates[event.schulsongClass.classId]?.error && (
                   <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-sm text-red-600">{uploadStates[event.schulsongClass.classId].error}</p>
+                    {uploadStates[event.schulsongClass.classId].retryProcessing && (
+                      <button
+                        onClick={() => handleRetryProcessing(
+                          event.schulsongClass!.classId,
+                          uploadStates[event.schulsongClass!.classId].retryProcessing!
+                        )}
+                        className="mt-2 text-sm font-medium text-purple-700 hover:text-purple-900 underline"
+                      >
+                        Konvertierung erneut versuchen
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -731,7 +842,9 @@ export default function EngineerEventDetailPage() {
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
                       <p className="text-sm text-purple-700">
-                        Uploading {uploadStates[event.schulsongClass.classId].uploadType === 'final-wav' ? 'Final WAV' : 'Final MP3'}...
+                        {uploadStates[event.schulsongClass.classId].phase === 'processing'
+                          ? 'Konvertierung läuft (WAV → MP3 + Vorschau)…'
+                          : `Uploading ${uploadStates[event.schulsongClass.classId].uploadType === 'final-wav' ? 'Final WAV' : 'Final MP3'}…`}
                       </p>
                     </div>
                     <div className="w-full bg-purple-200 rounded-full h-2">
@@ -740,6 +853,11 @@ export default function EngineerEventDetailPage() {
                         style={{ width: `${uploadStates[event.schulsongClass.classId].progress}%` }}
                       />
                     </div>
+                    {uploadStates[event.schulsongClass.classId].phase === 'processing' && (
+                      <p className="text-xs text-purple-600 mt-2">
+                        Datei ist hochgeladen. Bitte warten — die Konvertierung dauert meist 5–15 Sekunden.
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -853,6 +971,7 @@ export default function EngineerEventDetailPage() {
                   uploadStates={uploadStates}
                   onFileSelect={(songId, type, format, e) => handleFileSelect(classView.classId, type, format, e, undefined, songId)}
                   onDeleteFile={setDeletingFile}
+                  onRetryProcessing={(songId, payload) => handleRetryProcessing(songId, payload)}
                   audioPipelineStage={event.audioPipelineStage}
                   processingSongIds={processingSongIds}
                   processedSongIds={processedSongIds}
@@ -1015,6 +1134,7 @@ interface ClassCardProps {
   uploadStates: Record<string, SongUploadState>;
   onFileSelect: (songId: string, type: 'preview' | 'final', format: 'mp3' | 'wav', e: React.ChangeEvent<HTMLInputElement>) => void;
   onDeleteFile: (file: AudioFileWithUrl) => void;
+  onRetryProcessing: (songId: string, payload: { eventId: string; classId: string; songId?: string; r2Key: string }) => void;
   audioPipelineStage?: string;
   processingSongIds: Set<string>;
   processedSongIds: Set<string>;
@@ -1046,6 +1166,7 @@ function ClassCard({
   uploadStates,
   onFileSelect,
   onDeleteFile,
+  onRetryProcessing,
   audioPipelineStage,
   processingSongIds,
   processedSongIds,
@@ -1099,6 +1220,7 @@ function ClassCard({
                 uploadState={uploadStates[song.songId]}
                 onFileSelect={(type, format, e) => onFileSelect(song.songId, type, format, e)}
                 onDeleteFile={onDeleteFile}
+                onRetryProcessing={(payload) => onRetryProcessing(song.songId, payload)}
                 audioPipelineStage={audioPipelineStage}
                 isProcessing={processingSongIds.has(song.songId)}
                 isProcessed={processedSongIds.has(song.songId)}
@@ -1171,6 +1293,7 @@ interface SongRowProps {
   uploadState?: SongUploadState;
   onFileSelect: (type: 'preview' | 'final', format: 'mp3' | 'wav', e: React.ChangeEvent<HTMLInputElement>) => void;
   onDeleteFile: (file: AudioFileWithUrl) => void;
+  onRetryProcessing: (payload: { eventId: string; classId: string; songId?: string; r2Key: string }) => void;
   audioPipelineStage?: string;
   isProcessing?: boolean;
   isProcessed?: boolean;
@@ -1196,6 +1319,7 @@ function SongRow({
   uploadState,
   onFileSelect,
   onDeleteFile,
+  onRetryProcessing,
   audioPipelineStage,
   isProcessing,
   isProcessed,
@@ -1354,6 +1478,14 @@ function SongRow({
       {uploadState?.error && (
         <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-sm text-red-600">{uploadState.error}</p>
+          {uploadState.retryProcessing && (
+            <button
+              onClick={() => onRetryProcessing(uploadState.retryProcessing!)}
+              className="mt-2 text-sm font-medium text-purple-700 hover:text-purple-900 underline"
+            >
+              Konvertierung erneut versuchen
+            </button>
+          )}
         </div>
       )}
 
@@ -1365,7 +1497,9 @@ function SongRow({
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
             <p className="text-sm text-purple-700">
-              Uploading {uploadTypeLabel}...
+              {uploadState.phase === 'processing'
+                ? 'Konvertierung läuft (WAV → MP3 + Vorschau)…'
+                : `Uploading ${uploadTypeLabel}…`}
             </p>
           </div>
           <div className="w-full bg-purple-200 rounded-full h-2">
@@ -1374,6 +1508,11 @@ function SongRow({
               style={{ width: `${uploadState.progress}%` }}
             />
           </div>
+          {uploadState.phase === 'processing' && (
+            <p className="text-xs text-purple-600 mt-2">
+              Datei ist hochgeladen. Bitte warten — die Konvertierung dauert meist 5–15 Sekunden.
+            </p>
+          )}
         </div>
       )}
 

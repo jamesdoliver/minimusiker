@@ -50,6 +50,26 @@ export async function GET(
 
     const r2Service = getR2Service();
 
+    // Read-time guard: refuse to silently serve a raw .wav. If we hit this branch,
+    // either the upload skipped /api/audio/process or it's a legacy file from before
+    // 2026-02-11 — backfill via scripts/backfill-mp3r2key.ts.
+    if (!audioFile.mp3R2Key && audioFile.r2Key.toLowerCase().endsWith('.wav')) {
+      console.error('[teacher audio-downloads] mp3R2Key missing for WAV source', {
+        audioFileId: audioFile.id,
+        r2Key: audioFile.r2Key,
+        eventId,
+        classId: audioFile.classId,
+        songId: audioFile.songId,
+      });
+      return NextResponse.json(
+        {
+          error: 'Audio wird gerade verarbeitet. Bitte in einigen Minuten erneut versuchen.',
+          code: 'mp3_not_ready',
+        },
+        { status: 503 }
+      );
+    }
+
     // Prefer mp3R2Key over r2Key (mp3 is smaller, faster to stream/download)
     const r2Key = audioFile.mp3R2Key || audioFile.r2Key;
 

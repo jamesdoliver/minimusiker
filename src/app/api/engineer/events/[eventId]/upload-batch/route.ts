@@ -222,7 +222,9 @@ export async function PUT(
         continue;
       }
 
-      // Create AudioFile record with meaningful filename
+      // Create AudioFile record with meaningful filename. Status starts as
+      // 'processing' — /api/audio/process flips it to 'ready' once mp3R2Key is
+      // set. The status invariant blocks 'ready' on a WAV without mp3R2Key.
       const audioFile = await teacherService.createSongAudioFile({
         songId,
         classId: song.classId,
@@ -231,7 +233,7 @@ export async function PUT(
         r2Key: finalKey,
         filename: `${displayName}.wav`,
         uploadedBy: session.engineerId,
-        status: 'ready',
+        status: 'processing',
         isSchulsong: isMicha || false,
       });
 

@@ -69,10 +69,17 @@ export async function GET(
       if (!candidates || candidates.length === 0) continue;
 
       const best = pickBestFile(candidates);
-      const extension = best.r2Key.endsWith('.mp3') ? '.mp3' : '.wav';
+      const r2Key = best.mp3R2Key || best.r2Key;
+      const extension = r2Key.toLowerCase().endsWith('.mp3') ? '.mp3' : '.wav';
       const zipName = `${cls.className}${extension}`;
 
-      const buffer = await r2Service.getFileBuffer(best.r2Key);
+      if (!best.mp3R2Key && r2Key.toLowerCase().endsWith('.wav')) {
+        console.error('[staff zip] mp3R2Key missing for WAV — including raw WAV in zip', {
+          audioFileId: best.id, r2Key, eventId, classId: best.classId, songId: best.songId,
+        });
+      }
+
+      const buffer = await r2Service.getFileBuffer(r2Key);
       if (buffer) {
         filesToZip.push({ buffer, zipName });
       }
@@ -80,8 +87,16 @@ export async function GET(
 
     if (schulsongFiles.length > 0) {
       const best = pickBestFile(schulsongFiles);
-      const extension = best.r2Key.endsWith('.mp3') ? '.mp3' : '.wav';
-      const buffer = await r2Service.getFileBuffer(best.r2Key);
+      const r2Key = best.mp3R2Key || best.r2Key;
+      const extension = r2Key.toLowerCase().endsWith('.mp3') ? '.mp3' : '.wav';
+
+      if (!best.mp3R2Key && r2Key.toLowerCase().endsWith('.wav')) {
+        console.error('[staff zip] schulsong mp3R2Key missing for WAV — including raw WAV in zip', {
+          audioFileId: best.id, r2Key, eventId, classId: best.classId,
+        });
+      }
+
+      const buffer = await r2Service.getFileBuffer(r2Key);
       if (buffer) {
         filesToZip.push({ buffer, zipName: `Schulsong${extension}` });
       }
@@ -136,6 +151,6 @@ export async function GET(
 }
 
 function pickBestFile(candidates: AudioFile[]): AudioFile {
-  const mp3 = candidates.find((f) => f.r2Key.endsWith('.mp3'));
-  return mp3 ?? candidates[0];
+  const playable = candidates.find((f) => f.mp3R2Key || f.r2Key.toLowerCase().endsWith('.mp3'));
+  return playable ?? candidates[0];
 }

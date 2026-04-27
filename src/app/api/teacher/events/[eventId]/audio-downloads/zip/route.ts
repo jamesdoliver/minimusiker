@@ -111,6 +111,12 @@ export async function GET(
         const r2Key = audio.mp3R2Key || audio.r2Key;
         if (!r2Key) continue;
 
+        if (!audio.mp3R2Key && r2Key.toLowerCase().endsWith('.wav')) {
+          console.error('[teacher zip] mp3R2Key missing for WAV — including raw WAV in zip', {
+            audioFileId: audio.id, r2Key, eventId, classId: audio.classId, songId: audio.songId,
+          });
+        }
+
         const buffer = await r2Service.getFileBuffer(r2Key);
         if (!buffer) continue;
 
@@ -135,6 +141,12 @@ export async function GET(
           const r2Key = af.mp3R2Key || af.r2Key;
           if (!r2Key) continue;
 
+          if (!af.mp3R2Key && r2Key.toLowerCase().endsWith('.wav')) {
+            console.error('[teacher zip] mp3R2Key missing for WAV — including raw WAV in zip', {
+              audioFileId: af.id, r2Key, eventId, classId: af.classId, songId: af.songId,
+            });
+          }
+
           const buffer = await r2Service.getFileBuffer(r2Key);
           if (!buffer) continue;
 
@@ -157,6 +169,11 @@ export async function GET(
       if (schulsongFile) {
         const r2Key = schulsongFile.mp3R2Key || schulsongFile.r2Key;
         if (r2Key) {
+          if (!schulsongFile.mp3R2Key && r2Key.toLowerCase().endsWith('.wav')) {
+            console.error('[teacher zip] schulsong mp3R2Key missing for WAV — including raw WAV in zip', {
+              audioFileId: schulsongFile.id, r2Key, eventId, classId: schulsongFile.classId,
+            });
+          }
           const buffer = await r2Service.getFileBuffer(r2Key);
           if (buffer) {
             const ext = r2Key.endsWith('.wav') ? '.wav' : '.mp3';

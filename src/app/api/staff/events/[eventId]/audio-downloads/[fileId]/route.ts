@@ -42,10 +42,31 @@ export async function GET(
 
     const r2Service = getR2Service();
 
+    // Read-time guard: refuse to silently serve a raw .wav.
+    if (!audioFile.mp3R2Key && audioFile.r2Key.toLowerCase().endsWith('.wav')) {
+      console.error('[staff audio-downloads] mp3R2Key missing for WAV source', {
+        audioFileId: audioFile.id,
+        r2Key: audioFile.r2Key,
+        eventId,
+        classId: audioFile.classId,
+        songId: audioFile.songId,
+      });
+      return NextResponse.json(
+        {
+          error: 'Audio wird gerade verarbeitet. Bitte in einigen Minuten erneut versuchen.',
+          code: 'mp3_not_ready',
+        },
+        { status: 503 }
+      );
+    }
+
+    // Prefer mp3R2Key over r2Key (mp3 is smaller, faster to stream/download)
+    const r2Key = audioFile.mp3R2Key || audioFile.r2Key;
+
     // Stream mode
     const isStream = request.nextUrl.searchParams.get('stream') === '1';
     if (isStream) {
-      const streamUrl = await r2Service.generateSignedUrl(audioFile.r2Key, 3600);
+      const streamUrl = await r2Service.generateSignedUrl(r2Key, 3600);
       return NextResponse.json({ url: streamUrl });
     }
 
@@ -59,9 +80,9 @@ export async function GET(
       baseName = matchingClass?.className ?? 'Track';
     }
 
-    const extension = audioFile.r2Key.endsWith('.wav') ? '.wav' : '.mp3';
+    const extension = r2Key.endsWith('.wav') ? '.wav' : '.mp3';
     const downloadFilename = `${baseName}${extension}`;
-    const signedUrl = await r2Service.generateSignedUrl(audioFile.r2Key, 3600, downloadFilename);
+    const signedUrl = await r2Service.generateSignedUrl(r2Key, 3600, downloadFilename);
 
     return NextResponse.redirect(signedUrl);
   } catch (error) {

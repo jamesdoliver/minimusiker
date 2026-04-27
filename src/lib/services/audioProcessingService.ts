@@ -5,6 +5,7 @@ import { constants as fsConstants, existsSync } from 'fs';
 import path from 'path';
 import { getR2Service } from './r2Service';
 import { getTeacherService } from './teacherService';
+import { buildFinalMp3Key, buildPreviewMp3Key } from '@/lib/utils/audioPath';
 
 const execFileAsync = promisify(execFile);
 
@@ -141,7 +142,7 @@ export async function processAudioFile(
   r2Key: string,
   eventId: string,
   classId: string,
-  songId: string,
+  songId: string | null,
   displayName?: string
 ): Promise<{
   mp3Key: string;
@@ -201,14 +202,7 @@ export async function processAudioFile(
     ], { timeout: 30000 });
 
     // 5. Upload MP3 to R2
-    const mp3Filename = displayName ? `${displayName}.mp3` : 'final.mp3';
-    const mp3Key = `recordings/${eventId}/${classId}/${songId}/final/${mp3Filename}`;
-    const mp3Buffer = isWav
-      ? await readFileAsBuffer(mp3Path)
-      : buffer; // If already MP3, use original buffer
-
-    // For non-WAV files, we still want to create the .mp3 key
-    // If source is already MP3, we just copy it to the canonical path
+    const mp3Key = buildFinalMp3Key(eventId, classId, songId, displayName);
     if (isWav) {
       await uploadBuffer(r2, mp3Key, await readFileAsBuffer(mp3Path), 'audio/mpeg');
     } else {
@@ -217,14 +211,17 @@ export async function processAudioFile(
     }
 
     // 6. Upload preview to R2
-    const previewFilename = displayName ? `${displayName}.mp3` : 'preview.mp3';
-    const previewKey = `recordings/${eventId}/${classId}/${songId}/preview/${previewFilename}`;
+    const previewKey = buildPreviewMp3Key(eventId, classId, songId, displayName);
     await uploadBuffer(r2, previewKey, await readFileAsBuffer(previewPath), 'audio/mpeg');
 
-    // 7. Update AudioFile record in Airtable
-    //    Find the audio file by r2Key and update it
-    const audioFiles = await teacherService.getAudioFilesBySongId(songId, 'final');
-    const audioFile = audioFiles.find(af => af.r2Key === r2Key);
+    // 7. Update AudioFile record in Airtable.
+    //    Per-song: lookup by songId then match r2Key.
+    //    Schulsong (no songId): lookup by classId then match r2Key — schulsong AudioFiles
+    //    are not linked to a Songs record.
+    const candidates = songId
+      ? await teacherService.getAudioFilesBySongId(songId, 'final')
+      : (await teacherService.getAudioFilesByClassId(classId)).filter(af => af.type === 'final');
+    const audioFile = candidates.find(af => af.r2Key === r2Key);
     if (audioFile) {
       await teacherService.updateAudioFile(audioFile.id, {
         status: 'ready',
