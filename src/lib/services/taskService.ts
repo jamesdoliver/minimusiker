@@ -19,19 +19,13 @@ import {
   TaskCellStatus,
 } from '@/lib/types/tasks';
 import {
-  PAPER_ORDER_TEMPLATES,
-  CLOTHING_ORDER_TEMPLATES,
-  getTemplateById,
-  calculateUrgencyScore,
-  calculateDeadline,
-} from '@/lib/config/taskTemplates';
-import {
   TASK_TIMELINE,
   calculateDeadline as calculateDeadlineV2,
   getTimelineEntry,
   type TaskPrefix,
   type TaskCompletionType,
 } from '@/lib/config/taskTimeline';
+import { calculateUrgencyScore } from '@/lib/utils/taskUrgency';
 import {
   TASKS_TABLE_ID,
   TASKS_FIELD_IDS,
@@ -109,63 +103,6 @@ class TaskService {
       .firstPage();
     if (records.length === 0) throw new Error(`GuesstimateOrder not found: ${goId}`);
     return records[0];
-  }
-
-  /**
-   * Generate all tasks for a new event
-   * Called when a SimplyBook booking is confirmed
-   */
-  async generateTasksForEvent(eventId: string): Promise<Task[]> {
-    // Get event details to calculate deadlines
-    const event = await this.airtable.getEventById(eventId);
-    if (!event) {
-      throw new Error(`Event not found: ${eventId}`);
-    }
-
-    const eventDate = new Date(event.event_date);
-    const createdTasks: Task[] = [];
-
-    // Generate Paper Order tasks from templates
-    for (const template of PAPER_ORDER_TEMPLATES) {
-      const deadline = calculateDeadline(eventDate, template.timeline_offset);
-
-      const taskInput: CreateTaskInput = {
-        event_id: eventId,
-        template_id: template.id,
-        task_type: template.type,
-        task_name: template.name,
-        description: template.description,
-        completion_type: normalizeCompletionType(template.completion_type, template.id),
-        timeline_offset: template.timeline_offset,
-        deadline: deadline.toISOString(),
-        status: 'pending',
-      };
-
-      const task = await this.createTask(taskInput);
-      createdTasks.push(task);
-    }
-
-    // Generate Clothing Order tasks from templates
-    for (const template of CLOTHING_ORDER_TEMPLATES) {
-      const deadline = calculateDeadline(eventDate, template.timeline_offset);
-
-      const taskInput: CreateTaskInput = {
-        event_id: eventId,
-        template_id: template.id,
-        task_type: template.type,
-        task_name: template.name,
-        description: template.description,
-        completion_type: normalizeCompletionType(template.completion_type, template.id),
-        timeline_offset: template.timeline_offset,
-        deadline: deadline.toISOString(),
-        status: 'pending',
-      };
-
-      const task = await this.createTask(taskInput);
-      createdTasks.push(task);
-    }
-
-    return createdTasks;
   }
 
   /**
@@ -332,12 +269,12 @@ class TaskService {
       return this.completeWelleTask(task, taskId, adminEmail, completionData);
     }
 
-    const template = getTemplateById(task.template_id);
+    const entry = getTimelineEntry(task.template_id);
 
     let goId: string | undefined;
 
-    // Create go_id if template requires it
-    if (template?.creates_go_id) {
+    // Create go_id if the timeline entry requires it
+    if (entry?.creates_go_id) {
       const goOrder = await this.createGuesstimateOrder({
         event_id: task.event_id,
         event_ids: task.event_ids,
@@ -770,8 +707,8 @@ class TaskService {
   }
 
   /**
-   * Generate all 11 tasks for an event using the new TASK_TIMELINE config.
-   * This is the v2 replacement for generateTasksForEvent().
+   * Generate all 11 tasks for an event using the canonical TASK_TIMELINE config.
+   * Called when a SimplyBook booking is confirmed.
    */
   async generateTasksForEventV2(eventId: string): Promise<Task[]> {
     // Get event details to calculate deadlines
@@ -1241,9 +1178,9 @@ class TaskService {
     const deadline = new Date(task.deadline);
     const { urgencyScore, daysUntilDue, isOverdue } = calculateUrgencyScore(deadline);
 
-    // Get R2 file path from template
-    const template = getTemplateById(task.template_id);
-    const r2FilePath = template?.r2_file?.(task.event_id);
+    // Get R2 file path from the timeline entry
+    const entry = getTimelineEntry(task.template_id);
+    const r2FilePath = entry?.r2_file?.(task.event_id);
 
     return {
       ...task,

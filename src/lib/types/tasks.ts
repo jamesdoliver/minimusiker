@@ -90,26 +90,6 @@ export interface GuesstimateOrderWithEventDetails extends GuesstimateOrder {
   parsed_contains: GuesstimateOrderItem[];
 }
 
-// Task Template definition (hardcoded in config)
-//
-// Note: this interface and its consumer (`src/lib/config/taskTemplates.ts`) are
-// legacy plumbing slated for removal in Task 2.8 of the task-system rework.
-// The legacy templates store completion modes as `'checkbox'` / `'submit_only'`,
-// which are not part of the canonical v2 `TaskCompletionType` union. We keep the
-// field deliberately wide here so the legacy file can still type-check until it
-// is deleted alongside this interface.
-export interface TaskTemplate {
-  id: string; // Unique template identifier
-  type: TaskType;
-  name: string;
-  description: string;
-  timeline_offset: number; // Days relative to event
-  completion_type: TaskCompletionType | 'checkbox' | 'submit_only';
-  r2_file?: (eventId: string) => string; // Function to generate R2 path
-  creates_go_id: boolean;
-  creates_shipping: boolean;
-}
-
 // Task type configuration for UI
 export interface TaskTypeConfig {
   label: string;

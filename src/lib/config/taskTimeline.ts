@@ -1,9 +1,8 @@
 /**
  * Task Timeline Configuration (v2)
  *
- * This is the NEW task timeline for the redesigned task matrix system.
+ * This is the canonical task timeline for the task matrix system.
  * It defines all 11 tasks with their timeline offsets relative to event date.
- * The old taskTemplates.ts remains in use until migration is complete.
  */
 
 // ---------------------------------------------------------------------------
@@ -44,6 +43,12 @@ export interface TaskTimelineEntry {
   completion: TaskCompletionType;
   /** Whether completing this task should create a GuesstimateOrder record */
   creates_go_id: boolean;
+  /**
+   * Optional R2 path generator for printable assets associated with this task.
+   * Returns the R2 key for the printable PDF that staff need to ship/order.
+   * Only set for the 5 printable tasks (poster, flyers 1-3, minicard).
+   */
+  r2_file?: (eventId: string) => string;
 }
 
 // ---------------------------------------------------------------------------
@@ -65,6 +70,7 @@ export const TASK_TIMELINE: readonly TaskTimelineEntry[] = [
     offset: -45,
     completion: 'monetary',
     creates_go_id: true,
+    r2_file: (eventId) => `events/${eventId}/printables/poster.pdf`,
   },
   {
     id: 'ship_flyer_1',
@@ -75,6 +81,7 @@ export const TASK_TIMELINE: readonly TaskTimelineEntry[] = [
     offset: -43,
     completion: 'monetary',
     creates_go_id: true,
+    r2_file: (eventId) => `events/${eventId}/printables/flyers/flyer1.pdf`,
   },
   {
     id: 'order_schul_clothing',
@@ -95,6 +102,7 @@ export const TASK_TIMELINE: readonly TaskTimelineEntry[] = [
     offset: -18,
     completion: 'monetary',
     creates_go_id: true,
+    r2_file: (eventId) => `events/${eventId}/printables/flyers/flyer2.pdf`,
   },
   {
     id: 'ship_flyer_3',
@@ -105,6 +113,7 @@ export const TASK_TIMELINE: readonly TaskTimelineEntry[] = [
     offset: -10,
     completion: 'monetary',
     creates_go_id: true,
+    r2_file: (eventId) => `events/${eventId}/printables/flyers/flyer3.pdf`,
   },
   {
     id: 'shipment_welle_1',
@@ -125,6 +134,7 @@ export const TASK_TIMELINE: readonly TaskTimelineEntry[] = [
     offset: 5,
     completion: 'monetary',
     creates_go_id: true,
+    r2_file: (eventId) => `events/${eventId}/printables/minicards/minicard.pdf`,
   },
   {
     id: 'order_schul_clothing_2',
