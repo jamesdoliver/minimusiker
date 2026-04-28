@@ -76,11 +76,8 @@ export async function POST(request: NextRequest) {
       data: {
         task: result.task,
         go_id: result.goId,
-        shipping_task_id: result.shippingTaskId,
       },
-      message: result.shippingTaskId
-        ? 'Task created and completed. Shipping task created.'
-        : 'Task created and completed successfully.',
+      message: 'Task created and completed successfully.',
     });
   } catch (error) {
     console.error('Error creating and completing task:', error);

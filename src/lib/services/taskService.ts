@@ -21,7 +21,6 @@ import {
 import {
   PAPER_ORDER_TEMPLATES,
   CLOTHING_ORDER_TEMPLATES,
-  SHIPPING_TEMPLATE,
   getTemplateById,
   calculateUrgencyScore,
   calculateDeadline,
@@ -312,7 +311,7 @@ class TaskService {
     completionData: TaskCompletionData,
     adminEmail: string,
     goEnrichment?: { order_ids?: string; contains?: GuesstimateOrderItem[] }
-  ): Promise<{ task: Task; goId?: string; shippingTaskId?: string; fulfillmentSummary?: WelleFulfillmentSummary }> {
+  ): Promise<{ task: Task; goId?: string; fulfillmentSummary?: WelleFulfillmentSummary }> {
     const base = this.airtable.getBase();
     const table = base(TASKS_TABLE_ID);
 
@@ -336,7 +335,6 @@ class TaskService {
     const template = getTemplateById(task.template_id);
 
     let goId: string | undefined;
-    let shippingTaskId: string | undefined;
 
     // Create go_id if template requires it
     if (template?.creates_go_id) {
@@ -369,41 +367,11 @@ class TaskService {
 
     await table.update(taskId, updateFields as Partial<Airtable.FieldSet>);
 
-    // Create shipping task if template requires it
-    if (template?.creates_shipping && goId) {
-      const event = await this.airtable.getEventById(task.event_id);
-      if (event) {
-        const shippingTask = await this.createTask({
-          event_id: task.event_id,
-          event_ids: task.event_ids,
-          template_id: `shipping_${task.template_id}`,
-          task_type: 'shipping',
-          task_name: SHIPPING_TEMPLATE.name,
-          description: `${SHIPPING_TEMPLATE.description} - ${template.name}`,
-          completion_type: normalizeCompletionType(
-            SHIPPING_TEMPLATE.completion_type,
-            `shipping_${task.template_id}`,
-          ),
-          timeline_offset: 0, // Immediate
-          deadline: new Date().toISOString(),
-          status: 'pending',
-          parent_task_id: taskId,
-        });
-        shippingTaskId = shippingTask.id;
-
-        // Link shipping task to the go_id
-        await table.update(shippingTask.id, {
-          [TASKS_FIELD_IDS.go_id]: [goId],
-        });
-      }
-    }
-
     // Refetch the updated task
     const updatedRecord = await this.findTaskRecord(table, taskId);
     return {
       task: this.transformTaskRecord(updatedRecord),
       goId,
-      shippingTaskId,
     };
   }
 
@@ -846,7 +814,7 @@ class TaskService {
     templateId: string,
     completionData: TaskCompletionData,
     adminEmail: string,
-  ): Promise<{ task: Task; goId?: string; shippingTaskId?: string }> {
+  ): Promise<{ task: Task; goId?: string }> {
     // Find the TASK_TIMELINE entry
     const entry = TASK_TIMELINE.find((e) => e.id === templateId);
     if (!entry) {

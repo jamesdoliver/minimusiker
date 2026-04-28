@@ -162,11 +162,8 @@ export async function PATCH(
       data: {
         task: result.task,
         go_id: result.goId,
-        shipping_task_id: result.shippingTaskId,
       },
-      message: result.shippingTaskId
-        ? 'Task completed. Shipping task created.'
-        : 'Task completed successfully.',
+      message: 'Task completed successfully.',
     });
   } catch (error) {
     console.error('Error updating task:', error);

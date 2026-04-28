@@ -312,7 +312,7 @@ class ClothingOrdersService {
   /**
    * Complete a clothing order via the standard task cascade
    * Finds (or creates) the pending clothing task, then completes it through taskService
-   * which creates GO-ID + shipping task
+   * which creates a GO-ID.
    */
   async completeClothingOrder(
     eventRecordId: string,
@@ -320,7 +320,7 @@ class ClothingOrdersService {
     notes: string | undefined,
     orderIds: string[],
     adminEmail: string
-  ): Promise<{ taskId: string; goId: string; shippingTaskId?: string }> {
+  ): Promise<{ taskId: string; goId: string }> {
     const taskService = getTaskService();
     const base = this.airtable.getBase();
     const tasksTable = base(TASKS_TABLE_ID);
@@ -396,7 +396,7 @@ class ClothingOrdersService {
       });
     }
 
-    // Complete through the standard task cascade (creates GO-ID + shipping task)
+    // Complete through the standard task cascade (creates GO-ID)
     const result = await taskService.completeTask(
       taskId,
       { amount, notes: notes || undefined },
@@ -407,7 +407,6 @@ class ClothingOrdersService {
     return {
       taskId: result.task.id,
       goId: result.goId || '',
-      shippingTaskId: result.shippingTaskId,
     };
   }
 }
