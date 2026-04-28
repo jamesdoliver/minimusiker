@@ -200,8 +200,8 @@ export function calculateDeadline(
   offset: number
 ): Date {
   const base = typeof eventDate === 'string' ? new Date(eventDate) : new Date(eventDate);
-  base.setHours(0, 0, 0, 0);
-  base.setDate(base.getDate() + offset);
+  base.setUTCHours(0, 0, 0, 0);
+  base.setUTCDate(base.getUTCDate() + offset);
   return base;
 }
 
