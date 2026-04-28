@@ -15,7 +15,7 @@ import {
   ThresholdKey,
 } from '@/lib/utils/eventThresholds';
 import { EVENT_MILESTONES, Milestone, getMilestoneLabel } from '@/lib/utils/eventTimeline';
-import { getAllTemplates } from '@/lib/config/taskTemplates';
+import { TASK_TIMELINE } from '@/lib/config/taskTimeline';
 import { resolveShopProfile, ShopProfile, ClothingProduct } from '@/lib/config/shopProfiles';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -605,15 +605,15 @@ export default function EventSettingsPage() {
 
         {/* Section 4: Task Timeline (Read-only, Phase 2) */}
         <SettingsSection title="Aufgaben-Zeitplan" description="Zeitliche Planung der Event-Aufgaben (Phase 2 - bald konfigurierbar)" locked>
-          {getAllTemplates().map((template) => (
+          {TASK_TIMELINE.map((entry) => (
             <ReadOnlyField
-              key={template.id}
-              label={template.name}
-              description={template.description}
-              value={Math.abs(template.timeline_offset)}
-              suffix={template.timeline_offset <= 0 ? 'Tage vor Event' : 'Tage nach Event'}
+              key={entry.id}
+              label={entry.displayName}
+              description={entry.description}
+              value={Math.abs(entry.offset)}
+              suffix={entry.offset <= 0 ? 'Tage vor Event' : 'Tage nach Event'}
               eventDate={eventDate}
-              offsetDays={template.timeline_offset}
+              offsetDays={entry.offset}
             />
           ))}
         </SettingsSection>

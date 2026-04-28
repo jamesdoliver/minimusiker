@@ -15,7 +15,7 @@ import {
   AggregatedClothingItems,
   ClothingItem,
 } from '@/lib/types/clothingOrders';
-import { calculateDeadline } from '@/lib/config/taskTemplates';
+import { calculateDeadline } from '@/lib/config/taskTimeline';
 import {
   ORDERS_TABLE_ID,
   ORDERS_FIELD_IDS,
