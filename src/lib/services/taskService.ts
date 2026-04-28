@@ -18,6 +18,7 @@ import {
   TaskMatrixCell,
   TaskCellStatus,
 } from '@/lib/types/tasks';
+import type { Event } from '@/lib/types/airtable';
 import {
   TASK_TIMELINE,
   calculateDeadline as calculateDeadlineV2,
@@ -37,6 +38,7 @@ import {
 } from '@/lib/types/airtable';
 import { getOrdersByEventRecordId } from './ordersHelper';
 import { computeNewDeadline } from './deadlineHelper';
+import { uniqueLinkedRecordIds } from './taskBatchHelpers';
 import { classifyVariant } from '@/lib/config/variantClassification';
 
 /**
@@ -66,6 +68,21 @@ function normalizeCompletionType(
   // Fallback for unknown legacy templates (already on the way out)
   return 'monetary';
 }
+
+// Re-export uniqueLinkedRecordIds so existing imports from this module still work.
+export { uniqueLinkedRecordIds };
+
+/**
+ * Type for the prefetched record maps passed to enrichTaskWithEventDetails.
+ *
+ * `gos` is typed as the Airtable SDK record-shape (`{ id; get(field) }`)
+ * because the GO record is read field-by-field (no transformation), to
+ * preserve parity with the per-record fallback path.
+ */
+type EnrichmentMaps = {
+  events: Map<string, Event>;
+  gos: Map<string, { id: string; get: (field: string) => unknown }>;
+};
 
 /**
  * TaskService - Handles task generation, retrieval, and completion
@@ -200,9 +217,22 @@ class TaskService {
       ? await table.select({ returnFieldsByFieldId: true, filterByFormula: filterFormula }).all()
       : allRecords;
 
-    // Transform to TaskWithEventDetails
+    // Batch-fetch supporting records once instead of per-task. Without this,
+    // each enrichTaskWithEventDetails would fire its own getEventById +
+    // goTable.find round-trips, producing up to ~2N calls for N tasks.
+    const eventIds = uniqueLinkedRecordIds(filteredRecords, TASKS_FIELD_IDS.event_id);
+    const goIds = uniqueLinkedRecordIds(filteredRecords, TASKS_FIELD_IDS.go_id);
+
+    const [events, gos] = await Promise.all([
+      this.batchFetchEvents(eventIds),
+      this.batchFetchGOs(goIds),
+    ]);
+
+    // Transform to TaskWithEventDetails (using prefetched maps)
     const tasks = await Promise.all(
-      filteredRecords.map((record) => this.enrichTaskWithEventDetails(record))
+      filteredRecords.map((record) =>
+        this.enrichTaskWithEventDetails(record, { events, gos }),
+      ),
     );
 
     // Sort by urgency (lower score = more urgent)
@@ -1132,16 +1162,75 @@ class TaskService {
     };
   }
 
-  private async enrichTaskWithEventDetails(record: { id: string; get: (field: string) => unknown }): Promise<TaskWithEventDetails> {
+  /**
+   * Batch-fetch Events by record ID into a Map keyed by record ID.
+   * Returns an empty Map for empty input (no network call).
+   */
+  private async batchFetchEvents(eventIds: string[]): Promise<Map<string, Event>> {
+    const map = new Map<string, Event>();
+    if (eventIds.length === 0) return map;
+    const events = await this.airtable.getEventsByIds(eventIds);
+    for (const event of events) {
+      map.set(event.id, event);
+    }
+    return map;
+  }
+
+  /**
+   * Batch-fetch GuesstimateOrder records by record ID into a Map keyed by
+   * record ID. Returns the raw Airtable records (not transformed) so the
+   * caller can read fields by ID directly — matching the per-record
+   * fallback path in enrichTaskWithEventDetails.
+   *
+   * Chunks at 50 IDs per request to stay safely under Airtable's URL-based
+   * formula length cap (~16 KB). Returns an empty Map for empty input
+   * (no network call).
+   */
+  private async batchFetchGOs(
+    goIds: string[],
+  ): Promise<Map<string, { id: string; get: (field: string) => unknown }>> {
+    const map = new Map<string, { id: string; get: (field: string) => unknown }>();
+    if (goIds.length === 0) return map;
+
+    // Sanitize IDs: only allow valid Airtable record ID characters
+    const safeIds = goIds.filter((id) => /^rec[a-zA-Z0-9]{14}$/.test(id));
+    if (safeIds.length === 0) return map;
+
+    const base = this.airtable.getBase();
+    const goTable = base(GUESSTIMATE_ORDERS_TABLE_ID);
+    const batchSize = 50;
+    for (let i = 0; i < safeIds.length; i += batchSize) {
+      const batch = safeIds.slice(i, i + batchSize);
+      const formula = `OR(${batch.map((id) => `RECORD_ID() = '${id}'`).join(',')})`;
+      try {
+        const records = await goTable
+          .select({ filterByFormula: formula, returnFieldsByFieldId: true })
+          .all();
+        for (const record of records) {
+          map.set(record.id, record);
+        }
+      } catch (error) {
+        console.error('Error batch-fetching GuesstimateOrders by IDs:', error);
+      }
+    }
+    return map;
+  }
+
+  private async enrichTaskWithEventDetails(
+    record: { id: string; get: (field: string) => unknown },
+    prefetched?: EnrichmentMaps,
+  ): Promise<TaskWithEventDetails> {
     const task = this.transformTaskRecord(record);
 
-    // Get event details
+    // Get event details (use prefetched map or fetch directly)
     let schoolName = 'Unknown School';
     let eventDate = task.deadline;
     let eventType: string | undefined;
 
     if (task.event_id) {
-      const event = await this.airtable.getEventById(task.event_id);
+      const event =
+        prefetched?.events.get(task.event_id) ??
+        (await this.airtable.getEventById(task.event_id));
       if (event) {
         schoolName = event.school_name;
         eventDate = event.event_date;
@@ -1157,17 +1246,24 @@ class TaskService {
     // Get go_id display value and stock arrival status
     let goDisplayId: string | undefined;
     let stockArrived: boolean | undefined;
-    if (task.go_id) {
+    const goId = task.go_id;
+    if (goId) {
       try {
-        const base = this.airtable.getBase();
-        const goTable = base(GUESSTIMATE_ORDERS_TABLE_ID);
-        const goRecord = await goTable.find(task.go_id);
-        goDisplayId = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.go_id) as string;
+        let goRecord = prefetched?.gos.get(goId);
+        if (!goRecord) {
+          const base = this.airtable.getBase();
+          const goTable = base(GUESSTIMATE_ORDERS_TABLE_ID);
+          goRecord = await goTable.find(goId);
+        }
 
-        // For shipping tasks, check if linked GO-ID stock has arrived
-        if (task.task_type === 'shipping') {
-          const dateCompleted = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.date_completed) as string | undefined;
-          stockArrived = !!dateCompleted;
+        if (goRecord) {
+          goDisplayId = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.go_id) as string;
+
+          // For shipping tasks, check if linked GO-ID stock has arrived
+          if (task.task_type === 'shipping') {
+            const dateCompleted = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.date_completed) as string | undefined;
+            stockArrived = !!dateCompleted;
+          }
         }
       } catch {
         // Ignore if go_id record not found
