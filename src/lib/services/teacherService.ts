@@ -3227,12 +3227,12 @@ class TeacherService {
   /**
    * Create an invite for a teacher to access a specific event
    * @param eventRecordId - The Airtable record ID of the event
-   * @param invitedByTeacherId - The teacher record ID who is creating the invite
+   * @param invitedByTeacherId - The teacher record ID who is creating the invite, or null for admin-initiated invites
    * @returns Token, expiry date, and full invite URL
    */
   async createEventInvite(
     eventRecordId: string,
-    invitedByTeacherId: string
+    invitedByTeacherId: string | null
   ): Promise<{
     token: string;
     expiresAt: string;
@@ -3243,14 +3243,16 @@ class TeacherService {
       const token = crypto.randomBytes(32).toString('hex');
       const expiresAt = new Date(Date.now() + INVITE_EXPIRY_MS).toISOString();
 
-      // Create the invite record
-      await this.base(TEACHER_INVITES_TABLE_ID).create({
+      const fields: Record<string, any> = {
         [TEACHER_INVITES_FIELD_IDS.invite_token]: token,
         [TEACHER_INVITES_FIELD_IDS.event_id]: [eventRecordId],
-        [TEACHER_INVITES_FIELD_IDS.invited_by]: [invitedByTeacherId],
         [TEACHER_INVITES_FIELD_IDS.expires_at]: expiresAt,
         [TEACHER_INVITES_FIELD_IDS.status]: 'pending',
-      });
+      };
+      if (invitedByTeacherId) {
+        fields[TEACHER_INVITES_FIELD_IDS.invited_by] = [invitedByTeacherId];
+      }
+      await this.base(TEACHER_INVITES_TABLE_ID).create(fields);
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://portal.minimusiker.de';
       const inviteUrl = `${appUrl}/paedagogen-einladung/${token}`;
@@ -3481,8 +3483,8 @@ class TeacherService {
 
       const enriched = await Promise.all(
         invites.map(async (invite) => {
-          // Look up inviting teacher name
-          let invitedByName = 'Unknown';
+          // Look up inviting teacher name; admin-initiated invites have no invitedBy
+          let invitedByName = 'Verwaltung';
           if (invite.invitedBy) {
             const inviter = await this.getTeacherById(invite.invitedBy);
             if (inviter) {

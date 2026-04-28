@@ -13,6 +13,7 @@ import { getTaskService } from '@/lib/services/taskService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { getR2Service } from '@/lib/services/r2Service';
 import { getTeacherService } from '@/lib/services/teacherService';
+import { sendTeacherInviteEmail } from '@/lib/services/resendService';
 
 export const dynamic = 'force-dynamic';
 
@@ -177,9 +178,13 @@ export async function PATCH(
         console.log(`[EditBooking] Updated Airtable booking: ${bookingId}`);
 
         // Fetch linked Event once for all downstream syncs
-        // (estimated_children, event_date, activity log, notifications)
+        // (estimated_children, event_date, activity log, notifications, secondary_contacts invites)
         let linkedEvent: Awaited<ReturnType<typeof airtableService.getEventBySchoolBookingId>> = null;
-        if (body.estimated_children !== undefined || body.event_date !== undefined) {
+        if (
+          body.estimated_children !== undefined ||
+          body.event_date !== undefined ||
+          body.secondary_contacts !== undefined
+        ) {
           try {
             linkedEvent = await airtableService.getEventBySchoolBookingId(bookingId);
             if (!linkedEvent) {
@@ -283,6 +288,72 @@ export async function PATCH(
             console.log(`[EditBooking] Recalculated ${taskResult.updatedCount} task deadlines for Event ${linkedEvent.id}`);
           } catch (taskError) {
             console.warn('[EditBooking] Could not recalculate task deadlines:', taskError);
+          }
+        }
+
+        // Issue portal invites for newly-added secondary contacts (idempotent: skip if email already in prior list)
+        if (body.secondary_contacts !== undefined && linkedEvent) {
+          try {
+            const previousRaw = booking.secondaryContacts;
+            let previousContacts: SecondaryContact[] = [];
+            if (typeof previousRaw === 'string' && previousRaw.trim()) {
+              try {
+                const parsed = JSON.parse(previousRaw);
+                if (Array.isArray(parsed)) previousContacts = parsed;
+              } catch {
+                console.warn('[EditBooking] Failed to parse prior secondary_contacts JSON');
+              }
+            }
+            const previousEmails = new Set(
+              previousContacts
+                .map((c) => c.email?.toLowerCase().trim())
+                .filter((e): e is string => !!e)
+            );
+            const primaryEmail = booking.schoolContactEmail?.toLowerCase().trim();
+            if (primaryEmail) previousEmails.add(primaryEmail);
+
+            const seen = new Set<string>();
+            const newlyAdded = body.secondary_contacts.filter((c) => {
+              const email = c.email?.toLowerCase().trim();
+              if (!email || !EMAIL_REGEX.test(email)) return false;
+              if (previousEmails.has(email) || seen.has(email)) return false;
+              seen.add(email);
+              return true;
+            });
+
+            if (newlyAdded.length > 0) {
+              const teacherService = getTeacherService();
+              const eventInfo = await teacherService.getEventInfoForInvite(linkedEvent.id);
+              for (const contact of newlyAdded) {
+                try {
+                  const invite = await teacherService.createEventInvite(linkedEvent.id, null);
+                  if (eventInfo) {
+                    const result = await sendTeacherInviteEmail(contact.email!, {
+                      inviterName: admin.email || 'MiniMusiker Verwaltung',
+                      schoolName: eventInfo.schoolName,
+                      eventDate: eventInfo.eventDate,
+                      eventType: eventInfo.eventType,
+                      inviteUrl: invite.inviteUrl,
+                    });
+                    if (!result.success) {
+                      console.error(
+                        `[EditBooking] sendTeacherInviteEmail failed for ${contact.email}:`,
+                        result.error
+                      );
+                    } else {
+                      console.log(`[EditBooking] Issued portal invite to ${contact.email}`);
+                    }
+                  }
+                } catch (perContactErr) {
+                  console.error(
+                    `[EditBooking] Failed to invite secondary contact ${contact.email}:`,
+                    perContactErr
+                  );
+                }
+              }
+            }
+          } catch (inviteErr) {
+            console.warn('[EditBooking] Secondary-contact invite step failed:', inviteErr);
           }
         }
       }
