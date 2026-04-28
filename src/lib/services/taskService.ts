@@ -29,8 +29,9 @@ import {
 import {
   TASK_TIMELINE,
   calculateDeadline as calculateDeadlineV2,
+  getTimelineEntry,
   type TaskPrefix,
-  type TaskCompletionType as TimelineCompletionType,
+  type TaskCompletionType,
 } from '@/lib/config/taskTimeline';
 import {
   TASKS_TABLE_ID,
@@ -43,6 +44,34 @@ import {
 } from '@/lib/types/airtable';
 import { getOrdersByEventRecordId } from './ordersHelper';
 import { classifyVariant } from '@/lib/config/variantClassification';
+
+/**
+ * Normalize a stored Airtable `completion_type` value into the canonical v2 union.
+ *
+ * Airtable still holds legacy values (`'checkbox'`, `'submit_only'`) written before
+ * the type system was unified. They are ambiguous (orchestrated vs quantity_checkbox
+ * both stored as `'checkbox'`), so we resolve them by looking up the task's template
+ * in `TASK_TIMELINE` — the authoritative source of truth for completion type.
+ */
+function normalizeCompletionType(
+  storedValue: string | undefined,
+  templateId: string,
+): TaskCompletionType {
+  // V2 values pass through unchanged
+  if (
+    storedValue === 'monetary' ||
+    storedValue === 'orchestrated' ||
+    storedValue === 'tracklist' ||
+    storedValue === 'quantity_checkbox'
+  ) {
+    return storedValue;
+  }
+  // Legacy storage values are ambiguous; resolve via the template
+  const entry = getTimelineEntry(templateId);
+  if (entry) return entry.completion;
+  // Fallback for unknown legacy templates (already on the way out)
+  return 'monetary';
+}
 
 /**
  * TaskService - Handles task generation, retrieval, and completion
@@ -106,7 +135,7 @@ class TaskService {
         task_type: template.type,
         task_name: template.name,
         description: template.description,
-        completion_type: template.completion_type,
+        completion_type: normalizeCompletionType(template.completion_type, template.id),
         timeline_offset: template.timeline_offset,
         deadline: deadline.toISOString(),
         status: 'pending',
@@ -126,7 +155,7 @@ class TaskService {
         task_type: template.type,
         task_name: template.name,
         description: template.description,
-        completion_type: template.completion_type,
+        completion_type: normalizeCompletionType(template.completion_type, template.id),
         timeline_offset: template.timeline_offset,
         deadline: deadline.toISOString(),
         status: 'pending',
@@ -350,7 +379,10 @@ class TaskService {
           task_type: 'shipping',
           task_name: SHIPPING_TEMPLATE.name,
           description: `${SHIPPING_TEMPLATE.description} - ${template.name}`,
-          completion_type: SHIPPING_TEMPLATE.completion_type,
+          completion_type: normalizeCompletionType(
+            SHIPPING_TEMPLATE.completion_type,
+            `shipping_${task.template_id}`,
+          ),
           timeline_offset: 0, // Immediate
           deadline: new Date().toISOString(),
           status: 'pending',
@@ -551,7 +583,7 @@ class TaskService {
       task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
       task_name: entry.displayName,
       description: entry.description,
-      completion_type: this.mapCompletionType(entry.completion),
+      completion_type: entry.completion,
       timeline_offset: entry.offset,
       deadline: deadline.toISOString(),
       status: 'pending',
@@ -598,7 +630,7 @@ class TaskService {
       task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
       task_name: entry.displayName,
       description: entry.description,
-      completion_type: this.mapCompletionType(entry.completion),
+      completion_type: entry.completion,
       timeline_offset: entry.offset,
       deadline: deadline.toISOString(),
       status: 'pending',
@@ -769,22 +801,6 @@ class TaskService {
   }
 
   /**
-   * Map a timeline completion type to the existing TaskCompletionType used in Airtable.
-   */
-  private mapCompletionType(completion: TimelineCompletionType): Task['completion_type'] {
-    switch (completion) {
-      case 'monetary':
-        return 'monetary';
-      case 'orchestrated':
-        return 'checkbox';
-      case 'tracklist':
-        return 'submit_only';
-      case 'quantity_checkbox':
-        return 'checkbox';
-    }
-  }
-
-  /**
    * Generate all 11 tasks for an event using the new TASK_TIMELINE config.
    * This is the v2 replacement for generateTasksForEvent().
    */
@@ -807,7 +823,7 @@ class TaskService {
         task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
         task_name: entry.displayName,
         description: entry.description,
-        completion_type: this.mapCompletionType(entry.completion),
+        completion_type: entry.completion,
         timeline_offset: entry.offset,
         deadline: deadline.toISOString(),
         status: 'pending',
@@ -870,7 +886,7 @@ class TaskService {
       task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
       task_name: entry.displayName,
       description: entry.description,
-      completion_type: this.mapCompletionType(entry.completion),
+      completion_type: entry.completion,
       timeline_offset: entry.offset,
       deadline: deadline.toISOString(),
       status: 'pending',
@@ -1143,7 +1159,7 @@ class TaskService {
             task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
             task_name: entry.displayName,
             description: entry.description,
-            completion_type: this.mapCompletionType(entry.completion),
+            completion_type: entry.completion,
             timeline_offset: entry.offset,
             deadline: deadlineStr,
             status: 'pending',
@@ -1193,7 +1209,10 @@ class TaskService {
       task_type: (get(TASKS_FIELD_IDS.task_type) as TaskType) || 'paper_order',
       task_name: (get(TASKS_FIELD_IDS.task_name) as string) || '',
       description: (get(TASKS_FIELD_IDS.description) as string) || '',
-      completion_type: (get(TASKS_FIELD_IDS.completion_type) as Task['completion_type']) || 'submit_only',
+      completion_type: normalizeCompletionType(
+        get(TASKS_FIELD_IDS.completion_type) as string | undefined,
+        (get(TASKS_FIELD_IDS.template_id) as string) || '',
+      ),
       timeline_offset: (get(TASKS_FIELD_IDS.timeline_offset) as number) || 0,
       deadline: (get(TASKS_FIELD_IDS.deadline) as string) || '',
       status: (get(TASKS_FIELD_IDS.status) as TaskStatus) || 'pending',

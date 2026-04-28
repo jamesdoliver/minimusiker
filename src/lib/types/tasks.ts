@@ -1,5 +1,12 @@
 // Task Types for Admin Portal Task Management
 
+// How a task is completed — canonical definition lives in taskTimeline.
+// Imported and re-exported here so existing `TaskCompletionType` imports
+// from this module keep working, while internal interfaces below can also
+// reference it locally.
+import type { TaskCompletionType } from '@/lib/config/taskTimeline';
+export type { TaskCompletionType };
+
 // Task type categories
 export type TaskType =
   | 'paper_order'
@@ -8,9 +15,6 @@ export type TaskType =
   | 'cd_master'
   | 'cd_production'
   | 'shipping';
-
-// How a task is completed
-export type TaskCompletionType = 'monetary' | 'checkbox' | 'submit_only';
 
 // Task status
 export type TaskStatus = 'pending' | 'completed' | 'cancelled' | 'skipped' | 'partial';
@@ -87,13 +91,20 @@ export interface GuesstimateOrderWithEventDetails extends GuesstimateOrder {
 }
 
 // Task Template definition (hardcoded in config)
+//
+// Note: this interface and its consumer (`src/lib/config/taskTemplates.ts`) are
+// legacy plumbing slated for removal in Task 2.8 of the task-system rework.
+// The legacy templates store completion modes as `'checkbox'` / `'submit_only'`,
+// which are not part of the canonical v2 `TaskCompletionType` union. We keep the
+// field deliberately wide here so the legacy file can still type-check until it
+// is deleted alongside this interface.
 export interface TaskTemplate {
   id: string; // Unique template identifier
   type: TaskType;
   name: string;
   description: string;
   timeline_offset: number; // Days relative to event
-  completion_type: TaskCompletionType;
+  completion_type: TaskCompletionType | 'checkbox' | 'submit_only';
   r2_file?: (eventId: string) => string; // Function to generate R2 path
   creates_go_id: boolean;
   creates_shipping: boolean;
@@ -198,13 +209,6 @@ export interface CreateGuesstimateOrderInput {
 
 /** Category prefix for the new task timeline */
 export type NewTaskPrefix = 'Ship' | 'Order' | 'Shipment' | 'Audio';
-
-/** Completion mode for the new task timeline */
-export type NewTaskCompletionType =
-  | 'monetary'
-  | 'orchestrated'
-  | 'tracklist'
-  | 'quantity_checkbox';
 
 /** Visual status of a cell in the task matrix grid */
 export type TaskCellStatus = 'white' | 'yellow' | 'red' | 'green' | 'grey' | 'orange';
