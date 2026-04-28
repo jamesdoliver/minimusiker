@@ -43,6 +43,7 @@ import {
   type ShopifyOrderLineItem,
 } from '@/lib/types/airtable';
 import { getOrdersByEventRecordId } from './ordersHelper';
+import { computeNewDeadline } from './deadlineHelper';
 import { classifyVariant } from '@/lib/config/variantClassification';
 
 /**
@@ -1342,21 +1343,25 @@ class TaskService {
 
     const updatedTasks: string[] = [];
 
-    // Update each task's deadline based on its timeline_offset
+    // Update each task's deadline. Prefer the canonical offset from the v2 timeline
+    // (looked up via template_id) so the timeline config is the single source of
+    // truth; fall back to the stored timeline_offset for legacy templates that are
+    // not in the v2 timeline. Uses the UTC-safe v2 calculator to avoid DST/TZ
+    // off-by-one bugs.
     for (const record of records) {
-      const timelineOffset = record.get(TASKS_FIELD_IDS.timeline_offset) as number | undefined;
+      const templateId = record.get(TASKS_FIELD_IDS.template_id) as string | undefined;
+      const storedOffset = record.get(TASKS_FIELD_IDS.timeline_offset) as number | undefined;
 
-      // Skip tasks without timeline_offset (e.g., manually created tasks)
-      if (timelineOffset === undefined || timelineOffset === null) {
+      const newDeadline = computeNewDeadline(eventDate, templateId, storedOffset);
+
+      // Skip tasks without an offset (e.g., manually created tasks)
+      if (newDeadline === null) {
         continue;
       }
 
-      // Calculate new deadline using the existing calculateDeadline function
-      const newDeadline = calculateDeadline(eventDate, timelineOffset);
-
       // Update the task
       await table.update(record.id, {
-        [TASKS_FIELD_IDS.deadline]: newDeadline.toISOString().split('T')[0], // Date only
+        [TASKS_FIELD_IDS.deadline]: newDeadline, // Date only (YYYY-MM-DD)
       });
 
       updatedTasks.push(record.id);
