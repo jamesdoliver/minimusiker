@@ -46,12 +46,13 @@ export default function MasterCdCompletion({
   const [error, setError] = useState<string | null>(null);
   const { state: zipState, startDownload: startZipDownload, cancel: cancelZipDownload } = useClientZipDownload();
 
-  const fetchTracklist = useCallback(async () => {
+  const fetchTracklist = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await fetch(`/api/admin/tasks/${taskId}/tracklist`, {
         credentials: 'include',
+        signal,
       });
       if (!response.ok) {
         throw new Error(`Server error (${response.status})`);
@@ -63,14 +64,17 @@ export default function MasterCdCompletion({
         throw new Error(data.error || 'Failed to fetch tracklist');
       }
     } catch (err) {
+      if ((err as { name?: string }).name === 'AbortError') return;
       setError(err instanceof Error ? err.message : 'Failed to load tracklist');
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) setIsLoading(false);
     }
   }, [taskId]);
 
   useEffect(() => {
-    fetchTracklist();
+    const controller = new AbortController();
+    fetchTracklist(controller.signal);
+    return () => controller.abort();
   }, [fetchTracklist]);
 
   const handleDownloadAll = async () => {
@@ -169,7 +173,7 @@ export default function MasterCdCompletion({
             <p className="text-red-700 font-medium">Error loading tracklist</p>
             <p className="text-sm text-red-600 mt-1">{error}</p>
             <button
-              onClick={fetchTracklist}
+              onClick={() => fetchTracklist()}
               className="mt-3 text-sm text-red-700 underline hover:no-underline"
             >
               Try again

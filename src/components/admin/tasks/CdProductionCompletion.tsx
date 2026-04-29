@@ -21,6 +21,7 @@ export default function CdProductionCompletion({
 
   // Fetch CD quantity on mount
   useEffect(() => {
+    const controller = new AbortController();
     const fetchQuantity = async () => {
       try {
         setLoading(true);
@@ -28,6 +29,7 @@ export default function CdProductionCompletion({
 
         const response = await fetch(`/api/admin/tasks/${taskId}/cd-quantity`, {
           credentials: 'include',
+          signal: controller.signal,
         });
         const data = await response.json();
 
@@ -37,13 +39,15 @@ export default function CdProductionCompletion({
 
         setQuantity(data.data.quantity);
       } catch (err) {
+        if ((err as { name?: string }).name === 'AbortError') return;
         setError(err instanceof Error ? err.message : 'Failed to load CD quantity');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
     fetchQuantity();
+    return () => controller.abort();
   }, [taskId]);
 
   const handleComplete = async () => {

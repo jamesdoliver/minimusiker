@@ -74,13 +74,14 @@ export default function WelleCompletion({
   // Fetch orders for the event
   // -------------------------------------------------------------------------
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     setError(null);
 
     try {
       const res = await fetch(`/api/admin/orders/events/${eventId}`, {
         credentials: 'include',
+        signal,
       });
 
       const data = await res.json().catch(() => ({}));
@@ -94,15 +95,18 @@ export default function WelleCompletion({
       const waveData = data.data[waveKey];
       setOrders(waveData?.orders ?? []);
     } catch (err) {
+      if ((err as { name?: string }).name === 'AbortError') return;
       console.error('Error fetching event orders:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch orders');
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) setIsLoading(false);
     }
   }, [eventId, welle]);
 
   useEffect(() => {
-    fetchOrders();
+    const controller = new AbortController();
+    fetchOrders(controller.signal);
+    return () => controller.abort();
   }, [fetchOrders]);
 
   // -------------------------------------------------------------------------
