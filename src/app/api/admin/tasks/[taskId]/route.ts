@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getTaskService } from '@/lib/services/taskService';
 import { TaskCompletionData } from '@/lib/types/tasks';
 import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 import { createWhitelistGuard } from '@/lib/api/validators';
+import { apiOk, apiError } from '@/lib/api/response';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,10 +31,7 @@ export async function GET(
     const task = await taskService.getTaskById(taskId);
 
     if (!task) {
-      return NextResponse.json(
-        { success: false, error: 'Task not found' },
-        { status: 404 }
-      );
+      return apiError('Task not found', 404);
     }
 
     // Get download URL if task has an R2 file
@@ -42,19 +40,13 @@ export async function GET(
       downloadUrl = await taskService.getTaskDownloadUrl(taskId);
     }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        ...task,
-        r2_download_url: downloadUrl,
-      },
+    return apiOk({
+      ...task,
+      r2_download_url: downloadUrl,
     });
   } catch (error) {
     console.error('Error fetching task:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch task' },
-      { status: 500 }
-    );
+    return apiError('Failed to fetch task', 500);
   }
 }
 
@@ -77,12 +69,9 @@ export async function PATCH(
     const body = await request.json();
 
     if (!isValidStatusOverride(body.status)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Invalid status. Expected one of: ${VALID_STATUS_OVERRIDES.join(', ')} or omit for completion.`,
-        },
-        { status: 400 },
+      return apiError(
+        `Invalid status. Expected one of: ${VALID_STATUS_OVERRIDES.join(', ')} or omit for completion.`,
+        400,
       );
     }
 
@@ -93,72 +82,49 @@ export async function PATCH(
     // Handle cancellation
     if (body.status === 'cancelled') {
       const task = await taskService.cancelTask(taskId, adminEmail);
-      return NextResponse.json({
-        success: true,
-        data: { task },
-        message: 'Task cancelled successfully.',
-      });
+      return apiOk({ task }, 'Task cancelled successfully.');
     }
 
     // Handle skip
     if (body.status === 'skipped') {
       const task = await taskService.skipTask(taskId, adminEmail);
-      return NextResponse.json({
-        success: true,
-        data: { task },
-        message: 'Task skipped successfully.',
-      });
+      return apiOk({ task }, 'Task skipped successfully.');
     }
 
     // Handle partial completion
     if (body.status === 'partial') {
       if (!body.completion_data?.notes) {
-        return NextResponse.json(
-          { success: false, error: 'Notes are required for partial completion' },
-          { status: 400 },
-        );
+        return apiError('Notes are required for partial completion', 400);
       }
       const task = await taskService.partialCompleteTask(
         taskId,
         body.completion_data,
         adminEmail,
       );
-      return NextResponse.json({
-        success: true,
-        data: { task },
-        message: 'Task partially completed.',
-      });
+      return apiOk({ task }, 'Task partially completed.');
     }
 
     // Handle revert to pending
     if (body.status === 'pending') {
       const task = await taskService.revertTask(taskId, adminEmail);
-      return NextResponse.json({
-        success: true,
-        data: { task },
-        message: 'Task reverted to pending.',
-      });
+      return apiOk({ task }, 'Task reverted to pending.');
     }
 
     // Handle completion
     const completionData: TaskCompletionData = body.completion_data || {};
     const result = await taskService.completeTask(taskId, completionData, adminEmail);
 
-    return NextResponse.json({
-      success: true,
-      data: {
+    return apiOk(
+      {
         task: result.task,
         go_id: result.goId,
       },
-      message: 'Task completed successfully.',
-    });
+      'Task completed successfully.',
+    );
   } catch (error) {
     console.error('Error updating task:', error);
     const message = error instanceof Error ? error.message : 'Failed to update task';
     const status = message === 'Task is already completed' ? 409 : 500;
-    return NextResponse.json(
-      { success: false, error: message },
-      { status }
-    );
+    return apiError(message, status);
   }
 }

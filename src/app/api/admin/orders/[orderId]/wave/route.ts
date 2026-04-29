@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getOrderWaveService } from '@/lib/services/orderWaveService';
 import { requireAdmin } from '@/lib/auth/verifyAdminSession';
 import type { ShipmentWave } from '@/lib/types/tasks';
+import { apiOk, apiError } from '@/lib/api/response';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,22 +27,19 @@ export async function PATCH(
     const { shipment_wave } = body;
 
     if (!shipment_wave || !VALID_WAVES.includes(shipment_wave)) {
-      return NextResponse.json(
-        { success: false, error: `Invalid shipment_wave value. Must be one of: ${VALID_WAVES.join(', ')}` },
-        { status: 400 }
+      return apiError(
+        `Invalid shipment_wave value. Must be one of: ${VALID_WAVES.join(', ')}`,
+        400,
       );
     }
 
     const orderWaveService = getOrderWaveService();
     await orderWaveService.overrideWave(orderId, shipment_wave as ShipmentWave);
 
-    return NextResponse.json({ success: true });
+    return apiOk({});
   } catch (error) {
     console.error('Error overriding shipment wave:', error);
     const message = error instanceof Error ? error.message : 'Failed to override shipment wave';
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 500 }
-    );
+    return apiError(message, 500);
   }
 }

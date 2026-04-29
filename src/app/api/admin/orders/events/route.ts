@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getOrderWaveService } from '@/lib/services/orderWaveService';
 import { requireAdmin } from '@/lib/auth/verifyAdminSession';
+import { apiOk, apiError } from '@/lib/api/response';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,15 +17,9 @@ export async function GET(request: NextRequest) {
     const orderWaveService = getOrderWaveService();
     const events = await orderWaveService.getEventWaveSummaries();
 
-    return NextResponse.json({
-      success: true,
-      data: { events },
-    });
+    return apiOk({ events });
   } catch (error) {
     console.error('Error fetching event wave summaries:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch event wave summaries' },
-      { status: 500 }
-    );
+    return apiError('Failed to fetch event wave summaries', 500);
   }
 }

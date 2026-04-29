@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getTaskService } from '@/lib/services/taskService';
 import { TaskStatus, TaskFilterTab } from '@/lib/types/tasks';
 import { requireAdmin } from '@/lib/auth/verifyAdminSession';
+import { apiOk, apiError } from '@/lib/api/response';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,15 +38,9 @@ export async function GET(request: NextRequest) {
     const taskService = getTaskService();
     const result = await taskService.getTasks({ status, type, search });
 
-    return NextResponse.json({
-      success: true,
-      data: result,
-    });
+    return apiOk(result);
   } catch (error) {
     console.error('Error fetching tasks:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch tasks' },
-      { status: 500 }
-    );
+    return apiError('Failed to fetch tasks', 500);
   }
 }

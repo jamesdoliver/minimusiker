@@ -10,7 +10,7 @@
  * Returns orders with line items and aggregated data for admin dashboard.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import Airtable from 'airtable';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import {
@@ -20,6 +20,7 @@ import {
 } from '@/lib/types/airtable';
 import { resolveEventRecordId } from '@/lib/services/ordersHelper';
 import { createWhitelistGuard } from '@/lib/api/validators';
+import { apiOk, apiError } from '@/lib/api/response';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,10 +65,7 @@ export async function GET(request: NextRequest) {
     // Verify admin session
     const session = await verifyAdminSession(request);
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return apiError('Unauthorized', 401);
     }
 
     // Parse query params
@@ -80,14 +78,9 @@ export async function GET(request: NextRequest) {
     const rawStatus = searchParams.get('status');
     const status = rawStatus && rawStatus.length > 0 ? rawStatus : null;
     if (status !== null && !isValidPaymentStatus(status)) {
-      // NOTE: This route's other error responses still use the legacy `{ error }` shape.
-      // Phase 3 Task 3.4 normalizes admin response shapes to `{ success, error?, data? }`.
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Invalid status. Expected one of: ${VALID_PAYMENT_STATUSES.join(', ')}. Omit the parameter to skip filtering.`,
-        },
-        { status: 400 },
+      return apiError(
+        `Invalid status. Expected one of: ${VALID_PAYMENT_STATUSES.join(', ')}. Omit the parameter to skip filtering.`,
+        400,
       );
     }
     const limit = parseInt(searchParams.get('limit') || '100', 10);
@@ -99,7 +92,7 @@ export async function GET(request: NextRequest) {
       if (!eventRecordId) {
         console.warn(`[admin/orders] Event not found for identifier: ${eventId}`);
         // Return empty results if event doesn't exist
-        return NextResponse.json({
+        return apiOk<OrdersResponse>({
           orders: [],
           summary: {
             totalOrders: 0,
@@ -186,15 +179,10 @@ export async function GET(request: NextRequest) {
       digitalDelivered: orders.filter(o => o.digitalDelivered).length,
     };
 
-    const response: OrdersResponse = { orders, summary };
-
-    return NextResponse.json(response);
+    return apiOk<OrdersResponse>({ orders, summary });
 
   } catch (error) {
     console.error('[admin/orders] Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch orders' },
-      { status: 500 }
-    );
+    return apiError('Failed to fetch orders', 500);
   }
 }
