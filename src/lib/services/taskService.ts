@@ -42,33 +42,11 @@ import { computeNewDeadline } from './deadlineHelper';
 import { uniqueLinkedRecordIds } from './taskBatchHelpers';
 import { classifyVariant } from '@/lib/config/variantClassification';
 
-/**
- * Normalize a stored Airtable `completion_type` value into the canonical v2 union.
- *
- * Airtable still holds legacy values (`'checkbox'`, `'submit_only'`) written before
- * the type system was unified. They are ambiguous (orchestrated vs quantity_checkbox
- * both stored as `'checkbox'`), so we resolve them by looking up the task's template
- * in `TASK_TIMELINE` — the authoritative source of truth for completion type.
- */
-function normalizeCompletionType(
-  storedValue: string | undefined,
-  templateId: string,
-): TaskCompletionType {
-  // V2 values pass through unchanged
-  if (
-    storedValue === 'monetary' ||
-    storedValue === 'orchestrated' ||
-    storedValue === 'tracklist' ||
-    storedValue === 'quantity_checkbox'
-  ) {
-    return storedValue;
-  }
-  // Legacy storage values are ambiguous; resolve via the template
-  const entry = getTimelineEntry(templateId);
-  if (entry) return entry.completion;
-  // Fallback for unknown legacy templates (already on the way out)
-  return 'monetary';
-}
+// Re-export normalizeCompletionType from its dedicated module so the service
+// stays the single import point for downstream code, while unit tests can
+// pull the helper directly without dragging in the Airtable SDK singletons.
+export { normalizeCompletionType } from './normalizeCompletionType';
+import { normalizeCompletionType } from './normalizeCompletionType';
 
 // Re-export uniqueLinkedRecordIds so existing imports from this module still work.
 export { uniqueLinkedRecordIds };
