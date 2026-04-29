@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { cn, formatDate } from '@/lib/utils';
 import type { TaskMatrixCell } from '@/lib/types/tasks';
 import { getTimelineEntry, PREFIX_STYLES } from '@/lib/config/taskTimeline';
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,12 +93,10 @@ function PopoverMonetaryQuickComplete({
         });
       }
 
-      const data = await response.json().catch(() => ({}));
+      const data = await parseJsonOrThrow<{ success: boolean; error?: string }>(response);
 
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.error || `Failed to complete task (${response.status})`,
-        );
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to complete task');
       }
 
       onCompleted();

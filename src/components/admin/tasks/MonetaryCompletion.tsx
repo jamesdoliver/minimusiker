@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
 
 interface MonetaryCompletionProps {
   taskId: string;
@@ -78,10 +79,10 @@ export default function MonetaryCompletion({
         }),
       });
 
-      const data = await response.json().catch(() => ({}));
+      const data = await parseJsonOrThrow<{ success: boolean; error?: string }>(response);
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || `Failed to complete task (${response.status})`);
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to complete task');
       }
 
       // Upload invoice after task completion. Failure is non-blocking — task is
@@ -96,11 +97,9 @@ export default function MonetaryCompletion({
             credentials: 'include',
             body: formData,
           });
-          if (!uploadRes.ok) {
-            const uploadData = await uploadRes.json().catch(() => ({}));
-            console.error('Invoice upload failed:', uploadData.error || uploadRes.status);
-            setWarning('Task completed, but invoice upload failed. You can re-upload from the task list.');
-          }
+          // parseJsonOrThrow throws on !ok with a meaningful message; we catch
+          // below and convert to a warning rather than blocking task completion.
+          await parseJsonOrThrow(uploadRes);
         } catch (uploadErr) {
           console.error('Invoice upload error:', uploadErr);
           setWarning('Task completed, but invoice upload failed. You can re-upload from the task list.');

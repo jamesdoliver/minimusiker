@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -84,10 +85,14 @@ export default function WelleCompletion({
         signal,
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await parseJsonOrThrow<{
+        success: boolean;
+        error?: string;
+        data: { welle1?: { orders?: WaveOrder[] }; welle2?: { orders?: WaveOrder[] } };
+      }>(res);
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Failed to fetch orders (${res.status})`);
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch orders');
       }
 
       // Pick the correct wave's orders
@@ -126,10 +131,14 @@ export default function WelleCompletion({
         body: JSON.stringify({ welle }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await parseJsonOrThrow<{
+        success: boolean;
+        error?: string;
+        data: FulfillmentResult;
+      }>(res);
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Fulfillment failed (${res.status})`);
+      if (!data.success) {
+        throw new Error(data.error || 'Fulfillment failed');
       }
 
       const result: FulfillmentResult = data.data;
