@@ -28,9 +28,12 @@ export async function GET(
     const taskService = getTaskService();
     const orderWaveService = getOrderWaveService();
 
-    // Fetch tasks and wave summary in parallel
+    // Fetch tasks and wave summary in parallel.
+    // NOTE: `getTasks` searches `template_id` / `order_ids` only, not `event_id`,
+    // so passing `search: eventId` returns nothing. Fetch all tasks (efficient
+    // per Task 2.9 batch enrichment) and filter in-memory by event_id below.
     const [tasksResult, waveSummary] = await Promise.all([
-      taskService.getTasks({ status: undefined, type: 'all', search: eventId }),
+      taskService.getTasks({ type: 'all' }),
       orderWaveService.getEventOrders(eventId),
     ]);
 
