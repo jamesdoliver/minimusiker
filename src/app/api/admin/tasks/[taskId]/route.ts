@@ -8,23 +8,10 @@ export const dynamic = 'force-dynamic';
 
 const VALID_STATUS_OVERRIDES = ['cancelled', 'skipped', 'partial', 'pending'] as const;
 
-/**
- * Type-narrowing guard exported for unit testing and downstream call sites.
- * Returns true when `status` is one of the explicit override values handled by
- * the PATCH branches, or undefined (which routes to the default completion
- * path). Anything else must be rejected so unknown/typo'd values don't
- * silently complete a task.
- *
- * Implemented via the shared `createWhitelistGuard` helper so the predicate
- * shape stays consistent across routes. The boolean-returning call site below
- * (`!isValidStatusOverride(body.status)`) still works unchanged because a
- * type-predicate return value is structurally `boolean` at runtime.
- *
- * Note: this is exported from a Next.js route file. Next.js only serves the
- * HTTP method exports (GET/PATCH/etc); arbitrary additional exports are
- * permitted and not exposed as endpoints.
- */
-export const isValidStatusOverride = createWhitelistGuard(VALID_STATUS_OVERRIDES);
+// Type-narrowing guard for the PATCH body's `status` field. Accepts the
+// explicit override values or undefined (default completion path); rejects
+// everything else so unknown/typo'd values don't silently complete a task.
+const isValidStatusOverride = createWhitelistGuard(VALID_STATUS_OVERRIDES);
 
 /**
  * GET /api/admin/tasks/[taskId]
