@@ -15,7 +15,7 @@ import {
   AggregatedClothingItems,
   ClothingItem,
 } from '@/lib/types/clothingOrders';
-import { calculateDeadline } from '@/lib/config/taskTimeline';
+import { calculateDeadline, getTimelineEntry } from '@/lib/config/taskTimeline';
 import {
   ORDERS_TABLE_ID,
   ORDERS_FIELD_IDS,
@@ -326,11 +326,11 @@ class ClothingOrdersService {
     const tasksTable = base(TASKS_TABLE_ID);
     const eventsTable = base(EVENTS_TABLE_ID);
 
-    // Find the pending order_schul_shirts task for this event
+    // Find the pending order_schul_clothing task for this event
     const pendingTasks = await tasksTable
       .select({
         filterByFormula: `AND(
-          {${TASKS_FIELD_IDS.template_id}} = 'order_schul_shirts',
+          {${TASKS_FIELD_IDS.template_id}} = 'order_schul_clothing',
           {${TASKS_FIELD_IDS.status}} = 'pending',
           SEARCH('${eventRecordId}', ARRAYJOIN({${TASKS_FIELD_IDS.event_id}}))
         )`,
@@ -359,16 +359,22 @@ class ClothingOrdersService {
       const event = eventRecords[0];
       const eventDate = event.get(EVENTS_FIELD_IDS.event_date) as string;
 
-      const deadline = calculateDeadline(new Date(eventDate), -ORDER_DAY_OFFSET);
+      // Derive task content from the v2 timeline entry to prevent drift
+      const entry = getTimelineEntry('order_schul_clothing');
+      if (!entry) {
+        throw new Error("Timeline entry 'order_schul_clothing' not found");
+      }
+
+      const deadline = calculateDeadline(new Date(eventDate), entry.offset);
 
       const pendingTask = await taskService.createTask({
         event_id: eventRecordId,
-        template_id: 'order_schul_shirts',
-        task_type: 'clothing_order',
-        task_name: 'Order School T-Shirts & Hoodies',
-        description: 'Place supplier order for school-branded clothing items',
-        completion_type: 'monetary',
-        timeline_offset: -ORDER_DAY_OFFSET,
+        template_id: entry.id,
+        task_type: 'clothing_order', // legacy Airtable single-select; keep until Phase 3 TaskType decision
+        task_name: entry.displayName,
+        description: entry.description,
+        completion_type: entry.completion,
+        timeline_offset: entry.offset,
         deadline: deadline.toISOString(),
         status: 'pending',
       });

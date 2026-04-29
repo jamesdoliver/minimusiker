@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MinicardOrderEvent } from '@/lib/types/minicardOrders';
 import { TaskWithEventDetails } from '@/lib/types/tasks';
+import { getTimelineEntry } from '@/lib/config/taskTimeline';
 import MinicardOrderCard from './MinicardOrderCard';
 
 interface MinicardOrdersViewProps {
@@ -69,17 +70,24 @@ export default function MinicardOrdersView({ isActive, onCompleteTask, refreshKe
   };
 
   const handleMarkComplete = (event: MinicardOrderEvent) => {
+    // Derive synthetic task content from the v2 timeline entry to prevent drift
+    const entry = getTimelineEntry('order_minicard');
+    if (!entry) {
+      alert("Timeline entry 'order_minicard' not found");
+      return;
+    }
+
     // Build a synthetic TaskWithEventDetails for the completion modal
     const syntheticTask: TaskWithEventDetails = {
       id: event.task_record_id,
       task_id: '',
-      template_id: 'minicard',
+      template_id: entry.id,
       event_id: event.event_record_id,
-      task_type: 'paper_order',
-      task_name: 'Order Minicards',
-      description: `Minicard order for ${event.school_name}`,
-      completion_type: 'monetary',
-      timeline_offset: 1,
+      task_type: 'paper_order', // legacy Airtable single-select; keep until Phase 3 TaskType decision
+      task_name: entry.displayName,
+      description: entry.description,
+      completion_type: entry.completion,
+      timeline_offset: entry.offset,
       deadline: event.deadline,
       status: 'pending',
       created_at: '',

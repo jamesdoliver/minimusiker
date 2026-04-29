@@ -60,7 +60,7 @@ class MinicardOrdersService {
     const pendingTasks = await tasksTable
       .select({
         filterByFormula: `AND(
-          {${TASKS_FIELD_IDS.template_id}} = 'minicard',
+          {${TASKS_FIELD_IDS.template_id}} = 'order_minicard',
           {${TASKS_FIELD_IDS.status}} = 'pending'
         )`,
         returnFieldsByFieldId: true,
