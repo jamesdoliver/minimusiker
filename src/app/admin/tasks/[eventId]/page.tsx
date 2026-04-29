@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { cn, formatDate } from '@/lib/utils';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -39,9 +39,9 @@ interface EventDetailData {
 export default function EventDetailPage({
   params,
 }: {
-  params: Promise<{ eventId: string }>;
+  params: { eventId: string };
 }) {
-  const { eventId } = use(params);
+  const { eventId } = params;
 
   const [data, setData] = useState<EventDetailData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
