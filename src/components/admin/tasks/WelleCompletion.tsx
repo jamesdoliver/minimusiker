@@ -147,7 +147,7 @@ export default function WelleCompletion({
       // If all succeeded, auto-complete the task
       if (result.failed === 0) {
         try {
-          await fetch(`/api/admin/tasks/${taskId}`, {
+          const completeRes = await fetch(`/api/admin/tasks/${taskId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -158,6 +158,7 @@ export default function WelleCompletion({
               },
             }),
           });
+          await parseJsonOrThrow(completeRes);
           onComplete();
         } catch (completeErr) {
           console.error('Error completing task:', completeErr);
