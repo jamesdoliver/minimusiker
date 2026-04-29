@@ -1332,13 +1332,13 @@ class TaskService {
         .all(),
     );
 
-    const updatedTasks: string[] = [];
-
-    // Update each task's deadline. Prefer the canonical offset from the v2 timeline
+    // Build the update set first. Prefer the canonical offset from the v2 timeline
     // (looked up via template_id) so the timeline config is the single source of
     // truth; fall back to the stored timeline_offset for legacy templates that are
     // not in the v2 timeline. Uses the UTC-safe v2 calculator to avoid DST/TZ
     // off-by-one bugs.
+    const updates: Array<{ id: string; fields: Partial<Airtable.FieldSet> }> = [];
+
     for (const record of records) {
       const templateId = record.get(TASKS_FIELD_IDS.template_id) as string | undefined;
       const storedOffset = record.get(TASKS_FIELD_IDS.timeline_offset) as number | undefined;
@@ -1350,15 +1350,24 @@ class TaskService {
         continue;
       }
 
-      // Update the task
-      await withRetry(() =>
-        table.update(record.id, {
+      updates.push({
+        id: record.id,
+        fields: {
           [TASKS_FIELD_IDS.deadline]: newDeadline, // Date only (YYYY-MM-DD)
-        }),
-      );
-
-      updatedTasks.push(record.id);
+        },
+      });
     }
+
+    // Bulk update — Airtable accepts up to 10 records per call. For ~11 tasks
+    // this is 2 round-trips instead of N. Each chunk is wrapped in withRetry
+    // so transient 5xx / rate-limit errors are retried per chunk.
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const chunk = updates.slice(i, i + BATCH_SIZE);
+      await withRetry(() => table.update(chunk));
+    }
+
+    const updatedTasks = updates.map((u) => u.id);
 
     console.log(
       `Recalculated deadlines for ${updatedTasks.length} tasks for event ${eventRecordId} with new date ${newEventDate}`
