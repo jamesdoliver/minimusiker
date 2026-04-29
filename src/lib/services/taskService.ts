@@ -634,9 +634,19 @@ class TaskService {
 
   /**
    * Get GuesstimateOrders enriched with event details (for incoming orders view)
+   *
+   * Batches the event lookup with `getEventsByIds` instead of fetching one event
+   * per order — same pattern as `getTasks`. For ~N pending orders this collapses
+   * up to N round-trips into a single batched select.
    */
   async getGuesstimateOrdersEnriched(options?: { pendingOnly?: boolean }): Promise<GuesstimateOrderWithEventDetails[]> {
     const orders = await this.getGuesstimateOrders(undefined, options?.pendingOnly);
+
+    // Collect unique event IDs and batch-fetch once
+    const eventIds = Array.from(
+      new Set(orders.map((o) => o.event_id).filter((id): id is string => Boolean(id))),
+    );
+    const events = await this.batchFetchEvents(eventIds);
 
     const enriched: GuesstimateOrderWithEventDetails[] = [];
 
@@ -645,7 +655,7 @@ class TaskService {
       let eventDate = '';
 
       if (order.event_id) {
-        const event = await this.airtable.getEventById(order.event_id);
+        const event = events.get(order.event_id);
         if (event) {
           schoolName = event.school_name;
           eventDate = event.event_date;
