@@ -62,6 +62,7 @@ import { SONGS_TABLE_ID } from '@/lib/types/teacher';
 import { ManualCost } from '@/lib/types/analytics';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { aggregateEventTotals, AggregableClass } from '@/lib/utils/eventAggregation';
+import { withRetry } from '@/lib/utils/withRetry';
 import {
   TeacherResource,
   TEACHER_RESOURCES_TABLE_ID,
@@ -6152,7 +6153,9 @@ class AirtableService {
    */
   async getEventById(recordId: string): Promise<Event | null> {
     try {
-      const record = await this.base(EVENTS_TABLE_ID).find(recordId);
+      const record = await withRetry(() =>
+        this.base(EVENTS_TABLE_ID).find(recordId),
+      );
       return this.transformEventRecord(record);
     } catch (error) {
       console.error('Error fetching Event by record ID:', error);
@@ -6202,12 +6205,14 @@ class AirtableService {
       const batch = safeIds.slice(i, i + batchSize);
       const formula = `OR(${batch.map((id) => `RECORD_ID() = '${id}'`).join(',')})`;
       try {
-        const records = await this.base(EVENTS_TABLE_ID)
-          .select({
-            filterByFormula: formula,
-            returnFieldsByFieldId: true,
-          })
-          .all();
+        const records = await withRetry(() =>
+          this.base(EVENTS_TABLE_ID)
+            .select({
+              filterByFormula: formula,
+              returnFieldsByFieldId: true,
+            })
+            .all(),
+        );
         for (const record of records) {
           events.push(this.transformEventRecord(record));
         }

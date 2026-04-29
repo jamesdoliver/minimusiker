@@ -27,6 +27,7 @@ import {
   type TaskCompletionType,
 } from '@/lib/config/taskTimeline';
 import { calculateUrgencyScore } from '@/lib/utils/taskUrgency';
+import { withRetry } from '@/lib/utils/withRetry';
 import {
   TASKS_TABLE_ID,
   TASKS_FIELD_IDS,
@@ -185,14 +186,16 @@ class TaskService {
     const filterFormula = filters.length > 0 ? `AND(${filters.join(', ')})` : '';
 
     // Fetch all tasks to calculate counts
-    const allRecords = await table
-      .select({
-        returnFieldsByFieldId: true,
-        filterByFormula: options.status
-          ? `{${TASKS_FIELD_IDS.status}} = '${options.status}'`
-          : '',
-      })
-      .all();
+    const allRecords = await withRetry(() =>
+      table
+        .select({
+          returnFieldsByFieldId: true,
+          filterByFormula: options.status
+            ? `{${TASKS_FIELD_IDS.status}} = '${options.status}'`
+            : '',
+        })
+        .all(),
+    );
 
     // Calculate counts per type
     const counts: Record<TaskFilterTab, number> = {
@@ -214,7 +217,11 @@ class TaskService {
 
     // Fetch filtered tasks
     const filteredRecords = filterFormula
-      ? await table.select({ returnFieldsByFieldId: true, filterByFormula: filterFormula }).all()
+      ? await withRetry(() =>
+          table
+            .select({ returnFieldsByFieldId: true, filterByFormula: filterFormula })
+            .all(),
+        )
       : allRecords;
 
     // Batch-fetch supporting records once instead of per-task. Without this,
@@ -332,7 +339,9 @@ class TaskService {
       updateFields[TASKS_FIELD_IDS.order_ids] = goEnrichment.order_ids;
     }
 
-    await table.update(taskId, updateFields as Partial<Airtable.FieldSet>);
+    await withRetry(() =>
+      table.update(taskId, updateFields as Partial<Airtable.FieldSet>),
+    );
 
     // Refetch the updated task
     const updatedRecord = await this.findTaskRecord(table, taskId);
@@ -848,12 +857,14 @@ class TaskService {
     // 1. Parallel fetch: confirmed events + all non-cancelled tasks
     const [confirmedEvents, taskRecords] = await Promise.all([
       this.airtable.getConfirmedEvents(),
-      table
-        .select({
-          returnFieldsByFieldId: true,
-          filterByFormula: `{${TASKS_FIELD_IDS.status}} != 'cancelled'`,
-        })
-        .all(),
+      withRetry(() =>
+        table
+          .select({
+            returnFieldsByFieldId: true,
+            filterByFormula: `{${TASKS_FIELD_IDS.status}} != 'cancelled'`,
+          })
+          .all(),
+      ),
     ]);
 
     // 2. Index tasks by event_id → template_id for O(1) lookup
@@ -1203,9 +1214,11 @@ class TaskService {
       const batch = safeIds.slice(i, i + batchSize);
       const formula = `OR(${batch.map((id) => `RECORD_ID() = '${id}'`).join(',')})`;
       try {
-        const records = await goTable
-          .select({ filterByFormula: formula, returnFieldsByFieldId: true })
-          .all();
+        const records = await withRetry(() =>
+          goTable
+            .select({ filterByFormula: formula, returnFieldsByFieldId: true })
+            .all(),
+        );
         for (const record of records) {
           map.set(record.id, record);
         }
@@ -1332,15 +1345,17 @@ class TaskService {
     // Find all pending tasks for this event
     // Use SEARCH() with ARRAYJOIN() because event_id is a linked record field (array)
     const sanitizedEventId = eventRecordId.replace(/'/g, "\\'");
-    const records = await table
-      .select({
-        returnFieldsByFieldId: true,
-        filterByFormula: `AND(
-          SEARCH('${sanitizedEventId}', ARRAYJOIN({${TASKS_FIELD_IDS.event_id}})),
-          {${TASKS_FIELD_IDS.status}} = 'pending'
-        )`,
-      })
-      .all();
+    const records = await withRetry(() =>
+      table
+        .select({
+          returnFieldsByFieldId: true,
+          filterByFormula: `AND(
+            SEARCH('${sanitizedEventId}', ARRAYJOIN({${TASKS_FIELD_IDS.event_id}})),
+            {${TASKS_FIELD_IDS.status}} = 'pending'
+          )`,
+        })
+        .all(),
+    );
 
     const updatedTasks: string[] = [];
 
@@ -1361,9 +1376,11 @@ class TaskService {
       }
 
       // Update the task
-      await table.update(record.id, {
-        [TASKS_FIELD_IDS.deadline]: newDeadline, // Date only (YYYY-MM-DD)
-      });
+      await withRetry(() =>
+        table.update(record.id, {
+          [TASKS_FIELD_IDS.deadline]: newDeadline, // Date only (YYYY-MM-DD)
+        }),
+      );
 
       updatedTasks.push(record.id);
     }
