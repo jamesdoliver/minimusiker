@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { useClientZipDownload, ZipDownloadFile } from '@/lib/hooks/useClientZipDownload';
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
 
 interface TrackInfo {
   songId: string;
@@ -54,15 +55,11 @@ export default function MasterCdCompletion({
         credentials: 'include',
         signal,
       });
-      if (!response.ok) {
-        throw new Error(`Server error (${response.status})`);
-      }
-      const data = await response.json();
-      if (data.success) {
-        setTracklist(data.data);
-      } else {
+      const data = await parseJsonOrThrow<{ success: boolean; data: MasterCdData; error?: string }>(response);
+      if (!data.success) {
         throw new Error(data.error || 'Failed to fetch tracklist');
       }
+      setTracklist(data.data);
     } catch (err) {
       if ((err as { name?: string }).name === 'AbortError') return;
       setError(err instanceof Error ? err.message : 'Failed to load tracklist');
@@ -84,10 +81,7 @@ export default function MasterCdCompletion({
       const response = await fetch(`/api/admin/tasks/${taskId}/download`, {
         credentials: 'include',
       });
-      if (!response.ok) {
-        throw new Error(`Download failed (${response.status})`);
-      }
-      const data = await response.json();
+      const data = await parseJsonOrThrow<{ success: boolean; data: { tracks: Array<{ trackNumber: number; filename: string; url: string }> }; error?: string }>(response);
       if (!data.success) {
         throw new Error(data.error || 'Failed to get download URLs');
       }
@@ -127,12 +121,7 @@ export default function MasterCdCompletion({
           completion_data: { tracklist_verified: true },
         }),
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to complete task (${response.status})`);
-      }
-
-      const data = await response.json();
+      const data = await parseJsonOrThrow<{ success: boolean; error?: string }>(response);
       if (!data.success) {
         throw new Error(data.error || 'Failed to complete task');
       }

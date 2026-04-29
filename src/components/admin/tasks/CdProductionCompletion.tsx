@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
 
 interface CdProductionCompletionProps {
   taskId: string;
@@ -31,7 +32,7 @@ export default function CdProductionCompletion({
           credentials: 'include',
           signal: controller.signal,
         });
-        const data = await response.json();
+        const data = await parseJsonOrThrow<{ success: boolean; data: { quantity: number }; error?: string }>(response);
 
         if (!data.success) {
           throw new Error(data.error || 'Failed to fetch CD quantity');
@@ -63,8 +64,7 @@ export default function CdProductionCompletion({
           completion_data: { quantity_confirmed: true },
         }),
       });
-
-      const data = await response.json();
+      const data = await parseJsonOrThrow<{ success: boolean; error?: string }>(response);
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to complete task');
