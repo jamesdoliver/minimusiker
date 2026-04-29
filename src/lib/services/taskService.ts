@@ -119,9 +119,6 @@ class TaskService {
       [TASKS_FIELD_IDS.deadline]: input.deadline.split('T')[0], // Date only
       [TASKS_FIELD_IDS.status]: input.status,
       [TASKS_FIELD_IDS.created_at]: new Date().toISOString(),
-      ...(input.parent_task_id && {
-        [TASKS_FIELD_IDS.parent_task_id]: [input.parent_task_id],
-      }),
     });
 
     // Re-fetch with returnFieldsByFieldId for consistent field ID mapping
@@ -1123,7 +1120,6 @@ class TaskService {
 
     const eventIds = get(TASKS_FIELD_IDS.event_id) as string[] | undefined;
     const goIds = get(TASKS_FIELD_IDS.go_id) as string[] | undefined;
-    const parentTaskIds = get(TASKS_FIELD_IDS.parent_task_id) as string[] | undefined;
 
     return {
       id: record.id,
@@ -1146,7 +1142,6 @@ class TaskService {
       completion_data: get(TASKS_FIELD_IDS.completion_data) as string | undefined,
       go_id: goIds?.[0],
       order_ids: get(TASKS_FIELD_IDS.order_ids) as string | undefined,
-      parent_task_id: parentTaskIds?.[0],
       created_at: (get(TASKS_FIELD_IDS.created_at) as string) || '',
     };
   }
@@ -1234,9 +1229,8 @@ class TaskService {
       schoolName = `${task.event_ids.length} schools`;
     }
 
-    // Get go_id display value and stock arrival status
+    // Get go_id display value
     let goDisplayId: string | undefined;
-    let stockArrived: boolean | undefined;
     const goId = task.go_id;
     if (goId) {
       try {
@@ -1249,12 +1243,6 @@ class TaskService {
 
         if (goRecord) {
           goDisplayId = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.go_id) as string;
-
-          // For shipping tasks, check if linked GO-ID stock has arrived
-          if (task.task_type === 'shipping') {
-            const dateCompleted = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.date_completed) as string | undefined;
-            stockArrived = !!dateCompleted;
-          }
         }
       } catch {
         // Ignore if go_id record not found
@@ -1279,7 +1267,6 @@ class TaskService {
       days_until_due: daysUntilDue,
       is_overdue: isOverdue,
       r2_file_path: r2FilePath,
-      stock_arrived: stockArrived,
     };
   }
 

@@ -38,7 +38,6 @@ export interface Task {
   completion_data?: string; // JSON string of TaskCompletionData
   go_id?: string; // Linked GuesstimateOrder record ID
   order_ids?: string; // Comma-separated Shopify order IDs
-  parent_task_id?: string; // For shipping tasks, references parent task
   created_at: string;
 }
 
@@ -53,7 +52,6 @@ export interface TaskWithEventDetails extends Task {
   is_overdue: boolean;
   r2_file_path?: string; // Path to downloadable file
   r2_download_url?: string; // Signed URL for download
-  stock_arrived?: boolean; // For shipping tasks: whether linked GO-ID stock has arrived
 }
 
 // Completion data stored as JSON
@@ -167,7 +165,6 @@ export interface CreateTaskInput {
   timeline_offset: number;
   deadline: string;
   status: TaskStatus;
-  parent_task_id?: string;
 }
 
 export interface CompleteTaskInput {
