@@ -37,7 +37,7 @@
       "maxDuration": 300
     },
     "src/app/api/cron/email-automation/route.ts": {
-      "maxDuration": 300
+      "maxDuration": 900
     },
     "src/app/api/cron/standard-clothing-batch/route.ts": {
       "maxDuration": 120
