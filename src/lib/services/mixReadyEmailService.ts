@@ -86,6 +86,18 @@ async function sendOne(
   const alreadySent = await airtable.hasEmailBeenSent(entry.name, recipient.eventId, recipient.email);
   if (alreadySent) { counters.skipped++; return; }
 
+  // Cross-variant dedup: a parent who already received the OTHER variant
+  // (e.g. non-buyer email already sent, then they bought audio) must not
+  // receive a second email under the new variant's name.
+  if (slug === PARENT_BUYER_SLUG || slug === PARENT_NON_BUYER_SLUG) {
+    const otherSlug = slug === PARENT_BUYER_SLUG ? PARENT_NON_BUYER_SLUG : PARENT_BUYER_SLUG;
+    const otherEntry = getRegistryEntry(otherSlug);
+    if (otherEntry) {
+      const sentOther = await airtable.hasEmailBeenSent(otherEntry.name, recipient.eventId, recipient.email);
+      if (sentOther) { counters.skipped++; return; }
+    }
+  }
+
   const isParentLike = recipient.type === 'parent' || recipient.type === 'non-buyer';
   const unsubscribeUrl = isParentLike ? generateUnsubscribeUrl(recipient.email) : undefined;
   const templateOptions = isParentLike && unsubscribeUrl

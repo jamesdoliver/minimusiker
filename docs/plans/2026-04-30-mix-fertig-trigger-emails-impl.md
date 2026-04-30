@@ -1152,7 +1152,10 @@ EOF
 ## Risks and rollback
 
 - **Pre-+7-day fires:** for events where the engineer finishes mixing well before the event, the email fires earlier than the existing +7-day timeline. Parents clicking through may see only previews (or nothing if pre-+7). User accepted this trade-off.
-- **Dedup boundary:** `hasEmailBeenSent` keys on `(template_name, event_id, recipient_email)`. If a parent's audio-purchase status changes after the email is sent (e.g. they buy later), they will NOT be re-emailed — by design.
+- **Dedup boundary:** `hasEmailBeenSent` keys on `(template_name, event_id, recipient_email)`. The
+  parent buyer/non-buyer slugs have different template names, so we add a cross-variant dedup
+  check in `sendOne` to ensure a parent who already received one variant won't receive the
+  other if their audio-purchase status flips between cron ticks.
 - **Rollback:** to revert, re-activate the two Airtable Timeline records and either (a) leave the new code in place but mark the three new registry entries inactive in Airtable (admin can do this from the Trigger E-Mails tab), or (b) revert the PR. The cron handler is additive and disabling the registry entries makes it a no-op.
 
 ---
