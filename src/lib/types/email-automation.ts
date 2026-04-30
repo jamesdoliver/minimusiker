@@ -232,6 +232,7 @@ export interface EmailRecipient {
   type: 'teacher' | 'parent' | 'non-buyer';
   eventId: string;
   classId?: string;
+  parentRecordId?: string;   // only set for parent recipients
   // Additional data for template substitution
   templateData: Partial<TemplateData>;
 }

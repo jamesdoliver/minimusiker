@@ -407,6 +407,7 @@ export async function getParentRecipientsForEvent(
             type: 'parent',
             eventId: eventId,
             classId: registration.class_id?.[0],
+            parentRecordId,
             templateData: {
               school_name: eventData.schoolName,
               event_date: formatDateGerman(eventData.eventDate),
