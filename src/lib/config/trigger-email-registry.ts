@@ -1314,6 +1314,54 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
 </p>`,
     availableVariables: ['staffName', 'schoolName', 'eventDate', 'eventType', 'schoolAddress', 'contactName', 'contactEmail', 'contactPhone', 'estimatedChildren', 'staffPortalUrl'],
   },
+  {
+    slug: 'parent_mix_ready_audio_buyer',
+    name: 'Mix fertig — Eltern (Audio-Käufer)',
+    description: 'Eltern, die für dieses Event ein Audio-Produkt (Minicard, CD, Bundle, Kinderliederbox) gekauft haben.',
+    recipientType: 'parent',
+    defaultSubject: 'Hier singt {{childName}}! Eure Aufnahmen sind fertig.',
+    defaultBodyHtml: `
+    <p>Hallo {{parentFirstName}},</p>
+    <p>die Aufnahmen vom Minimusikertag an der {{schoolName}} sind fertig — und {{childName}} ist live dabei.</p>
+    <p>Da ihr bereits Audio bestellt habt, könnt ihr die Aufnahmen jederzeit über euer Familien-Portal abspielen, sobald sie zur Veröffentlichung freigegeben sind.</p>
+    <p><a href="{{parentPortalLink}}">Zum Familien-Portal →</a></p>
+    <p>Liebe Grüße<br/>Euer Minimusiker-Team</p>
+  `,
+    triggerEventKey: 'event:mix_ready_for_release',
+    availableVariables: ['schoolName', 'eventDate', 'parentName', 'parentFirstName', 'childName', 'className', 'parentPortalLink'],
+  },
+  {
+    slug: 'parent_mix_ready_non_audio_buyer',
+    name: 'Mix fertig — Eltern (kein Audio-Kauf)',
+    description: 'Eltern dieses Events, die noch kein Audio-Produkt gekauft haben.',
+    recipientType: 'parent',
+    defaultSubject: 'Hier singt {{childName}}! Hört jetzt in die Aufnahme rein.',
+    defaultBodyHtml: `
+    <p>Hallo {{parentFirstName}},</p>
+    <p>die Aufnahmen vom Minimusikertag an der {{schoolName}} sind fertig — und {{childName}} ist live dabei.</p>
+    <p>Im Familien-Portal könnt ihr eine Hörprobe abspielen — und dort auch eine Minicard oder Kinderliederbox bestellen, um die kompletten Aufnahmen herunterzuladen und unbegrenzt anzuhören.</p>
+    <p><a href="{{parentPortalLink}}">Reinhören und bestellen →</a></p>
+    <p>Liebe Grüße<br/>Euer Minimusiker-Team</p>
+  `,
+    triggerEventKey: 'event:mix_ready_for_release',
+    availableVariables: ['schoolName', 'eventDate', 'parentName', 'parentFirstName', 'childName', 'className', 'parentPortalLink'],
+  },
+  {
+    slug: 'teacher_mix_ready',
+    name: 'Mix fertig — Lehrer',
+    description: 'Lehrer eines Mimi-/Plus-Events: alle Aufnahmen sind gemixt und ggf. Schulsong vom Lehrer freigegeben.',
+    recipientType: 'teacher',
+    defaultSubject: 'So klingt die {{schoolName}}! Hört jetzt in eure Aufnahmen rein.',
+    defaultBodyHtml: `
+    <p>Hallo,</p>
+    <p>die Aufnahmen vom Minimusikertag an der {{schoolName}} sind fertig.</p>
+    <p>Du kannst die Mixe ab sofort in deinem Pädagogen-Portal anhören.</p>
+    <p><a href="{{parentPortalLink}}">Zum Pädagogen-Portal →</a></p>
+    <p>Liebe Grüße<br/>Euer Minimusiker-Team</p>
+  `,
+    triggerEventKey: 'event:mix_ready_for_release',
+    availableVariables: ['schoolName', 'eventDate'],
+  },
 ];
 
 /**
