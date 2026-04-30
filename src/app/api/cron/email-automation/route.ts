@@ -14,7 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { processEmailAutomation, processSchulsongReleaseEmails, processSchulsongApprovalReminders, processSchulsongMerchLastChance, processTracklistConfirmationEmails, getCurrentBerlinHour } from '@/lib/services/emailAutomationService';
+import { processEmailAutomation, processSchulsongReleaseEmails, processMixReadyEmails, processSchulsongApprovalReminders, processSchulsongMerchLastChance, processTracklistConfirmationEmails, getCurrentBerlinHour } from '@/lib/services/emailAutomationService';
 import { CronAutomationResponse } from '@/lib/types/email-automation';
 
 export const dynamic = 'force-dynamic';
@@ -94,11 +94,17 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
     // Process schulsong release emails in the 6-8am Berlin window
     // (covers cron drift; dedup makes multiple runs safe)
     let schulsongResult: { sent: number; skipped: number; failed: number; errors: string[] } | undefined;
+    let mixReadyResult: { sent: number; skipped: number; failed: number; errors: string[] } | undefined;
     if (berlinHour >= 6 && berlinHour <= 8) {
       console.log(`[Email Automation Cron] Processing schulsong releases (Berlin hour: ${berlinHour})`);
       schulsongResult = await processSchulsongReleaseEmails(isDryRun);
       if (schulsongResult.errors.length > 0) {
         console.error('[Email Automation Cron] Schulsong errors:', schulsongResult.errors);
+      }
+      console.log(`[Email Automation Cron] Processing mix-ready releases (Berlin hour: ${berlinHour})`);
+      mixReadyResult = await processMixReadyEmails(isDryRun);
+      if (mixReadyResult.errors.length > 0) {
+        console.error('[Email Automation Cron] MixReady errors:', mixReadyResult.errors);
       }
     }
 
@@ -132,6 +138,11 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
         `[Email Automation Cron] Schulsong: ${schulsongResult.sent} sent, ${schulsongResult.skipped} skipped, ${schulsongResult.failed} failed`
       );
     }
+    if (mixReadyResult) {
+      console.log(
+        `[Email Automation Cron] MixReady: ${mixReadyResult.sent} sent, ${mixReadyResult.skipped} skipped, ${mixReadyResult.failed} failed`
+      );
+    }
     if (approvalReminderResult && (approvalReminderResult.sent > 0 || approvalReminderResult.failed > 0)) {
       console.log(
         `[Email Automation Cron] Approval reminders: ${approvalReminderResult.sent} sent, ${approvalReminderResult.skipped} skipped, ${approvalReminderResult.failed} failed`
@@ -157,6 +168,7 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
       mode: isDryRun ? 'dry-run' : 'live',
       result,
       schulsongResult,
+      mixReadyResult,
       approvalReminderResult,
       merchLastChanceResult,
       tracklistReminderResult,
