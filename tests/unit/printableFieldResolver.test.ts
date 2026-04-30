@@ -47,3 +47,34 @@ describe('resolveFieldValues', () => {
     });
   });
 });
+
+describe('resolveFieldValues — schuleOrKita', () => {
+  const field: PrintableFieldDef = {
+    key: 'school-or-kita',
+    label: 'Institution word',
+    kind: 'text',
+    defaultPosition: { x: 0, y: 0 },
+    defaultSize: { width: 0, height: 0 },
+    draggable: false,
+    source: { type: 'computed', name: 'schuleOrKita' },
+  };
+
+  it('returns "Schule" when isKita is false', () => {
+    expect(resolveFieldValues([field], { ...baseBooking, isKita: false })).toEqual({
+      'school-or-kita': { kind: 'text', text: 'Schule' },
+    });
+  });
+
+  it('returns "KiTa" when isKita is true', () => {
+    expect(resolveFieldValues([field], { ...baseBooking, isKita: true })).toEqual({
+      'school-or-kita': { kind: 'text', text: 'KiTa' },
+    });
+  });
+
+  it('returns "Schule" when isKita is undefined (default)', () => {
+    const { isKita: _ignored, ...rest } = baseBooking;
+    expect(resolveFieldValues([field], rest)).toEqual({
+      'school-or-kita': { kind: 'text', text: 'Schule' },
+    });
+  });
+});

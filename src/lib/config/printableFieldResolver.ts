@@ -53,6 +53,8 @@ function resolveComputed(name: ComputedFieldName, booking: ResolverBooking): str
   switch (name) {
     case 'schoolName':
       return booking.schoolName ?? '';
+    case 'schuleOrKita':
+      return booking.isKita ? 'KiTa' : 'Schule';
     // Other computed sources implemented in later tasks.
     default:
       return '';
