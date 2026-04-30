@@ -1,3 +1,13 @@
+// Mock the Airtable module — importing mixReadyEmailService pulls in
+// emailAutomationService → airtableService, which top-level requires the
+// `airtable` package. We don't exercise it from this pure-predicate test,
+// but the require chain still needs to resolve cleanly.
+jest.mock('airtable', () => {
+  const mockTable = jest.fn(() => ({ select: jest.fn(), find: jest.fn() }));
+  const mockBase = jest.fn(() => mockTable);
+  return jest.fn(() => ({ base: mockBase }));
+});
+
 import { isMixReadyForEvent } from '@/lib/services/mixReadyEmailService';
 import type { Event } from '@/lib/types/airtable';
 
