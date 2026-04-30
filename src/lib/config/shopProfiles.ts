@@ -362,6 +362,28 @@ export const MINICARD_VARIANT_IDS = new Set([
   '53836123472218',   // Kinderliederbox (+)
 ]);
 
+/**
+ * All Shopify variant IDs for audio-category products across all profiles
+ * (Minicard, CD, Minicard+CD bundle, Kinderliederbox).
+ * Used by `hasAudioPurchaseForEvent` to classify a parent as an "audio buyer".
+ *
+ * Broader than `MINICARD_VARIANT_IDS`, which is restricted to digital-access
+ * variants (CD-only is intentionally excluded there because the CD doesn't
+ * grant digital streaming access).
+ */
+export const AUDIO_PRODUCT_VARIANT_IDS = new Set([
+  // Minimusikertag profile
+  '53258099720538',   // Minicard
+  '53258098639194',   // CD
+  '53327238824282',   // Minicard+CD bundle
+  '53265570824538',   // Kinderliederbox
+  // PLUS profile
+  '53440629375322',   // Minicard PLUS
+  '53525559771482',   // CD PLUS
+  '53525549089114',   // Minicard+CD bundle PLUS
+  '53836123472218',   // Kinderliederbox PLUS
+]);
+
 // ============================================================================
 // PROFILE RESOLUTION
 // ============================================================================
