@@ -232,6 +232,7 @@ export interface EmailRecipient {
   type: 'teacher' | 'parent' | 'non-buyer';
   eventId: string;
   classId?: string;
+  parentRecordId?: string;   // only set for parent recipients
   // Additional data for template substitution
   templateData: Partial<TemplateData>;
 }
@@ -300,6 +301,7 @@ export interface CronAutomationResponse {
   mode?: 'live' | 'dry-run';
   result?: AutomationResult;
   schulsongResult?: { sent: number; skipped: number; failed: number; errors: string[] };
+  mixReadyResult?: { sent: number; skipped: number; failed: number; errors: string[] };
   approvalReminderResult?: { sent: number; skipped: number; failed: number; errors: string[] };
   merchLastChanceResult?: { sent: number; skipped: number; failed: number; errors: string[] };
   error?: string;
