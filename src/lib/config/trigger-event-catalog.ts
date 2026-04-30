@@ -129,6 +129,17 @@ export const TRIGGER_EVENT_CATALOG: TriggerEvent[] = [
     availableVariables: ['orderCount', 'eventCount', 'totalValue', 'ordersTableHtml'],
     recipientMode: 'configurable',
   },
+  {
+    key: 'event:mix_ready_for_release',
+    name: 'Mix fertig (Audio-Release)',
+    description:
+      'Wird ausgelöst, wenn der Mix für ein Mimi-/Plus-Event fertiggestellt ist: ' +
+      'der Engineer hat die Finals abgegeben (audio_pipeline_stage=finals_submitted) ' +
+      'und – falls Schulsong angehängt ist – der Lehrer hat den Schulsong freigegeben ' +
+      '(schulsong_released_at gesetzt). Polled hourly im 6–8 Uhr Berlin Fenster.',
+    availableVariables: ['schoolName', 'eventDate', 'parentName', 'parentFirstName', 'childName', 'className', 'parentPortalLink'],
+    recipientMode: 'specific',
+  },
 ];
 
 export function getTriggerEvent(key: string): TriggerEvent | undefined {
