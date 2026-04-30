@@ -1360,7 +1360,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     <p>Liebe Grüße<br/>Euer Minimusiker-Team</p>
   `,
     triggerEventKey: 'event:mix_ready_for_release',
-    availableVariables: ['schoolName', 'eventDate'],
+    availableVariables: ['schoolName', 'parentPortalLink'],
   },
 ];
 

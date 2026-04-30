@@ -469,7 +469,7 @@ Templates use the same `{{variable}}` substitution syntax as existing trigger en
     <p>Liebe Grüße<br/>Euer Minimusiker-Team</p>
   `,
   triggerEventKey: 'event:mix_ready_for_release',
-  availableVariables: ['schoolName', 'eventDate'],
+  availableVariables: ['schoolName', 'parentPortalLink'],
 },
 ```
 
