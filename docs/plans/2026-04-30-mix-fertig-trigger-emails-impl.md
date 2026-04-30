@@ -750,8 +750,14 @@ async function sendOne(
   const alreadySent = await airtable.hasEmailBeenSent(entry.name, recipient.eventId, recipient.email);
   if (alreadySent) { counters.skipped++; return; }
 
+  const isParentLike = recipient.type === 'parent' || recipient.type === 'non-buyer';
+  const unsubscribeUrl = isParentLike ? generateUnsubscribeUrl(recipient.email) : undefined;
+  const templateOptions = isParentLike && unsubscribeUrl
+    ? { showUnsubscribe: true, unsubscribeUrl }
+    : undefined;
+
   const subject = renderTriggerTemplate(trigger.subject, variables);
-  const html = renderFullTriggerEmail(trigger.bodyHtml, variables);
+  const html = renderFullTriggerEmail(trigger.bodyHtml, variables, templateOptions);
 
   let status: 'sent' | 'failed' = 'sent';
   let errorMessage: string | undefined;
@@ -764,9 +770,7 @@ async function sendOne(
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
       const headers: Record<string, string> = {};
-      let unsubscribeUrl: string | undefined;
-      if (recipient.type === 'parent' || recipient.type === 'non-buyer') {
-        unsubscribeUrl = generateUnsubscribeUrl(recipient.email);
+      if (unsubscribeUrl) {
         headers['List-Unsubscribe'] = `<${unsubscribeUrl}>`;
         headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
       }
@@ -854,7 +858,7 @@ export async function sendMixReadyEmailForEvent(eventId: string): Promise<SendCo
   }
 
   console.log(
-    `[MixReadyEmail] ${eventId}: ${counters.sent} sent, ${counters.skipped} skipped, ${counters.failed} failed`
+    `[MixReadyEmail] ${eventId}: ${counters.sent} sent, ${counters.failed} failed, ${counters.skipped} skipped`
   );
   return counters;
 }
