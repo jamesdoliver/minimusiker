@@ -839,6 +839,53 @@ export async function processSchulsongReleaseEmails(
 }
 
 // =============================================================================
+// Mix Ready Email Processing (called by cron — Mimi/Plus tier events)
+// =============================================================================
+
+/**
+ * Find all events whose mix is ready (engineer finals submitted; for combined
+ * Mimi+Schulsong events, also requires teacher schulsong approval = schulsong_released_at set).
+ * Sends teacher + parent (split by audio purchase) emails. Dedup via EMAIL_LOGS.
+ */
+export async function processMixReadyEmails(
+  dryRun: boolean = false
+): Promise<{ sent: number; skipped: number; failed: number; errors: string[] }> {
+  const { sendMixReadyEmailForEvent, isMixReadyForEvent } = await import('@/lib/services/mixReadyEmailService');
+
+  const airtable = getAirtableService();
+  const allEvents = await airtable.getAllEvents();
+  const eligible = allEvents.filter(isMixReadyForEvent);
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const event of eligible) {
+    try {
+      if (dryRun) {
+        console.log(`[MixReadyCron] (dry-run) Would send for ${event.event_id} (${event.school_name})`);
+        skipped++;
+        continue;
+      }
+      const result = await sendMixReadyEmailForEvent(event.event_id);
+      sent += result.sent;
+      skipped += result.skipped;
+      failed += result.failed;
+    } catch (err) {
+      const msg = `Failed to process ${event.event_id}: ${err instanceof Error ? err.message : String(err)}`;
+      console.error(`[MixReadyCron] ${msg}`);
+      errors.push(msg);
+    }
+  }
+
+  console.log(
+    `[MixReadyCron] Processed ${eligible.length} events: ${sent} sent, ${skipped} skipped, ${failed} failed`
+  );
+  return { sent, skipped, failed, errors };
+}
+
+// =============================================================================
 // Schulsong Approval Reminder Processing (called by cron)
 // =============================================================================
 
