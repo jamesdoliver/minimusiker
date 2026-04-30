@@ -6,7 +6,9 @@ import {
 } from '@/lib/types/airtable';
 import { AUDIO_PRODUCT_VARIANT_IDS } from '@/lib/config/shopProfiles';
 
-const AUDIO_TITLE_KEYWORDS = ['minicard', 'cd', 'kinderliederbox', 'tonie'];
+// 'cd' deliberately omitted — too short, would false-match titles like "ABCD pack".
+// CD variants are covered by variant_id matching against AUDIO_PRODUCT_VARIANT_IDS.
+const AUDIO_TITLE_KEYWORDS = ['minicard', 'kinderliederbox', 'tonie'];
 
 /**
  * Pure: does any line item count as an audio-category purchase?
