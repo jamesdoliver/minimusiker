@@ -22,7 +22,43 @@ import type {
   EmailRecipient,
 } from '@/lib/types/email-automation';
 
+/**
+ * Snapshot of events that were ALREADY in `audio_pipeline_stage='finals_submitted'`
+ * when this trigger pipeline launched (audited 2026-04-30). Their parents have
+ * never received a mix-ready email under any system (the legacy timeline templates
+ * never fired in production), so flipping the trigger on without a guard would
+ * blast ~1,300 parents with notifications about events that happened 1-2 months ago.
+ *
+ * The skip is by event_id, which means: even if these events get re-uploaded or
+ * status-changed, they will continue to be excluded. That's the correct behaviour
+ * for "from today onwards" semantics — we are explicitly excluding the existing
+ * backlog. New events that *enter* finals_submitted after launch are unaffected
+ * and fire normally.
+ *
+ * Safe to remove this constant once all 12 events have aged out (i.e. no longer
+ * in finals_submitted, e.g. the admin marked them done or the data was archived).
+ */
+export const MIX_READY_PRE_LAUNCH_SKIP: ReadonlySet<string> = new Set([
+  'evt_drk_kindergarten_am_postweg_minimusiker_20260422_53ce38',
+  'evt_drk_kindertageseinrichtung_zwe_minimusiker_20260311_b9d3b6',
+  'evt_fuchshofschule_minimusiker_20260319_f7041a',
+  'evt_grundschule_am_r_merbad_zunzwe_minimusiker_20260302_1afb54',
+  'evt_grundschule_nordstadt_minimusiker_20260309_0fcf5b',
+  'evt_grundschule_s_dstadt_minimusiker_20260417_3b5e82',
+  'evt_grundschule_sundheim_minimusiker_20260313_c0ca18',
+  'evt_grundschule_unterharmersbach_minimusiker_20260306_583f43',
+  'evt_heier_grundschule_minimusiker_20260324_988e38',
+  'evt_kita_zum_regenbogen_r_hen_minimusiker_20260304_a618fc',
+  'evt_otto_willmann_schule_minimusiker_20260126_8d295e',
+  'evt_sterfeldschule_minimusiker_20260318_5104a0',
+]);
+
 export function isMixReadyForEvent(event: Event): boolean {
+  // Pre-launch backlog skip: events that were already finals_submitted when this
+  // trigger pipeline went live are explicitly excluded so we don't mass-email
+  // parents about old events.
+  if (MIX_READY_PRE_LAUNCH_SKIP.has(event.event_id)) return false;
+
   // Tier check — Mimi/Plus only. Pure schulsong-only is handled by the
   // existing schulsong_release trigger.
   const tier = getEventTier({

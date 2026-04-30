@@ -64,4 +64,11 @@ describe('isMixReadyForEvent', () => {
   it('not eligible when communications_paused is set in timeline_overrides', () => {
     expect(isMixReadyForEvent(baseEvent({ timeline_overrides: '{"communications_paused":true}' }))).toBe(false);
   });
+
+  it('not eligible when event_id is in the pre-launch backlog skip set', () => {
+    // Pick any one of the 12 backlog event_ids — the predicate must short-circuit
+    // even though every other gating condition is satisfied.
+    expect(isMixReadyForEvent(baseEvent({ event_id: 'evt_sterfeldschule_minimusiker_20260318_5104a0' }))).toBe(false);
+    expect(isMixReadyForEvent(baseEvent({ event_id: 'evt_grundschule_am_r_merbad_zunzwe_minimusiker_20260302_1afb54' }))).toBe(false);
+  });
 });
