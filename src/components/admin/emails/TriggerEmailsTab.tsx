@@ -22,6 +22,10 @@ const RECIPIENT_GROUP_ORDER: Array<{ key: string; label: string }> = [
   { key: 'engineer', label: 'Engineer-E-Mails' },
 ];
 
+const CATEGORY_GROUP_ORDER: Array<{ key: string; label: string }> = [
+  { key: 'registrations', label: 'Registrierungen' },
+];
+
 export default function TriggerEmailsTab() {
   const [templates, setTemplates] = useState<TriggerEmailTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -114,11 +118,21 @@ export default function TriggerEmailsTab() {
     );
   }
 
-  // Group templates by recipient type
-  const grouped = RECIPIENT_GROUP_ORDER.map((group) => ({
-    ...group,
-    templates: templates.filter((t) => t.recipientType === group.key),
-  })).filter((group) => group.templates.length > 0);
+  // Category groups render first (top of list); recipient-type groups below.
+  // Categorized templates are excluded from recipient groups so they don't appear twice.
+  const categoryGroups = CATEGORY_GROUP_ORDER.map((group) => ({
+    key: `cat:${group.key}`,
+    label: group.label,
+    templates: templates.filter((t) => t.category === group.key),
+  })).filter((g) => g.templates.length > 0);
+
+  const recipientGroups = RECIPIENT_GROUP_ORDER.map((group) => ({
+    key: `rec:${group.key}`,
+    label: group.label,
+    templates: templates.filter((t) => t.recipientType === group.key && !t.category),
+  })).filter((g) => g.templates.length > 0);
+
+  const grouped = [...categoryGroups, ...recipientGroups];
 
   return (
     <>
