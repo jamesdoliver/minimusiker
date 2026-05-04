@@ -538,6 +538,26 @@ export function getSampleVariables(slug: string): Record<string, string> {
       count: '5',
       digestHtml: '<table><tr><td>Grundschule Sonnenschein — Keine Klassen — mueller@schule.de</td></tr></table>',
     },
+    'cron:registration_low_t7': {
+      teacherName: 'Frau Müller',
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      registeredCount: '45',
+      expectedCount: '100',
+      percentRegistered: '45',
+      daysUntilEvent: '7',
+      teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
+    },
+    'cron:registration_critical_t7': {
+      teacherName: 'Frau Müller',
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      registeredCount: '20',
+      expectedCount: '100',
+      percentRegistered: '20',
+      daysUntilEvent: '7',
+      teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
+    },
   };
 
   return samples[slug] || {};

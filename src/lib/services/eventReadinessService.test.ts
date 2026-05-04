@@ -102,11 +102,11 @@ describe('checkRegistrationShortfall', () => {
         percentRegistered: '40',
         teacherPortalUrl: expect.stringContaining('/paedagogen/events/evt_test'),
       }),
-      expect.objectContaining({ eventRecordId: 'rec_evt' }),
     );
     expect(r.sent).toBe(1);
     expect(r.skipped).toBe(0);
     expect(r.failed).toBe(0);
+    expect(mockLogActivity).toHaveBeenCalledTimes(1);
     expect(mockLogActivity).toHaveBeenCalledWith(
       expect.objectContaining({
         activityType: 'email_sent',
@@ -132,11 +132,11 @@ describe('checkRegistrationShortfall', () => {
         percentRegistered: '30',
         teacherPortalUrl: expect.stringContaining('/paedagogen/events/evt_test'),
       }),
-      expect.objectContaining({ eventRecordId: 'rec_evt' }),
     );
     expect(r.sent).toBe(1);
     expect(r.skipped).toBe(0);
     expect(r.failed).toBe(0);
+    expect(mockLogActivity).toHaveBeenCalledTimes(1);
     expect(mockLogActivity).toHaveBeenCalledWith(
       expect.objectContaining({
         activityType: 'email_sent',
@@ -158,7 +158,6 @@ describe('checkRegistrationShortfall', () => {
     expect(mockSend).toHaveBeenCalledWith(
       't@e.de',
       'cron:registration_critical_t7',
-      expect.any(Object),
       expect.any(Object),
     );
   });

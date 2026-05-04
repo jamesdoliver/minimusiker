@@ -22,6 +22,9 @@ const RECIPIENT_GROUP_ORDER: Array<{ key: string; label: string }> = [
   { key: 'engineer', label: 'Engineer-E-Mails' },
 ];
 
+// IMPORTANT: every category string used in TRIGGER_EMAIL_REGISTRY entries must be listed
+// here. Templates with a category not in this list silently disappear from the admin UI
+// (excluded from recipient groups by `!t.category`, not picked up by any category group).
 const CATEGORY_GROUP_ORDER: Array<{ key: string; label: string }> = [
   { key: 'registrations', label: 'Registrierungen' },
 ];

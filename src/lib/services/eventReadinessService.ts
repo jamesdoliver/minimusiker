@@ -1118,14 +1118,13 @@ export async function checkRegistrationShortfall(dryRun = false): Promise<Readin
           {
             teacherName: teacher.name || 'Lehrkraft',
             schoolName: event.school_name,
-            eventDate: event.event_date,
+            eventDate: formatDateGerman(event.event_date),
             registeredCount: String(registeredCount),
             expectedCount: String(estimatedChildren),
             percentRegistered: String(percentRegistered),
             daysUntilEvent: String(REGISTRATION_SHORTFALL_DAYS_BEFORE),
             teacherPortalUrl: `${baseUrl}/paedagogen/events/${event.event_id}`,
           },
-          { eventRecordId: event.id },
         );
 
         if (r.success) {
