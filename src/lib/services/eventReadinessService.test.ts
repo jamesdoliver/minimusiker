@@ -92,12 +92,27 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
       Array.from({ length: 40 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
     );
-    await checkRegistrationShortfall();
+    const r = await checkRegistrationShortfall();
     expect(mockSend).toHaveBeenCalledWith(
       't@e.de',
       'cron:registration_low_t7',
-      expect.any(Object),
-      expect.any(Object),
+      expect.objectContaining({
+        registeredCount: '40',
+        expectedCount: '100',
+        percentRegistered: '40',
+        teacherPortalUrl: expect.stringContaining('/paedagogen/events/evt_test'),
+      }),
+      expect.objectContaining({ eventRecordId: 'rec_evt' }),
+    );
+    expect(r.sent).toBe(1);
+    expect(r.skipped).toBe(0);
+    expect(r.failed).toBe(0);
+    expect(mockLogActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activityType: 'email_sent',
+        eventRecordId: 'rec_evt',
+        metadata: expect.objectContaining({ slug: 'cron:registration_low_t7', ratio: 40 }),
+      }),
     );
   });
 
@@ -107,12 +122,27 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
       Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
     );
-    await checkRegistrationShortfall();
+    const r = await checkRegistrationShortfall();
     expect(mockSend).toHaveBeenCalledWith(
       't@e.de',
       'cron:registration_critical_t7',
-      expect.any(Object),
-      expect.any(Object),
+      expect.objectContaining({
+        registeredCount: '30',
+        expectedCount: '100',
+        percentRegistered: '30',
+        teacherPortalUrl: expect.stringContaining('/paedagogen/events/evt_test'),
+      }),
+      expect.objectContaining({ eventRecordId: 'rec_evt' }),
+    );
+    expect(r.sent).toBe(1);
+    expect(r.skipped).toBe(0);
+    expect(r.failed).toBe(0);
+    expect(mockLogActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activityType: 'email_sent',
+        eventRecordId: 'rec_evt',
+        metadata: expect.objectContaining({ slug: 'cron:registration_critical_t7', ratio: 30 }),
+      }),
     );
   });
 
@@ -203,5 +233,18 @@ describe('checkRegistrationShortfall', () => {
     ]);
     await checkRegistrationShortfall();
     expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('matches T+7 events with ISO-timestamp event_date', async () => {
+    const t7 = new Date();
+    t7.setDate(t7.getDate() + 7);
+    const isoDate = `${t7.toISOString().split('T')[0]}T08:00:00.000Z`;
+    mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtT7({ event_date: isoDate })]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
+    );
+    await checkRegistrationShortfall();
+    expect(mockSend).toHaveBeenCalled();
   });
 });
