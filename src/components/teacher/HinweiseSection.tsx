@@ -5,6 +5,8 @@ export interface HinweiseSectionProps {
   tracklistFinalized: boolean;
   isSchulsong: boolean;
   schulsongApproved: boolean;
+  // When true, hide class- and tracklist-related rows (only schulsong row remains)
+  isSchulsongOnly?: boolean;
 }
 
 interface HinweisRow {
@@ -19,9 +21,12 @@ export function HinweiseSection({
   tracklistFinalized,
   isSchulsong,
   schulsongApproved,
+  isSchulsongOnly = false,
 }: HinweiseSectionProps) {
-  const rows: HinweisRow[] = [
-    {
+  const rows: HinweisRow[] = [];
+
+  if (!isSchulsongOnly) {
+    rows.push({
       key: 'classes',
       complete: classesWithoutSongs.length === 0,
       pendingText: (
@@ -31,14 +36,14 @@ export function HinweiseSection({
         </>
       ),
       completeText: 'Alle Klassen haben Lieder',
-    },
-    {
+    });
+    rows.push({
       key: 'tracklist',
       complete: tracklistFinalized,
       pendingText: 'Die Lieder-Reihenfolge wurde noch nicht final festgelegt',
       completeText: 'Die Lieder-Reihenfolge wurde bereits final festgelegt',
-    },
-  ];
+    });
+  }
 
   if (isSchulsong) {
     rows.push({

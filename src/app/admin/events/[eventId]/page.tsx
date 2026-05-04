@@ -452,6 +452,7 @@ export default function EventDetailPage() {
 
   // Tier switch handler (Off ←→ Minimusikertag ←→ PLUS)
   const currentTier: 'off' | 'minimusikertag' | 'plus' = isPlus ? 'plus' : isMinimusikertag ? 'minimusikertag' : 'off';
+  const isSchulsongOnly = isSchulsong && !isMinimusikertag && !isPlus;
   const handleTierSwitch = async (newTier: 'off' | 'minimusikertag' | 'plus') => {
     if (newTier === currentTier) return;
     setIsUpdatingToggles('tier');
@@ -1500,6 +1501,7 @@ export default function EventDetailPage() {
           eventId={eventId}
           classes={event.classes || []}
           isSchulsong={isSchulsong}
+          isSchulsongOnly={isSchulsongOnly}
           tracklistFinalizedAt={event.tracklistFinalizedAt}
           eventDate={event.eventDate}
         />

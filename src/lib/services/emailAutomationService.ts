@@ -22,6 +22,7 @@ import {
 } from '@/lib/types/email-automation';
 import { Event, Class, Parent, Registration, EVENTS_TABLE_ID, EVENTS_FIELD_IDS, ORDERS_TABLE_ID, ORDERS_FIELD_IDS } from '@/lib/types/airtable';
 import { parseOverrides } from '@/lib/utils/eventThresholds';
+import { isSchulsongOnlyEvent } from '@/lib/utils/eventTier';
 
 // Constants
 const RATE_LIMIT_DELAY_MS = 500; // 500ms delay between emails to respect Resend rate limits
@@ -1156,9 +1157,12 @@ export async function processTracklistConfirmationEmails(
   const berlinToday = new Date(berlinNow);
   berlinToday.setHours(0, 0, 0, 0);
 
-  // Filter events: not finalized, event date >= cutoff, event today or past, not cancelled
+  // Filter events: not finalized, event date >= cutoff, event today or past, not cancelled.
+  // Schulsong-only events have no tracklist concept (single song) and the teacher portal
+  // hides the tracklist UI for them, so they could never finalize — skip them entirely.
   const pending = allEvents.filter((e) => {
     if (e.status === 'Cancelled' || e.status === 'Deleted') return false;
+    if (isSchulsongOnlyEvent(e)) return false;
     if (e.tracklist_finalized_at) return false;
     if (!e.event_date) return false;
     if (e.event_date < TRACKLIST_EMAIL_CUTOFF) return false;

@@ -1291,6 +1291,7 @@ export default function TeacherEventDetailPage() {
   }, [event?.isSchulsong, eventId]);
 
   const isEditable = event?.status !== 'completed';
+  const isSchulsongOnly = event?.isSchulsongOnly === true;
 
   const choirs = collections.filter(c => c.classType === 'choir');
   const teacherSongs = collections.filter(c => c.classType === 'teacher_song');
@@ -1367,7 +1368,7 @@ export default function TeacherEventDetailPage() {
           </div>
 
           {/* Edit Notice */}
-          {isEditable && (
+          {isEditable && !isSchulsongOnly && (
             <div className="mt-6 pt-6 border-t border-gray-100">
               <div className="flex items-start gap-3 bg-blue-50 rounded-lg p-4">
                 <svg
@@ -1395,23 +1396,35 @@ export default function TeacherEventDetailPage() {
           )}
         </div>
 
-        {/* Hinweise + Lieder-Reihenfolge two-column section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <HinweiseSection
-            classesWithoutSongs={
-              (event.classes || [])
-                .filter(c => c.songs.length === 0)
-                .map(c => c.className)
-            }
-            tracklistFinalized={Boolean(event.tracklistFinalizedAt)}
-            isSchulsong={event.isSchulsong || false}
-            schulsongApproved={schulsongApproved}
-          />
-          <LiederReihenfolgeSection
-            tracklistFinalized={Boolean(event.tracklistFinalizedAt)}
-            onOpenModal={() => setShowAlbumLayoutModal(true)}
-          />
-        </div>
+        {/* Hinweise (+ Lieder-Reihenfolge for non-schulsong-only events) */}
+        {isSchulsongOnly ? (
+          <div className="mb-8">
+            <HinweiseSection
+              classesWithoutSongs={[]}
+              tracklistFinalized={false}
+              isSchulsong={event.isSchulsong || false}
+              schulsongApproved={schulsongApproved}
+              isSchulsongOnly
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <HinweiseSection
+              classesWithoutSongs={
+                (event.classes || [])
+                  .filter(c => c.songs.length === 0)
+                  .map(c => c.className)
+              }
+              tracklistFinalized={Boolean(event.tracklistFinalizedAt)}
+              isSchulsong={event.isSchulsong || false}
+              schulsongApproved={schulsongApproved}
+            />
+            <LiederReihenfolgeSection
+              tracklistFinalized={Boolean(event.tracklistFinalizedAt)}
+              onOpenModal={() => setShowAlbumLayoutModal(true)}
+            />
+          </div>
+        )}
 
         {/* SCS Clothing Order - Only shown when scs_shirts_included is enabled */}
         {event.scsShirtsIncluded === true && (
@@ -1432,7 +1445,8 @@ export default function TeacherEventDetailPage() {
         {/* Audio Downloads Section - Shows when all final audio is ready */}
         <AudioDownloadSection eventId={event.eventId} />
 
-        {/* Classes Section */}
+        {/* Classes Section — hidden for schulsong-only events */}
+        {!isSchulsongOnly && (
         <div>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -1534,9 +1548,10 @@ export default function TeacherEventDetailPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Groups Section */}
-        {groups.length > 0 && (
+        {!isSchulsongOnly && groups.length > 0 && (
           <div className="mt-8">
             <div className="flex items-center gap-3 mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Gruppen</h2>
@@ -1559,7 +1574,7 @@ export default function TeacherEventDetailPage() {
         )}
 
         {/* Chor Section */}
-        {choirs.length > 0 && (
+        {!isSchulsongOnly && choirs.length > 0 && (
           <div className="mt-8">
             <div className="flex items-center gap-3 mb-4">
               <h2 className="text-xl font-semibold text-gray-900">
@@ -1587,7 +1602,7 @@ export default function TeacherEventDetailPage() {
         )}
 
         {/* Lehrerlied Section */}
-        {teacherSongs.length > 0 && (
+        {!isSchulsongOnly && teacherSongs.length > 0 && (
           <div className="mt-8">
             <div className="flex items-center gap-3 mb-4">
               <h2 className="text-xl font-semibold text-gray-900">
@@ -1682,8 +1697,8 @@ export default function TeacherEventDetailPage() {
           />
         )}
 
-        {/* Tracklist Reminder Popup — blocking modal on/after event day */}
-        {!isLoading && event && (
+        {/* Tracklist Reminder Popup — blocking modal on/after event day. Suppressed for schulsong-only events. */}
+        {!isLoading && event && !isSchulsongOnly && (
           <TracklistReminderPopup
             eventId={event.eventId}
             eventDate={event.eventDate}

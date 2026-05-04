@@ -10,6 +10,9 @@ interface AdminLehrerStatusCardProps {
   isSchulsong: boolean;
   tracklistFinalizedAt?: string;
   eventDate: string;
+  // When true, hides tracklist controls and the class/tracklist Hinweise rows.
+  // Mirrors the teacher view for schulsong-only events.
+  isSchulsongOnly?: boolean;
 }
 
 export default function AdminLehrerStatusCard({
@@ -18,6 +21,7 @@ export default function AdminLehrerStatusCard({
   isSchulsong,
   tracklistFinalizedAt,
   eventDate,
+  isSchulsongOnly = false,
 }: AdminLehrerStatusCardProps) {
   const [schulsongApproved, setSchulsongApproved] = useState(false);
   const [showAlbumModal, setShowAlbumModal] = useState(false);
@@ -70,32 +74,35 @@ export default function AdminLehrerStatusCard({
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Lehrer-Status</h3>
-          <div className="flex items-center gap-2">
-            {localFinalizedAt ? (
-              <>
+          {!isSchulsongOnly && (
+            <div className="flex items-center gap-2">
+              {localFinalizedAt ? (
+                <>
+                  <button onClick={() => setShowAlbumModal(true)} className="text-sm text-pink-600 hover:text-pink-700 font-medium">
+                    Tracklist ansehen
+                  </button>
+                  <button onClick={handleUnlock} disabled={isUnlocking} className="text-sm text-amber-600 hover:text-amber-700 font-medium">
+                    {isUnlocking ? 'Entsperren...' : 'Entsperren'}
+                  </button>
+                </>
+              ) : (
                 <button onClick={() => setShowAlbumModal(true)} className="text-sm text-pink-600 hover:text-pink-700 font-medium">
-                  Tracklist ansehen
+                  Tracklist bearbeiten
                 </button>
-                <button onClick={handleUnlock} disabled={isUnlocking} className="text-sm text-amber-600 hover:text-amber-700 font-medium">
-                  {isUnlocking ? 'Entsperren...' : 'Entsperren'}
-                </button>
-              </>
-            ) : (
-              <button onClick={() => setShowAlbumModal(true)} className="text-sm text-pink-600 hover:text-pink-700 font-medium">
-                Tracklist bearbeiten
-              </button>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
         <HinweiseSection
           classesWithoutSongs={classesWithoutSongs}
           tracklistFinalized={Boolean(localFinalizedAt)}
           isSchulsong={isSchulsong}
           schulsongApproved={schulsongApproved}
+          isSchulsongOnly={isSchulsongOnly}
         />
       </div>
 
-      {showAlbumModal && (
+      {showAlbumModal && !isSchulsongOnly && (
         <AlbumLayoutModal
           eventId={eventId}
           apiBaseUrl={`/api/admin/events/${encodeURIComponent(eventId)}/album-order`}
