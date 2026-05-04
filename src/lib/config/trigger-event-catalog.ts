@@ -140,6 +140,20 @@ export const TRIGGER_EVENT_CATALOG: TriggerEvent[] = [
     availableVariables: ['schoolName', 'eventDate', 'parentName', 'parentFirstName', 'childName', 'className', 'parentPortalLink'],
     recipientMode: 'specific',
   },
+  {
+    key: 'cron:registration_shortfall_t7',
+    name: 'CRON: Registrierungen unter Schwelle (T-7)',
+    description:
+      'Läuft täglich um 7 Uhr. Sendet eine Erinnerung an die Lehrkraft, '
+      + 'wenn 7 Tage vor dem Event weniger als 50% der erwarteten Kinder '
+      + 'registriert sind. Zwei Schwere-Stufen: <50%, <33%.',
+    availableVariables: [
+      'teacherName', 'schoolName', 'eventDate',
+      'registeredCount', 'expectedCount', 'percentRegistered',
+      'daysUntilEvent', 'teacherPortalUrl',
+    ],
+    recipientMode: 'specific',
+  },
 ];
 
 export function getTriggerEvent(key: string): TriggerEvent | undefined {
