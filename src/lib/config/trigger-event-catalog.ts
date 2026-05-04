@@ -146,7 +146,7 @@ export const TRIGGER_EVENT_CATALOG: TriggerEvent[] = [
     description:
       'Läuft täglich um 7 Uhr. Sendet eine Erinnerung an die Lehrkraft, '
       + 'wenn 7 Tage vor dem Event weniger als 50% der erwarteten Kinder '
-      + 'registriert sind. Zwei Schwere-Stufen: <50%, <33%.',
+      + 'registriert sind. Zwei Stufen: 33–50% (Niedrig), <33% (Kritisch).',
     availableVariables: [
       'teacherName', 'schoolName', 'eventDate',
       'registeredCount', 'expectedCount', 'percentRegistered',
