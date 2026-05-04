@@ -323,6 +323,30 @@ export async function sendStaffEventReminderEmail(
 }
 
 /**
+ * Send a registration-shortfall reminder to the teacher (T-7).
+ * Slug is selected by the cron based on the registered/expected ratio
+ * (see `selectShortfallSlug`). Inactive templates short-circuit upstream
+ * — this helper just delegates to `sendTriggerEmail`.
+ */
+export async function sendRegistrationShortfallEmail(
+  email: string,
+  slug: 'cron:registration_low_t7' | 'cron:registration_critical_t7',
+  variables: {
+    teacherName: string;
+    schoolName: string;
+    eventDate: string;
+    registeredCount: string;
+    expectedCount: string;
+    percentRegistered: string;
+    daysUntilEvent: string;
+    teacherPortalUrl: string;
+  },
+  options?: { eventRecordId?: string },
+): Promise<SendEmailResult> {
+  return sendTriggerEmail(email, slug, variables, 'Registration shortfall', options);
+}
+
+/**
  * Send unassigned staff alert to configured admin recipients
  */
 export async function sendUnassignedStaffAlertEmail(
