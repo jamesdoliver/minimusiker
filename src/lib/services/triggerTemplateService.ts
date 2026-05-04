@@ -79,7 +79,7 @@ async function populateAllTriggerCaches(): Promise<void> {
         }
       } else {
         result = {
-          active: true,
+          active: entry.defaultActive ?? true,
           subject: entry.defaultSubject,
           bodyHtml: entry.defaultBodyHtml,
           isCustomized: false,
@@ -94,7 +94,7 @@ async function populateAllTriggerCaches(): Promise<void> {
     for (const entry of TRIGGER_EMAIL_REGISTRY) {
       if (!getCached(entry.slug)) {
         setCache(entry.slug, {
-          active: true,
+          active: entry.defaultActive ?? true,
           subject: entry.defaultSubject,
           bodyHtml: entry.defaultBodyHtml,
           isCustomized: false,
@@ -216,7 +216,7 @@ export async function seedMissingTriggerTemplates(): Promise<{ seeded: string[];
         triggerHour: -1,  // Sentinel: trigger templates are event-driven, not cron-driven
         subject: entry.defaultSubject,
         bodyHtml: entry.defaultBodyHtml,
-        active: true,
+        active: entry.defaultActive ?? true,
         templateType: 'trigger',
         triggerSlug: entry.slug,
         triggerDescription: entry.description,
@@ -268,7 +268,7 @@ export async function getAllTriggerTemplates(): Promise<TriggerEmailTemplate[]> 
         recipientType: entry.recipientType,
         subject: record?.subject ?? entry.defaultSubject,
         bodyHtml: record?.bodyHtml ?? entry.defaultBodyHtml,
-        active: record?.active ?? true,
+        active: record?.active ?? (entry.defaultActive ?? true),
         availableVariables: entry.availableVariables,
         isCustomized,
         category: entry.category,
@@ -292,7 +292,7 @@ export async function getAllTriggerTemplates(): Promise<TriggerEmailTemplate[]> 
         recipientType: entry.recipientType,
         subject: entry.defaultSubject,
         bodyHtml: entry.defaultBodyHtml,
-        active: true,
+        active: entry.defaultActive ?? true,
         availableVariables: entry.availableVariables,
         isCustomized: false,
         category: entry.category,
@@ -334,7 +334,7 @@ export async function getTriggerTemplateBySlug(slug: string): Promise<TriggerEma
       recipientType: entry.recipientType,
       subject: record?.subject ?? entry.defaultSubject,
       bodyHtml: record?.bodyHtml ?? entry.defaultBodyHtml,
-      active: record?.active ?? true,
+      active: record?.active ?? (entry.defaultActive ?? true),
       availableVariables: entry.availableVariables,
       isCustomized,
       category: entry.category,
@@ -355,7 +355,7 @@ export async function getTriggerTemplateBySlug(slug: string): Promise<TriggerEma
       recipientType: entry.recipientType,
       subject: entry.defaultSubject,
       bodyHtml: entry.defaultBodyHtml,
-      active: true,
+      active: entry.defaultActive ?? true,
       availableVariables: entry.availableVariables,
       isCustomized: false,
       category: entry.category,
