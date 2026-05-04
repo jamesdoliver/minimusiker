@@ -15,6 +15,10 @@ export interface TriggerEmailDefinition {
   defaultBodyHtml: string;
   availableVariables: string[];
   triggerEventKey?: string;  // Key from TRIGGER_EVENT_CATALOG
+  /** When false, freshly seeded Airtable rows and pre-seed cache fallbacks return active=false. Defaults to true (backwards-compatible). */
+  defaultActive?: boolean;
+  /** Optional UI grouping. Templates with a category render under that section instead of under their recipientType. */
+  category?: string;
   sendNow?: {
     eventFilter: 'schulsong_approved' | 'all_events' | 'schulsong_events';
     recipientResolver: 'event_teacher' | 'parents_by_registration';
