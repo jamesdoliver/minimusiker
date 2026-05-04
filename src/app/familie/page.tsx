@@ -521,11 +521,8 @@ function ParentPortalContent() {
                   className={className}
                   audioUrl={audioAccess.classPreview.previewUrl}
                   isLocked={true}
-                  previewLimit={10}
-                  fadeOutDuration={1}
                   title={tPreview('title')}
                   previewBadge={tPreview('previewBadge')}
-                  previewMessage={tPreview('previewMessage')}
                 />
               ) : (
                 <div className="bg-sage-50 border border-sage-200 rounded-lg p-6 text-center">
@@ -536,7 +533,7 @@ function ParentPortalContent() {
               <div className="mt-4 p-4 bg-sage-50 border border-sage-200 rounded-lg">
                 <p className="text-sm text-sage-800">
                   {selectedChild
-                    ? tPreview('previewDescription', { childName: `${selectedChild.childName}'s` })
+                    ? tPreview('previewDescription', { childName: selectedChild.childName })
                     : tPreview('previewDescriptionSchool')
                   }
                 </p>

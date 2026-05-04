@@ -166,9 +166,9 @@
   "recordingPreview": {
     "title": "Audiovorschau",
     "previewBadge": "Vorschau",
-    "previewMessage": "Dies ist eine 10-sekündige Vorschau. Kaufen Sie das Paket unten, um die vollständige Aufnahme freizuschalten!",
-    "previewDescription": "Dies ist eine 10-sekündige Vorschau der Aufführung von {childName}. Kaufen Sie das Paket unten, um die vollständige Aufnahme freizuschalten!",
-    "previewDescriptionSchool": "Dies ist eine 10-sekündige Vorschau der Aufführung Ihrer Schule. Kaufen Sie das Paket unten, um die vollständige Aufnahme freizuschalten!",
+    "previewMessage": "Dies ist eine kurze Vorschau. Du kannst die vollständige Version hören, wenn ihr ein Produkt bestellt.",
+    "previewDescription": "Dies ist eine kurze Vorschau vom Lied von {childName}. Du kannst die vollständige Version hören, wenn ihr ein Produkt bestellt.",
+    "previewDescriptionSchool": "Dies ist eine kurze Vorschau vom Lied eurer Schule. Du kannst die vollständige Version hören, wenn ihr ein Produkt bestellt.",
     "comingSoon": "Die Aufnahme wird nach der Veranstaltung verfügbar sein",
     "availableSoon": "Die Aufnahme wird nach der Veranstaltung verfügbar sein"
   },

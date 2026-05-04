@@ -1,0 +1,2 @@
+export const PREVIEW_DURATION_SECONDS = 30;
+export const PREVIEW_FADE_OUT_SECONDS = 1;

@@ -8,7 +8,7 @@ export const maxDuration = 300; // 5 minutes
 
 /**
  * POST /api/audio/process
- * Process an uploaded audio file: encode WAV→MP3 and generate 10-second preview snippet.
+ * Process an uploaded audio file: encode WAV→MP3 and generate 30-second preview snippet.
  * Called per-file after engineer batch upload confirmation.
  *
  * On success: processAudioFile sets the AudioFile record to status='ready' (with mp3R2Key set).

@@ -64,7 +64,7 @@ export const AUDIO_FILES_FIELD_IDS = {
   // Teacher approval for schulsong
   teacher_approved_at: 'fldSyA8lWMV72xCuq', // Date/time - when teacher approved schulsong
   // Audio processing fields
-  preview_r2_key: 'fldpnarwGzEyVjmpC', // R2 key for the 10-second preview snippet
+  preview_r2_key: 'fldpnarwGzEyVjmpC', // R2 key for the 30-second preview snippet
   mp3_r2_key: 'fldzADPZjKEZbfy2i', // R2 key for the encoded MP3 (when original is WAV)
   schulsong_version: 'fldZdmNUQ3kUx1q7H', // Version number for schulsong (incremented on each re-upload)
 } as const;
@@ -168,7 +168,7 @@ export interface AudioFile {
   // Teacher approval for schulsong
   teacherApprovedAt?: string; // ISO datetime when teacher approved schulsong
   // Audio processing fields
-  previewR2Key?: string; // R2 key for the 10-second preview snippet
+  previewR2Key?: string; // R2 key for the 30-second preview snippet
   mp3R2Key?: string; // R2 key for the encoded MP3 (when original is WAV)
   schulsongVersion?: number; // Version number for schulsong (incremented on each re-upload)
 }

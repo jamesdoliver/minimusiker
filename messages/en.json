@@ -166,9 +166,9 @@
   "recordingPreview": {
     "title": "Audio Preview",
     "previewBadge": "Preview",
-    "previewMessage": "This is a 10-second preview. Purchase the bundle below to unlock the full recording!",
-    "previewDescription": "This is a 10-second preview of {childName} performance. Purchase the bundle below to unlock the full recording!",
-    "previewDescriptionSchool": "This is a 10-second preview of your school's performance. Purchase the bundle below to unlock the full recording!",
+    "previewMessage": "This is a short preview. You can hear the full version once you order a product.",
+    "previewDescription": "This is a short preview of {childName}'s song. You can hear the full version once you order a product.",
+    "previewDescriptionSchool": "This is a short preview of your school's song. You can hear the full version once you order a product.",
     "comingSoon": "The recording will be available after the event",
     "availableSoon": "Recording will be available after the event"
   },

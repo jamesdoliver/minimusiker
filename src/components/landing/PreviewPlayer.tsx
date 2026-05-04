@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { PREVIEW_DURATION_SECONDS, PREVIEW_FADE_OUT_SECONDS } from '@/lib/config/audioPreview';
 
 interface PreviewPlayerProps {
   eventId: string;
@@ -11,9 +12,7 @@ interface PreviewPlayerProps {
   isLocked: boolean;
   /** Direct audio URL (when provided, bypasses URL generation) */
   audioUrl?: string;
-  /** Preview time limit in seconds (default: 10) */
   previewLimit?: number;
-  /** Fade out duration in seconds (default: 1) */
   fadeOutDuration?: number;
   /** Title to display */
   title?: string;
@@ -30,8 +29,8 @@ export default function PreviewPlayer({
   previewKey,
   isLocked,
   audioUrl: directAudioUrl,
-  previewLimit = 10,
-  fadeOutDuration = 1,
+  previewLimit = PREVIEW_DURATION_SECONDS,
+  fadeOutDuration = PREVIEW_FADE_OUT_SECONDS,
   title,
   previewBadge = 'Preview Only',
   previewMessage,
@@ -287,10 +286,10 @@ export default function PreviewPlayer({
         </div>
 
         {/* Preview Message */}
-        {isLocked && (
+        {isLocked && previewMessage && (
           <div className="bg-sage-50 border border-sage-200 rounded-md p-4">
             <p className="text-sm text-sage-800">
-              {previewMessage || `🎵 This is a ${previewLimit}-second preview. Purchase the full recording to enjoy the complete performance!`}
+              {previewMessage}
             </p>
           </div>
         )}

@@ -6,6 +6,7 @@ import path from 'path';
 import { getR2Service } from './r2Service';
 import { getTeacherService } from './teacherService';
 import { buildFinalMp3Key, buildPreviewMp3Key } from '@/lib/utils/audioPath';
+import { PREVIEW_DURATION_SECONDS, PREVIEW_FADE_OUT_SECONDS } from '@/lib/config/audioPreview';
 
 const execFileAsync = promisify(execFile);
 
@@ -129,12 +130,12 @@ async function getFfmpegPath(): Promise<string> {
 }
 
 /**
- * Process an uploaded audio file: encode WAV→MP3, generate 10-second preview snippet.
+ * Process an uploaded audio file: encode WAV→MP3, generate 30-second preview snippet.
  *
  * Steps:
  * 1. Download source file from R2 to /tmp
  * 2. If WAV: encode to MP3 (192kbps) → upload to R2
- * 3. Generate 10-second preview with 1-second fade-out → upload to R2
+ * 3. Generate 30-second preview with 1-second fade-out → upload to R2
  * 4. Update AudioFile record in Airtable with new keys and status
  * 5. Clean up /tmp files
  */
@@ -191,11 +192,12 @@ export async function processAudioFile(
     //    We extract duration from ffmpeg stderr output
     const durationSeconds = await getAudioDuration(ffmpeg, sourceMp3Path);
 
-    // 4. Generate 30-second preview with 1-second fade-out
+    // 4. Generate preview with fade-out (duration from PREVIEW_DURATION_SECONDS).
+    const fadeStart = PREVIEW_DURATION_SECONDS - PREVIEW_FADE_OUT_SECONDS;
     await execFileAsync(ffmpeg, [
       '-i', sourceMp3Path,
-      '-t', '30',
-      '-af', 'afade=t=out:st=29:d=1',
+      '-t', String(PREVIEW_DURATION_SECONDS),
+      '-af', `afade=t=out:st=${fadeStart}:d=${PREVIEW_FADE_OUT_SECONDS}`,
       '-b:a', '192k',
       '-y',
       previewPath,
