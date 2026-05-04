@@ -16,6 +16,7 @@
  */
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import QRCode from 'qrcode';
 import {
   getR2Service,
@@ -42,9 +43,40 @@ import {
   type QrCodePlacement,
 } from '../config/printableConfig';
 import type { TextElementConfig, PrintableItemConfig } from '../config/printableShared';
+import { isPartialType, stripPartialSuffix, partialBasenameFor } from '../config/printableShared';
+import type { PrintableItemType } from '../config/printableTextConfig';
 
 // Re-export shared types so existing consumers don't break
 export type { TextElementConfig, PrintableItemConfig } from '../config/printableShared';
+
+/**
+ * Greedy word-wrap. Returns the input split into lines that each measure ≤
+ * `maxWidth` at the given font size. A token longer than `maxWidth` is
+ * placed on its own line and overflows — admins can fix by widening the box
+ * or shortening the text. Whitespace-only inputs return [].
+ */
+function wrapTextToWidth(
+  text: string,
+  maxWidth: number,
+  fontSize: number,
+  font: { widthOfTextAtSize(str: string, size: number): number },
+): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (font.widthOfTextAtSize(candidate, fontSize) <= maxWidth) {
+      current = candidate;
+    } else {
+      if (current) lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
 
 // Result type for generation operations
 export interface GenerationResult {
@@ -70,6 +102,18 @@ class PrintableService {
   // ========================================
   // Custom Font Loading
   // ========================================
+
+  /**
+   * Embed a custom (non-standard-14) font into a PDFDocument. pdf-lib refuses
+   * to embed TTF/OTF without a fontkit instance registered on the document,
+   * silently throwing — which previously caused us to fall back to standard
+   * Helvetica and lose German umlauts when the WinAnsi encoder dropped them.
+   * Registering is idempotent.
+   */
+  private async embedCustomFont(pdfDoc: PDFDocument, fontData: Uint8Array) {
+    pdfDoc.registerFontkit(fontkit);
+    return pdfDoc.embedFont(fontData, { subset: true });
+  }
 
   /**
    * Get a custom font from R2, with caching
@@ -216,7 +260,12 @@ class PrintableService {
 
     // Process each item config
     for (const itemConfig of itemConfigs) {
-      const type = itemConfig.type as PrintableType;
+      const rawType = itemConfig.type;
+      const isPartial = isPartialType(rawType);
+      // Canonical (suffix-stripped) type used by all downstream helpers
+      // (printableIsBack, uploadPrintable, PRINTABLE_CONFIGS, etc.). The
+      // helpers do not know about `-partial`.
+      const type = stripPartialSuffix(rawType) as PrintableType;
 
       try {
         // Skip back items with missing QR code
@@ -230,31 +279,57 @@ class PrintableService {
           continue;
         }
 
-        // Fetch the template or generate blank for clothing
-        let templateBuffer = await this.r2Service.getTemplate(type);
         let pdfDoc: PDFDocument;
 
-        if (!templateBuffer) {
-          // For clothing items (tshirt/hoodie), generate a blank PDF
-          if (this.isClothingType(type)) {
-            console.log(`[PrintableService] No template for ${type}, generating blank A3 PDF`);
-            const blankPdfBuffer = await this.generateBlankPdf(842, 1191); // A3 dimensions
-            pdfDoc = await PDFDocument.load(blankPdfBuffer);
-          } else {
+        if (isPartial) {
+          // Form-mode items use a shared partial-blank template. For e.g.
+          // flyer1 + flyer1-back this is a single 2-page PDF; we extract page 0
+          // (front) or page 1 (back).
+          const itemBasename = partialBasenameFor(type as PrintableItemType);
+          const partialBuffer = await this.r2Service.getPartialTemplate(itemBasename);
+          if (!partialBuffer) {
             results.push({
               success: false,
               type,
-              error: `Template not found: ${type}. Please upload template to R2.`,
+              error: `Partial template not found: templates/${itemBasename}-partial-template.pdf. Run scripts/upload-printable-templates.ts.`,
             });
             continue;
           }
+          const fullDoc = await PDFDocument.load(partialBuffer);
+          const pageIndex = printableIsBack(type) ? 1 : 0;
+          const newDoc = await PDFDocument.create();
+          const [copiedPage] = await newDoc.copyPages(fullDoc, [pageIndex]);
+          newDoc.addPage(copiedPage);
+          pdfDoc = newDoc;
         } else {
-          // Load the PDF from template
-          pdfDoc = await PDFDocument.load(templateBuffer);
+          // Legacy path: load per-item template, fall back to blank PDF for
+          // clothing items.
+          const templateBuffer = await this.r2Service.getTemplate(type);
+
+          if (!templateBuffer) {
+            // For clothing items (tshirt/hoodie), generate a blank PDF
+            if (this.isClothingType(type)) {
+              console.log(`[PrintableService] No template for ${type}, generating blank A3 PDF`);
+              const blankPdfBuffer = await this.generateBlankPdf(842, 1191); // A3 dimensions
+              pdfDoc = await PDFDocument.load(blankPdfBuffer);
+            } else {
+              results.push({
+                success: false,
+                type,
+                error: `Template not found: ${type}. Please upload template to R2.`,
+              });
+              continue;
+            }
+          } else {
+            // Load the PDF from template
+            pdfDoc = await PDFDocument.load(templateBuffer);
+          }
         }
 
-        // For back items - only add QR code at custom position
-        if (printableIsBack(type)) {
+        // Legacy back items have all text baked into the template PDF, so we
+        // only overlay the QR. Partial-mode back items use a partial-blank
+        // template and still need text rendered alongside the QR.
+        if (printableIsBack(type) && !isPartial) {
           if (qrCodeBuffer && itemConfig.qrPosition) {
             await this.addQrCodeAtPosition(
               pdfDoc,
@@ -265,12 +340,12 @@ class PrintableService {
             );
           }
         } else {
-          // For front items - add all text elements
+          // Front items (legacy or partial) and partial-back items: render
+          // text + QR.
           for (const textElement of itemConfig.textElements) {
             await this.addTextElementToPdf(pdfDoc, textElement, type);
           }
 
-          // Add QR code if this item has one (front items with QR)
           if (qrCodeBuffer && itemConfig.qrPosition) {
             await this.addQrCodeAtPosition(
               pdfDoc,
@@ -369,7 +444,11 @@ class PrintableService {
     logoBuffer?: Buffer,
     qrCodeUrl?: string
   ): Promise<{ success: boolean; pdfBuffer?: Buffer; error?: string }> {
-    const type = itemConfig.type as PrintableType;
+    const rawType = itemConfig.type;
+    const isPartial = isPartialType(rawType);
+    // Canonical type used by all downstream helpers (see note in
+    // generateAllPrintablesWithConfigs).
+    const type = stripPartialSuffix(rawType) as PrintableType;
 
     // Generate QR code buffer if URL is provided
     let qrCodeBuffer: Buffer | undefined;
@@ -390,29 +469,49 @@ class PrintableService {
         };
       }
 
-      // Fetch the template or generate blank for clothing
-      let templateBuffer = await this.r2Service.getTemplate(type);
       let pdfDoc: PDFDocument;
 
-      if (!templateBuffer) {
-        // For clothing items (tshirt/hoodie), generate a blank PDF
-        if (this.isClothingType(type)) {
-          console.log(`[PrintableService] No template for ${type}, generating blank A3 PDF for preview`);
-          const blankPdfBuffer = await this.generateBlankPdf(842, 1191); // A3 dimensions
-          pdfDoc = await PDFDocument.load(blankPdfBuffer);
-        } else {
+      if (isPartial) {
+        const itemBasename = printableIsBack(type) ? type.replace('-back', '') : type;
+        const partialBuffer = await this.r2Service.getPartialTemplate(itemBasename);
+        if (!partialBuffer) {
           return {
             success: false,
-            error: `Template not found: ${type}. Please upload template to R2.`,
+            error: `Partial template not found: templates/${itemBasename}-partial-template.pdf. Run scripts/upload-printable-templates.ts.`,
           };
         }
+        const fullDoc = await PDFDocument.load(partialBuffer);
+        const pageIndex = printableIsBack(type) ? 1 : 0;
+        const newDoc = await PDFDocument.create();
+        const [copiedPage] = await newDoc.copyPages(fullDoc, [pageIndex]);
+        newDoc.addPage(copiedPage);
+        pdfDoc = newDoc;
       } else {
-        // Load the PDF from template
-        pdfDoc = await PDFDocument.load(templateBuffer);
+        // Legacy path: per-item template, blank fallback for clothing.
+        const templateBuffer = await this.r2Service.getTemplate(type);
+
+        if (!templateBuffer) {
+          // For clothing items (tshirt/hoodie), generate a blank PDF
+          if (this.isClothingType(type)) {
+            console.log(`[PrintableService] No template for ${type}, generating blank A3 PDF for preview`);
+            const blankPdfBuffer = await this.generateBlankPdf(842, 1191); // A3 dimensions
+            pdfDoc = await PDFDocument.load(blankPdfBuffer);
+          } else {
+            return {
+              success: false,
+              error: `Template not found: ${type}. Please upload template to R2.`,
+            };
+          }
+        } else {
+          // Load the PDF from template
+          pdfDoc = await PDFDocument.load(templateBuffer);
+        }
       }
 
-      // For back items - only add QR code at custom position
-      if (printableIsBack(type)) {
+      // Legacy back items have all text baked into the template PDF, so we
+      // only overlay the QR. Partial-mode back items use a partial-blank
+      // template and still need text rendered alongside the QR.
+      if (printableIsBack(type) && !isPartial) {
         if (qrCodeBuffer && itemConfig.qrPosition) {
           await this.addQrCodeAtPosition(
             pdfDoc,
@@ -423,12 +522,12 @@ class PrintableService {
           );
         }
       } else {
-        // For front items - add all text elements
+        // Front items (legacy or partial) and partial-back items: render
+        // text + QR.
         for (const textElement of itemConfig.textElements) {
           await this.addTextElementToPdf(pdfDoc, textElement, type);
         }
 
-        // Add QR code if this item has one (front items with QR)
         if (qrCodeBuffer && itemConfig.qrPosition) {
           await this.addQrCodeAtPosition(
             pdfDoc,
@@ -504,7 +603,7 @@ class PrintableService {
         fontName = PRINTABLE_FONTS[printableType] || 'springwood-display';
       }
       const fontData = await this.getCustomFont(fontName);
-      useFont = await pdfDoc.embedFont(fontData);
+      useFont = await this.embedCustomFont(pdfDoc, fontData);
     } catch (error) {
       console.warn(`Failed to load custom font for element, using Helvetica:`, error);
       useFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -513,8 +612,14 @@ class PrintableService {
     // Use the element's color (already in RGB 0-1 format)
     const color = rgb(element.color.r, element.color.g, element.color.b);
 
-    // Split text into lines for multiline support
-    const lines = element.text.split('\n').filter(line => line.trim() !== '');
+    // 1) Honour explicit `\n` line breaks from the source.
+    // 2) For each line, wrap at the box width so long resolved values (e.g.
+    //    school names, body paragraphs) don't overflow horizontally.
+    const explicitLines = element.text.split('\n').filter(line => line.trim() !== '');
+    const lines: string[] = [];
+    for (const line of explicitLines) {
+      lines.push(...wrapTextToWidth(line, element.width, element.fontSize, useFont));
+    }
     if (lines.length === 0) return;
 
     // Calculate line height based on font size
@@ -524,11 +629,19 @@ class PrintableService {
     const totalTextHeight = lines.length * lineHeight;
     const startY = element.y + element.height / 2 + totalTextHeight / 2 - element.fontSize;
 
+    const align = element.textAlign ?? 'center';
+
     // Draw each line
     lines.forEach((line, index) => {
       const textWidth = useFont.widthOfTextAtSize(line, element.fontSize);
-      // Center each line horizontally within the text box
-      const xPos = element.x + (element.width - textWidth) / 2;
+      let xPos: number;
+      if (align === 'left') {
+        xPos = element.x;
+      } else if (align === 'right') {
+        xPos = element.x + element.width - textWidth;
+      } else {
+        xPos = element.x + (element.width - textWidth) / 2;
+      }
       const yPos = startY - (index * lineHeight);
 
       firstPage.drawText(line, {
@@ -565,7 +678,7 @@ class PrintableService {
       try {
         const fontName = PRINTABLE_FONTS[printableType];
         const fontData = await this.getCustomFont(fontName);
-        useFont = await pdfDoc.embedFont(fontData);
+        useFont = await this.embedCustomFont(pdfDoc, fontData);
       } catch (error) {
         console.warn(`Failed to load custom font for ${printableType}, using Helvetica:`, error);
         useFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -1186,7 +1299,7 @@ class PrintableService {
         // Use custom font for this printable type
         const fontName = PRINTABLE_FONTS[printableType];
         const fontData = await this.getCustomFont(fontName);
-        useFont = await pdfDoc.embedFont(fontData);
+        useFont = await this.embedCustomFont(pdfDoc, fontData);
       } catch (error) {
         console.warn(`[PrintableService] Failed to load custom font for ${printableType}, falling back to Helvetica:`, error);
         // Fall back to standard font
@@ -1355,34 +1468,30 @@ class PrintableService {
 
     const bleedPts = bleedMm * MM_TO_POINTS;
     const pages = pdfDoc.getPages();
-
     if (pages.length === 0) {
       return pdfDoc;
     }
 
+    // Extend the page's MediaBox to add bleed without re-embedding.
+    //
+    // The previous implementation created a fresh PDFDocument and re-embedded
+    // the original page via `embedPdf`. That works for content-stream-only
+    // pages, but pdf-lib drops custom font dictionaries when wrapping a page
+    // as an XObject form — Poppler reports `font resource is not a dictionary`
+    // and the page renders blank wherever Fredoka text was drawn.
+    //
+    // In-place MediaBox extension keeps every resource reference intact:
+    // the existing content keeps its (x, y) coordinates and we just declare
+    // the visible page extends `bleedPts` further in every direction.
     const originalPage = pages[0];
     const { width: origWidth, height: origHeight } = originalPage.getSize();
-
-    // Create new document with expanded dimensions
-    const newDoc = await PDFDocument.create();
-    const newWidth = origWidth + (bleedPts * 2);
-    const newHeight = origHeight + (bleedPts * 2);
-
-    // Add new page with bleed dimensions
-    const newPage = newDoc.addPage([newWidth, newHeight]);
-
-    // Embed the original page as a form XObject
-    const [embeddedPage] = await newDoc.embedPdf(pdfDoc, [0]);
-
-    // Draw the original page centered (offset by bleed amount)
-    newPage.drawPage(embeddedPage, {
-      x: bleedPts,
-      y: bleedPts,
-      width: origWidth,
-      height: origHeight,
-    });
-
-    return newDoc;
+    originalPage.setMediaBox(
+      -bleedPts,
+      -bleedPts,
+      origWidth + bleedPts * 2,
+      origHeight + bleedPts * 2,
+    );
+    return pdfDoc;
   }
 
   /**

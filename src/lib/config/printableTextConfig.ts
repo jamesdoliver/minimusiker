@@ -422,9 +422,9 @@ export const PRINTABLE_ITEMS: PrintableTextConfig[] = [
     name: 'CD Jacket',
     description: 'Standard CD jacket (120×120mm)',
     templateFilename: 'cd-jacket-template.pdf',
-    pdfDimensions: { width: 340, height: 340 },
+    pdfDimensions: { width: 697.5, height: 357 },
     previewImage: '/images/printable_previews/cd-jacket-preview.png',
-    previewDimensions: { width: 680, height: 680 }, // 2x PDF dims
+    previewDimensions: { width: 1395, height: 714 }, // 2x PDF dims
     textDefaults: {
       x: 70,
       y: 230,

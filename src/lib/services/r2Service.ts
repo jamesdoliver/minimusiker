@@ -1491,6 +1491,49 @@ class R2Service {
   }
 
   /**
+   * Fetch a partial-blank PDF template from R2.
+   *
+   * Partial templates are shared across multiple item types: e.g. a single
+   * `flyer1-partial-template.pdf` (2 pages) is consumed by both `flyer1` (page 0)
+   * and `flyer1-back` (page 1) when those items are migrated to form-mode.
+   *
+   * @param itemBasename The item type minus any back/front suffix variants.
+   *   E.g. for `flyer1` and `flyer1-back`, pass `'flyer1'`.
+   */
+  async getPartialTemplate(itemBasename: string): Promise<Buffer | null> {
+    const key = `${R2_PATHS.TEMPLATES}/${itemBasename}-partial-template.pdf`;
+
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.assetsBucketName,
+        Key: key,
+      });
+
+      const response = await this.client.send(command);
+
+      if (!response.Body) {
+        return null;
+      }
+
+      // Convert stream to buffer (mirrors getTemplate's pattern)
+      const chunks: Uint8Array[] = [];
+      const stream = response.Body as AsyncIterable<Uint8Array>;
+
+      for await (const chunk of stream) {
+        chunks.push(chunk);
+      }
+
+      return Buffer.concat(chunks);
+    } catch (error) {
+      if ((error as { name?: string }).name === 'NoSuchKey') {
+        return null;
+      }
+      console.error(`[R2Service] Error fetching partial template ${key}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Check if a template exists
    */
   async templateExists(templateType: TemplateType): Promise<boolean> {

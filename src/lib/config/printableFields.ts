@@ -20,7 +20,16 @@ export type ComputedFieldName =
   | 'eventDateLocation'   // "Am DD.MM.YYYY in der {schoolName}"
   | 'schuleOrKita'        // "Schule" | "KiTa"
   | 'qrUrl'               // "minimusiker.app/e/{accessCode}" (or full https://)
-  | 'earlyBirdDeadline';  // "DD.MM.YYYY" (eventDate - threshold days)
+  | 'earlyBirdDeadline'   // "DD.MM.YYYY" (eventDate - threshold days)
+  | 'tshirtBodyParagraph'
+  | 'qrCaption'
+  | 'songList'            // Multi-line "N. Title Class" rendered from tracklist
+  | 'eventDateHeadline'   // "Minimusikertag am DD.MM.YYYY"
+  | 'flyerSubtitlePreEvent' // "Nur noch wenige Tage bis zum Minimusikertag im {schoolName}"
+  | 'eventDatePostHeadline' // "Das war unser Minimusikertag am DD.MM.YYYY"
+  | 'eventDateShort'         // "DD.MM.YYYY" only (when prefix is baked into the partial)
+  | 'flyer3WowBody'          // "Heute haben wir mit der ganzen {Schule|KiTa}…"
+  | 'flyer3LiebeBody';       // "Über diesen QR-Code könnt ihr die Aufnahmen … Namen eurer {Schule|KiTa}."
 
 export interface PrintableFieldDef {
   /** Stable key used to address this field in saved state. Unique per item type. */
@@ -38,6 +47,10 @@ export interface PrintableFieldDef {
   defaultColor?: string;
   /** When false, the form UI hides the position handle and the canvas shows the field as a non-draggable badge. */
   draggable: boolean;
+  /** When true, the form panel renders a multi-line textarea instead of a single-line input. Only meaningful for kind 'text'. */
+  multiline?: boolean;
+  /** Horizontal alignment within the text box. Defaults to 'center' to preserve legacy behavior. */
+  textAlign?: 'left' | 'center' | 'right';
   source: PrintableFieldSource;
 }
 

@@ -20,26 +20,41 @@ import {
   PrintableItemType,
   TextElement,
 } from '@/lib/config/printableTextConfig';
-import { ItemStatus, itemTypeToR2Type, convertItemToPdfConfig } from '@/lib/config/printableShared';
+import {
+  ItemStatus,
+  itemTypeToR2Type,
+  convertItemToPdfConfig,
+  convertFormModeItemToPdfConfig,
+  partialBasenameFor,
+} from '@/lib/config/printableShared';
+import { hasFormMode, getFieldRegistry } from '@/lib/config/printableFieldRegistry';
+import { bookingToResolverInput } from '@/lib/config/printableFieldResolver';
+import { getMasterCdService, type MasterCdTrack } from '@/lib/services/masterCdService';
+import type { FormModeItemState } from '@/lib/config/formModeState';
 
 export const dynamic = 'force-dynamic';
 
-// Request body type - Phase 4 with multiple text elements
+// Request body type - Phase 4 with multiple text elements; form-mode items
+// (Phase 0+) send `formModeState` instead of textElements/qrPosition/canvasScale.
 interface GeneratePrintablesRequest {
   eventId: string;        // Could be SimplyBook ID or actual event_id
   schoolName: string;
   eventDate: string;
   accessCode?: number;    // Optional - auto-fetched if not provided
+  isKita?: boolean;       // Sent by modal so the resolver can pick Schule/KiTa variants
   items: {
     type: PrintableItemType;
     status?: ItemStatus;  // Item status - 'skipped' items get placeholder instead of PDF
-    textElements: TextElement[];  // Array of text elements
+    // Legacy free-positioning editor:
+    textElements?: TextElement[];  // Array of text elements
     qrPosition?: {
       x: number;     // CSS pixels
       y: number;     // CSS pixels
       size: number;  // CSS pixels
     };
     canvasScale?: number;  // Scale factor for CSS to PDF conversion
+    // Form-mode (Phase 0+):
+    formModeState?: FormModeItemState;
   }[];
 }
 
@@ -56,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: GeneratePrintablesRequest = await request.json();
-    const { eventId: passedEventId, schoolName, eventDate, items } = body;
+    const { eventId: passedEventId, schoolName, eventDate, items, isKita } = body;
     let { accessCode } = body;
 
     // Validate required fields
@@ -79,27 +94,74 @@ export async function POST(request: NextRequest) {
     const airtableService = getAirtableService();
     const r2Service = getR2Service();
 
-    // Pre-flight health check - only verify templates needed for the items being generated
-    // This allows generating flyers even when button/minicard templates don't exist yet
-    const confirmedTypes = items
-      .filter(item => item.status !== 'skipped')
-      .map(item => itemTypeToR2Type(item.type) as TemplateType);
+    // Pre-flight: verify the right template files exist for each requested item.
+    // - Form-mode items (flyer1, flyer1-back, minicard, cd-jacket, …) read from
+    //   `templates/<basename>-partial-template.pdf`.
+    // - Legacy items (button, mocks) read from `templates/<type>-template.pdf`.
+    // Any other check would either over-reject (legacy filename for a migrated
+    // item that only ever ships its partial PDF) or under-reject (passing
+    // pre-flight then dying inside the generator). Clothing items (tshirt-print,
+    // hoodie-print) skip the check — the generator falls back to a blank A3.
+    const preflightItems = items.filter(item => item.status !== 'skipped');
+    if (preflightItems.length > 0) {
+      const optionalTypes = new Set(['tshirt', 'hoodie']);
+      const partialChecked = new Map<string, boolean>(); // basename → exists; dedupes front+back
+      const templatesFound: string[] = [];
+      const templatesMissing: string[] = [];
+      const errors: string[] = [];
 
-    if (confirmedTypes.length > 0) {
-      const healthCheck = await r2Service.checkAssetsForTypes(confirmedTypes);
-      if (!healthCheck.healthy) {
-        console.error('[printables/generate] Health check failed:', healthCheck.errors);
+      for (const item of preflightItems) {
+        if (optionalTypes.has(item.type)) continue; // clothing prints fall back to blank A3
+        const useFormMode = hasFormMode(item.type);
+        let exists: boolean;
+        let filename: string;
 
+        if (useFormMode) {
+          const basename = partialBasenameFor(item.type);
+          filename = `${basename}-partial-template.pdf`;
+          const cached = partialChecked.get(filename);
+          if (cached !== undefined) {
+            exists = cached;
+          } else {
+            exists = await r2Service.fileExistsInAssetsBucket(`templates/${filename}`);
+            partialChecked.set(filename, exists);
+          }
+        } else {
+          // Legacy types (button, mocks). Reuse the r2 helper for bucket-level
+          // accessibility + filename mapping.
+          const r2Type = itemTypeToR2Type(item.type) as TemplateType;
+          const hc = await r2Service.checkAssetsForTypes([r2Type]);
+          exists = hc.templatesFound.includes(r2Type);
+          filename = `${r2Type}-template.pdf`;
+        }
+
+        if (exists) {
+          templatesFound.push(item.type);
+        } else {
+          templatesMissing.push(item.type);
+          errors.push(`Missing template: ${item.type} (looked for ${filename})`);
+        }
+      }
+
+      // Always check fonts.
+      const fontsHealth = await r2Service.checkAssetsForTypes([]); // empty list, only checks fonts
+      const fontsMissing = fontsHealth.fontsMissing;
+      if (fontsMissing.length > 0) {
+        errors.push(...fontsMissing.map(f => `Missing font: ${f}`));
+      }
+
+      if (errors.length > 0) {
+        console.error('[printables/generate] Pre-flight failed:', errors);
         return NextResponse.json({
           success: false,
           partialSuccess: false,
           error: 'Pre-flight check failed: missing required assets',
           healthCheck: {
-            bucketAccessible: healthCheck.bucketAccessible,
-            missingTemplates: healthCheck.templatesMissing,
-            missingFonts: healthCheck.fontsMissing,
+            bucketAccessible: true,
+            missingTemplates: templatesMissing,
+            missingFonts: fontsMissing,
           },
-          errors: healthCheck.errors,
+          errors,
         }, { status: 400 });
       }
     }
@@ -148,13 +210,65 @@ export async function POST(request: NextRequest) {
     const confirmedItems = items.filter(item => item.status !== 'skipped');
     const skippedItems = items.filter(item => item.status === 'skipped');
 
-    // Convert confirmed items from CSS editor coordinates to PDF coordinates
-    const itemConfigs = confirmedItems.map(item => convertItemToPdfConfig({
-      type: item.type,
-      textElements: item.textElements,
-      qrPosition: item.qrPosition,
-      canvasScale: item.canvasScale,
-    }));
+    // Determine if any confirmed item references the `songList` computed
+    // source. If so, fetch the tracklist once and refuse to generate when it
+    // isn't fully ready — partial tracklists would silently yield blank
+    // entries on the PDF.
+    let tracklist: MasterCdTrack[] | null = null;
+    const itemsThatNeedTracklist = confirmedItems.filter(item => {
+      if (!hasFormMode(item.type)) return false;
+      const fields = getFieldRegistry(item.type);
+      return fields?.some(f => f.source.type === 'computed' && f.source.name === 'songList') ?? false;
+    });
+
+    if (itemsThatNeedTracklist.length > 0) {
+      const tracklistData = await getMasterCdService().getTracklist(eventId);
+      if (!tracklistData.allReady) {
+        return NextResponse.json({
+          success: false,
+          partialSuccess: false,
+          error: `Tracklist is not yet ready (${tracklistData.readyCount}/${tracklistData.totalCount} tracks confirmed). Teacher must confirm all songs first.`,
+        }, { status: 400 });
+      }
+      tracklist = tracklistData.tracks;
+    }
+
+    // Convert confirmed items from CSS editor coordinates to PDF coordinates.
+    // Migrated items dispatch to the form-mode converter (yields a
+    // `<type>-partial` config that printableService recognises); legacy items
+    // continue through convertItemToPdfConfig.
+    const itemConfigs = confirmedItems.map(item => {
+      if (hasFormMode(item.type)) {
+        const fields = getFieldRegistry(item.type);
+        if (!fields) {
+          // Tautological today (hasFormMode returns getFieldRegistry !== null), but
+          // kept as a contract assertion in case the two helpers ever diverge.
+          throw new Error(
+            `Form-mode item ${item.type} has no field registry`,
+          );
+        }
+        return convertFormModeItemToPdfConfig({
+          type: item.type,
+          fields,
+          state: item.formModeState ?? {},
+          booking: bookingToResolverInput({
+            schoolName,
+            bookingDate: eventDate,
+            accessCode,
+            isKita,
+          }),
+          tracklist,
+          // Phase 0 sends global defaults only; Airtable timeline overrides
+          // come in a later phase.
+        });
+      }
+      return convertItemToPdfConfig({
+        type: item.type,
+        textElements: item.textElements ?? [],
+        qrPosition: item.qrPosition,
+        canvasScale: item.canvasScale,
+      });
+    });
 
     // Results tracking
     const succeeded: { type: string; key?: string }[] = [];
@@ -219,6 +333,24 @@ export async function POST(request: NextRequest) {
       console.warn(`[printables/generate] Failed to create audio folder: ${folderResult.error}`);
     }
 
+    // Sign download URLs for succeeded items so the client can offer
+    // direct download without an extra round-trip per item. URLs are valid
+    // for 1 hour; the client treats them as ephemeral.
+    const succeededWithUrls = await Promise.all(
+      succeeded.map(async (r) => {
+        let url: string | undefined;
+        if (r.key) {
+          try {
+            const filename = `${eventId}-${r.type}.pdf`;
+            url = await r2Service.generateSignedUrl(r.key, 3600, filename);
+          } catch (err) {
+            console.warn(`[printables/generate] Failed to sign URL for ${r.type}:`, err);
+          }
+        }
+        return { type: r.type, key: r.key, url };
+      })
+    );
+
     // Return improved response structure
     return NextResponse.json({
       success: allSucceeded || allSkipped,
@@ -229,10 +361,7 @@ export async function POST(request: NextRequest) {
       qrCodeIncluded: !!qrCodeUrl,
       audioFolderCreated,
       results: {
-        succeeded: succeeded.map(r => ({
-          type: r.type,
-          key: r.key,
-        })),
+        succeeded: succeededWithUrls,
         failed: failed.map(r => ({
           type: r.type,
           error: r.error || 'Unknown error',

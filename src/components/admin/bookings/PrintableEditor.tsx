@@ -21,7 +21,7 @@ import {
 } from '@/lib/config/printableTextConfig';
 import type { FlyerFrontType } from '@/lib/config/printableTextConfig';
 
-interface PrintableEditorProps {
+export interface PrintableEditorProps {
   itemConfig: PrintableTextConfig;
   schoolName: string;
   accessCode?: string | number;
@@ -43,7 +43,7 @@ interface PrintableEditorProps {
  */
 const FLYER_FRONT_TYPES: FlyerFrontType[] = ['flyer1', 'flyer2', 'flyer3'];
 
-export default function PrintableEditor({
+export function PrintableEditor({
   itemConfig,
   schoolName,
   accessCode,

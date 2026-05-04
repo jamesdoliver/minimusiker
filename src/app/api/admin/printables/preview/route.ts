@@ -17,25 +17,37 @@ import {
   PrintableItemType,
   TextElement,
 } from '@/lib/config/printableTextConfig';
-import { convertItemToPdfConfig } from '@/lib/config/printableShared';
+import {
+  convertItemToPdfConfig,
+  convertFormModeItemToPdfConfig,
+} from '@/lib/config/printableShared';
+import { hasFormMode, getFieldRegistry } from '@/lib/config/printableFieldRegistry';
+import { bookingToResolverInput } from '@/lib/config/printableFieldResolver';
+import { getMasterCdService, type MasterCdTrack } from '@/lib/services/masterCdService';
+import type { FormModeItemState } from '@/lib/config/formModeState';
 
 export const dynamic = 'force-dynamic';
 
-// Request body type for preview generation
+// Request body type for preview generation. Form-mode items (Phase 0+) send
+// `formModeState` instead of textElements/qrPosition/canvasScale.
 interface PreviewRequest {
   eventId: string;        // Could be SimplyBook ID or actual event_id
   schoolName: string;
   eventDate: string;
   accessCode?: number;    // Optional - auto-fetched if not provided
+  isKita?: boolean;       // Sent by modal so the resolver can pick Schule/KiTa variants
   item: {
     type: PrintableItemType;
-    textElements: TextElement[];
+    // Legacy free-positioning editor:
+    textElements?: TextElement[];
     qrPosition?: {
       x: number;
       y: number;
       size: number;
     };
     canvasScale?: number;
+    // Form-mode (Phase 0+):
+    formModeState?: FormModeItemState;
   };
 }
 
@@ -52,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: PreviewRequest = await request.json();
-    const { eventId: passedEventId, schoolName, eventDate, item } = body;
+    const { eventId: passedEventId, schoolName, eventDate, item, isKita } = body;
     let { accessCode } = body;
 
     // Validate required fields
@@ -98,13 +110,59 @@ export async function POST(request: NextRequest) {
       ? `https://minimusiker.app/e/${accessCode}`
       : undefined;
 
-    // Convert item from CSS editor coordinates to PDF coordinates
-    const itemConfig = convertItemToPdfConfig({
-      type: item.type,
-      textElements: item.textElements,
-      qrPosition: item.qrPosition,
-      canvasScale: item.canvasScale,
-    });
+    // Convert item from CSS editor coordinates to PDF coordinates. Migrated
+    // items dispatch to the form-mode converter (which emits a
+    // `<type>-partial` config that printableService recognises); legacy items
+    // continue through convertItemToPdfConfig.
+    let itemConfig;
+    if (hasFormMode(item.type)) {
+      const fields = getFieldRegistry(item.type);
+      if (!fields) {
+        // Tautological today (hasFormMode returns getFieldRegistry !== null), but
+        // kept as a contract assertion in case the two helpers ever diverge.
+        return NextResponse.json(
+          { error: `Form-mode item ${item.type} has no field registry` },
+          { status: 500 },
+        );
+      }
+
+      // Fetch the tracklist if any field needs it; refuse preview when it
+      // isn't fully ready so admins don't preview a half-empty PDF.
+      let tracklist: MasterCdTrack[] | null = null;
+      const needsTracklist = fields.some(
+        f => f.source.type === 'computed' && f.source.name === 'songList',
+      );
+      if (needsTracklist) {
+        const tracklistData = await getMasterCdService().getTracklist(eventId);
+        if (!tracklistData.allReady) {
+          return NextResponse.json({
+            success: false,
+            error: `Tracklist is not yet ready (${tracklistData.readyCount}/${tracklistData.totalCount} tracks confirmed).`,
+          }, { status: 400 });
+        }
+        tracklist = tracklistData.tracks;
+      }
+
+      itemConfig = convertFormModeItemToPdfConfig({
+        type: item.type,
+        fields,
+        state: item.formModeState ?? {},
+        booking: bookingToResolverInput({
+          schoolName,
+          bookingDate: eventDate,
+          accessCode,
+          isKita,
+        }),
+        tracklist,
+      });
+    } else {
+      itemConfig = convertItemToPdfConfig({
+        type: item.type,
+        textElements: item.textElements ?? [],
+        qrPosition: item.qrPosition,
+        canvasScale: item.canvasScale,
+      });
+    }
 
     // Generate single printable using the service
     const result = await printableService.generateSinglePrintablePreview(
@@ -178,7 +236,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate signed URL for download (expires in 5 minutes)
     // Signed URL expires in 1 hour (admin may revisit the tab)
     const signedUrl = await r2Service.generateSignedUrlForAssetsBucket(previewKey, 3600);
 

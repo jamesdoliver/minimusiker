@@ -1,16 +1,21 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BookingWithDetails } from '@/app/api/admin/bookings/route';
 import {
   PrintableItemType,
   PrintableEditorState,
   PRINTABLE_ITEMS,
-  TOTAL_PRINTABLE_ITEMS,
   initializeEditorState,
 } from '@/lib/config/printableTextConfig';
-import PrintableEditor from './PrintableEditor';
-import { ItemStatus } from '@/lib/config/printableShared';
+import { PrintableFormEditor } from './PrintableFormEditor';
+import { ItemStatus, PRINTABLE_TAB_GROUPS, type PrintableTab } from '@/lib/config/printableShared';
+import { type FormModeItemState } from '@/lib/config/formModeState';
+import { bookingToResolverInput } from '@/lib/config/printableFieldResolver';
+import { hasFormMode } from '@/lib/config/printableFieldRegistry';
+import type { MasterCdData } from '@/lib/services/masterCdService';
+
+const EMPTY_FORM_STATE: FormModeItemState = Object.freeze({}) as FormModeItemState;
 
 interface ConfirmPrintablesModalProps {
   isOpen: boolean;
@@ -33,6 +38,8 @@ interface HealthCheckResult {
 interface GenerationResultItem {
   type: string;
   key?: string;
+  /** Signed download URL for the generated PDF. Present on succeeded items, valid for 1h. */
+  url?: string;
   error?: string;
 }
 
@@ -64,12 +71,39 @@ export default function ConfirmPrintablesModal({
   onClose,
   booking,
 }: ConfirmPrintablesModalProps) {
-  // Current step in the wizard (0 to 10 for 11 items)
+  // Current step in the wizard, scoped to the active tab's items.
   const [currentStep, setCurrentStep] = useState(0);
+
+  // Active wizard tab. The full list of 11 items is split into Papers / Clothing
+  // for navigation only — status loading, generation, and persistence still
+  // operate over the full list (see PRINTABLE_ITEMS uses below).
+  const [activeTab, setActiveTab] = useState<PrintableTab>('papersPreEvent');
+  const tabItemTypes = PRINTABLE_TAB_GROUPS[activeTab];
+  // Resolve tab item types -> full PrintableTextConfig objects (preserving order).
+  const tabItems = tabItemTypes
+    .map((t) => PRINTABLE_ITEMS.find((item) => item.type === t))
+    .filter((item): item is (typeof PRINTABLE_ITEMS)[number] => Boolean(item));
 
   // Editor state for each item type
   const [itemEditorStates, setItemEditorStates] = useState<Record<PrintableItemType, PrintableEditorState>>(() =>
     initializeAllItemsEditorState(booking.schoolName, booking.bookingDate)
+  );
+
+  // Form-mode field overrides per item, persisted in a separate localStorage
+  // key (`-form`) so the new form-driven editor never mixes its state with the
+  // legacy free-positioning `-editor` blob. Only migrated items (e.g. flyer1,
+  // flyer1-back) populate this slice; legacy items continue to use itemEditorStates.
+  const [formModeStates, setFormModeStates] = useState<
+    Partial<Record<PrintableItemType, FormModeItemState>>
+  >({});
+
+  // Consumed by PrintableFormEditor; lifts per-field overrides into the modal
+  // so they can be persisted to the `-form` localStorage slice.
+  const setItemFormModeState = useCallback(
+    (itemType: PrintableItemType, next: FormModeItemState) => {
+      setFormModeStates((prev) => ({ ...prev, [itemType]: next }));
+    },
+    [],
   );
 
   // Track status of each item: pending, confirmed, or skipped
@@ -89,6 +123,12 @@ export default function ConfirmPrintablesModal({
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
 
+  // Master CD tracklist state — fetched on modal open and forwarded to the
+  // form-mode editor so fields using the `songList` computed source can
+  // render the per-event song list. Items that don't reference `songList`
+  // ignore this; absence of data resolves to an empty string.
+  const [tracklistData, setTracklistData] = useState<MasterCdData | null>(null);
+
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
@@ -96,6 +136,12 @@ export default function ConfirmPrintablesModal({
 
   // Preview download state
   const [isDownloading, setIsDownloading] = useState(false);
+
+  // Whether the most recent generation should close the modal on full success.
+  // True for "Generate All" (covers every tab), false for per-tab generation
+  // (modal stays open so admins can keep working). Drives the post-generation
+  // copy in the result panel.
+  const [lastGenerationClosesModal, setLastGenerationClosesModal] = useState(false);
 
   // Ref for click-outside detection
   const modalRef = useRef<HTMLDivElement>(null);
@@ -107,12 +153,20 @@ export default function ConfirmPrintablesModal({
   // has navigated or if a previous session was restored from localStorage.
   const stepSetByUser = useRef(false);
 
+  // Track consecutive Skip clicks within this session. After 3 in a row, the
+  // next Skip prompts a one-time confirm so admins don't accidentally skip
+  // the entire wizard.
+  const consecutiveSkips = useRef(0);
+  const skipCascadeWarned = useRef(false);
+
   // localStorage key prefix for persisting editor state across sessions
   const envPrefix = process.env.NEXT_PUBLIC_VERCEL_ENV || process.env.NODE_ENV || 'dev';
   const storageKeyPrefix = `printables-${envPrefix}-${booking.code}`;
 
-  // Current item config
-  const currentItem = PRINTABLE_ITEMS[currentStep];
+  // Current item config (scoped to the active tab).
+  // Defense in depth — synchronous reset in the tab onClick keeps
+  // `currentStep` in range, so this fallback is unreachable in normal flow.
+  const currentItem = tabItems[currentStep] ?? tabItems[0];
   const currentEditorState = itemEditorStates[currentItem.type];
 
   // Run health check and load status when modal opens
@@ -163,6 +217,25 @@ export default function ConfirmPrintablesModal({
         setItemsStatus(initialStatus);
       }
 
+      // Restore form-mode overrides from localStorage (separate key from legacy editor).
+      // Always read regardless of legacy `restored` — form-mode state is parallel.
+      try {
+        const formRaw = localStorage.getItem(`${storageKeyPrefix}-form`);
+        if (formRaw) {
+          const parsed = JSON.parse(formRaw) as Partial<Record<PrintableItemType, FormModeItemState>>;
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            setFormModeStates(parsed);
+          } else {
+            setFormModeStates({});
+          }
+        } else {
+          setFormModeStates({});
+        }
+      } catch {
+        // Corrupted JSON — start fresh.
+        setFormModeStates({});
+      }
+
       // One-time cleanup: remove old-format localStorage keys (before env-scoping was added)
       try {
         const oldPrefix = `printables-editor-${booking.code}`;
@@ -186,6 +259,35 @@ export default function ConfirmPrintablesModal({
       })();
     }
   }, [isOpen, booking.schoolName]);
+
+  // Fetch the Master CD tracklist whenever the modal opens. The endpoint
+  // accepts an Event record ID; fall back to `code` (SimplyBook ID) only if
+  // we have nothing better — the route returns 404 in that case and the
+  // editor silently renders songList fields as empty.
+  useEffect(() => {
+    if (!isOpen) return;
+    const eventRef = booking.eventRecordId ?? booking.code;
+    if (!eventRef) {
+      setTracklistData(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/admin/tasks/tracklist?eventId=${encodeURIComponent(eventRef)}`)
+      .then(r => r.json())
+      .then((res: { success: boolean; data?: MasterCdData; error?: string }) => {
+        if (cancelled) return;
+        if (res.success && res.data) {
+          setTracklistData(res.data);
+        } else {
+          setTracklistData(null);
+        }
+      })
+      .catch(() => {
+        // Silent — songList fields will resolve to empty.
+        if (!cancelled) setTracklistData(null);
+      });
+    return () => { cancelled = true; };
+  }, [isOpen, booking.eventRecordId, booking.code]);
 
   // Handle close - block during generation, otherwise close (state is persisted in localStorage)
   const handleClose = useCallback(() => {
@@ -223,6 +325,21 @@ export default function ConfirmPrintablesModal({
       localStorage.setItem(`${storageKeyPrefix}-editor`, JSON.stringify(itemEditorStates));
     }
   }, [isOpen, storageKeyPrefix, itemEditorStates]);
+
+  // Persist form-mode overrides to a SEPARATE localStorage key. Migrated items
+  // write here; legacy items continue writing to `-editor` above. Keeping the
+  // two blobs apart prevents schema collisions during the gradual migration.
+  useEffect(() => {
+    if (!isOpen || !storageKeyPrefix) return;
+    try {
+      localStorage.setItem(
+        `${storageKeyPrefix}-form`,
+        JSON.stringify(formModeStates),
+      );
+    } catch {
+      // Quota exceeded or storage disabled — ignore silently.
+    }
+  }, [isOpen, storageKeyPrefix, formModeStates]);
 
   useEffect(() => {
     if (isOpen) {
@@ -315,32 +432,71 @@ export default function ConfirmPrintablesModal({
     [currentItem.type]
   );
 
+  // Tab order for cross-tab navigation. Used to find the next tab with
+  // pending items when the admin reaches the end of the current tab.
+  const TAB_ORDER: PrintableTab[] = ['papersPreEvent', 'papersPostEvent', 'clothing'];
+
+  // Find the next tab (in TAB_ORDER) after `from` that still has pending items.
+  // Returns null when there are no more pending items anywhere.
+  const findNextTabWithPending = (
+    from: PrintableTab,
+    statuses: Record<PrintableItemType, ItemStatus>,
+  ): PrintableTab | null => {
+    const startIdx = TAB_ORDER.indexOf(from);
+    for (let i = startIdx + 1; i < TAB_ORDER.length; i++) {
+      const tab = TAB_ORDER[i];
+      const items = PRINTABLE_TAB_GROUPS[tab];
+      if (items.some((t) => statuses[t] === 'pending')) {
+        return tab;
+      }
+    }
+    return null;
+  };
+
+  // Advance: within-tab next item, or jump to the next tab with pending items.
+  // Computed against `nextStatuses` (passed in) because React state updates
+  // are batched and we may need to advance based on a status that hasn't
+  // committed yet.
+  const advanceAfter = (nextStatuses: Record<PrintableItemType, ItemStatus>) => {
+    if (currentStep < tabItems.length - 1) {
+      setCurrentStep(currentStep + 1);
+      return;
+    }
+    const nextTab = findNextTabWithPending(activeTab, nextStatuses);
+    if (nextTab) {
+      setActiveTab(nextTab);
+      setCurrentStep(0);
+    }
+    // Otherwise stay put — the "Generate" button takes over the footer.
+  };
+
   // Handle confirm current item and go to next
   const handleConfirmAndNext = () => {
     userHasInteracted.current.add(currentItem.type);
     stepSetByUser.current = true;
-    setItemsStatus((prev) => ({
-      ...prev,
-      [currentItem.type]: 'confirmed',
-    }));
-
-    if (currentStep < TOTAL_PRINTABLE_ITEMS - 1) {
-      setCurrentStep(currentStep + 1);
-    }
+    consecutiveSkips.current = 0;
+    const nextStatuses = { ...itemsStatus, [currentItem.type]: 'confirmed' as ItemStatus };
+    setItemsStatus(nextStatuses);
+    advanceAfter(nextStatuses);
   };
 
   // Handle skip current item and go to next
   const handleSkip = () => {
+    // Prompt once per session after the third consecutive skip, before applying.
+    if (consecutiveSkips.current >= 2 && !skipCascadeWarned.current) {
+      const ok = window.confirm(
+        "You've skipped several items in a row. Skipped items won't be generated. Continue skipping?",
+      );
+      skipCascadeWarned.current = true;
+      if (!ok) return;
+    }
+
     userHasInteracted.current.add(currentItem.type);
     stepSetByUser.current = true;
-    setItemsStatus((prev) => ({
-      ...prev,
-      [currentItem.type]: 'skipped',
-    }));
-
-    if (currentStep < TOTAL_PRINTABLE_ITEMS - 1) {
-      setCurrentStep(currentStep + 1);
-    }
+    consecutiveSkips.current += 1;
+    const nextStatuses = { ...itemsStatus, [currentItem.type]: 'skipped' as ItemStatus };
+    setItemsStatus(nextStatuses);
+    advanceAfter(nextStatuses);
   };
 
   // Handle go back
@@ -351,11 +507,36 @@ export default function ConfirmPrintablesModal({
     }
   };
 
-  // Handle generate all PDFs
-  const handleGenerateAll = async () => {
+  // Build the request body item array for a given subset of types. Used by
+  // both the all-items and per-tab generate handlers.
+  const buildItemsPayload = (types: readonly PrintableItemType[]) =>
+    types.map((type) => {
+      const status = itemsStatus[type];
+      if (hasFormMode(type)) {
+        return {
+          type,
+          status,
+          formModeState: formModeStates[type] ?? {},
+        };
+      }
+      const state = itemEditorStates[type];
+      return {
+        type,
+        status,
+        textElements: state.textElements,
+        qrPosition: state.qrPosition,
+        canvasScale: state.canvasScale,
+      };
+    });
+
+  const runGenerate = async (
+    types: readonly PrintableItemType[],
+    { closeOnFullSuccess }: { closeOnFullSuccess: boolean },
+  ) => {
     setIsGenerating(true);
     setGenerationError(null);
     setGenerationResult(null);
+    setLastGenerationClosesModal(closeOnFullSuccess);
 
     try {
       const response = await fetch('/api/admin/printables/generate', {
@@ -365,16 +546,8 @@ export default function ConfirmPrintablesModal({
           eventId: booking.code,
           schoolName: booking.schoolName,
           eventDate: booking.bookingDate,
-          items: PRINTABLE_ITEMS.map(item => {
-            const state = itemEditorStates[item.type];
-            return {
-              type: item.type,
-              status: itemsStatus[item.type], // Include status for each item
-              textElements: state.textElements,
-              qrPosition: state.qrPosition,
-              canvasScale: state.canvasScale,
-            };
-          }),
+          isKita: booking.isKita,
+          items: buildItemsPayload(types),
         }),
       });
 
@@ -385,9 +558,9 @@ export default function ConfirmPrintablesModal({
         throw new Error(result.error || 'Failed to generate printables');
       }
 
-      // If fully successful (no failures), clear saved state and close modal after short delay
-      if (result.success && !result.partialSuccess && !result.allSkipped) {
+      if (closeOnFullSuccess && result.success && !result.partialSuccess && !result.allSkipped) {
         localStorage.removeItem(`${storageKeyPrefix}-editor`);
+        localStorage.removeItem(`${storageKeyPrefix}-form`);
         localStorage.removeItem(`${storageKeyPrefix}-status`);
         localStorage.removeItem(`${storageKeyPrefix}-step`);
         setTimeout(() => {
@@ -401,6 +574,16 @@ export default function ConfirmPrintablesModal({
       setIsGenerating(false);
     }
   };
+
+  // Handle generate all PDFs across every tab (closes on full success).
+  const handleGenerateAll = () =>
+    runGenerate(PRINTABLE_ITEMS.map((i) => i.type), { closeOnFullSuccess: true });
+
+  // Handle generate just the current tab. Modal stays open so admins can
+  // continue with later tabs (typical: pre-event now, post-event after the
+  // event). Result panel still surfaces download URLs for the items run.
+  const handleGenerateCurrentTab = () =>
+    runGenerate(PRINTABLE_TAB_GROUPS[activeTab], { closeOnFullSuccess: false });
 
   // Handle retry failed items
   const handleRetryFailed = async () => {
@@ -420,14 +603,23 @@ export default function ConfirmPrintablesModal({
           eventId: booking.code,
           schoolName: booking.schoolName,
           eventDate: booking.bookingDate,
+          isKita: booking.isKita,
           // Only send failed items for retry
           items: PRINTABLE_ITEMS
             .filter(item => failedTypes.includes(item.type))
             .map(item => {
+              const status = itemsStatus[item.type];
+              if (hasFormMode(item.type)) {
+                return {
+                  type: item.type,
+                  status,
+                  formModeState: formModeStates[item.type] ?? {},
+                };
+              }
               const state = itemEditorStates[item.type];
               return {
                 type: item.type,
-                status: itemsStatus[item.type],
+                status,
                 textElements: state.textElements,
                 qrPosition: state.qrPosition,
                 canvasScale: state.canvasScale,
@@ -469,6 +661,7 @@ export default function ConfirmPrintablesModal({
       // If now fully successful, clear saved state and close modal
       if (newResult.results.failed.length === 0 && !newResult.allSkipped) {
         localStorage.removeItem(`${storageKeyPrefix}-editor`);
+        localStorage.removeItem(`${storageKeyPrefix}-form`);
         localStorage.removeItem(`${storageKeyPrefix}-status`);
         localStorage.removeItem(`${storageKeyPrefix}-step`);
         setTimeout(() => {
@@ -488,6 +681,22 @@ export default function ConfirmPrintablesModal({
     setGenerationError(null);
 
     try {
+      // Migrated items (form-mode) send their form-mode state; legacy items
+      // continue to send the free-positioning editor blob. The route
+      // dispatches on hasFormMode and the generator extracts the
+      // partial-blank template page.
+      const itemBody = hasFormMode(currentItem.type)
+        ? {
+            type: currentItem.type,
+            formModeState: formModeStates[currentItem.type] ?? {},
+          }
+        : {
+            type: currentItem.type,
+            textElements: currentEditorState.textElements,
+            qrPosition: currentEditorState.qrPosition,
+            canvasScale: currentEditorState.canvasScale,
+          };
+
       const response = await fetch('/api/admin/printables/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -496,12 +705,8 @@ export default function ConfirmPrintablesModal({
           schoolName: booking.schoolName,
           eventDate: booking.bookingDate,
           accessCode: booking.accessCode,
-          item: {
-            type: currentItem.type,
-            textElements: currentEditorState.textElements,
-            qrPosition: currentEditorState.qrPosition,
-            canvasScale: currentEditorState.canvasScale,
-          },
+          isKita: booking.isKita,
+          item: itemBody,
         }),
       });
 
@@ -533,8 +738,8 @@ export default function ConfirmPrintablesModal({
   // All items are ready when none are pending (all confirmed or skipped)
   const allItemsReady = pendingCount === 0;
 
-  // Check if on last step
-  const isLastStep = currentStep === TOTAL_PRINTABLE_ITEMS - 1;
+  // Check if on last step of the current tab
+  const isLastStep = currentStep === tabItems.length - 1;
 
   // Check if health check passed - only gate on fonts (universally required).
   // Template availability is checked per-item by the generate route.
@@ -544,6 +749,13 @@ export default function ConfirmPrintablesModal({
 
   // Current item status
   const currentItemStatus = itemsStatus[currentItem.type];
+
+  // Memoized projection of booking -> ResolverBooking so the form-mode editor
+  // can rely on a stable reference for its useMemo deps.
+  const resolverBooking = useMemo(
+    () => bookingToResolverInput(booking),
+    [booking.schoolName, booking.bookingDate, booking.accessCode, booking.isKita],
+  );
 
   if (!isOpen) return null;
 
@@ -625,14 +837,95 @@ export default function ConfirmPrintablesModal({
           </div>
         )}
 
+        {/* Tab buttons (Pre-Event / Post-Event / Clothing) */}
+        <div className="px-6 pt-3">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            {(['papersPreEvent', 'papersPostEvent', 'clothing'] as const).map((tab) => {
+              const items = PRINTABLE_TAB_GROUPS[tab];
+              const tabConfirmed = items.filter((i) => itemsStatus[i] === 'confirmed').length;
+              const tabSkipped = items.filter((i) => itemsStatus[i] === 'skipped').length;
+              const isActive = tab === activeTab;
+              const isComplete = tabConfirmed + tabSkipped === items.length;
+              const label = tab === 'papersPreEvent' ? 'Pre-Event' : tab === 'papersPostEvent' ? 'Post-Event' : 'Clothing';
+
+              const styles = isActive
+                ? isComplete
+                  ? 'bg-green-600 text-white'
+                  : 'bg-[#F4A261] text-white'
+                : isComplete
+                  ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200';
+
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab);
+                    setCurrentStep(0);
+                    stepSetByUser.current = true;
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${styles}`}
+                >
+                  {isComplete && (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                  {label}
+                  <span className="text-xs opacity-80">
+                    {tabConfirmed + tabSkipped}/{items.length}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Per-tab generate — appears once the active tab has 0 pending items.
+                Lets admins ship pre-event flyers without waiting for post-event
+                or clothing to be confirmed. */}
+            {(() => {
+              const tabTypes = PRINTABLE_TAB_GROUPS[activeTab];
+              const tabPending = tabTypes.filter((t) => itemsStatus[t] === 'pending').length;
+              const tabConfirmed = tabTypes.filter((t) => itemsStatus[t] === 'confirmed').length;
+              if (tabPending !== 0 || tabConfirmed === 0) return null;
+              const tabLabel = activeTab === 'papersPreEvent' ? 'Pre-Event' : activeTab === 'papersPostEvent' ? 'Post-Event' : 'Clothing';
+              return (
+                <button
+                  onClick={handleGenerateCurrentTab}
+                  disabled={isGenerating || !healthOk}
+                  title={!healthOk ? 'Fix missing assets before generating' : undefined}
+                  className="ml-auto inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Generate {tabLabel} ({tabConfirmed})
+                    </>
+                  )}
+                </button>
+              );
+            })()}
+          </div>
+        </div>
+
         {/* Progress stepper */}
         <div className="px-6 py-3 border-b border-gray-100 bg-gray-50">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">
-              Step {currentStep + 1} of {TOTAL_PRINTABLE_ITEMS}: {currentItem.name}
+              Step {currentStep + 1} of {tabItems.length}: {currentItem.name}
             </span>
             <div className="flex items-center gap-1.5">
-              {PRINTABLE_ITEMS.map((item, index) => {
+              {tabItems.map((item, index) => {
                 const status = itemsStatus[item.type];
                 const isCurrent = index === currentStep;
 
@@ -683,20 +976,56 @@ export default function ConfirmPrintablesModal({
                 )}
               </div>
 
+              {/* Download all (.zip-less): opens each PDF in a new tab so the
+                  browser triggers a save. Single click instead of N. */}
+              {generationResult.results.succeeded.some((s) => s.url) && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      generationResult.results.succeeded.forEach((s) => {
+                        if (s.url) window.open(s.url, '_blank', 'noopener,noreferrer');
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Open all {generationResult.results.succeeded.filter((s) => s.url).length} PDFs
+                  </button>
+                </div>
+              )}
+
               {/* Results grid */}
               <div className="flex flex-wrap gap-2">
-                {/* Succeeded items */}
-                {generationResult.results.succeeded.map((item) => (
-                  <div
-                    key={item.type}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    {item.type}
-                  </div>
-                ))}
+                {/* Succeeded items — each is a download link when a signed URL is present. */}
+                {generationResult.results.succeeded.map((item) =>
+                  item.url ? (
+                    <a
+                      key={item.type}
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200 hover:underline"
+                      title="Download PDF"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      {item.type}
+                    </a>
+                  ) : (
+                    <div
+                      key={item.type}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded text-xs"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {item.type}
+                    </div>
+                  ),
+                )}
 
                 {/* Failed items */}
                 {generationResult.results.failed.map((item) => (
@@ -753,9 +1082,14 @@ export default function ConfirmPrintablesModal({
                 </button>
               )}
 
-              {/* Close button for full success */}
+              {/* Success copy. "Generate All" closes the modal automatically;
+                  per-tab generation leaves it open so admins can keep working. */}
               {generationResult.success && !generationResult.partialSuccess && !generationResult.allSkipped && (
-                <p className="text-sm text-green-600">All printables generated successfully. Closing...</p>
+                <p className="text-sm text-green-600">
+                  {lastGenerationClosesModal
+                    ? 'All printables generated successfully. Closing…'
+                    : 'PDFs ready — click any item above to download, or "Open all" to grab them at once.'}
+                </p>
               )}
               {generationResult.allSkipped && (
                 <p className="text-sm text-amber-600">All items were skipped. No PDFs generated.</p>
@@ -764,15 +1098,19 @@ export default function ConfirmPrintablesModal({
           </div>
         )}
 
-        {/* Main content - PrintableEditor */}
+        {/* Main content - PrintableFormEditor */}
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-          <PrintableEditor
+          <PrintableFormEditor
             itemConfig={currentItem}
             schoolName={booking.schoolName}
             accessCode={booking.accessCode}
             eventDate={booking.bookingDate}
             editorState={currentEditorState}
             onEditorStateChange={updateCurrentItemEditorState}
+            formModeState={formModeStates[currentItem.type] ?? EMPTY_FORM_STATE}
+            onFormModeStateChange={setItemFormModeState}
+            booking={resolverBooking}
+            tracklist={tracklistData?.tracks ?? null}
           />
         </div>
 
@@ -899,25 +1237,48 @@ export default function ConfirmPrintablesModal({
                 </svg>
               </button>
 
-              {/* Confirm & Next / Confirm button */}
-              {!isLastStep ? (
-                <button
-                  onClick={handleConfirmAndNext}
-                  className="inline-flex items-center gap-2 px-5 py-2 bg-[#F4A261] text-white rounded-lg hover:bg-[#E07B3A] transition-colors font-medium"
-                >
-                  {currentItemStatus === 'confirmed' ? 'Update & Next' : 'Confirm & Next'}
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              ) : (
-                <button
-                  onClick={handleConfirmAndNext}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-colors bg-[#F4A261] text-white hover:bg-[#E07B3A]"
-                >
-                  {currentItemStatus === 'confirmed' ? 'Update' : 'Confirm'}
-                </button>
-              )}
+              {/* Confirm & Next / Confirm button. When the admin is on the last
+                  step of the active tab and another tab still has pending items,
+                  the button auto-advances to that tab — surface that in the label
+                  so the click result is predictable. */}
+              {(() => {
+                const verb = currentItemStatus === 'confirmed' ? 'Update' : 'Confirm';
+                const nextTabIfLast = isLastStep
+                  ? findNextTabWithPending(activeTab, itemsStatus)
+                  : null;
+                const nextTabLabel = nextTabIfLast
+                  ? nextTabIfLast === 'papersPreEvent'
+                    ? 'Pre-Event'
+                    : nextTabIfLast === 'papersPostEvent'
+                      ? 'Post-Event'
+                      : 'Clothing'
+                  : null;
+
+                let label: string;
+                if (!isLastStep) {
+                  label = `${verb} & Next`;
+                } else if (nextTabLabel) {
+                  label = `${verb} & Continue to ${nextTabLabel}`;
+                } else {
+                  label = verb;
+                }
+
+                const showArrow = !isLastStep || !!nextTabLabel;
+
+                return (
+                  <button
+                    onClick={handleConfirmAndNext}
+                    className="inline-flex items-center gap-2 px-5 py-2 bg-[#F4A261] text-white rounded-lg hover:bg-[#E07B3A] transition-colors font-medium"
+                  >
+                    {label}
+                    {showArrow && (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })()}
 
               {/* Generate All button - show when all items are ready (no pending) */}
               {allItemsReady && (
