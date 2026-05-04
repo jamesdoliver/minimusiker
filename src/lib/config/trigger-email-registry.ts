@@ -1366,6 +1366,74 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     triggerEventKey: 'event:mix_ready_for_release',
     availableVariables: ['schoolName', 'parentPortalLink'],
   },
+
+  // ─── Registration Shortfall — Low (33–50%) ──────────────────────────
+  {
+    slug: 'cron:registration_low_t7',
+    name: 'Registrierungen niedrig (33–50%) — T-7',
+    description:
+      'Wird 7 Tage vor dem Event an die Lehrkraft gesendet, wenn 33–50% '
+      + 'der erwarteten Kinder registriert sind. Default-Status: inaktiv.',
+    recipientType: 'teacher',
+    triggerEventKey: 'cron:registration_shortfall_t7',
+    category: 'registrations',
+    defaultActive: false,
+    defaultSubject: 'Erinnerung: Anmeldungen für {{schoolName}} – noch 7 Tage',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{teacherName}},
+</h2>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bisher sind <strong>{{registeredCount}} von {{expectedCount}} Kindern</strong>
+  ({{percentRegistered}}%) für das Event an der {{schoolName}} am {{eventDate}}
+  angemeldet — noch 7 Tage bis zum Termin.
+</p>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bitte erinnern Sie die Eltern noch einmal an die Anmeldung — z.B. per
+  Klassen-WhatsApp oder einem Flyer im Tornister.
+</p>
+<p style="margin: 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  <a href="{{teacherPortalUrl}}" style="color: #d85a6a;">Pädagogen-Portal öffnen</a>
+</p>`,
+    availableVariables: [
+      'teacherName', 'schoolName', 'eventDate',
+      'registeredCount', 'expectedCount', 'percentRegistered',
+      'daysUntilEvent', 'teacherPortalUrl',
+    ],
+  },
+
+  // ─── Registration Shortfall — Critical (<33%) ───────────────────────
+  {
+    slug: 'cron:registration_critical_t7',
+    name: 'Registrierungen kritisch niedrig (<33%) — T-7',
+    description:
+      'Wird 7 Tage vor dem Event an die Lehrkraft gesendet, wenn weniger '
+      + 'als 33% der erwarteten Kinder registriert sind. Default-Status: inaktiv.',
+    recipientType: 'teacher',
+    triggerEventKey: 'cron:registration_shortfall_t7',
+    category: 'registrations',
+    defaultActive: false,
+    defaultSubject: 'Dringend: Wenige Anmeldungen für {{schoolName}} — bitte handeln',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{teacherName}},
+</h2>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Aktuell sind erst <strong>{{registeredCount}} von {{expectedCount}} Kindern</strong>
+  ({{percentRegistered}}%) für das Event an der {{schoolName}} am {{eventDate}}
+  angemeldet. Das Event findet in 7 Tagen statt.
+</p>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bitte aktivieren Sie die Eltern jetzt — direkte Ansprache, Flyer, Klassen-Chat.
+  Ohne Aktion wird die Teilnehmerzahl deutlich unter dem Erwartungswert bleiben.
+</p>
+<p style="margin: 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  <a href="{{teacherPortalUrl}}" style="color: #d85a6a;">Pädagogen-Portal öffnen</a>
+</p>`,
+    availableVariables: [
+      'teacherName', 'schoolName', 'eventDate',
+      'registeredCount', 'expectedCount', 'percentRegistered',
+      'daysUntilEvent', 'teacherPortalUrl',
+    ],
+  },
 ];
 
 /**
