@@ -142,7 +142,7 @@ export async function getTriggerTemplate(slug: string): Promise<TriggerTemplateR
 
   // Shouldn't happen, but fall back to registry default
   return {
-    active: true,
+    active: registryEntry.defaultActive ?? true,
     subject: registryEntry.defaultSubject,
     bodyHtml: registryEntry.defaultBodyHtml,
     isCustomized: false,

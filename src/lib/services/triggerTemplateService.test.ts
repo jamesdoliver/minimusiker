@@ -9,11 +9,14 @@ jest.mock('airtable', () => ({
 
 // Stub the airtable service module so getAllEmailTemplates returns nothing.
 // This simulates the pre-seed window: registry entries exist but no Airtable row.
+const mockCreateEmailTemplate = jest.fn(async () => ({ id: 'rec_new' }));
+const mockUpdateEmailTemplate = jest.fn(async () => undefined);
+
 jest.mock('./airtableService', () => ({
   getAirtableService: () => ({
     getAllEmailTemplates: async () => [],
-    createEmailTemplate: jest.fn(async () => ({ id: 'rec_new' })),
-    updateEmailTemplate: jest.fn(async () => undefined),
+    createEmailTemplate: mockCreateEmailTemplate,
+    updateEmailTemplate: mockUpdateEmailTemplate,
   }),
 }));
 
@@ -48,7 +51,12 @@ jest.mock('@/lib/config/trigger-email-registry', () => {
   };
 });
 
-import { getAllTriggerTemplates, getTriggerTemplate } from './triggerTemplateService';
+import {
+  getAllTriggerTemplates,
+  getTriggerTemplate,
+  getTriggerTemplateBySlug,
+  seedMissingTriggerTemplates,
+} from './triggerTemplateService';
 
 describe('defaultActive plumbing', () => {
   it('getAllTriggerTemplates returns active=true when defaultActive is unset', async () => {
@@ -71,5 +79,37 @@ describe('defaultActive plumbing', () => {
   it('getTriggerTemplate cache fallback returns active=true for unset slug', async () => {
     const t = await getTriggerTemplate('test_default_active');
     expect(t.active).toBe(true);
+  });
+});
+
+describe('seedMissingTriggerTemplates honors defaultActive', () => {
+  beforeEach(() => {
+    mockCreateEmailTemplate.mockClear();
+  });
+
+  it('seeds with active=false when defaultActive is explicitly false', async () => {
+    await seedMissingTriggerTemplates();
+    expect(mockCreateEmailTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ triggerSlug: 'test_default_inactive', active: false }),
+    );
+  });
+
+  it('seeds with active=true when defaultActive is unset', async () => {
+    await seedMissingTriggerTemplates();
+    expect(mockCreateEmailTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ triggerSlug: 'test_default_active', active: true }),
+    );
+  });
+});
+
+describe('getTriggerTemplateBySlug honors defaultActive', () => {
+  it('returns active=true for unset defaultActive', async () => {
+    const t = await getTriggerTemplateBySlug('test_default_active');
+    expect(t?.active).toBe(true);
+  });
+
+  it('returns active=false when defaultActive=false and no Airtable record', async () => {
+    const t = await getTriggerTemplateBySlug('test_default_inactive');
+    expect(t?.active).toBe(false);
   });
 });
