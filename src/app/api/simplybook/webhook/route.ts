@@ -246,6 +246,7 @@ export async function POST(request: Request) {
               schoolName: booking.client_name || booking.client || '',
               bookingDate: mappedData.bookingDate,
               estimatedChildren: mappedData.numberOfChildren,
+              mainTeacher: mappedData.contactPerson,
             });
 
             if (defaultClass) {

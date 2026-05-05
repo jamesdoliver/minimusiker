@@ -449,6 +449,7 @@ export async function POST(request: NextRequest) {
               schoolName,
               bookingDate: eventDate || new Date().toISOString().split('T')[0],
               estimatedChildren,
+              mainTeacher: contactName,
             });
 
             if (defaultClass) {

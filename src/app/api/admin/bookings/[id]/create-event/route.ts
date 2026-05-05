@@ -97,6 +97,7 @@ export async function POST(
             schoolName,
             bookingDate: eventDate,
             estimatedChildren: booking.estimatedChildren || 0,
+            mainTeacher: booking.schoolContactName || undefined,
           });
           if (defaultClass) {
             console.log(`[CreateEvent] Created default class ${defaultClass.classId} for ${eventId}`);

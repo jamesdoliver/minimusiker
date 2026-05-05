@@ -407,6 +407,7 @@ export async function PATCH(
               schoolName,
               bookingDate: body.event_date,
               estimatedChildren: booking.estimatedChildren || 0,
+              mainTeacher: booking.schoolContactName || undefined,
             });
           } catch (classErr) {
             console.error('[EditBooking] Default class creation failed:', classErr);

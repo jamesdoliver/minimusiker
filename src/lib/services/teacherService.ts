@@ -1776,6 +1776,7 @@ class TeacherService {
     schoolName: string;
     bookingDate: string;
     estimatedChildren?: number;
+    mainTeacher?: string;
   }): Promise<TeacherClassView | null> {
     const DEFAULT_CLASS_NAME = 'Alle Kinder';
 
@@ -1800,7 +1801,7 @@ class TeacherService {
       const classFields: Airtable.FieldSet = {
         [CLASSES_FIELD_IDS.class_id]: classId,
         [CLASSES_FIELD_IDS.class_name]: DEFAULT_CLASS_NAME,
-        [CLASSES_FIELD_IDS.main_teacher]: '',
+        [CLASSES_FIELD_IDS.main_teacher]: data.mainTeacher || '',
         [CLASSES_FIELD_IDS.legacy_booking_id]: data.eventId,
         [CLASSES_FIELD_IDS.event_id]: [data.eventRecordId],
         [CLASSES_FIELD_IDS.is_default]: true,
