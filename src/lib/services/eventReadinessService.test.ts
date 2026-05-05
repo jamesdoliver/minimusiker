@@ -373,4 +373,27 @@ describe('checkRegistrationShortfall — post phase', () => {
     await checkRegistrationShortfall('post', true);
     expect(mockSend).not.toHaveBeenCalled();
   });
+
+  it('skips when ratio >= 50% (post)', async () => {
+    mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtPostT4()]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
+      Array.from({ length: 60 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
+    );
+    const r = await checkRegistrationShortfall('post');
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(r.sent).toBe(0);
+  });
+
+  it('does NOT call sender when post template is inactive', async () => {
+    mockGetTriggerTemplate.mockResolvedValue({ active: false, subject: '', bodyHtml: '', isCustomized: false });
+    mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtPostT4()]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
+    );
+    const r = await checkRegistrationShortfall('post');
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(r.skipped).toBeGreaterThanOrEqual(1);
+  });
 });

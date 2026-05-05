@@ -158,7 +158,7 @@ export const TRIGGER_EVENT_CATALOG: TriggerEvent[] = [
     key: 'cron:registration_shortfall_post4',
     name: 'CRON: Registrierungen nach dem Event (T+4)',
     description:
-      'Läuft täglich um 7 Uhr. Sendet eine Rückblende an die Lehrkraft, '
+      'Läuft täglich um 7 Uhr. Sendet einen Rückblick an die Lehrkraft, '
       + 'wenn 4 Tage nach dem Event weniger als 50% der erwarteten Kinder '
       + 'registriert waren. Zwei Stufen: 33–50% (Niedrig), <33% (Kritisch).',
     availableVariables: [
