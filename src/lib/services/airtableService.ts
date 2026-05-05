@@ -61,6 +61,7 @@ import {
 import { SONGS_TABLE_ID } from '@/lib/types/teacher';
 import { ManualCost } from '@/lib/types/analytics';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
+import { aggregateEventTotals } from '@/lib/utils/eventAggregation';
 import {
   TeacherResource,
   TEACHER_RESOURCES_TABLE_ID,
@@ -2488,6 +2489,7 @@ class AirtableService {
           const registeredParents = linkedRegistrationIds.length;
 
           const classType = (classRecord.fields[CLASSES_FIELD_IDS.class_type] as string) || 'regular';
+          const isDefault = Boolean(classRecord.fields[CLASSES_FIELD_IDS.is_default]);
 
           classes.push({
             classId,
@@ -2500,15 +2502,15 @@ class AirtableService {
             registrationRate: totalChildren > 0
               ? Math.round((registeredParents / totalChildren) * 100)
               : 0,
+            isDefault,
           });
         }
 
         // Sort classes by name
         classes.sort((a, b) => a.className.localeCompare(b.className));
 
-        // Compute totals
-        const totalChildren = classes.reduce((sum, c) => sum + c.totalChildren, 0);
-        const totalParents = classes.reduce((sum, c) => sum + c.registeredParents, 0);
+        // Compute totals (excludes is_default catch-all when real classes exist)
+        const { totalChildren, totalParents, overallRegistrationRate } = aggregateEventTotals(classes);
 
         // Fetch assigned staff name if present
         let assignedStaffName: string | undefined;
@@ -2536,9 +2538,7 @@ class AirtableService {
           assignedStaffName,
           isSchulsong,
           classes,
-          overallRegistrationRate: totalChildren > 0
-            ? Math.round((totalParents / totalChildren) * 100)
-            : 0,
+          overallRegistrationRate,
         };
       } catch (error) {
         console.error('Error fetching school event detail:', error);

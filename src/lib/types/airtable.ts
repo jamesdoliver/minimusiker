@@ -435,6 +435,7 @@ export interface EventClassDetail {
   totalChildren: number;
   registeredParents: number;
   registrationRate: number;  // percentage
+  isDefault?: boolean;  // auto-created "Alle Kinder" catch-all
   songs?: { id: string; title: string; artist?: string; notes?: string; order?: number; hiddenByEngineer?: boolean }[];
 }
 
