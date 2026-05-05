@@ -401,6 +401,7 @@ export interface SchoolEventSummary {
   totalParents: number;
   assignedStaffId?: string;   // Personen record ID
   assignedStaffName?: string; // Staff name for display
+  assignedStaffNames?: string[]; // All assigned staff names (in same order as IDs)
   assignedEngineerIds?: string[]; // All assigned engineer Personen record IDs
   assignedEngineerId?: string; // First engineer (backwards compat)
   isSchulsong?: boolean;      // Whether this event includes a schulsong

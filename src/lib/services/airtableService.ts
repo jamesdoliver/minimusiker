@@ -3732,6 +3732,29 @@ class AirtableService {
         return assignedStaff.includes(staffId);
       });
 
+      // Batch-fetch staff names for all assigned staff IDs across staffEvents
+      // (single Personen round-trip vs N per-event lookups)
+      const allStaffIds = new Set<string>();
+      for (const ev of staffEvents) {
+        const ids = (ev.fields[EVENTS_FIELD_IDS.assigned_staff] as string[]) || [];
+        ids.forEach(id => allStaffIds.add(id));
+      }
+
+      const staffNameMap = new Map<string, string>();
+      if (allStaffIds.size > 0) {
+        const idArray = Array.from(allStaffIds);
+        const formula = idArray.length === 1
+          ? `RECORD_ID() = '${idArray[0]}'`
+          : `OR(${idArray.map(id => `RECORD_ID() = '${id}'`).join(',')})`;
+        const personenRecords = await this.base(PERSONEN_TABLE_ID)
+          .select({ filterByFormula: formula })
+          .all();
+        for (const p of personenRecords) {
+          const name = (p.fields['staff_name'] as string) || '';
+          if (name) staffNameMap.set(p.id, name);
+        }
+      }
+
       // Batch fetch class counts and children totals for all staff events
       // Use Promise.all to fetch classes for each event in parallel
       const summaries = await Promise.all(
@@ -3786,6 +3809,10 @@ class AirtableService {
           const realCount = aggregable.filter(c => !c.isDefault).length;
           const classCount = realCount > 0 ? realCount : aggregable.length;
 
+          const assignedStaffNames = (assignedStaffIds || [])
+            .map(id => staffNameMap.get(id))
+            .filter(Boolean) as string[];
+
           return {
             eventId,
             schoolName,
@@ -3796,6 +3823,8 @@ class AirtableService {
             totalChildren,
             totalParents,
             assignedStaffId: assignedStaffIds?.[0],
+            assignedStaffName: assignedStaffNames[0],
+            assignedStaffNames,
             assignedEngineerIds: assignedEngineerIds || [],
             assignedEngineerId: assignedEngineerIds?.[0],
             isSchulsong,
