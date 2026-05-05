@@ -44,9 +44,12 @@ export async function POST(request: NextRequest) {
 
   let totalEvents = 0;
   let processed = 0;
+  let totalRemainingEmptyClasses = 0;
 
   try {
     const events = await airtableService.getAllEvents();
+    // Stable record-id ordering for deterministic pagination across runs.
+    events.sort((a, b) => a.id.localeCompare(b.id));
     totalEvents = events.length;
 
     for (let i = skip; i < events.length; i++) {
@@ -56,6 +59,7 @@ export async function POST(request: NextRequest) {
 
       try {
         const outcome = await airtableService.refreshTeacherForEvent(event.id);
+        totalRemainingEmptyClasses += outcome.remainingEmptyClasses ?? 0;
         results.push({
           eventRecordId: event.id,
           eventId: event.event_id,
@@ -101,6 +105,7 @@ export async function POST(request: NextRequest) {
     hasMore,
     nextSkip,
     summary,
+    totalRemainingEmptyClasses,
     results,
   });
 }

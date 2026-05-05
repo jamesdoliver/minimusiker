@@ -6932,6 +6932,7 @@ class AirtableService {
     teacherName?: string;
     classId?: string;
     className?: string;
+    remainingEmptyClasses?: number;
   }> {
     const eventRecord = await this.getEventById(eventRecordId);
     if (!eventRecord) {
@@ -6953,6 +6954,7 @@ class AirtableService {
       return { status: 'no_classes' };
     }
 
+    const emptyClassCount = classes.reduce((n, c) => (c.main_teacher ? n : n + 1), 0);
     const classToUpdate = classes.find((c) => !c.main_teacher);
     if (!classToUpdate) {
       return { status: 'all_filled' };
@@ -6965,6 +6967,9 @@ class AirtableService {
       teacherName: booking.schoolContactName,
       classId: classToUpdate.class_id,
       className: classToUpdate.class_name,
+      // After updating one class, this many other classes still need a teacher.
+      // Surface so the operator knows per-class backfill remains a manual task.
+      remainingEmptyClasses: emptyClassCount - 1,
     };
   }
 
