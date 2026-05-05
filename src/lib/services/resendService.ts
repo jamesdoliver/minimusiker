@@ -19,6 +19,7 @@ import {
 import { getCampaignEmailTemplate, EmailTemplateOptions } from './emailTemplateWrapper';
 import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
 import { getActivityService } from '@/lib/services/activityService';
+import type { RegistrationShortfallSlug } from './registrationShortfall';
 
 interface SendEmailResult {
   success: boolean;
@@ -320,6 +321,32 @@ export async function sendStaffEventReminderEmail(
     estimatedChildren: data.estimatedChildren || '—',
     staffPortalUrl: data.staffPortalUrl,
   }, 'Staff event reminder');
+}
+
+export interface RegistrationShortfallData {
+  teacherName: string;
+  schoolName: string;
+  eventDate: string;
+  registeredCount: string;
+  expectedCount: string;
+  percentRegistered: string;
+  teacherPortalUrl: string;
+}
+
+/**
+ * Send a registration-shortfall reminder to the teacher.
+ * Slug is selected by the cron based on the registered/expected ratio
+ * and the phase (pre = T-7, post = T+4) — see `selectShortfallTier` and
+ * `getShortfallSlug`. Inactive templates short-circuit upstream —
+ * this helper just delegates to `sendTriggerEmail`.
+ */
+export async function sendRegistrationShortfallEmail(
+  email: string,
+  slug: RegistrationShortfallSlug,
+  data: RegistrationShortfallData,
+  options?: { eventRecordId?: string },
+): Promise<SendEmailResult> {
+  return sendTriggerEmail(email, slug, { ...data }, 'Registration shortfall', options);
 }
 
 /**

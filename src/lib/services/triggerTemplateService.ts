@@ -79,7 +79,7 @@ async function populateAllTriggerCaches(): Promise<void> {
         }
       } else {
         result = {
-          active: true,
+          active: entry.defaultActive ?? true,
           subject: entry.defaultSubject,
           bodyHtml: entry.defaultBodyHtml,
           isCustomized: false,
@@ -94,7 +94,7 @@ async function populateAllTriggerCaches(): Promise<void> {
     for (const entry of TRIGGER_EMAIL_REGISTRY) {
       if (!getCached(entry.slug)) {
         setCache(entry.slug, {
-          active: true,
+          active: entry.defaultActive ?? true,
           subject: entry.defaultSubject,
           bodyHtml: entry.defaultBodyHtml,
           isCustomized: false,
@@ -142,7 +142,7 @@ export async function getTriggerTemplate(slug: string): Promise<TriggerTemplateR
 
   // Shouldn't happen, but fall back to registry default
   return {
-    active: true,
+    active: registryEntry.defaultActive ?? true,
     subject: registryEntry.defaultSubject,
     bodyHtml: registryEntry.defaultBodyHtml,
     isCustomized: false,
@@ -216,7 +216,7 @@ export async function seedMissingTriggerTemplates(): Promise<{ seeded: string[];
         triggerHour: -1,  // Sentinel: trigger templates are event-driven, not cron-driven
         subject: entry.defaultSubject,
         bodyHtml: entry.defaultBodyHtml,
-        active: true,
+        active: entry.defaultActive ?? true,
         templateType: 'trigger',
         triggerSlug: entry.slug,
         triggerDescription: entry.description,
@@ -268,9 +268,10 @@ export async function getAllTriggerTemplates(): Promise<TriggerEmailTemplate[]> 
         recipientType: entry.recipientType,
         subject: record?.subject ?? entry.defaultSubject,
         bodyHtml: record?.bodyHtml ?? entry.defaultBodyHtml,
-        active: record?.active ?? true,
+        active: record?.active ?? (entry.defaultActive ?? true),
         availableVariables: entry.availableVariables,
         isCustomized,
+        category: entry.category,
         triggerEventKey: entry.triggerEventKey,
         triggerEventName: triggerEvent?.name,
         triggerEventDescription: triggerEvent?.description,
@@ -291,9 +292,10 @@ export async function getAllTriggerTemplates(): Promise<TriggerEmailTemplate[]> 
         recipientType: entry.recipientType,
         subject: entry.defaultSubject,
         bodyHtml: entry.defaultBodyHtml,
-        active: true,
+        active: entry.defaultActive ?? true,
         availableVariables: entry.availableVariables,
         isCustomized: false,
+        category: entry.category,
         triggerEventKey: entry.triggerEventKey,
         triggerEventName: triggerEvent?.name,
         triggerEventDescription: triggerEvent?.description,
@@ -332,9 +334,10 @@ export async function getTriggerTemplateBySlug(slug: string): Promise<TriggerEma
       recipientType: entry.recipientType,
       subject: record?.subject ?? entry.defaultSubject,
       bodyHtml: record?.bodyHtml ?? entry.defaultBodyHtml,
-      active: record?.active ?? true,
+      active: record?.active ?? (entry.defaultActive ?? true),
       availableVariables: entry.availableVariables,
       isCustomized,
+      category: entry.category,
       triggerEventKey: entry.triggerEventKey,
       triggerEventName: triggerEvent?.name,
       triggerEventDescription: triggerEvent?.description,
@@ -352,9 +355,10 @@ export async function getTriggerTemplateBySlug(slug: string): Promise<TriggerEma
       recipientType: entry.recipientType,
       subject: entry.defaultSubject,
       bodyHtml: entry.defaultBodyHtml,
-      active: true,
+      active: entry.defaultActive ?? true,
       availableVariables: entry.availableVariables,
       isCustomized: false,
+      category: entry.category,
       triggerEventKey: entry.triggerEventKey,
       triggerEventName: triggerEvent?.name,
       triggerEventDescription: triggerEvent?.description,
@@ -533,6 +537,42 @@ export function getSampleVariables(slug: string): Record<string, string> {
     event_readiness_admin_digest: {
       count: '5',
       digestHtml: '<table><tr><td>Grundschule Sonnenschein — Keine Klassen — mueller@schule.de</td></tr></table>',
+    },
+    'cron:registration_low_t7': {
+      teacherName: 'Frau Müller',
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      registeredCount: '45',
+      expectedCount: '100',
+      percentRegistered: '45',
+      teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
+    },
+    'cron:registration_critical_t7': {
+      teacherName: 'Frau Müller',
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      registeredCount: '20',
+      expectedCount: '100',
+      percentRegistered: '20',
+      teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
+    },
+    'cron:registration_low_post4': {
+      teacherName: 'Frau Müller',
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      registeredCount: '45',
+      expectedCount: '100',
+      percentRegistered: '45',
+      teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
+    },
+    'cron:registration_critical_post4': {
+      teacherName: 'Frau Müller',
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      registeredCount: '20',
+      expectedCount: '100',
+      percentRegistered: '20',
+      teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
     },
   };
 

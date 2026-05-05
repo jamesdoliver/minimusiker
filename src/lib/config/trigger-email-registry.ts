@@ -15,6 +15,10 @@ export interface TriggerEmailDefinition {
   defaultBodyHtml: string;
   availableVariables: string[];
   triggerEventKey?: string;  // Key from TRIGGER_EVENT_CATALOG
+  /** When false, freshly seeded Airtable rows and pre-seed cache fallbacks return active=false. Defaults to true (backwards-compatible). */
+  defaultActive?: boolean;
+  /** Optional UI grouping. Templates with a category render under that section instead of under their recipientType. */
+  category?: string;
   sendNow?: {
     eventFilter: 'schulsong_approved' | 'all_events' | 'schulsong_events';
     recipientResolver: 'event_teacher' | 'parents_by_registration';
@@ -1361,6 +1365,144 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
   `,
     triggerEventKey: 'event:mix_ready_for_release',
     availableVariables: ['schoolName', 'parentPortalLink'],
+  },
+
+  // ─── Registration Shortfall — Low (33–50%) ──────────────────────────
+  {
+    slug: 'cron:registration_low_t7',
+    name: 'Registrierungen niedrig (33–50%) — T-7',
+    description:
+      'Wird 7 Tage vor dem Event an die Lehrkraft gesendet, wenn 33–50% '
+      + 'der erwarteten Kinder registriert sind. Default-Status: inaktiv.',
+    recipientType: 'teacher',
+    triggerEventKey: 'cron:registration_shortfall_t7',
+    category: 'registrations_pre',
+    defaultActive: false,
+    defaultSubject: 'Erinnerung: Anmeldungen für {{schoolName}} – noch 7 Tage',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{teacherName}},
+</h2>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bisher sind <strong>{{registeredCount}} von {{expectedCount}} Kindern</strong>
+  ({{percentRegistered}}%) für das Event an der {{schoolName}} am {{eventDate}}
+  angemeldet — noch 7 Tage bis zum Termin.
+</p>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bitte erinnern Sie die Eltern noch einmal an die Anmeldung — z.B. per
+  Klassen-WhatsApp oder einem Flyer im Tornister.
+</p>
+<p style="margin: 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  <a href="{{teacherPortalUrl}}" style="color: #d85a6a;">Pädagogen-Portal öffnen</a>
+</p>`,
+    availableVariables: [
+      'teacherName', 'schoolName', 'eventDate',
+      'registeredCount', 'expectedCount', 'percentRegistered',
+      'teacherPortalUrl',
+    ],
+  },
+
+  // ─── Registration Shortfall — Critical (<33%) ───────────────────────
+  {
+    slug: 'cron:registration_critical_t7',
+    name: 'Registrierungen kritisch niedrig (<33%) — T-7',
+    description:
+      'Wird 7 Tage vor dem Event an die Lehrkraft gesendet, wenn weniger '
+      + 'als 33% der erwarteten Kinder registriert sind. Default-Status: inaktiv.',
+    recipientType: 'teacher',
+    triggerEventKey: 'cron:registration_shortfall_t7',
+    category: 'registrations_pre',
+    defaultActive: false,
+    defaultSubject: 'Dringend: Wenige Anmeldungen für {{schoolName}} — bitte handeln',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{teacherName}},
+</h2>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Aktuell sind erst <strong>{{registeredCount}} von {{expectedCount}} Kindern</strong>
+  ({{percentRegistered}}%) für das Event an der {{schoolName}} am {{eventDate}}
+  angemeldet. Das Event findet in 7 Tagen statt.
+</p>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bitte aktivieren Sie die Eltern jetzt — direkte Ansprache, Flyer, Klassen-Chat.
+  Ohne Aktion wird die Teilnehmerzahl deutlich unter dem Erwartungswert bleiben.
+</p>
+<p style="margin: 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  <a href="{{teacherPortalUrl}}" style="color: #d85a6a;">Pädagogen-Portal öffnen</a>
+</p>`,
+    availableVariables: [
+      'teacherName', 'schoolName', 'eventDate',
+      'registeredCount', 'expectedCount', 'percentRegistered',
+      'teacherPortalUrl',
+    ],
+  },
+
+  // ─── Registration Shortfall — Low Post-Event (33–50%) ───────────────
+  {
+    slug: 'cron:registration_low_post4',
+    name: 'Registrierungen niedrig (33–50%) — T+4',
+    description:
+      'Wird 4 Tage nach dem Event an die Lehrkraft gesendet, wenn 33–50% '
+      + 'der erwarteten Kinder registriert waren. Default-Status: inaktiv.',
+    recipientType: 'teacher',
+    triggerEventKey: 'cron:registration_shortfall_post4',
+    category: 'registrations_post',
+    defaultActive: false,
+    defaultSubject: 'Rückblick: Anmeldungen für {{schoolName}}',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{teacherName}},
+</h2>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Das Event an der {{schoolName}} am {{eventDate}} liegt nun 4 Tage zurück.
+  Insgesamt waren <strong>{{registeredCount}} von {{expectedCount}} Kindern</strong>
+  ({{percentRegistered}}%) registriert.
+</p>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Wir möchten gemeinsam mit Ihnen reflektieren, wie wir die Reichweite beim
+  nächsten Event noch besser nutzen können — z.B. durch frühere Eltern-Ansprache
+  oder zusätzliche Erinnerungen.
+</p>
+<p style="margin: 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  <a href="{{teacherPortalUrl}}" style="color: #d85a6a;">Pädagogen-Portal öffnen</a>
+</p>`,
+    availableVariables: [
+      'teacherName', 'schoolName', 'eventDate',
+      'registeredCount', 'expectedCount', 'percentRegistered',
+      'teacherPortalUrl',
+    ],
+  },
+
+  // ─── Registration Shortfall — Critical Post-Event (<33%) ────────────
+  {
+    slug: 'cron:registration_critical_post4',
+    name: 'Registrierungen kritisch niedrig (<33%) — T+4',
+    description:
+      'Wird 4 Tage nach dem Event an die Lehrkraft gesendet, wenn weniger '
+      + 'als 33% der erwarteten Kinder registriert waren. Default-Status: inaktiv.',
+    recipientType: 'teacher',
+    triggerEventKey: 'cron:registration_shortfall_post4',
+    category: 'registrations_post',
+    defaultActive: false,
+    defaultSubject: 'Niedrige Beteiligung: {{schoolName}} — bitte Rücksprache',
+    defaultBodyHtml: `<h2 style="margin: 0 0 16px 0; color: #2F4858; font-size: 22px; font-weight: 600;">
+  Hallo {{teacherName}},
+</h2>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Vier Tage nach dem Event an der {{schoolName}} am {{eventDate}} blicken wir
+  zurück: Es waren nur <strong>{{registeredCount}} von {{expectedCount}} Kindern</strong>
+  ({{percentRegistered}}%) registriert.
+</p>
+<p style="margin: 0 0 16px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  Bei dieser geringen Beteiligung würden wir gerne mit Ihnen besprechen, wie
+  wir die Eltern beim nächsten Event besser erreichen können — gerne auch in
+  einem kurzen Telefonat.
+</p>
+<p style="margin: 0; color: #4a5568; font-size: 16px; line-height: 1.6;">
+  <a href="{{teacherPortalUrl}}" style="color: #d85a6a;">Pädagogen-Portal öffnen</a>
+</p>`,
+    availableVariables: [
+      'teacherName', 'schoolName', 'eventDate',
+      'registeredCount', 'expectedCount', 'percentRegistered',
+      'teacherPortalUrl',
+    ],
   },
 ];
 
