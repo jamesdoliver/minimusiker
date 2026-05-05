@@ -13,6 +13,14 @@ interface StaffGroup {
 
 interface StaffEventDetailData extends SchoolEventDetail {
   groups: StaffGroup[];
+  bookingInfo?: {
+    contactPerson?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    address?: string;
+    postalCode?: string;
+    city?: string;
+  };
 }
 
 interface StaffEventDetailResponse {
