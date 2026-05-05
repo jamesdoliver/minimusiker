@@ -4,8 +4,10 @@ import { getAirtableService } from '@/lib/services/airtableService';
 
 export const dynamic = 'force-dynamic';
 
-// Airtable rate-limit-friendly cap. The per-event helper does ~5 round-trips,
-// so 200 events ≈ 1000 requests. Caller can re-run for additional batches.
+// Cap per run to stay polite under Airtable's 5 req/sec rate limit. Each event
+// triggers ~1 event fetch + 1 booking fetch + 1 classes lookup (which paginates
+// the Classes table) + 1 update — so cost is dominated by Classes table size,
+// not by event count. Operator paginates via ?skip=N.
 const MAX_EVENTS_PER_RUN = 200;
 
 type PerEventResult = {
@@ -33,6 +35,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const skipParam = request.nextUrl.searchParams.get('skip');
+  const parsedSkip = skipParam !== null ? parseInt(skipParam, 10) : 0;
+  const skip = Number.isFinite(parsedSkip) && parsedSkip > 0 ? parsedSkip : 0;
+
   const airtableService = getAirtableService();
   const results: PerEventResult[] = [];
 
@@ -43,8 +49,9 @@ export async function POST(request: NextRequest) {
     const events = await airtableService.getAllEvents();
     totalEvents = events.length;
 
-    for (const event of events) {
+    for (let i = skip; i < events.length; i++) {
       if (processed >= MAX_EVENTS_PER_RUN) break;
+      const event = events[i];
       processed++;
 
       try {
@@ -82,11 +89,17 @@ export async function POST(request: NextRequest) {
     return acc;
   }, {});
 
+  const hasMore = skip + processed < totalEvents;
+  const nextSkip = hasMore ? skip + processed : null;
+
   return NextResponse.json({
     success: true,
     totalEvents,
+    skip,
     processed,
     cap: MAX_EVENTS_PER_RUN,
+    hasMore,
+    nextSkip,
     summary,
     results,
   });
