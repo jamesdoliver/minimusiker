@@ -1,53 +1,57 @@
 /**
- * Pure tier selection for the registration-shortfall trigger emails.
- * Phase-aware: same gates apply pre-event (T-7) and post-event (T+4).
- * No side effects, no I/O — easy to unit test.
+ * Configuration for the registration-shortfall trigger emails.
+ *
+ * Three independent triggers, each with its own date offset and ratio gate.
+ * Same event can receive multiple emails over its lifecycle:
+ *   - T-14: gentle reminder when <33% registered 14 days before the event
+ *   - T-4:  urgent alarm when <33% registered 4 days before (independent check)
+ *   - T+3:  post-event reflection when <50% registered 3 days after
+ *
+ * Each trigger fires at most once per event over its lifetime via the cron's
+ * exact-date filter — same idempotency model as `checkStaffEventReminder`.
  */
 
-export type RegistrationShortfallPhase = 'pre' | 'post';
-export type RegistrationShortfallTier = 'low' | 'critical';
-
-export const REGISTRATION_SHORTFALL_SLUGS = {
-  pre: {
-    low: 'cron:registration_low_t7',
-    critical: 'cron:registration_critical_t7',
+export const REGISTRATION_SHORTFALL_TRIGGERS = {
+  t_minus_14: {
+    slug: 'cron:registration_t_minus_14',
+    daysOffset: 14,    // event_date = today + 14
+    threshold: 0.33,   // fire when ratio < 33%
   },
-  post: {
-    low: 'cron:registration_low_post4',
-    critical: 'cron:registration_critical_post4',
+  t_minus_4: {
+    slug: 'cron:registration_t_minus_4',
+    daysOffset: 4,     // event_date = today + 4
+    threshold: 0.33,   // fire when ratio < 33%
+  },
+  t_plus_3: {
+    slug: 'cron:registration_t_plus_3',
+    daysOffset: -3,    // event_date = today - 3 (event was 3 days ago)
+    threshold: 0.50,   // fire when ratio < 50%
   },
 } as const;
 
+export type RegistrationShortfallTriggerKey = keyof typeof REGISTRATION_SHORTFALL_TRIGGERS;
+
 export type RegistrationShortfallSlug =
-  | typeof REGISTRATION_SHORTFALL_SLUGS.pre.low
-  | typeof REGISTRATION_SHORTFALL_SLUGS.pre.critical
-  | typeof REGISTRATION_SHORTFALL_SLUGS.post.low
-  | typeof REGISTRATION_SHORTFALL_SLUGS.post.critical;
+  | typeof REGISTRATION_SHORTFALL_TRIGGERS.t_minus_14.slug
+  | typeof REGISTRATION_SHORTFALL_TRIGGERS.t_minus_4.slug
+  | typeof REGISTRATION_SHORTFALL_TRIGGERS.t_plus_3.slug;
+
+export const REGISTRATION_SHORTFALL_TRIGGER_KEYS: ReadonlyArray<RegistrationShortfallTriggerKey> = [
+  't_minus_14',
+  't_minus_4',
+  't_plus_3',
+];
 
 /**
- * Pick the tier for a given (registered, expected) pair.
- * Same gates apply for pre and post phases:
- *   - ratio < 0.33   → 'critical'
- *   - 0.33 ≤ ratio < 0.50 → 'low'
- *   - otherwise (≥ 50% or expected ≤ 0) → null (no email)
+ * Returns true if the registered/expected ratio falls below the trigger's threshold.
+ * Returns false when expected ≤ 0 (no comparison possible) — caller must skip.
  */
-export function selectShortfallTier(
+export function shouldFire(
   registeredCount: number,
   expectedCount: number,
-): RegistrationShortfallTier | null {
-  if (expectedCount <= 0) return null;
+  triggerKey: RegistrationShortfallTriggerKey,
+): boolean {
+  if (expectedCount <= 0) return false;
   const ratio = registeredCount / expectedCount;
-  if (ratio >= 0.5) return null;
-  if (ratio < 0.33) return 'critical';
-  return 'low';
-}
-
-/**
- * Look up the canonical slug for a (tier, phase) combination.
- */
-export function getShortfallSlug(
-  tier: RegistrationShortfallTier,
-  phase: RegistrationShortfallPhase,
-): RegistrationShortfallSlug {
-  return REGISTRATION_SHORTFALL_SLUGS[phase][tier];
+  return ratio < REGISTRATION_SHORTFALL_TRIGGERS[triggerKey].threshold;
 }

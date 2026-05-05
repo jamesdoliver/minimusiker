@@ -538,16 +538,7 @@ export function getSampleVariables(slug: string): Record<string, string> {
       count: '5',
       digestHtml: '<table><tr><td>Grundschule Sonnenschein — Keine Klassen — mueller@schule.de</td></tr></table>',
     },
-    'cron:registration_low_t7': {
-      teacherName: 'Frau Müller',
-      schoolName: 'Grundschule Sonnenschein',
-      eventDate: 'Montag, 15. März 2025',
-      registeredCount: '45',
-      expectedCount: '100',
-      percentRegistered: '45',
-      teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
-    },
-    'cron:registration_critical_t7': {
+    'cron:registration_t_minus_14': {
       teacherName: 'Frau Müller',
       schoolName: 'Grundschule Sonnenschein',
       eventDate: 'Montag, 15. März 2025',
@@ -556,22 +547,22 @@ export function getSampleVariables(slug: string): Record<string, string> {
       percentRegistered: '20',
       teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
     },
-    'cron:registration_low_post4': {
+    'cron:registration_t_minus_4': {
       teacherName: 'Frau Müller',
       schoolName: 'Grundschule Sonnenschein',
       eventDate: 'Montag, 15. März 2025',
-      registeredCount: '45',
+      registeredCount: '25',
       expectedCount: '100',
-      percentRegistered: '45',
+      percentRegistered: '25',
       teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
     },
-    'cron:registration_critical_post4': {
+    'cron:registration_t_plus_3': {
       teacherName: 'Frau Müller',
       schoolName: 'Grundschule Sonnenschein',
       eventDate: 'Montag, 15. März 2025',
-      registeredCount: '20',
+      registeredCount: '40',
       expectedCount: '100',
-      percentRegistered: '20',
+      percentRegistered: '40',
       teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
     },
   };

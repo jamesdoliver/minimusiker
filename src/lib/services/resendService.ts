@@ -335,9 +335,9 @@ export interface RegistrationShortfallData {
 
 /**
  * Send a registration-shortfall reminder to the teacher.
- * Slug is selected by the cron based on the registered/expected ratio
- * and the phase (pre = T-7, post = T+4) — see `selectShortfallTier` and
- * `getShortfallSlug`. Inactive templates short-circuit upstream —
+ * Slug is one of the three timing-keyed triggers (T-14, T-4, T+3); the cron
+ * selects which trigger to evaluate per day and the registered/expected ratio
+ * gate is checked via `shouldFire`. Inactive templates short-circuit upstream —
  * this helper just delegates to `sendTriggerEmail`.
  */
 export async function sendRegistrationShortfallEmail(
