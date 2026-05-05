@@ -1397,7 +1397,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     availableVariables: [
       'teacherName', 'schoolName', 'eventDate',
       'registeredCount', 'expectedCount', 'percentRegistered',
-      'daysUntilEvent', 'teacherPortalUrl',
+      'teacherPortalUrl',
     ],
   },
 
@@ -1431,7 +1431,7 @@ export const TRIGGER_EMAIL_REGISTRY: TriggerEmailDefinition[] = [
     availableVariables: [
       'teacherName', 'schoolName', 'eventDate',
       'registeredCount', 'expectedCount', 'percentRegistered',
-      'daysUntilEvent', 'teacherPortalUrl',
+      'teacherPortalUrl',
     ],
   },
 ];

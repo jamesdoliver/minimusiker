@@ -20,7 +20,7 @@ import {
   sendRegistrationShortfallEmail,
 } from './resendService';
 import { getActivityService } from './activityService';
-import { selectShortfallSlug } from './registrationShortfall';
+import { selectShortfallTier, getShortfallSlug, type RegistrationShortfallPhase } from './registrationShortfall';
 import { getTriggerTemplate } from './triggerTemplateService';
 import Airtable from 'airtable';
 import { ORDERS_TABLE_ID, ORDERS_FIELD_IDS } from '@/lib/types/airtable';
@@ -1007,24 +1007,34 @@ export async function checkStaffEventReminder(dryRun = false): Promise<Readiness
   return result;
 }
 
-const REGISTRATION_SHORTFALL_DAYS_BEFORE = 7;
+const REGISTRATION_SHORTFALL_OFFSETS: Record<'pre' | 'post', number> = {
+  pre: 7,    // T-7 — 7 days before the event (today + 7 = event date)
+  post: -4,  // T+4 — 4 days after the event (today - 4 = event date)
+};
 
 /**
- * T-7 registration shortfall reminder. Sends one of two tiered emails to the
- * assigned teacher when the registered/expected ratio falls below 50%.
+ * Phase-aware registration shortfall reminder. Sends one of two tiered emails
+ * to the assigned teacher when the registered/expected ratio falls below 50%.
  *
- * Idempotency: exact-date match on T-7 means each event is evaluated exactly
- * once over its lifetime — same model as `checkStaffEventReminder`.
+ * - phase 'pre'  → T-7 (7 days before event)
+ * - phase 'post' → T+4 (4 days after event)
+ *
+ * Idempotency: exact-date match means each event is evaluated exactly once
+ * per phase over its lifetime — same model as `checkStaffEventReminder`.
  */
-export async function checkRegistrationShortfall(dryRun = false): Promise<ReadinessResult> {
+export async function checkRegistrationShortfall(
+  phase: RegistrationShortfallPhase,
+  dryRun = false,
+): Promise<ReadinessResult> {
   const result: ReadinessResult = { sent: 0, skipped: 0, failed: 0, errors: [] };
 
   try {
     const airtable = getAirtableService();
     const allEvents = await airtable.getAllEvents();
 
+    const offset = REGISTRATION_SHORTFALL_OFFSETS[phase];
     const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + REGISTRATION_SHORTFALL_DAYS_BEFORE);
+    targetDate.setDate(targetDate.getDate() + offset);
     const targetDateStr = targetDate.toISOString().split('T')[0];
 
     const candidates = allEvents.filter((event) => {
@@ -1037,12 +1047,12 @@ export async function checkRegistrationShortfall(dryRun = false): Promise<Readin
     });
 
     if (candidates.length === 0) {
-      console.log(`[EventReadiness] No registration-eligible events on ${targetDateStr}`);
+      console.log(`[EventReadiness] Registration shortfall (${phase}): no candidates on ${targetDateStr}`);
       result.skipped = 1;
       return result;
     }
 
-    console.log(`[EventReadiness] Found ${candidates.length} registration-eligible event(s) at T-7`);
+    console.log(`[EventReadiness] Registration shortfall (${phase}): found ${candidates.length} candidate event(s)`);
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
 
@@ -1064,8 +1074,9 @@ export async function checkRegistrationShortfall(dryRun = false): Promise<Readin
       const registrations = await airtable.getRegistrationsByEventId(event.id);
       const registeredCount = registrations.filter((r) => r.registered_complete).length;
 
-      const slug = selectShortfallSlug(registeredCount, estimatedChildren);
-      if (!slug) continue; // ratio ≥ 50%
+      const tier = selectShortfallTier(registeredCount, estimatedChildren);
+      if (!tier) continue; // ratio ≥ 50%
+      const slug = getShortfallSlug(tier, phase);
 
       const teacherRecipients = await getTeacherRecipientsForEvent(
         event.event_id,
@@ -1076,7 +1087,7 @@ export async function checkRegistrationShortfall(dryRun = false): Promise<Readin
           schoolName: event.school_name,
           eventDate: event.event_date,
           eventType: event.event_type || 'MiniMusiker',
-          daysUntilEvent: REGISTRATION_SHORTFALL_DAYS_BEFORE,
+          daysUntilEvent: REGISTRATION_SHORTFALL_OFFSETS[phase],
           accessCode: event.access_code,
           isKita: event.is_kita,
           isMinimusikertag: event.is_minimusikertag,
@@ -1104,7 +1115,7 @@ export async function checkRegistrationShortfall(dryRun = false): Promise<Readin
 
       if (dryRun) {
         console.log(
-          `[EventReadiness] DRY RUN: would send ${slug} to ${teacher.email} `
+          `[EventReadiness] DRY RUN (${phase}): would send ${slug} to ${teacher.email} `
           + `(ratio: ${percentRegistered}%, registered: ${registeredCount}/${estimatedChildren})`,
         );
         result.skipped++;
@@ -1122,7 +1133,6 @@ export async function checkRegistrationShortfall(dryRun = false): Promise<Readin
             registeredCount: String(registeredCount),
             expectedCount: String(estimatedChildren),
             percentRegistered: String(percentRegistered),
-            daysUntilEvent: String(REGISTRATION_SHORTFALL_DAYS_BEFORE),
             teacherPortalUrl: `${baseUrl}/paedagogen/events/${event.event_id}`,
           },
         );
@@ -1132,7 +1142,7 @@ export async function checkRegistrationShortfall(dryRun = false): Promise<Readin
           getActivityService().logActivity({
             eventRecordId: event.id,
             activityType: 'email_sent',
-            description: `Registration shortfall (${slug}) — ${percentRegistered}% (${registeredCount}/${estimatedChildren})`,
+            description: `Registration shortfall (${phase}, ${slug}) — ${percentRegistered}% (${registeredCount}/${estimatedChildren})`,
             actorEmail: 'system',
             actorType: 'system',
             metadata: { slug, ratio: percentRegistered },

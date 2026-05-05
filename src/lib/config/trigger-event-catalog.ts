@@ -150,7 +150,7 @@ export const TRIGGER_EVENT_CATALOG: TriggerEvent[] = [
     availableVariables: [
       'teacherName', 'schoolName', 'eventDate',
       'registeredCount', 'expectedCount', 'percentRegistered',
-      'daysUntilEvent', 'teacherPortalUrl',
+      'teacherPortalUrl',
     ],
     recipientMode: 'specific',
   },

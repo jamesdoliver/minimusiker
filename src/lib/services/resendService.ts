@@ -330,15 +330,15 @@ export interface RegistrationShortfallData {
   registeredCount: string;
   expectedCount: string;
   percentRegistered: string;
-  daysUntilEvent: string;
   teacherPortalUrl: string;
 }
 
 /**
- * Send a registration-shortfall reminder to the teacher (T-7).
+ * Send a registration-shortfall reminder to the teacher.
  * Slug is selected by the cron based on the registered/expected ratio
- * (see `selectShortfallSlug`). Inactive templates short-circuit upstream
- * — this helper just delegates to `sendTriggerEmail`.
+ * and the phase (pre = T-7, post = T+4) — see `selectShortfallTier` and
+ * `getShortfallSlug`. Inactive templates short-circuit upstream —
+ * this helper just delegates to `sendTriggerEmail`.
  */
 export async function sendRegistrationShortfallEmail(
   email: string,

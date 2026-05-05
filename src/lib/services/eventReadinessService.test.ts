@@ -81,7 +81,7 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
       Array.from({ length: 60 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
     );
-    const r = await checkRegistrationShortfall();
+    const r = await checkRegistrationShortfall('pre');
     expect(mockSend).not.toHaveBeenCalled();
     expect(r.sent).toBe(0);
   });
@@ -92,7 +92,7 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
       Array.from({ length: 40 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
     );
-    const r = await checkRegistrationShortfall();
+    const r = await checkRegistrationShortfall('pre');
     expect(mockSend).toHaveBeenCalledWith(
       't@e.de',
       'cron:registration_low_t7',
@@ -122,7 +122,7 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
       Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
     );
-    const r = await checkRegistrationShortfall();
+    const r = await checkRegistrationShortfall('pre');
     expect(mockSend).toHaveBeenCalledWith(
       't@e.de',
       'cron:registration_critical_t7',
@@ -154,7 +154,7 @@ describe('checkRegistrationShortfall', () => {
       ...Array.from({ length: 60 }, (_, i) => ({ registered_complete: false, id: `i${i}` })),
       ...Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `c${i}` })),
     ]);
-    await checkRegistrationShortfall();
+    await checkRegistrationShortfall('pre');
     expect(mockSend).toHaveBeenCalledWith(
       't@e.de',
       'cron:registration_critical_t7',
@@ -168,7 +168,7 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue([
       { registered_complete: true, id: 'r1' },
     ]);
-    const r = await checkRegistrationShortfall();
+    const r = await checkRegistrationShortfall('pre');
     expect(mockSend).not.toHaveBeenCalled();
     expect(r.skipped).toBeGreaterThanOrEqual(1);
   });
@@ -179,7 +179,7 @@ describe('checkRegistrationShortfall', () => {
     ]);
     mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue([]);
-    await checkRegistrationShortfall();
+    await checkRegistrationShortfall('pre');
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -187,7 +187,7 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtT7({ status: 'Cancelled' })]);
     mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue([]);
-    await checkRegistrationShortfall();
+    await checkRegistrationShortfall('pre');
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -198,7 +198,7 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
       Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
     );
-    await checkRegistrationShortfall();
+    await checkRegistrationShortfall('pre');
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -209,7 +209,7 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
       Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
     );
-    const r = await checkRegistrationShortfall();
+    const r = await checkRegistrationShortfall('pre');
     expect(mockSend).not.toHaveBeenCalled();
     expect(r.skipped).toBeGreaterThanOrEqual(1);
   });
@@ -220,7 +220,7 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
       Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
     );
-    await checkRegistrationShortfall(true);
+    await checkRegistrationShortfall('pre', true);
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -230,7 +230,7 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getAllEvents.mockResolvedValue([
       makeEventAtT7({ event_date: tooEarly.toISOString().split('T')[0] }),
     ]);
-    await checkRegistrationShortfall();
+    await checkRegistrationShortfall('pre');
     expect(mockSend).not.toHaveBeenCalled();
   });
 
@@ -243,7 +243,7 @@ describe('checkRegistrationShortfall', () => {
     mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
       Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
     );
-    await checkRegistrationShortfall();
+    await checkRegistrationShortfall('pre');
     expect(mockSend).toHaveBeenCalled();
   });
 });

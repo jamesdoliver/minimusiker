@@ -61,7 +61,7 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
   console.log('[Event Readiness Cron] Staff reminder check:', staffReminderResult);
 
   // Daily check: registration shortfall (7 days before, only if <50% registered)
-  const registrationShortfallResult = await checkRegistrationShortfall(isDryRun);
+  const registrationShortfallResult = await checkRegistrationShortfall('pre', isDryRun);
   console.log('[Event Readiness Cron] Registration shortfall check:', registrationShortfallResult);
 
   // Weekly checks: only on Mondays (or if forced)

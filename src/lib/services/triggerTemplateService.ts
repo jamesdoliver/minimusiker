@@ -545,7 +545,6 @@ export function getSampleVariables(slug: string): Record<string, string> {
       registeredCount: '45',
       expectedCount: '100',
       percentRegistered: '45',
-      daysUntilEvent: '7',
       teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
     },
     'cron:registration_critical_t7': {
@@ -555,7 +554,6 @@ export function getSampleVariables(slug: string): Record<string, string> {
       registeredCount: '20',
       expectedCount: '100',
       percentRegistered: '20',
-      daysUntilEvent: '7',
       teacherPortalUrl: 'https://minimusiker.app/paedagogen/events/abc123',
     },
   };
