@@ -445,6 +445,7 @@ export async function PATCH(
     // Handle date update
     if (hasDateUpdate) {
       const oldDate = existingEvent?.event_date || 'Unknown';
+      const dateActuallyChanged = (existingEvent?.event_date || '').slice(0, 10) !== body.event_date.slice(0, 10);
       // Resolve booking record ID for fallback date propagation
       if (!resolvedBookingRecordId && existingEvent?.simplybook_booking?.[0]) {
         resolvedBookingRecordId = existingEvent.simplybook_booking[0];
@@ -452,7 +453,7 @@ export async function PATCH(
       dateResult = await airtableService.updateEventDate(eventRecordId, body.event_date, resolvedBookingRecordId || undefined);
 
       // Sync date change back to SimplyBook (best-effort)
-      if (dateResult.simplybookId) {
+      if (dateActuallyChanged && dateResult.simplybookId) {
         const sbResult = await simplybookService.editBookingDate(
           dateResult.simplybookId,
           body.event_date
@@ -464,76 +465,80 @@ export async function PATCH(
       }
 
       // Log activity for date change
-      getActivityService().logActivity({
-        eventRecordId,
-        activityType: 'date_changed',
-        description: ActivityService.generateDescription('date_changed', {
-          oldDate,
-          newDate: body.event_date,
-        }),
-        actorEmail: admin.email,
-        actorType: 'admin',
-        metadata: { oldDate, newDate: body.event_date, simplybookSynced },
-      });
-
-      // Send admin notification for date change (or "booking confirmed" if first date)
-      try {
-        // Get booking details for notification
-        let contactName = '';
-        let contactEmail = '';
-        let contactPhone = '';
-        let schoolAddress = existingEvent?.school_address || '';
-        let city = '';
-        let estimatedChildren: number | undefined;
-
-        if (existingEvent?.simplybook_booking?.[0]) {
-          const booking = await airtableService.getSchoolBookingById(existingEvent.simplybook_booking[0]);
-          if (booking) {
-            contactName = booking.schoolContactName || '';
-            contactEmail = booking.schoolContactEmail || '';
-            contactPhone = booking.schoolPhone || '';
-            schoolAddress = schoolAddress || booking.schoolAddress || '';
-            city = booking.city || '';
-            estimatedChildren = booking.estimatedChildren;
-          }
-        }
-
-        // If the old date was empty, this is a pending booking getting its first date → "Booking Confirmed"
-        const isFirstDateAssignment = !existingEvent?.event_date;
-
-        if (isFirstDateAssignment) {
-          await triggerNewBookingNotification({
-            bookingId: eventId,
-            schoolName: existingEvent?.school_name || '',
-            contactName,
-            contactEmail,
-            contactPhone,
-            eventDate: body.event_date,
-            estimatedChildren,
-            address: schoolAddress,
-            city,
-            status: 'Bestätigt',
-          });
-        } else {
-          await triggerDateChangeNotification({
-            bookingId: eventId,
-            schoolName: existingEvent?.school_name || '',
-            contactName,
-            contactEmail,
-            contactPhone,
-            eventDate: body.event_date,
-            address: schoolAddress,
-            city,
+      if (dateActuallyChanged) {
+        getActivityService().logActivity({
+          eventRecordId,
+          activityType: 'date_changed',
+          description: ActivityService.generateDescription('date_changed', {
             oldDate,
             newDate: body.event_date,
-          });
+          }),
+          actorEmail: admin.email,
+          actorType: 'admin',
+          metadata: { oldDate, newDate: body.event_date, simplybookSynced },
+        });
+      }
+
+      // Send admin notification for date change (or "booking confirmed" if first date)
+      if (dateActuallyChanged) {
+        try {
+          // Get booking details for notification
+          let contactName = '';
+          let contactEmail = '';
+          let contactPhone = '';
+          let schoolAddress = existingEvent?.school_address || '';
+          let city = '';
+          let estimatedChildren: number | undefined;
+
+          if (existingEvent?.simplybook_booking?.[0]) {
+            const booking = await airtableService.getSchoolBookingById(existingEvent.simplybook_booking[0]);
+            if (booking) {
+              contactName = booking.schoolContactName || '';
+              contactEmail = booking.schoolContactEmail || '';
+              contactPhone = booking.schoolPhone || '';
+              schoolAddress = schoolAddress || booking.schoolAddress || '';
+              city = booking.city || '';
+              estimatedChildren = booking.estimatedChildren;
+            }
+          }
+
+          // If the old date was empty, this is a pending booking getting its first date → "Booking Confirmed"
+          const isFirstDateAssignment = !existingEvent?.event_date;
+
+          if (isFirstDateAssignment) {
+            await triggerNewBookingNotification({
+              bookingId: eventId,
+              schoolName: existingEvent?.school_name || '',
+              contactName,
+              contactEmail,
+              contactPhone,
+              eventDate: body.event_date,
+              estimatedChildren,
+              address: schoolAddress,
+              city,
+              status: 'Bestätigt',
+            });
+          } else {
+            await triggerDateChangeNotification({
+              bookingId: eventId,
+              schoolName: existingEvent?.school_name || '',
+              contactName,
+              contactEmail,
+              contactPhone,
+              eventDate: body.event_date,
+              address: schoolAddress,
+              city,
+              oldDate,
+              newDate: body.event_date,
+            });
+          }
+        } catch (notificationError) {
+          console.warn('Could not send date change notification:', notificationError);
         }
-      } catch (notificationError) {
-        console.warn('Could not send date change notification:', notificationError);
       }
 
       // Recalculate task deadlines for pending tasks
-      if (body.recalculate_tasks !== false) {
+      if (dateActuallyChanged && body.recalculate_tasks !== false) {
         try {
           const taskService = getTaskService();
           const taskResult = await taskService.recalculateDeadlinesForEvent(

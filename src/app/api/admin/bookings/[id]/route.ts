@@ -222,8 +222,13 @@ export async function PATCH(
           }
         }
 
+        // Detect actual date change (skip log/notification when the date is unchanged)
+        const dateActuallyChanged =
+          body.event_date !== undefined &&
+          (booking.startDate || '').slice(0, 10) !== body.event_date.slice(0, 10);
+
         // Activity log for date change
-        if (body.event_date !== undefined && linkedEvent) {
+        if (dateActuallyChanged && linkedEvent && body.event_date !== undefined) {
           const oldDate = booking.startDate || 'Unknown';
           getActivityService().logActivity({
             eventRecordId: linkedEvent.id,
@@ -239,7 +244,7 @@ export async function PATCH(
         }
 
         // Date change notification
-        if (body.event_date !== undefined && linkedEvent) {
+        if (dateActuallyChanged && linkedEvent && body.event_date !== undefined) {
           try {
             const isFirstDateAssignment = !booking.startDate;
 
@@ -278,7 +283,7 @@ export async function PATCH(
         }
 
         // Recalculate task deadlines for pending tasks
-        if (body.event_date !== undefined && linkedEvent) {
+        if (dateActuallyChanged && linkedEvent && body.event_date !== undefined) {
           try {
             const taskService = getTaskService();
             const taskResult = await taskService.recalculateDeadlinesForEvent(
