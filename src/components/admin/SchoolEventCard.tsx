@@ -58,7 +58,12 @@ export default function SchoolEventCard({ event, basePath = '/admin/events' }: S
 
       {/* Assigned Staff */}
       <p className="text-sm text-gray-600 mb-4">
-        Assigned Staff: {event.assignedStaffName || <span className="text-gray-400">None</span>}
+        Assigned Staff:{' '}
+        {event.assignedStaffNames && event.assignedStaffNames.length > 0
+          ? event.assignedStaffNames.join(', ')
+          : event.assignedStaffName
+            ? event.assignedStaffName
+            : <span className="text-gray-400">None</span>}
       </p>
 
       {/* Stats row */}
