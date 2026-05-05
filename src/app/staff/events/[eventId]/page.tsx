@@ -71,6 +71,7 @@ export default function StaffEventDetailPage() {
   const regularClasses = event.classes.filter(
     c => !c.classType || c.classType === 'regular'
   );
+  // Hide the auto-default "Alle Kinder" catch-all once any real class exists; otherwise keep it so parents can still register.
   const realRegularClasses = regularClasses.filter(c => !c.isDefault);
   const visibleRegularClasses = realRegularClasses.length > 0 ? realRegularClasses : regularClasses;
   const choirs = event.classes.filter(c => c.classType === 'choir');
