@@ -1007,7 +1007,7 @@ export async function checkStaffEventReminder(dryRun = false): Promise<Readiness
   return result;
 }
 
-const REGISTRATION_SHORTFALL_OFFSETS: Record<'pre' | 'post', number> = {
+const REGISTRATION_SHORTFALL_OFFSETS: Record<RegistrationShortfallPhase, number> = {
   pre: 7,    // T-7 — 7 days before the event (today + 7 = event date)
   post: -4,  // T+4 — 4 days after the event (today - 4 = event date)
 };
@@ -1145,7 +1145,7 @@ export async function checkRegistrationShortfall(
             description: `Registration shortfall (${phase}, ${slug}) — ${percentRegistered}% (${registeredCount}/${estimatedChildren})`,
             actorEmail: 'system',
             actorType: 'system',
-            metadata: { slug, ratio: percentRegistered },
+            metadata: { slug, phase, ratio: percentRegistered },
           });
         } else {
           result.failed++;

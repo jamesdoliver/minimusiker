@@ -111,7 +111,7 @@ describe('checkRegistrationShortfall', () => {
       expect.objectContaining({
         activityType: 'email_sent',
         eventRecordId: 'rec_evt',
-        metadata: expect.objectContaining({ slug: 'cron:registration_low_t7', ratio: 40 }),
+        metadata: expect.objectContaining({ slug: 'cron:registration_low_t7', phase: 'pre', ratio: 40 }),
       }),
     );
   });
@@ -141,7 +141,7 @@ describe('checkRegistrationShortfall', () => {
       expect.objectContaining({
         activityType: 'email_sent',
         eventRecordId: 'rec_evt',
-        metadata: expect.objectContaining({ slug: 'cron:registration_critical_t7', ratio: 30 }),
+        metadata: expect.objectContaining({ slug: 'cron:registration_critical_t7', phase: 'pre', ratio: 30 }),
       }),
     );
   });
