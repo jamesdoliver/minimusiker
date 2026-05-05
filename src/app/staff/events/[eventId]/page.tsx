@@ -113,6 +113,28 @@ export default function StaffEventDetailPage() {
               <p className="text-gray-600">
                 {event.mainTeacher ? `Teacher: ${event.mainTeacher}` : 'No teacher assigned'}
               </p>
+              {event.bookingInfo && (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm text-gray-700">
+                  {event.bookingInfo.contactPerson && (
+                    <div><span className="text-gray-500">Contact:</span> {event.bookingInfo.contactPerson}</div>
+                  )}
+                  {(event.bookingInfo.address || event.bookingInfo.postalCode || event.bookingInfo.city) && (
+                    <div>
+                      <span className="text-gray-500">Address:</span>{' '}
+                      {[
+                        event.bookingInfo.address,
+                        [event.bookingInfo.postalCode, event.bookingInfo.city].filter(Boolean).join(' '),
+                      ].filter(Boolean).join(', ')}
+                    </div>
+                  )}
+                  {event.bookingInfo.contactEmail && (
+                    <div><span className="text-gray-500">Email:</span> <a className="text-[#5a8a82] hover:underline" href={`mailto:${event.bookingInfo.contactEmail}`}>{event.bookingInfo.contactEmail}</a></div>
+                  )}
+                  {event.bookingInfo.contactPhone && (
+                    <div><span className="text-gray-500">Phone:</span> <a className="text-[#5a8a82] hover:underline" href={`tel:${event.bookingInfo.contactPhone}`}>{event.bookingInfo.contactPhone}</a></div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Right: Stats */}
