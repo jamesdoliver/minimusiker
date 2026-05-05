@@ -1103,6 +1103,17 @@ export async function checkRegistrationShortfall(
         continue;
       }
 
+      // Defensive: skip when admin has flipped active=true without filling subject + body.
+      // Prevents sending an email with empty content wrapped in brand chrome.
+      if (!template.subject.trim() || !template.bodyHtml.trim()) {
+        console.warn(
+          `[EventReadiness] Template ${trigger.slug} is active but subject/body is empty — `
+          + `skipping. Admin must fill content before activation.`,
+        );
+        result.skipped++;
+        continue;
+      }
+
       const percentRegistered = Math.floor((registeredCount / estimatedChildren) * 100);
 
       if (dryRun) {

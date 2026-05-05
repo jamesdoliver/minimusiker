@@ -17,7 +17,7 @@ const mockGetAirtable = {
 };
 const mockGetTeacherRecipients = jest.fn(async () => [] as Array<{ email: string; name: string }>);
 const mockGetTriggerTemplate = jest.fn(async () => ({
-  active: true, subject: '', bodyHtml: '', isCustomized: false,
+  active: true, subject: 'S', bodyHtml: '<p>B</p>', isCustomized: false,
 }));
 const mockLogActivity = jest.fn();
 
@@ -72,7 +72,7 @@ describe('checkRegistrationShortfall — t_minus_14', () => {
     mockGetAirtable.getSchoolBookingById.mockReset();
     mockGetTriggerTemplate.mockReset();
     mockLogActivity.mockClear();
-    mockGetTriggerTemplate.mockResolvedValue({ active: true, subject: '', bodyHtml: '', isCustomized: false });
+    mockGetTriggerTemplate.mockResolvedValue({ active: true, subject: 'S', bodyHtml: '<p>B</p>', isCustomized: false });
     mockGetTeacherRecipients.mockResolvedValue([{ email: 't@e.de', name: 'Frau X' }]);
   });
 
@@ -146,7 +146,7 @@ describe('checkRegistrationShortfall — t_minus_4', () => {
     mockGetAirtable.getSchoolBookingById.mockReset();
     mockGetTriggerTemplate.mockReset();
     mockLogActivity.mockClear();
-    mockGetTriggerTemplate.mockResolvedValue({ active: true, subject: '', bodyHtml: '', isCustomized: false });
+    mockGetTriggerTemplate.mockResolvedValue({ active: true, subject: 'S', bodyHtml: '<p>B</p>', isCustomized: false });
     mockGetTeacherRecipients.mockResolvedValue([{ email: 't@e.de', name: 'Frau X' }]);
   });
 
@@ -186,6 +186,54 @@ describe('checkRegistrationShortfall — t_minus_4', () => {
     await checkRegistrationShortfall('t_minus_4');
     expect(mockSend).not.toHaveBeenCalled();
   });
+
+  it('skips schulsong-only events at T-4', async () => {
+    mockGetAirtable.getAllEvents.mockResolvedValue([
+      makeEventAtOffset(4, { is_minimusikertag: false, is_kita: false, is_plus: false, is_schulsong: true }),
+    ]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue([]);
+    await checkRegistrationShortfall('t_minus_4');
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('skips when template is inactive (T-4)', async () => {
+    mockGetTriggerTemplate.mockResolvedValue({ active: false, subject: '', bodyHtml: '', isCustomized: false });
+    mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtOffset(4)]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
+      Array.from({ length: 20 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
+    );
+    const r = await checkRegistrationShortfall('t_minus_4');
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(r.skipped).toBeGreaterThanOrEqual(1);
+  });
+
+  it('counts only registered_complete=true rows (T-4)', async () => {
+    mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtOffset(4)]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue([
+      ...Array.from({ length: 50 }, (_, i) => ({ registered_complete: false, id: `i${i}` })),
+      ...Array.from({ length: 20 }, (_, i) => ({ registered_complete: true, id: `c${i}` })),
+    ]);
+    // numerator = 20 → ratio 20% → fires (under 33%)
+    await checkRegistrationShortfall('t_minus_4');
+    expect(mockSend).toHaveBeenCalledWith(
+      't@e.de',
+      'cron:registration_t_minus_4',
+      expect.objectContaining({ percentRegistered: '20' }),
+    );
+  });
+
+  it('dryRun=true does not call sender (T-4)', async () => {
+    mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtOffset(4)]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
+      Array.from({ length: 20 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
+    );
+    await checkRegistrationShortfall('t_minus_4', true);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
 });
 
 describe('checkRegistrationShortfall — t_plus_3', () => {
@@ -197,7 +245,7 @@ describe('checkRegistrationShortfall — t_plus_3', () => {
     mockGetAirtable.getSchoolBookingById.mockReset();
     mockGetTriggerTemplate.mockReset();
     mockLogActivity.mockClear();
-    mockGetTriggerTemplate.mockResolvedValue({ active: true, subject: '', bodyHtml: '', isCustomized: false });
+    mockGetTriggerTemplate.mockResolvedValue({ active: true, subject: 'S', bodyHtml: '<p>B</p>', isCustomized: false });
     mockGetTeacherRecipients.mockResolvedValue([{ email: 't@e.de', name: 'Frau X' }]);
   });
 
@@ -273,5 +321,18 @@ describe('checkRegistrationShortfall — t_plus_3', () => {
     );
     await checkRegistrationShortfall('t_plus_3', true);
     expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('skips when template is active but subject/body is empty', async () => {
+    // Active but unfilled — what happens if admin flips active=true without filling content
+    mockGetTriggerTemplate.mockResolvedValue({ active: true, subject: '', bodyHtml: '', isCustomized: false });
+    mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtOffset(-3)]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
+    );
+    const r = await checkRegistrationShortfall('t_plus_3');
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(r.skipped).toBeGreaterThanOrEqual(1);
   });
 });
