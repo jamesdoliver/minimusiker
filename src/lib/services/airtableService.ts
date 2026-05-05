@@ -61,7 +61,7 @@ import {
 import { SONGS_TABLE_ID } from '@/lib/types/teacher';
 import { ManualCost } from '@/lib/types/analytics';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
-import { aggregateEventTotals } from '@/lib/utils/eventAggregation';
+import { aggregateEventTotals, AggregableClass } from '@/lib/utils/eventAggregation';
 import {
   TeacherResource,
   TEACHER_RESOURCES_TABLE_ID,
@@ -3746,10 +3746,8 @@ class AirtableService {
 
           // Fetch classes for this event to get class count, children, and teacher
           const linkedClassIds = (eventRecord.fields[EVENTS_FIELD_IDS.classes] as string[]) || [];
-          const classCount = linkedClassIds.length;
-          let totalChildren = 0;
+          const aggregable: AggregableClass[] = [];
           let mainTeacher = '';
-          let totalParents = 0;
 
           // Batch fetch class records if there are linked classes
           if (linkedClassIds.length > 0) {
@@ -3767,18 +3765,26 @@ class AirtableService {
                 .all();
 
               for (const classRecord of classRecords) {
-                totalChildren += (classRecord.fields[CLASSES_FIELD_IDS.total_children] as number) || 0;
+                const isDefault = Boolean(classRecord.fields[CLASSES_FIELD_IDS.is_default]);
                 if (!mainTeacher) {
                   mainTeacher = (classRecord.fields[CLASSES_FIELD_IDS.main_teacher] as string) || '';
                 }
-                // Count registrations from linked field
-                const linkedRegistrationIds = (classRecord.fields[CLASSES_FIELD_IDS.registrations] as string[]) || [];
-                totalParents += linkedRegistrationIds.length;
+                aggregable.push({
+                  className: (classRecord.fields[CLASSES_FIELD_IDS.class_name] as string) || '',
+                  totalChildren: (classRecord.fields[CLASSES_FIELD_IDS.total_children] as number) || 0,
+                  registeredParents: ((classRecord.fields[CLASSES_FIELD_IDS.registrations] as string[]) || []).length,
+                  isDefault,
+                });
               }
             } catch (error) {
               console.error(`Error fetching classes for event ${eventId}:`, error);
             }
           }
+
+          // Compute totals (excludes is_default catch-all when real classes exist)
+          const { totalChildren, totalParents } = aggregateEventTotals(aggregable);
+          const realCount = aggregable.filter(c => !c.isDefault).length;
+          const classCount = realCount > 0 ? realCount : aggregable.length;
 
           return {
             eventId,
