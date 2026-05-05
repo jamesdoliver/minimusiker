@@ -71,6 +71,8 @@ export default function StaffEventDetailPage() {
   const regularClasses = event.classes.filter(
     c => !c.classType || c.classType === 'regular'
   );
+  const realRegularClasses = regularClasses.filter(c => !c.isDefault);
+  const visibleRegularClasses = realRegularClasses.length > 0 ? realRegularClasses : regularClasses;
   const choirs = event.classes.filter(c => c.classType === 'choir');
 
   // Separate schulsong from teacher_song collections
@@ -141,7 +143,7 @@ export default function StaffEventDetailPage() {
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Classes Overview</h2>
 
-          {regularClasses.length === 0 ? (
+          {visibleRegularClasses.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
               <div className="text-3xl mb-3">📚</div>
               <p className="text-gray-600">No classes have been added to this event yet.</p>
@@ -172,7 +174,7 @@ export default function StaffEventDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {regularClasses.map((cls) => (
+                  {visibleRegularClasses.map((cls) => (
                     <tr key={cls.classId} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-gray-900">{cls.className}</div>

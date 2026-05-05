@@ -327,6 +327,8 @@ export default function EventDetailPage() {
   const regularClasses = (event?.classes || []).filter(
     (c: any) => !c.classType || c.classType === 'regular'
   );
+  const realRegularClasses = regularClasses.filter((c: any) => !c.isDefault);
+  const visibleRegularClasses = realRegularClasses.length > 0 ? realRegularClasses : regularClasses;
 
   // Collection management handlers
   const toggleCollectionExpanded = (classId: string) => {
@@ -1535,7 +1537,7 @@ export default function EventDetailPage() {
         </div>
 
         {/* Missing songs warning */}
-        {regularClasses.length > 0 && regularClasses.some((c: any) => (c.songs || []).length === 0) && (
+        {visibleRegularClasses.length > 0 && visibleRegularClasses.some((c: any) => (c.songs || []).length === 0) && (
           <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <svg className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1544,7 +1546,7 @@ export default function EventDetailPage() {
               <p className="text-sm text-yellow-800">
                 Folgende Klassen haben noch keine Lieder:{' '}
                 <span className="font-medium">
-                  {regularClasses.filter((c: any) => (c.songs || []).length === 0).map((c: any) => c.className).join(', ')}
+                  {visibleRegularClasses.filter((c: any) => (c.songs || []).length === 0).map((c: any) => c.className).join(', ')}
                 </span>
                 {' '}&mdash; diese fehlen in der Album-Reihenfolge.
               </p>
@@ -1552,7 +1554,7 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        {regularClasses.length === 0 ? (
+        {visibleRegularClasses.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
             <div className="text-4xl mb-4">📚</div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Classes Yet</h3>
@@ -1571,7 +1573,7 @@ export default function EventDetailPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {regularClasses.map((cls: any) => {
+            {visibleRegularClasses.map((cls: any) => {
               const isExpanded = expandedClasses.has(cls.classRecordId || cls.classId);
               const songs = cls.songs || [];
 
