@@ -87,11 +87,16 @@ export async function POST(
       );
     }
 
+    // Resolve teacher display name so the new Class record's main_teacher is populated
+    const teacherProfile = await teacherService.getTeacherByEmail(session.email);
+    const teacherName = teacherProfile?.name || session.email; // last-ditch fallback
+
     // Create the class
     const newClass = await teacherService.createClass({
       eventId,
       className: className.trim(),
       teacherEmail: session.email,
+      teacherName,
       numChildren: numChildren !== undefined && numChildren !== null && numChildren !== ''
         ? parseInt(String(numChildren), 10)
         : undefined,
