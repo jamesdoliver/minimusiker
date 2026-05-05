@@ -16,7 +16,7 @@ export interface AggregableClass {
  * is_default flag distinguishes the system-generated row. Manual duplicates are
  * a data-entry issue handled outside this helper.
  */
-export function isCatchAllClass(cls: Pick<AggregableClass, 'isDefault'>): boolean {
+export function isCatchAllClass(cls: AggregableClass): boolean {
   return cls.isDefault === true;
 }
 
