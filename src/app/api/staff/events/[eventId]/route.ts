@@ -93,7 +93,7 @@ export async function GET(
     try {
       // Try resolving the Event record by event_id first; fall back to SimplyBook lookup.
       let resolvedEventRecordId = await airtableService.getEventsRecordIdByBookingId(eventId);
-      if (!resolvedEventRecordId) {
+      if (!resolvedEventRecordId && /^\d+$/.test(eventId)) {
         const bookingFromSb = await airtableService.getSchoolBookingBySimplybookId(eventId);
         if (bookingFromSb) {
           const linkedEvent = await airtableService.getEventBySchoolBookingId(bookingFromSb.id);
