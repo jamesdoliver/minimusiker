@@ -141,12 +141,12 @@ export const TRIGGER_EVENT_CATALOG: TriggerEvent[] = [
     recipientMode: 'specific',
   },
   {
-    key: 'cron:registration_shortfall_t7',
-    name: 'CRON: Registrierungen unter Schwelle (T-7)',
+    key: 'cron:registration_t_minus_14',
+    name: 'CRON: Registrierungen 14 Tage vor dem Event',
     description:
-      'Läuft täglich um 7 Uhr. Sendet eine Erinnerung an die Lehrkraft, '
-      + 'wenn 7 Tage vor dem Event weniger als 50% der erwarteten Kinder '
-      + 'registriert sind. Zwei Stufen: 33–50% (Niedrig), <33% (Kritisch).',
+      'Läuft täglich um 7 Uhr. Erinnert die Lehrkraft 14 Tage vor dem Event '
+      + 'an Flyer 2 / Eltern-Aktivierung, wenn weniger als 33% der erwarteten '
+      + 'Kinder registriert sind. Die meisten Schulen erhalten diese Mail.',
     availableVariables: [
       'teacherName', 'schoolName', 'eventDate',
       'registeredCount', 'expectedCount', 'percentRegistered',
@@ -155,12 +155,26 @@ export const TRIGGER_EVENT_CATALOG: TriggerEvent[] = [
     recipientMode: 'specific',
   },
   {
-    key: 'cron:registration_shortfall_post4',
-    name: 'CRON: Registrierungen nach dem Event (T+4)',
+    key: 'cron:registration_t_minus_4',
+    name: 'CRON: Registrierungen 4 Tage vor dem Event',
     description:
-      'Läuft täglich um 7 Uhr. Sendet einen Rückblick an die Lehrkraft, '
-      + 'wenn 4 Tage nach dem Event weniger als 50% der erwarteten Kinder '
-      + 'registriert waren. Zwei Stufen: 33–50% (Niedrig), <33% (Kritisch).',
+      'Läuft täglich um 7 Uhr. Sendet 4 Tage vor dem Event eine dringliche '
+      + 'Warnung an die Lehrkraft, wenn weniger als 33% der erwarteten Kinder '
+      + 'registriert sind. Unabhängig von der T-14 Mail — prüft erneut den aktuellen Stand.',
+    availableVariables: [
+      'teacherName', 'schoolName', 'eventDate',
+      'registeredCount', 'expectedCount', 'percentRegistered',
+      'teacherPortalUrl',
+    ],
+    recipientMode: 'specific',
+  },
+  {
+    key: 'cron:registration_t_plus_3',
+    name: 'CRON: Registrierungen 3 Tage nach dem Event',
+    description:
+      'Läuft täglich um 7 Uhr. Sendet 3 Tage nach dem Event eine Rückmeldung '
+      + 'an die Lehrkraft, wenn weniger als 50% der erwarteten Kinder registriert '
+      + 'waren. Berücksichtigt auch Anmeldungen, die nach dem Event eingegangen sind.',
     availableVariables: [
       'teacherName', 'schoolName', 'eventDate',
       'registeredCount', 'expectedCount', 'percentRegistered',

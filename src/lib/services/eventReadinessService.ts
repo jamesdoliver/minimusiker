@@ -20,7 +20,7 @@ import {
   sendRegistrationShortfallEmail,
 } from './resendService';
 import { getActivityService } from './activityService';
-import { selectShortfallTier, getShortfallSlug, type RegistrationShortfallPhase } from './registrationShortfall';
+import { REGISTRATION_SHORTFALL_TRIGGERS, shouldFire, type RegistrationShortfallTriggerKey } from './registrationShortfall';
 import { getTriggerTemplate } from './triggerTemplateService';
 import Airtable from 'airtable';
 import { ORDERS_TABLE_ID, ORDERS_FIELD_IDS } from '@/lib/types/airtable';
@@ -1007,34 +1007,26 @@ export async function checkStaffEventReminder(dryRun = false): Promise<Readiness
   return result;
 }
 
-const REGISTRATION_SHORTFALL_OFFSETS: Record<RegistrationShortfallPhase, number> = {
-  pre: 7,    // T-7 — 7 days before the event (today + 7 = event date)
-  post: -4,  // T+4 — 4 days after the event (today - 4 = event date)
-};
-
 /**
- * Phase-aware registration shortfall reminder. Sends one of two tiered emails
- * to the assigned teacher when the registered/expected ratio falls below 50%.
+ * Registration shortfall reminder. Three independent triggers, each with its own
+ * date offset and ratio gate (see REGISTRATION_SHORTFALL_TRIGGERS).
  *
- * - phase 'pre'  → T-7 (7 days before event)
- * - phase 'post' → T+4 (4 days after event)
- *
- * Idempotency: exact-date match means each event is evaluated exactly once
- * per phase over its lifetime — same model as `checkStaffEventReminder`.
+ * Idempotency: exact-date match means each event passes through each trigger
+ * exactly once over its lifetime — same model as `checkStaffEventReminder`.
  */
 export async function checkRegistrationShortfall(
-  phase: RegistrationShortfallPhase,
+  triggerKey: RegistrationShortfallTriggerKey,
   dryRun = false,
 ): Promise<ReadinessResult> {
   const result: ReadinessResult = { sent: 0, skipped: 0, failed: 0, errors: [] };
+  const trigger = REGISTRATION_SHORTFALL_TRIGGERS[triggerKey];
 
   try {
     const airtable = getAirtableService();
     const allEvents = await airtable.getAllEvents();
 
-    const offset = REGISTRATION_SHORTFALL_OFFSETS[phase];
     const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + offset);
+    targetDate.setDate(targetDate.getDate() + trigger.daysOffset);
     const targetDateStr = targetDate.toISOString().split('T')[0];
 
     const candidates = allEvents.filter((event) => {
@@ -1047,12 +1039,12 @@ export async function checkRegistrationShortfall(
     });
 
     if (candidates.length === 0) {
-      console.log(`[EventReadiness] Registration shortfall (${phase}): no candidates on ${targetDateStr}`);
+      console.log(`[EventReadiness] Registration shortfall (${triggerKey}): no candidates on ${targetDateStr}`);
       result.skipped = 1;
       return result;
     }
 
-    console.log(`[EventReadiness] Registration shortfall (${phase}): found ${candidates.length} candidate event(s)`);
+    console.log(`[EventReadiness] Registration shortfall (${triggerKey}): ${candidates.length} candidate(s) at ${targetDateStr}`);
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://minimusiker.app';
 
@@ -1074,9 +1066,9 @@ export async function checkRegistrationShortfall(
       const registrations = await airtable.getRegistrationsByEventId(event.id);
       const registeredCount = registrations.filter((r) => r.registered_complete).length;
 
-      const tier = selectShortfallTier(registeredCount, estimatedChildren);
-      if (!tier) continue; // ratio ≥ 50%
-      const slug = getShortfallSlug(tier, phase);
+      if (!shouldFire(registeredCount, estimatedChildren, triggerKey)) {
+        continue; // ratio at or above threshold
+      }
 
       const teacherRecipients = await getTeacherRecipientsForEvent(
         event.event_id,
@@ -1087,7 +1079,7 @@ export async function checkRegistrationShortfall(
           schoolName: event.school_name,
           eventDate: event.event_date,
           eventType: event.event_type || 'MiniMusiker',
-          daysUntilEvent: REGISTRATION_SHORTFALL_OFFSETS[phase],
+          daysUntilEvent: trigger.daysOffset,
           accessCode: event.access_code,
           isKita: event.is_kita,
           isMinimusikertag: event.is_minimusikertag,
@@ -1105,7 +1097,7 @@ export async function checkRegistrationShortfall(
 
       // Pre-check active flag — disabled templates would otherwise be reported as "sent"
       // by the resendService disabled-shortcut (returns success: true, messageId: 'disabled').
-      const template = await getTriggerTemplate(slug);
+      const template = await getTriggerTemplate(trigger.slug);
       if (!template.active) {
         result.skipped++;
         continue;
@@ -1115,7 +1107,7 @@ export async function checkRegistrationShortfall(
 
       if (dryRun) {
         console.log(
-          `[EventReadiness] DRY RUN (${phase}): would send ${slug} to ${teacher.email} `
+          `[EventReadiness] DRY RUN (${triggerKey}): would send ${trigger.slug} to ${teacher.email} `
           + `(ratio: ${percentRegistered}%, registered: ${registeredCount}/${estimatedChildren})`,
         );
         result.skipped++;
@@ -1125,7 +1117,7 @@ export async function checkRegistrationShortfall(
       try {
         const r = await sendRegistrationShortfallEmail(
           teacher.email,
-          slug,
+          trigger.slug,
           {
             teacherName: teacher.name || 'Lehrkraft',
             schoolName: event.school_name,
@@ -1142,28 +1134,28 @@ export async function checkRegistrationShortfall(
           getActivityService().logActivity({
             eventRecordId: event.id,
             activityType: 'email_sent',
-            description: `Registration shortfall (${phase}, ${slug}) — ${percentRegistered}% (${registeredCount}/${estimatedChildren})`,
+            description: `Registration shortfall (${triggerKey}, ${trigger.slug}) — ${percentRegistered}% (${registeredCount}/${estimatedChildren})`,
             actorEmail: 'system',
             actorType: 'system',
-            metadata: { slug, phase, ratio: percentRegistered },
+            metadata: { slug: trigger.slug, triggerKey, ratio: percentRegistered },
           });
         } else {
           result.failed++;
-          result.errors.push(`Shortfall send failed for ${event.event_id}: ${r.error}`);
+          result.errors.push(`Shortfall send failed for ${event.event_id} (${triggerKey}): ${r.error}`);
         }
       } catch (err) {
         result.failed++;
         result.errors.push(
-          `Shortfall send error for ${event.event_id}: ${err instanceof Error ? err.message : 'Unknown'}`,
+          `Shortfall send error for ${event.event_id} (${triggerKey}): ${err instanceof Error ? err.message : 'Unknown'}`,
         );
       }
     }
   } catch (error) {
     result.failed = 1;
     result.errors.push(
-      `[EventReadiness] checkRegistrationShortfall: ${error instanceof Error ? error.message : 'Unknown'}`,
+      `[EventReadiness] checkRegistrationShortfall(${triggerKey}): ${error instanceof Error ? error.message : 'Unknown'}`,
     );
-    console.error('[EventReadiness] Error in checkRegistrationShortfall:', error);
+    console.error(`[EventReadiness] Error in checkRegistrationShortfall(${triggerKey}):`, error);
   }
 
   return result;

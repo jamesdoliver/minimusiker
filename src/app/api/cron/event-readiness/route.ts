@@ -29,8 +29,9 @@ interface CronResult {
   noStaff?: { sent: number; skipped: number; failed: number; errors: string[] };
   noEvent?: { sent: number; skipped: number; failed: number; errors: string[] };
   staffReminder?: { sent: number; skipped: number; failed: number; errors: string[] };
-  registrationShortfallPre?: { sent: number; skipped: number; failed: number; errors: string[] };
-  registrationShortfallPost?: { sent: number; skipped: number; failed: number; errors: string[] };
+  registrationT14?: { sent: number; skipped: number; failed: number; errors: string[] };
+  registrationT4?: { sent: number; skipped: number; failed: number; errors: string[] };
+  registrationT3?: { sent: number; skipped: number; failed: number; errors: string[] };
   classesAndSongs?: { sent: number; skipped: number; failed: number; errors: string[] };
   postWave2Orders?: { sent: number; skipped: number; failed: number; errors: string[] };
   recentOrderChanges?: { sent: number; skipped: number; failed: number; errors: string[] };
@@ -61,13 +62,17 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
   const staffReminderResult = await checkStaffEventReminder(isDryRun);
   console.log('[Event Readiness Cron] Staff reminder check:', staffReminderResult);
 
-  // Daily check: registration shortfall — pre-event (T-7)
-  const registrationShortfallPreResult = await checkRegistrationShortfall('pre', isDryRun);
-  console.log('[Event Readiness Cron] Registration shortfall (pre) check:', registrationShortfallPreResult);
+  // Daily check: registration shortfall — T-14 (gentle reminder, <33%)
+  const registrationT14Result = await checkRegistrationShortfall('t_minus_14', isDryRun);
+  console.log('[Event Readiness Cron] Registration T-14 check:', registrationT14Result);
 
-  // Daily check: registration shortfall — post-event (T+4)
-  const registrationShortfallPostResult = await checkRegistrationShortfall('post', isDryRun);
-  console.log('[Event Readiness Cron] Registration shortfall (post) check:', registrationShortfallPostResult);
+  // Daily check: registration shortfall — T-4 (alarm, <33%)
+  const registrationT4Result = await checkRegistrationShortfall('t_minus_4', isDryRun);
+  console.log('[Event Readiness Cron] Registration T-4 check:', registrationT4Result);
+
+  // Daily check: registration shortfall — T+3 (post-event, <50%)
+  const registrationT3Result = await checkRegistrationShortfall('t_plus_3', isDryRun);
+  console.log('[Event Readiness Cron] Registration T+3 check:', registrationT3Result);
 
   // Weekly checks: only on Mondays (or if forced)
   const isMonday = new Date().getDay() === 1;
@@ -97,8 +102,9 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
     noStaff: noStaffResult,
     noEvent: noEventResult,
     staffReminder: staffReminderResult,
-    registrationShortfallPre: registrationShortfallPreResult,
-    registrationShortfallPost: registrationShortfallPostResult,
+    registrationT14: registrationT14Result,
+    registrationT4: registrationT4Result,
+    registrationT3: registrationT3Result,
     classesAndSongs: classesAndSongsResult || undefined,
     postWave2Orders: postWave2OrdersResult || undefined,
     recentOrderChanges: recentOrderChangesResult || undefined,
