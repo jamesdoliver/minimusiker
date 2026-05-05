@@ -26,7 +26,8 @@ const RECIPIENT_GROUP_ORDER: Array<{ key: string; label: string }> = [
 // here. Templates with a category not in this list silently disappear from the admin UI
 // (excluded from recipient groups by `!t.category`, not picked up by any category group).
 const CATEGORY_GROUP_ORDER: Array<{ key: string; label: string }> = [
-  { key: 'registrations', label: 'Registrierungen' },
+  { key: 'registrations_pre', label: 'Registrierungen vor dem Event' },
+  { key: 'registrations_post', label: 'Registrierungen nach dem Event' },
 ];
 
 export default function TriggerEmailsTab() {

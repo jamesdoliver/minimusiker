@@ -247,3 +247,130 @@ describe('checkRegistrationShortfall', () => {
     expect(mockSend).toHaveBeenCalled();
   });
 });
+
+// Helper: build an event whose date is exactly today-4 (post-phase eligible by default).
+function makeEventAtPostT4(overrides: Record<string, unknown> = {}) {
+  const t4 = new Date();
+  t4.setDate(t4.getDate() - 4);
+  return {
+    id: 'rec_evt',
+    event_id: 'evt_test',
+    event_date: t4.toISOString().split('T')[0],
+    school_name: 'Test',
+    status: 'Confirmed',
+    simplybook_booking: ['rec_book'],
+    is_minimusikertag: true,
+    is_kita: false,
+    is_plus: false,
+    is_schulsong: false,
+    ...overrides,
+  };
+}
+
+describe('checkRegistrationShortfall — post phase', () => {
+  beforeEach(() => {
+    mockSend.mockClear();
+    mockGetTeacherRecipients.mockClear();
+    mockGetAirtable.getAllEvents.mockReset();
+    mockGetAirtable.getRegistrationsByEventId.mockReset();
+    mockGetAirtable.getSchoolBookingById.mockReset();
+    mockGetTriggerTemplate.mockReset();
+    mockLogActivity.mockClear();
+    mockGetTriggerTemplate.mockResolvedValue({ active: true, subject: '', bodyHtml: '', isCustomized: false });
+    mockGetTeacherRecipients.mockResolvedValue([{ email: 't@e.de', name: 'Frau X' }]);
+  });
+
+  it('sends low_post4 slug at 40% ratio', async () => {
+    mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtPostT4()]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
+      Array.from({ length: 40 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
+    );
+    const r = await checkRegistrationShortfall('post');
+    expect(mockSend).toHaveBeenCalledWith(
+      't@e.de',
+      'cron:registration_low_post4',
+      expect.objectContaining({
+        registeredCount: '40',
+        expectedCount: '100',
+        percentRegistered: '40',
+        teacherPortalUrl: expect.stringContaining('/paedagogen/events/evt_test'),
+      }),
+    );
+    expect(r.sent).toBe(1);
+    expect(r.skipped).toBe(0);
+    expect(r.failed).toBe(0);
+    expect(mockLogActivity).toHaveBeenCalledTimes(1);
+    expect(mockLogActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activityType: 'email_sent',
+        eventRecordId: 'rec_evt',
+        metadata: expect.objectContaining({ slug: 'cron:registration_low_post4', phase: 'post', ratio: 40 }),
+      }),
+    );
+  });
+
+  it('sends critical_post4 slug at 30% ratio', async () => {
+    mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtPostT4()]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
+    );
+    const r = await checkRegistrationShortfall('post');
+    expect(mockSend).toHaveBeenCalledWith(
+      't@e.de',
+      'cron:registration_critical_post4',
+      expect.objectContaining({
+        registeredCount: '30',
+        expectedCount: '100',
+        percentRegistered: '30',
+        teacherPortalUrl: expect.stringContaining('/paedagogen/events/evt_test'),
+      }),
+    );
+    expect(r.sent).toBe(1);
+    expect(r.skipped).toBe(0);
+    expect(r.failed).toBe(0);
+    expect(mockLogActivity).toHaveBeenCalledTimes(1);
+    expect(mockLogActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activityType: 'email_sent',
+        eventRecordId: 'rec_evt',
+        metadata: expect.objectContaining({ slug: 'cron:registration_critical_post4', phase: 'post', ratio: 30 }),
+      }),
+    );
+  });
+
+  it('does not match events whose date is not exactly 4 days ago', async () => {
+    const wrongDay = new Date();
+    wrongDay.setDate(wrongDay.getDate() - 6);
+    mockGetAirtable.getAllEvents.mockResolvedValue([
+      makeEventAtPostT4({ event_date: wrongDay.toISOString().split('T')[0] }),
+    ]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
+    );
+    await checkRegistrationShortfall('post');
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('skips schulsong-only events at T+4', async () => {
+    mockGetAirtable.getAllEvents.mockResolvedValue([
+      makeEventAtPostT4({ is_minimusikertag: false, is_kita: false, is_plus: false, is_schulsong: true }),
+    ]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue([]);
+    await checkRegistrationShortfall('post');
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('dryRun=true does not call sender', async () => {
+    mockGetAirtable.getAllEvents.mockResolvedValue([makeEventAtPostT4()]);
+    mockGetAirtable.getSchoolBookingById.mockResolvedValue({ estimatedChildren: 100 });
+    mockGetAirtable.getRegistrationsByEventId.mockResolvedValue(
+      Array.from({ length: 30 }, (_, i) => ({ registered_complete: true, id: `r${i}` })),
+    );
+    await checkRegistrationShortfall('post', true);
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+});

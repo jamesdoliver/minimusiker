@@ -29,7 +29,8 @@ interface CronResult {
   noStaff?: { sent: number; skipped: number; failed: number; errors: string[] };
   noEvent?: { sent: number; skipped: number; failed: number; errors: string[] };
   staffReminder?: { sent: number; skipped: number; failed: number; errors: string[] };
-  registrationShortfall?: { sent: number; skipped: number; failed: number; errors: string[] };
+  registrationShortfallPre?: { sent: number; skipped: number; failed: number; errors: string[] };
+  registrationShortfallPost?: { sent: number; skipped: number; failed: number; errors: string[] };
   classesAndSongs?: { sent: number; skipped: number; failed: number; errors: string[] };
   postWave2Orders?: { sent: number; skipped: number; failed: number; errors: string[] };
   recentOrderChanges?: { sent: number; skipped: number; failed: number; errors: string[] };
@@ -60,9 +61,13 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
   const staffReminderResult = await checkStaffEventReminder(isDryRun);
   console.log('[Event Readiness Cron] Staff reminder check:', staffReminderResult);
 
-  // Daily check: registration shortfall (7 days before, only if <50% registered)
-  const registrationShortfallResult = await checkRegistrationShortfall('pre', isDryRun);
-  console.log('[Event Readiness Cron] Registration shortfall check:', registrationShortfallResult);
+  // Daily check: registration shortfall — pre-event (T-7)
+  const registrationShortfallPreResult = await checkRegistrationShortfall('pre', isDryRun);
+  console.log('[Event Readiness Cron] Registration shortfall (pre) check:', registrationShortfallPreResult);
+
+  // Daily check: registration shortfall — post-event (T+4)
+  const registrationShortfallPostResult = await checkRegistrationShortfall('post', isDryRun);
+  console.log('[Event Readiness Cron] Registration shortfall (post) check:', registrationShortfallPostResult);
 
   // Weekly checks: only on Mondays (or if forced)
   const isMonday = new Date().getDay() === 1;
@@ -92,7 +97,8 @@ async function handleCronRequest(request: NextRequest): Promise<NextResponse<Cro
     noStaff: noStaffResult,
     noEvent: noEventResult,
     staffReminder: staffReminderResult,
-    registrationShortfall: registrationShortfallResult,
+    registrationShortfallPre: registrationShortfallPreResult,
+    registrationShortfallPost: registrationShortfallPostResult,
     classesAndSongs: classesAndSongsResult || undefined,
     postWave2Orders: postWave2OrdersResult || undefined,
     recentOrderChanges: recentOrderChangesResult || undefined,
