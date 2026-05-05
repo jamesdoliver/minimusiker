@@ -6920,6 +6920,55 @@ class AirtableService {
   }
 
   /**
+   * Refresh the main_teacher on the first empty class for an event,
+   * pulling the contact person name from the linked SchoolBooking.
+   *
+   * Returns a structured status so callers (single-event admin route or
+   * bulk backfill) can decide how to surface the outcome. Pure business
+   * logic — no HTTP coupling.
+   */
+  async refreshTeacherForEvent(eventRecordId: string): Promise<{
+    status: 'updated' | 'no_booking' | 'no_contact' | 'no_classes' | 'all_filled' | 'event_not_found';
+    teacherName?: string;
+    classId?: string;
+    className?: string;
+  }> {
+    const eventRecord = await this.getEventById(eventRecordId);
+    if (!eventRecord) {
+      return { status: 'event_not_found' };
+    }
+
+    const simplybookBookingIds = eventRecord.simplybook_booking;
+    if (!simplybookBookingIds?.[0]) {
+      return { status: 'no_booking' };
+    }
+
+    const booking = await this.getSchoolBookingById(simplybookBookingIds[0]);
+    if (!booking?.schoolContactName) {
+      return { status: 'no_contact' };
+    }
+
+    const classes = await this.getClassesByEventId(eventRecordId);
+    if (classes.length === 0) {
+      return { status: 'no_classes' };
+    }
+
+    const classToUpdate = classes.find((c) => !c.main_teacher);
+    if (!classToUpdate) {
+      return { status: 'all_filled' };
+    }
+
+    await this.updateClassTeacher(classToUpdate.id, booking.schoolContactName);
+
+    return {
+      status: 'updated',
+      teacherName: booking.schoolContactName,
+      classId: classToUpdate.class_id,
+      className: classToUpdate.class_name,
+    };
+  }
+
+  /**
    * Get registrations linked to an event by event record ID
    */
   async getRegistrationsByEventId(eventRecordId: string): Promise<Registration[]> {

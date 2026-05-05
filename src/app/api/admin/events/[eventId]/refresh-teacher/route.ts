@@ -46,62 +46,45 @@ export async function POST(
       );
     }
 
-    // Get the Event record to find linked booking
-    const eventRecord = await airtableService.getEventById(eventRecordId);
-    if (!eventRecord) {
-      return NextResponse.json(
-        { success: false, error: 'Event record not found' },
-        { status: 404 }
-      );
+    const result = await airtableService.refreshTeacherForEvent(eventRecordId);
+
+    switch (result.status) {
+      case 'event_not_found':
+        return NextResponse.json(
+          { success: false, error: 'Event record not found' },
+          { status: 404 }
+        );
+      case 'no_booking':
+        return NextResponse.json(
+          { success: false, error: 'No linked booking found for this event' },
+          { status: 400 }
+        );
+      case 'no_contact':
+        return NextResponse.json(
+          { success: false, error: 'No contact person found in booking' },
+          { status: 400 }
+        );
+      case 'no_classes':
+        return NextResponse.json(
+          { success: false, error: 'No classes found for this event' },
+          { status: 400 }
+        );
+      case 'all_filled':
+        return NextResponse.json(
+          { success: false, error: 'All classes already have teachers assigned' },
+          { status: 400 }
+        );
+      case 'updated':
+        return NextResponse.json({
+          success: true,
+          message: `Teacher set to "${result.teacherName}" for class "${result.className}"`,
+          data: {
+            classId: result.classId,
+            className: result.className,
+            teacherName: result.teacherName,
+          },
+        });
     }
-
-    // Get linked SchoolBooking
-    const simplybookBookingIds = eventRecord.simplybook_booking;
-    if (!simplybookBookingIds?.[0]) {
-      return NextResponse.json(
-        { success: false, error: 'No linked booking found for this event' },
-        { status: 400 }
-      );
-    }
-
-    const booking = await airtableService.getSchoolBookingById(simplybookBookingIds[0]);
-    if (!booking?.schoolContactName) {
-      return NextResponse.json(
-        { success: false, error: 'No contact person found in booking' },
-        { status: 400 }
-      );
-    }
-
-    // Get classes for this event
-    const classes = await airtableService.getClassesByEventId(eventRecordId);
-    if (classes.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'No classes found for this event' },
-        { status: 400 }
-      );
-    }
-
-    // Find first class with empty main_teacher
-    const classToUpdate = classes.find(c => !c.main_teacher);
-    if (!classToUpdate) {
-      return NextResponse.json(
-        { success: false, error: 'All classes already have teachers assigned' },
-        { status: 400 }
-      );
-    }
-
-    // Update the class with the contact person as teacher
-    await airtableService.updateClassTeacher(classToUpdate.id, booking.schoolContactName);
-
-    return NextResponse.json({
-      success: true,
-      message: `Teacher set to "${booking.schoolContactName}" for class "${classToUpdate.class_name}"`,
-      data: {
-        classId: classToUpdate.class_id,
-        className: classToUpdate.class_name,
-        teacherName: booking.schoolContactName,
-      },
-    });
   } catch (error) {
     console.error('Error refreshing teacher:', error);
     return NextResponse.json(
