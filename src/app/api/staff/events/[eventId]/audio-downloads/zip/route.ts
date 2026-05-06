@@ -69,36 +69,36 @@ export async function GET(
       if (!candidates || candidates.length === 0) continue;
 
       const best = pickBestFile(candidates);
-      const r2Key = best.mp3R2Key || best.r2Key;
-      const extension = r2Key.toLowerCase().endsWith('.mp3') ? '.mp3' : '.wav';
-      const zipName = `${cls.className}${extension}`;
+      const r2KeyIsMp3 = best.r2Key.toLowerCase().endsWith('.mp3');
+      const mp3Key = best.mp3R2Key || (r2KeyIsMp3 ? best.r2Key : null);
 
-      if (!best.mp3R2Key && r2Key.toLowerCase().endsWith('.wav')) {
-        console.error('[staff zip] mp3R2Key missing for WAV — including raw WAV in zip', {
-          audioFileId: best.id, r2Key, eventId, classId: best.classId, songId: best.songId,
+      if (!mp3Key) {
+        console.error('[staff zip] Skipping class — no MP3 source available', {
+          audioFileId: best.id, r2Key: best.r2Key, eventId, classId: best.classId, songId: best.songId,
         });
+        continue;
       }
 
-      const buffer = await r2Service.getFileBuffer(r2Key);
+      const buffer = await r2Service.getFileBuffer(mp3Key);
       if (buffer) {
-        filesToZip.push({ buffer, zipName });
+        filesToZip.push({ buffer, zipName: `${cls.className}.mp3` });
       }
     }
 
     if (schulsongFiles.length > 0) {
       const best = pickBestFile(schulsongFiles);
-      const r2Key = best.mp3R2Key || best.r2Key;
-      const extension = r2Key.toLowerCase().endsWith('.mp3') ? '.mp3' : '.wav';
+      const r2KeyIsMp3 = best.r2Key.toLowerCase().endsWith('.mp3');
+      const mp3Key = best.mp3R2Key || (r2KeyIsMp3 ? best.r2Key : null);
 
-      if (!best.mp3R2Key && r2Key.toLowerCase().endsWith('.wav')) {
-        console.error('[staff zip] schulsong mp3R2Key missing for WAV — including raw WAV in zip', {
-          audioFileId: best.id, r2Key, eventId, classId: best.classId,
+      if (!mp3Key) {
+        console.error('[staff zip] Skipping schulsong — no MP3 source available', {
+          audioFileId: best.id, r2Key: best.r2Key, eventId, classId: best.classId,
         });
-      }
-
-      const buffer = await r2Service.getFileBuffer(r2Key);
-      if (buffer) {
-        filesToZip.push({ buffer, zipName: `Schulsong${extension}` });
+      } else {
+        const buffer = await r2Service.getFileBuffer(mp3Key);
+        if (buffer) {
+          filesToZip.push({ buffer, zipName: 'Schulsong.mp3' });
+        }
       }
     }
 

@@ -164,17 +164,29 @@ class MasterCdService {
         continue;
       }
 
-      // Prefer MP3 version if available, fall back to primary r2Key (may be WAV)
+      // Bulk downloads are always MP3. Use the encoded mp3R2Key, or r2Key
+      // only if it's already an .mp3. WAV-only tracks are skipped (and logged)
+      // so the zip never contains a mix of formats.
       const audioFile = track.songId === '__schulsong__'
         ? schulsongAudio
         : finalAudioBySongId.get(track.songId);
-      const downloadKey = audioFile?.mp3R2Key || track.r2Key;
-      const isMp3 = downloadKey.toLowerCase().endsWith('.mp3') || !!audioFile?.mp3R2Key;
-      const ext = isMp3 ? 'mp3' : 'wav';
-      const padded = String(track.trackNumber).padStart(2, '0');
-      const filename = `${padded}. ${track.title} - ${track.className}.${ext}`;
+      const r2KeyIsMp3 = track.r2Key.toLowerCase().endsWith('.mp3');
+      const mp3Key = audioFile?.mp3R2Key || (r2KeyIsMp3 ? track.r2Key : null);
 
-      const url = await this.r2.generateSignedUrl(downloadKey, 3600, filename);
+      if (!mp3Key) {
+        console.error('[masterCd] Skipping track from bulk download — no MP3 source available', {
+          trackNumber: track.trackNumber,
+          songId: track.songId,
+          audioFileId: audioFile?.id,
+          r2Key: track.r2Key,
+        });
+        continue;
+      }
+
+      const padded = String(track.trackNumber).padStart(2, '0');
+      const filename = `${padded}. ${track.title} - ${track.className}.mp3`;
+
+      const url = await this.r2.generateSignedUrl(mp3Key, 3600, filename);
 
       downloads.push({
         trackNumber: track.trackNumber,

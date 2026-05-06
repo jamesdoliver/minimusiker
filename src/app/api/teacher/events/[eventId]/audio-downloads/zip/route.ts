@@ -108,24 +108,24 @@ export async function GET(
 
         if (!audio) continue;
 
-        const r2Key = audio.mp3R2Key || audio.r2Key;
-        if (!r2Key) continue;
+        const r2KeyIsMp3 = audio.r2Key.toLowerCase().endsWith('.mp3');
+        const mp3Key = audio.mp3R2Key || (r2KeyIsMp3 ? audio.r2Key : null);
 
-        if (!audio.mp3R2Key && r2Key.toLowerCase().endsWith('.wav')) {
-          console.error('[teacher zip] mp3R2Key missing for WAV — including raw WAV in zip', {
-            audioFileId: audio.id, r2Key, eventId, classId: audio.classId, songId: audio.songId,
+        if (!mp3Key) {
+          console.error('[teacher zip] Skipping track — no MP3 source available', {
+            audioFileId: audio.id, r2Key: audio.r2Key, eventId, classId: audio.classId, songId: audio.songId,
           });
+          continue;
         }
 
-        const buffer = await r2Service.getFileBuffer(r2Key);
+        const buffer = await r2Service.getFileBuffer(mp3Key);
         if (!buffer) continue;
 
         const padded = String(albumTrack.albumOrder).padStart(2, '0');
         const displayName = albumTrack.isSchulsong
           ? albumTrack.songTitle
           : `${albumTrack.songTitle} - ${albumTrack.className}`;
-        const extension = r2Key.endsWith('.wav') ? '.wav' : '.mp3';
-        const zipName = deduplicateName(`${padded}. ${displayName}${extension}`);
+        const zipName = deduplicateName(`${padded}. ${displayName}.mp3`);
 
         filesToZip.push({ buffer, zipName });
       }
@@ -138,16 +138,17 @@ export async function GET(
           (f) => f.classId === cls.classId && !f.isSchulsong
         );
         for (const af of classFiles) {
-          const r2Key = af.mp3R2Key || af.r2Key;
-          if (!r2Key) continue;
+          const r2KeyIsMp3 = af.r2Key.toLowerCase().endsWith('.mp3');
+          const mp3Key = af.mp3R2Key || (r2KeyIsMp3 ? af.r2Key : null);
 
-          if (!af.mp3R2Key && r2Key.toLowerCase().endsWith('.wav')) {
-            console.error('[teacher zip] mp3R2Key missing for WAV — including raw WAV in zip', {
-              audioFileId: af.id, r2Key, eventId, classId: af.classId, songId: af.songId,
+          if (!mp3Key) {
+            console.error('[teacher zip] Skipping track — no MP3 source available', {
+              audioFileId: af.id, r2Key: af.r2Key, eventId, classId: af.classId, songId: af.songId,
             });
+            continue;
           }
 
-          const buffer = await r2Service.getFileBuffer(r2Key);
+          const buffer = await r2Service.getFileBuffer(mp3Key);
           if (!buffer) continue;
 
           const song = af.songId
@@ -157,8 +158,7 @@ export async function GET(
           const baseName = song?.title
             ? `${song.title} - ${cls.className}`
             : cls.className;
-          const extension = r2Key.endsWith('.wav') ? '.wav' : '.mp3';
-          const zipName = deduplicateName(`${baseName}${extension}`);
+          const zipName = deduplicateName(`${baseName}.mp3`);
 
           filesToZip.push({ buffer, zipName });
         }
@@ -167,17 +167,17 @@ export async function GET(
       // Schulsong fallback
       const schulsongFile = finalReadyFiles.find((f) => f.isSchulsong);
       if (schulsongFile) {
-        const r2Key = schulsongFile.mp3R2Key || schulsongFile.r2Key;
-        if (r2Key) {
-          if (!schulsongFile.mp3R2Key && r2Key.toLowerCase().endsWith('.wav')) {
-            console.error('[teacher zip] schulsong mp3R2Key missing for WAV — including raw WAV in zip', {
-              audioFileId: schulsongFile.id, r2Key, eventId, classId: schulsongFile.classId,
-            });
-          }
-          const buffer = await r2Service.getFileBuffer(r2Key);
+        const r2KeyIsMp3 = schulsongFile.r2Key.toLowerCase().endsWith('.mp3');
+        const mp3Key = schulsongFile.mp3R2Key || (r2KeyIsMp3 ? schulsongFile.r2Key : null);
+
+        if (!mp3Key) {
+          console.error('[teacher zip] Skipping schulsong — no MP3 source available', {
+            audioFileId: schulsongFile.id, r2Key: schulsongFile.r2Key, eventId, classId: schulsongFile.classId,
+          });
+        } else {
+          const buffer = await r2Service.getFileBuffer(mp3Key);
           if (buffer) {
-            const ext = r2Key.endsWith('.wav') ? '.wav' : '.mp3';
-            filesToZip.push({ buffer, zipName: deduplicateName(`Schulsong${ext}`) });
+            filesToZip.push({ buffer, zipName: deduplicateName('Schulsong.mp3') });
           }
         }
       }
