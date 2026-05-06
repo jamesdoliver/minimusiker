@@ -122,7 +122,7 @@ export default function EditSongModal({
               onChange={(e) => setPublicNotes(e.target.value)}
               rows={2}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-              placeholder="Visible to parents, e.g., With actions, slow tempo..."
+              placeholder="Anmerkungen hier eingeben..."
             />
           </div>
           {showInternalNotes && (
