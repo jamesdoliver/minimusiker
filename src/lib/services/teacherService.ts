@@ -678,8 +678,8 @@ class TeacherService {
           maxRecords: 1,
         }).firstPage();
 
-        // SimplyBook ID fallback (numeric IDs)
-        if (eventRecords.length === 0 && /^\d+$/.test(eventId)) {
+        // SimplyBook ID fallback (numeric IDs and "M-xxxxxx" manual booking codes)
+        if (eventRecords.length === 0 && (/^\d+$/.test(eventId) || /^M-[a-f0-9]+$/i.test(eventId))) {
           const booking = await getAirtableService().getSchoolBookingBySimplybookId(eventId);
           if (booking) {
             const eventRecord = await getAirtableService().getEventBySchoolBookingId(booking.id);
@@ -994,8 +994,8 @@ class TeacherService {
           maxRecords: 1,
         }).firstPage();
 
-        // SimplyBook ID fallback (numeric IDs)
-        if (eventRecords.length === 0 && /^\d+$/.test(eventId)) {
+        // SimplyBook ID fallback (numeric IDs and "M-xxxxxx" manual booking codes)
+        if (eventRecords.length === 0 && (/^\d+$/.test(eventId) || /^M-[a-f0-9]+$/i.test(eventId))) {
           const booking = await getAirtableService().getSchoolBookingBySimplybookId(eventId);
           if (booking) {
             const eventRecord = await getAirtableService().getEventBySchoolBookingId(booking.id);
@@ -1649,10 +1649,11 @@ class TeacherService {
       // First, look up the Event record - it's the source of truth for event info
       let eventRecord = await getAirtableService().getEventByEventId(data.eventId);
 
-      // Fallback: if eventId looks like a simplybookId (numeric), resolve via SchoolBookings
-      // This handles the case where getTeacherEvents() fell back to simplybookId because
-      // the Event wasn't linked to the SchoolBooking via simplybook_booking field
-      if (!eventRecord && /^\d+$/.test(data.eventId)) {
+      // Fallback: if eventId is a simplybookId (numeric SimplyBook code or "M-xxxxxx"
+      // manual booking code), resolve via SchoolBookings. Without this fallback, the
+      // class is created with no Event linkage and a timestamp-based class_id, which
+      // turns it into a parent-visible orphan that breaks registration.
+      if (!eventRecord && (/^\d+$/.test(data.eventId) || /^M-[a-f0-9]+$/i.test(data.eventId))) {
         console.log(`createClass: eventId "${data.eventId}" looks like a simplybookId, trying fallback resolution`);
         const booking = await getAirtableService().getSchoolBookingBySimplybookId(data.eventId);
         if (booking) {
@@ -2190,8 +2191,9 @@ class TeacherService {
         })
         .firstPage();
 
-      // Fallback: if eventId looks like a simplybookId (numeric), resolve via SchoolBookings
-      if (eventRecords.length === 0 && /^\d+$/.test(eventId)) {
+      // Fallback: if eventId is a simplybookId (numeric or "M-xxxxxx" manual code),
+      // resolve via SchoolBookings.
+      if (eventRecords.length === 0 && (/^\d+$/.test(eventId) || /^M-[a-f0-9]+$/i.test(eventId))) {
         const booking = await getAirtableService().getSchoolBookingBySimplybookId(eventId);
         if (booking) {
           const eventRecord = await getAirtableService().getEventBySchoolBookingId(booking.id);
@@ -2363,8 +2365,9 @@ class TeacherService {
         })
         .firstPage();
 
-      // Fallback: if eventId looks like a simplybookId (numeric), resolve via SchoolBookings
-      if (eventRecords.length === 0 && /^\d+$/.test(data.eventId)) {
+      // Fallback: if eventId is a simplybookId (numeric or "M-xxxxxx" manual code),
+      // resolve via SchoolBookings.
+      if (eventRecords.length === 0 && (/^\d+$/.test(data.eventId) || /^M-[a-f0-9]+$/i.test(data.eventId))) {
         console.log(`createGroup: eventId "${data.eventId}" looks like a simplybookId, trying fallback resolution`);
         const booking = await getAirtableService().getSchoolBookingBySimplybookId(data.eventId);
         if (booking) {

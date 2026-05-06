@@ -3173,43 +3173,100 @@ class AirtableService {
       // Ensure tables are initialized
       this.ensureNormalizedTablesInitialized();
 
-      // NEW: Query Classes table and Registrations
       try {
-        // Get all classes for this event using legacy_booking_id
-        // Classes may have been created with either event_id (e.g., "gs-frankenberg-2025-03-15")
-        // or simplybookId (e.g., "8594251"), so we need to search for both
-        let filterFormula = `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${bookingId.replace(/'/g, "\\'")}'`;
+        // Step 1: Resolve the Event record. Try event_id / legacy_booking_id first,
+        // then fall back to a SchoolBookings simplybookId lookup (e.g., "M-65519a").
+        let eventRecords = await this.base(EVENTS_TABLE_ID)
+          .select({
+            filterByFormula: `OR({${EVENTS_FIELD_IDS.event_id}} = '${bookingId.replace(/'/g, "\\'")}', {${EVENTS_FIELD_IDS.legacy_booking_id}} = '${bookingId.replace(/'/g, "\\'")}')`,
+            returnFieldsByFieldId: true,
+            maxRecords: 1,
+          })
+          .firstPage();
 
-        // Try to get the Event record to find alternative identifiers
-        const event = await this.getEventByEventId(bookingId);
-        if (event?.simplybook_booking?.[0]) {
-          const schoolBooking = await this.getSchoolBookingById(event.simplybook_booking[0]);
-          if (schoolBooking?.simplybookId && schoolBooking.simplybookId !== bookingId) {
-            filterFormula = `OR(
-              {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${bookingId.replace(/'/g, "\\'")}',
-              {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${schoolBooking.simplybookId.replace(/'/g, "\\'")}'
-            )`;
+        if (eventRecords.length === 0) {
+          const booking = await this.getSchoolBookingBySimplybookId(bookingId);
+          if (booking) {
+            const linkedEvent = await this.getEventBySchoolBookingId(booking.id);
+            if (linkedEvent) {
+              eventRecords = await this.base(EVENTS_TABLE_ID)
+                .select({
+                  filterByFormula: `RECORD_ID() = '${linkedEvent.id}'`,
+                  returnFieldsByFieldId: true,
+                  maxRecords: 1,
+                })
+                .firstPage();
+            }
           }
         }
 
-        const classRecords = await this.classesTable!.select({
-          filterByFormula: filterFormula,
-        }).all();
+        // Step 2: Fetch class records.
+        //
+        // PRIMARY: query by the Event's linked `classes` field — the canonical
+        // source of truth that admin and teacher portals already use. This
+        // ignores stale records that still text-match `legacy_booking_id` but
+        // are not actually linked to the Event (e.g., when the teacher portal
+        // created classes against a `M-xxxxxx` simplybookId that the
+        // `createClass` resolver couldn't translate to an Event record).
+        //
+        // FALLBACK: legacy events without linked-record relationships use the
+        // older text match on `legacy_booking_id` (also covering the case where
+        // a class was created with the simplybookId).
+        let classRecords: Airtable.Records<Airtable.FieldSet> = [];
+
+        if (eventRecords.length > 0) {
+          const eventRecord = eventRecords[0];
+          const linkedClassIds = (eventRecord.fields[EVENTS_FIELD_IDS.classes] as string[]) || [];
+
+          if (linkedClassIds.length > 0) {
+            const classFormula = linkedClassIds.length === 1
+              ? `RECORD_ID() = '${linkedClassIds[0]}'`
+              : `OR(${linkedClassIds.map(id => `RECORD_ID() = '${id}'`).join(',')})`;
+            classRecords = await this.classesTable!.select({
+              filterByFormula: classFormula,
+              returnFieldsByFieldId: true,
+            }).all();
+          }
+        }
+
+        if (classRecords.length === 0) {
+          // Legacy fallback: text match on legacy_booking_id with simplybookId OR
+          let filterFormula = `{${CLASSES_FIELD_IDS.legacy_booking_id}} = '${bookingId.replace(/'/g, "\\'")}'`;
+          const event = await this.getEventByEventId(bookingId);
+          if (event?.simplybook_booking?.[0]) {
+            const schoolBooking = await this.getSchoolBookingById(event.simplybook_booking[0]);
+            if (schoolBooking?.simplybookId && schoolBooking.simplybookId !== bookingId) {
+              filterFormula = `OR({${CLASSES_FIELD_IDS.legacy_booking_id}} = '${bookingId.replace(/'/g, "\\'")}', {${CLASSES_FIELD_IDS.legacy_booking_id}} = '${schoolBooking.simplybookId.replace(/'/g, "\\'")}')`;
+            }
+          }
+          classRecords = await this.classesTable!.select({
+            filterByFormula: filterFormula,
+            returnFieldsByFieldId: true,
+          }).all();
+        }
 
         // Filter out non-registrable class types (choir, teacher_song)
         const registrableRecords = classRecords.filter(classRecord => {
           const f = classRecord.fields as Record<string, any>;
-          const classType = f['class_type'] || f[CLASSES_FIELD_IDS.class_type];
-          const isDefault = Boolean(f['is_default'] || f[CLASSES_FIELD_IDS.is_default]);
+          const classType = f[CLASSES_FIELD_IDS.class_type] || f['class_type'];
+          const isDefault = Boolean(f[CLASSES_FIELD_IDS.is_default] || f['is_default']);
           return isRegistrableClassType(classType, isDefault);
         });
 
+        // Hide the auto-default "Alle Kinder" catch-all once any real class exists.
+        // This mirrors the admin UI rule (admin/events/[eventId]/page.tsx) so parents
+        // and admins see a consistent class list.
+        const nonDefaultRecords = registrableRecords.filter(r => {
+          const f = r.fields as Record<string, any>;
+          return !(f[CLASSES_FIELD_IDS.is_default] || f['is_default']);
+        });
+        const visibleRecords = nonDefaultRecords.length > 0 ? nonDefaultRecords : registrableRecords;
+
         // For each class, count registered children
         const classesWithCounts = await Promise.all(
-          registrableRecords.map(async (classRecord) => {
+          visibleRecords.map(async (classRecord) => {
             const classFields = classRecord.fields as Record<string, any>;
-            // Note: Airtable returns human-readable field names, not field IDs
-            const classId = classFields['class_id'] || classFields[CLASSES_FIELD_IDS.class_id];
+            const classId = classFields[CLASSES_FIELD_IDS.class_id] || classFields['class_id'];
 
             // Count registrations for this class (excluding placeholders if any)
             const registrations = await this.registrationsTable!.select({
@@ -3225,10 +3282,10 @@ class AirtableService {
 
             return {
               classId: classId || '',
-              className: classFields['class_name'] || classFields[CLASSES_FIELD_IDS.class_name] || 'Unknown Class',
-              teacherName: classFields['main_teacher'] || classFields[CLASSES_FIELD_IDS.main_teacher] || '',
+              className: classFields[CLASSES_FIELD_IDS.class_name] || classFields['class_name'] || 'Unknown Class',
+              teacherName: classFields[CLASSES_FIELD_IDS.main_teacher] || classFields['main_teacher'] || '',
               registeredCount: realRegistrations.length,
-              isDefault: Boolean(classFields['is_default'] || classFields[CLASSES_FIELD_IDS.is_default]),
+              isDefault: Boolean(classFields[CLASSES_FIELD_IDS.is_default] || classFields['is_default']),
             };
           })
         );
