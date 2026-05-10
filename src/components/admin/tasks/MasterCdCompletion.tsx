@@ -4,25 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { useClientZipDownload, ZipDownloadFile } from '@/lib/hooks/useClientZipDownload';
 import { parseJsonOrThrow } from '@/lib/api/parseResponse';
-
-interface TrackInfo {
-  songId: string;
-  title: string;
-  className: string;
-  albumOrder: number;
-  status: 'ready' | 'processing' | 'missing';
-  r2Key: string;
-  durationSeconds: number;
-}
-
-interface MasterCdData {
-  eventId: string;
-  schoolName: string;
-  totalTracks: number;
-  readyTracks: number;
-  allReady: boolean;
-  tracks: TrackInfo[];
-}
+import type { MasterCdData } from '@/lib/services/masterCdService';
 
 interface MasterCdCompletionProps {
   taskId: string;
@@ -185,7 +167,7 @@ export default function MasterCdCompletion({
               Album Tracklist — {tracklist.schoolName}
             </h3>
             <p className="text-sm text-gray-500 mt-0.5">
-              {tracklist.totalTracks} tracks
+              {tracklist.totalCount} tracks
               {' '}&middot;{' '}
               <span
                 className={cn(
@@ -193,7 +175,7 @@ export default function MasterCdCompletion({
                   tracklist.allReady ? 'text-green-600' : 'text-amber-600'
                 )}
               >
-                {tracklist.readyTracks}/{tracklist.totalTracks} ready
+                {tracklist.readyCount}/{tracklist.totalCount} ready
               </span>
             </p>
           </div>
@@ -268,7 +250,7 @@ export default function MasterCdCompletion({
               >
                 {/* Track Number */}
                 <td className="px-6 py-3 text-sm font-mono text-gray-500">
-                  {track.albumOrder}
+                  {track.trackNumber}
                 </td>
 
                 {/* Song Title */}
@@ -283,7 +265,7 @@ export default function MasterCdCompletion({
 
                 {/* Duration */}
                 <td className="px-6 py-3 text-sm text-gray-500 text-right font-mono">
-                  {track.durationSeconds > 0
+                  {track.durationSeconds && track.durationSeconds > 0
                     ? formatDuration(track.durationSeconds)
                     : '—'}
                 </td>
