@@ -296,6 +296,15 @@ export async function GET(request: NextRequest) {
       // schulsong) is uploaded, which is the bug this fix addresses.
       // Compare against unhiddenSongCount so engineer-hidden songs (which never get
       // a final uploaded) don't permanently block M=green.
+      //
+      // Note: this admin dot does NOT match the engineer-page status badge, by design.
+      //   - Engineer page reads `audio_pipeline_stage` directly: "I clicked Submit
+      //     Finals" (workflow state — engineer-facing, set as soon as ≥1 final exists).
+      //   - Admin dot below: "All non-schulsong unhidden songs actually have a final"
+      //     (completeness state — admin-facing).
+      // Both are correct for their audience. If you ever need a single source of
+      // truth, fix at the source: gate submit-for-review on completeness, which
+      // would also close the mixReadyEmailService premature-fire gap.
       let minimusikertagAudioStage: 'not_started' | 'staff_uploaded' | 'finals_submitted' = 'not_started';
       if (summary) {
         const finalSongs = summary.minimusikertagFinalSongIds.size;
