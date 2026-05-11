@@ -8,34 +8,10 @@ import StatusCircle from './StatusCircle';
 import EventTypeCircles from './EventTypeCircles';
 import { RegistrationProgress } from './RegistrationProgress';
 import { ClassSongCount } from './ClassSongCount';
+import AudioPipelineCircles from './AudioPipelineCircles';
 
 // Computed status type for styling
 type ComputedStatus = 'confirmed' | 'completed' | 'onHold' | 'pending';
-
-function AudioPipelineIndicator({ stage, eventDate }: { stage?: 'not_started' | 'staff_uploaded' | 'finals_submitted'; eventDate?: string }) {
-  let isFuture = false;
-  if (eventDate) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const eventDay = new Date(eventDate + 'T00:00:00');
-    eventDay.setHours(0, 0, 0, 0);
-    isFuture = eventDay > today;
-  }
-
-  if (isFuture) {
-    return <span title="Event hasn't happened yet" className="text-gray-400">&#x23F3;</span>;
-  }
-  if (!stage || stage === 'not_started') {
-    return <span title="Staff audio not uploaded">&#x274C;</span>;
-  }
-  if (stage === 'staff_uploaded') {
-    return <span title="Waiting for engineer finals">&#x2699;&#xFE0F;</span>;
-  }
-  if (stage === 'finals_submitted') {
-    return <span title="Finals submitted">&#x2705;</span>;
-  }
-  return <span>—</span>;
-}
 
 interface BookingsTableProps {
   bookings: BookingWithDetails[];
@@ -193,8 +169,11 @@ export default function BookingsTable({ bookings, onEventDeleted, onNotesUpdate,
                       />
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <AudioPipelineIndicator
-                        stage={booking.audioPipelineStage}
+                      <AudioPipelineCircles
+                        isMinimusikertag={booking.isMinimusikertag}
+                        isSchulsong={booking.isSchulsong}
+                        minimusikertagStage={booking.minimusikertagAudioStage}
+                        schulsongStage={booking.schulsongAudioStage}
                         eventDate={booking.bookingDate}
                       />
                     </td>
