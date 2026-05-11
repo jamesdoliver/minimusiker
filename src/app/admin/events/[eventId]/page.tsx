@@ -49,6 +49,7 @@ import DeleteConfirmModal from '@/components/shared/class-management/DeleteConfi
 import EditGroupModal from '@/components/shared/class-management/EditGroupModal';
 import UnifiedAddModal from '@/components/shared/class-management/UnifiedAddModal';
 import EventActivityTimeline from '@/components/admin/EventActivityTimeline';
+import EventEmailHistory from '@/components/admin/EventEmailHistory';
 import AdminLehrerStatusCard from '@/components/admin/AdminLehrerStatusCard';
 import DateChangeModal from '@/components/admin/events/DateChangeModal';
 import AddTeacherModal from '@/components/admin/AddTeacherModal';
@@ -2489,6 +2490,11 @@ export default function EventDetailPage() {
       {/* Activity Timeline */}
       <div className="mt-8">
         <EventActivityTimeline eventId={eventId} />
+      </div>
+
+      {/* Email history (per-event email_logs) */}
+      <div className="mt-8">
+        <EventEmailHistory eventId={eventId} />
       </div>
 
       {/* Modals */}

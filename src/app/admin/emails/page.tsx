@@ -122,6 +122,7 @@ export default function AdminEmails() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [sendNowTemplateId, setSendNowTemplateId] = useState<string | null>(null);
   const [sendNowEvents, setSendNowEvents] = useState<SendNowEvent[]>([]);
+  const [sendNowEventSearch, setSendNowEventSearch] = useState('');
   const [sendNowSelectedEventIds, setSendNowSelectedEventIds] = useState<Set<string>>(new Set());
   const [isSendNowModalOpen, setIsSendNowModalOpen] = useState(false);
   const [isSendNowLoading, setIsSendNowLoading] = useState(false);
@@ -287,6 +288,7 @@ export default function AdminEmails() {
     setIsSendNowModalOpen(false);
     setSendNowTemplateId(null);
     setSendNowEvents([]);
+    setSendNowEventSearch('');
     setSendNowSelectedEventIds(new Set());
     setSendNowResult(null);
     setSendNowPreview(null);
@@ -954,38 +956,66 @@ export default function AdminEmails() {
                   </div>
                 ) : (
                   /* Event selection view */
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-500 mb-3">
-                      Wähle die Veranstaltungen aus, an deren Empfänger die E-Mail gesendet werden soll:
-                    </p>
-                    {sendNowEvents.map((event) => (
-                      <label
-                        key={event.eventId}
-                        className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={sendNowSelectedEventIds.has(event.eventId)}
-                          onChange={() => toggleSendNowEvent(event.eventId)}
-                          className="rounded border-gray-300 text-primary focus:ring-primary"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {event.schoolName}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(event.eventDate).toLocaleDateString('de-DE', {
-                              day: '2-digit',
-                              month: 'long',
-                              year: 'numeric',
-                            })}
-                            {' | '}
-                            {event.eventType}
-                          </p>
+                  (() => {
+                    const q = sendNowEventSearch.trim().toLowerCase();
+                    const filtered = q
+                      ? sendNowEvents.filter((e) => e.schoolName.toLowerCase().includes(q))
+                      : sendNowEvents;
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-500">
+                          Wähle die Veranstaltungen aus, an deren Empfänger die E-Mail gesendet werden soll:
+                        </p>
+                        <div className="sticky top-0 bg-white pt-1 pb-2 z-10 flex items-center gap-3">
+                          <input
+                            type="search"
+                            value={sendNowEventSearch}
+                            onChange={(e) => setSendNowEventSearch(e.target.value)}
+                            placeholder="Schule suchen..."
+                            className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                          />
+                          <span className="text-xs text-gray-500 whitespace-nowrap">
+                            {q
+                              ? `${filtered.length} / ${sendNowEvents.length}`
+                              : `${sendNowEvents.length} Veranstaltungen`}
+                          </span>
                         </div>
-                      </label>
-                    ))}
-                  </div>
+                        {filtered.length === 0 ? (
+                          <div className="py-6 text-center text-sm text-gray-500">
+                            Keine Veranstaltungen passen zur Suche
+                          </div>
+                        ) : (
+                          filtered.map((event) => (
+                            <label
+                              key={event.eventId}
+                              className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={sendNowSelectedEventIds.has(event.eventId)}
+                                onChange={() => toggleSendNowEvent(event.eventId)}
+                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {event.schoolName}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(event.eventDate).toLocaleDateString('de-DE', {
+                                    day: '2-digit',
+                                    month: 'long',
+                                    year: 'numeric',
+                                  })}
+                                  {' | '}
+                                  {event.eventType}
+                                </p>
+                              </div>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    );
+                  })()
                 )}
               </div>
 
