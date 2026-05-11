@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getActivityService } from '@/lib/services/activityService';
 import { getAirtableService } from '@/lib/services/airtableService';
+import { mergeActivityWithEmailLogs } from '@/lib/utils/mergeActivityWithEmailLogs';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,12 +67,25 @@ export async function GET(
       }
     }
 
-    // Fetch activities for this event
+    // Fetch the full activity list and EMAIL_LOGS for this event, then merge.
+    // Pagination is applied post-merge so the limit reflects overall position
+    // in the combined timeline rather than position within a single source.
     const activityService = getActivityService();
-    const { activities, hasMore } = await activityService.getActivitiesForEvent(
-      eventRecordId,
-      { limit, offset }
-    );
+    const [allActivities, allLogs] = await Promise.all([
+      activityService.getAllActivitiesForEvent(eventRecordId),
+      airtableService.getEmailLogsForEvent(eventId),
+    ]);
+
+    const merged = mergeActivityWithEmailLogs(allActivities, allLogs);
+
+    if (merged.length > 500) {
+      console.warn(
+        `[admin/events/${eventId}/activity] Merged timeline has ${merged.length} rows — consider archiving or paginating at source.`
+      );
+    }
+
+    const activities = merged.slice(offset, offset + limit);
+    const hasMore = merged.length > offset + limit;
 
     return NextResponse.json({
       success: true,

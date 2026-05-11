@@ -59,14 +59,13 @@ class ActivityService {
   }
 
   /**
-   * Get activities for an event, ordered by most recent first
+   * Get ALL activities for an event (unsliced), ordered by most recent first.
+   *
+   * Use this when you need to merge with another source (e.g. EMAIL_LOGS) and
+   * paginate the combined list. For paginated reads against EVENT_ACTIVITY
+   * alone, prefer `getActivitiesForEvent`.
    */
-  async getActivitiesForEvent(
-    eventRecordId: string,
-    options: { limit?: number; offset?: number } = {}
-  ): Promise<{ activities: EventActivity[]; hasMore: boolean }> {
-    const { limit = 20, offset = 0 } = options;
-
+  async getAllActivitiesForEvent(eventRecordId: string): Promise<EventActivity[]> {
     try {
       // Note: Airtable's SEARCH formula doesn't work reliably on linked record fields
       // We fetch all records and filter in code for reliability
@@ -82,11 +81,7 @@ class ActivityService {
         return eventIds?.includes(eventRecordId);
       });
 
-      // Apply pagination
-      const paginatedRecords = filteredRecords.slice(offset, offset + limit);
-      const hasMore = filteredRecords.length > offset + limit;
-
-      const activities: EventActivity[] = paginatedRecords.map((record) => {
+      return filteredRecords.map((record) => {
         // Use field names for .get() calls (Airtable SDK expects names, not IDs)
         const metadataRaw = record.get(EVENT_ACTIVITY_FIELD_NAMES.metadata) as string | undefined;
         let metadata: Record<string, unknown> | undefined;
@@ -113,12 +108,24 @@ class ActivityService {
           createdAt: (record.get(EVENT_ACTIVITY_FIELD_NAMES.created_at) as string) || '',
         };
       });
-
-      return { activities, hasMore };
     } catch (error) {
       console.error('[ActivityService] Failed to fetch activities:', error);
-      return { activities: [], hasMore: false };
+      return [];
     }
+  }
+
+  /**
+   * Get activities for an event, ordered by most recent first, paginated.
+   */
+  async getActivitiesForEvent(
+    eventRecordId: string,
+    options: { limit?: number; offset?: number } = {}
+  ): Promise<{ activities: EventActivity[]; hasMore: boolean }> {
+    const { limit = 20, offset = 0 } = options;
+    const all = await this.getAllActivitiesForEvent(eventRecordId);
+    const activities = all.slice(offset, offset + limit);
+    const hasMore = all.length > offset + limit;
+    return { activities, hasMore };
   }
 
   /**
