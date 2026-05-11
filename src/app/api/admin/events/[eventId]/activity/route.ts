@@ -70,10 +70,21 @@ export async function GET(
     // Fetch the full activity list and EMAIL_LOGS for this event, then merge.
     // Pagination is applied post-merge so the limit reflects overall position
     // in the combined timeline rather than position within a single source.
+    //
+    // EMAIL_LOGS is keyed by the event_id slug (e.g. 'evt_xxx'), NOT the Airtable
+    // record ID or the simplybook ID that callers may pass as the URL param. Resolve
+    // the slug from the event record before querying so the merged timeline isn't
+    // silently empty when the route is called from the booking overview with a
+    // simplybook ID.
+    const eventRecord = await airtableService.getEventByRecordId(eventRecordId);
+    const emailLogsEventKey = eventRecord?.event_id;
+
     const activityService = getActivityService();
     const [allActivities, allLogs] = await Promise.all([
       activityService.getAllActivitiesForEvent(eventRecordId),
-      airtableService.getEmailLogsForEvent(eventId),
+      emailLogsEventKey
+        ? airtableService.getEmailLogsForEvent(emailLogsEventKey)
+        : Promise.resolve([]),
     ]);
 
     const merged = mergeActivityWithEmailLogs(allActivities, allLogs);
