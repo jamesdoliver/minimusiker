@@ -7591,6 +7591,31 @@ class AirtableService {
     }
   }
 
+  /**
+   * Get every email log whose `sent_at` is within the last `days` days.
+   * Used by the diagnostic stats endpoint to aggregate sent/failed/skipped
+   * counts across templates over a rolling window. Filtering is pushed to
+   * Airtable via `IS_AFTER` so we don't pull months of unrelated rows.
+   */
+  async getEmailLogsSince(days: number): Promise<EmailLog[]> {
+    if (!this.ensureEmailTablesInitialized()) return [];
+
+    try {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+      const records = await this.emailLogsTable!.select({
+        filterByFormula: `IS_AFTER({${EMAIL_LOGS_FIELD_IDS.sent_at}}, '${cutoff}')`,
+        sort: [{ field: EMAIL_LOGS_FIELD_IDS.sent_at, direction: 'desc' }],
+        returnFieldsByFieldId: true,
+      }).all();
+
+      return records.map((record) => this.transformEmailLogRecord(record));
+    } catch (error) {
+      console.error('Error fetching email logs since cutoff:', error);
+      return [];
+    }
+  }
+
   // ==================== Parent Registration Management ====================
 
   /**

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import TriggerEmailsTab from '@/components/admin/emails/TriggerEmailsTab';
+import EmailLogsDiagnostic from '@/components/admin/emails/EmailLogsDiagnostic';
 import { EmailTemplate, EmailLog, Audience } from '@/lib/types/email-automation';
 
 interface TemplatesData {
@@ -109,7 +110,7 @@ interface DryRunData {
 }
 
 export default function AdminEmails() {
-  const [activeTab, setActiveTab] = useState<'timeline' | 'trigger'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'trigger' | 'logs'>('timeline');
   const [templatesData, setTemplatesData] = useState<TemplatesData | null>(null);
   const [logsData, setLogsData] = useState<LogsData | null>(null);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
@@ -482,10 +483,23 @@ export default function AdminEmails() {
         >
           Trigger E-Mails
         </button>
+        <button
+          onClick={() => setActiveTab('logs')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'logs'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+          }`}
+        >
+          Versand-Log
+        </button>
       </div>
 
       {/* Trigger Emails Tab */}
       {activeTab === 'trigger' && <TriggerEmailsTab />}
+
+      {/* Versand-Log Diagnostic Tab */}
+      {activeTab === 'logs' && <EmailLogsDiagnostic />}
 
       {/* Templates Timeline */}
       {activeTab === 'timeline' && (<>
