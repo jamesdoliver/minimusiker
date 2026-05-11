@@ -49,7 +49,7 @@ export const AUDIO_FILES_FIELD_IDS = {
   filename: 'fldOTWiFz8G1lE04c', // Original filename
   class_id: 'fldAYW88oxtF5L5Bf', // Which class this audio is for
   event_id: 'fldwtYA1GwhVf3Ia7', // booking_id
-  song_id: 'fldehSfLpy3iozdBt', // Optional link to song record
+  song_id: 'fldehSfLpy3iozdBt', // Text field — holds the linked Song's Airtable record ID as a string. Always written. The proper linked-record relation is AUDIO_FILES_LINKED_FIELD_IDS.song_link (airtable.ts), populated only under useNormalizedTables().
   type: 'fldOMmFN7BqHVAqfH', // raw | preview | final
   r2_key: 'fldvzj75CspwfOfPX', // Path in R2 storage
   uploaded_by: 'fldJw0CU9eu3TOAY5', // Staff/Engineer record ID

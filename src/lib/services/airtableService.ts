@@ -6747,6 +6747,10 @@ class AirtableService {
             if (type === 'raw') {
               entry.minimusikertagHasRaw = true;
             } else if (type === 'final' && status !== 'error') {
+              // Both fields hold the same Songs record ID string — `song_id` is a
+              // text field that mirrors `song_link[0]` for pre-normalized rows
+              // (see teacherService.createAudioFile). Prefer the linked-record
+              // field; fall back to the text mirror so the Set stays consistent.
               const songLinkArray = (record.fields[AUDIO_FILES_LINKED_FIELD_IDS.song_link] as string[]) || [];
               const songIdText = record.fields[AUDIO_FILES_FIELD_IDS.song_id] as string | undefined;
               const songKey = songLinkArray[0] || songIdText;
