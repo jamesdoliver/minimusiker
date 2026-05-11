@@ -1401,6 +1401,7 @@ export default function TeacherEventDetailPage() {
           <div className="mb-8">
             <HinweiseSection
               classesWithoutSongs={[]}
+              totalClasses={0}
               tracklistFinalized={false}
               isSchulsong={event.isSchulsong || false}
               schulsongApproved={schulsongApproved}
@@ -1415,6 +1416,7 @@ export default function TeacherEventDetailPage() {
                   .filter(c => c.songs.length === 0)
                   .map(c => c.className)
               }
+              totalClasses={(event.classes || []).length}
               tracklistFinalized={Boolean(event.tracklistFinalizedAt)}
               isSchulsong={event.isSchulsong || false}
               schulsongApproved={schulsongApproved}

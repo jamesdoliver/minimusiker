@@ -95,6 +95,7 @@ export default function AdminLehrerStatusCard({
         </div>
         <HinweiseSection
           classesWithoutSongs={classesWithoutSongs}
+          totalClasses={classes.length}
           tracklistFinalized={Boolean(localFinalizedAt)}
           isSchulsong={isSchulsong}
           schulsongApproved={schulsongApproved}
