@@ -7605,9 +7605,15 @@ class AirtableService {
 
       const records = await this.emailLogsTable!.select({
         filterByFormula: `IS_AFTER({${EMAIL_LOGS_FIELD_IDS.sent_at}}, '${cutoff}')`,
+        maxRecords: 5000,
+        pageSize: 100,
         sort: [{ field: EMAIL_LOGS_FIELD_IDS.sent_at, direction: 'desc' }],
         returnFieldsByFieldId: true,
       }).all();
+
+      if (records.length === 5000) {
+        console.warn(`[EmailLogs] getEmailLogsSince(${days}) hit the 5000-row cap — aggregation may be incomplete`);
+      }
 
       return records.map((record) => this.transformEmailLogRecord(record));
     } catch (error) {

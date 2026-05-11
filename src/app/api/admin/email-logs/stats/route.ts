@@ -92,6 +92,8 @@ export async function GET(request: NextRequest) {
       else if (log.status === 'skipped') row.skipped += 1;
       byTemplateMap.set(templateKey, row);
 
+      // dailyCounts: reserved for a future trend chart on the diagnostic tab; kept in
+      // the response per the API contract in docs/plans/2026-05-11-email-activity-log-and-diagnostic.md
       // Daily — bucket by YYYY-MM-DD in UTC for stable aggregation
       const dateKey = (log.sentAt || '').slice(0, 10);
       if (dateKey) {
