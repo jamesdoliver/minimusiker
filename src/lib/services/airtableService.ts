@@ -61,6 +61,7 @@ import {
 } from '@/lib/types/airtable';
 import {
   SONGS_TABLE_ID,
+  SONGS_FIELD_IDS,
   AUDIO_FILES_TABLE_ID,
   AUDIO_FILES_FIELD_IDS,
 } from '@/lib/types/teacher';
@@ -88,6 +89,17 @@ import {
 
 // Single table name in Airtable
 export const TABLE_NAME = 'parent_journey_table';
+
+/**
+ * Per-event song count split into total (for display) and unhidden
+ * (for M-audio completeness). Engineer-hidden songs are excluded from `unhidden`
+ * since the engineer will never upload a final for them, and counting them
+ * would prevent the M indicator from ever turning green.
+ */
+export interface SongCountSummary {
+  total: number;
+  unhidden: number;
+}
 
 /**
  * Per-event audio pipeline summary used by admin views to render
@@ -6616,32 +6628,37 @@ class AirtableService {
   }
 
   /**
-   * Get song counts for multiple events in a single query
+   * Get song counts for multiple events in a single query.
+   * Returns both total and unhidden counts; the M (Minimusikertag) completeness
+   * indicator uses unhidden so engineer-hidden songs don't block M=green, while
+   * the displayed C/S column keeps showing the total.
+   *
    * @param eventRecordIds Array of Event record IDs
-   * @returns Map of event record ID to song count
+   * @returns Map of event record ID to { total, unhidden }
    */
-  async getSongCountsByEventIds(eventRecordIds: string[]): Promise<Map<string, number>> {
-    const counts = new Map<string, number>();
+  async getSongCountsByEventIds(eventRecordIds: string[]): Promise<Map<string, SongCountSummary>> {
+    const counts = new Map<string, SongCountSummary>();
 
     if (eventRecordIds.length === 0) return counts;
 
-    // Initialize all event IDs with 0
-    eventRecordIds.forEach(id => counts.set(id, 0));
+    eventRecordIds.forEach(id => counts.set(id, { total: 0, unhidden: 0 }));
 
     try {
       const records = await this.base(SONGS_TABLE_ID)
         .select({
-          fields: [SONGS_LINKED_FIELD_IDS.event_link],
+          fields: [SONGS_LINKED_FIELD_IDS.event_link, SONGS_FIELD_IDS.hidden_by_engineer],
           returnFieldsByFieldId: true,
         })
         .all();
 
       for (const record of records) {
         const eventIdArray = record.fields[SONGS_LINKED_FIELD_IDS.event_link] as string[] || [];
+        const isHidden = Boolean(record.fields[SONGS_FIELD_IDS.hidden_by_engineer]);
         for (const eventId of eventIdArray) {
-          if (counts.has(eventId)) {
-            counts.set(eventId, (counts.get(eventId) || 0) + 1);
-          }
+          const entry = counts.get(eventId);
+          if (!entry) continue;
+          entry.total += 1;
+          if (!isHidden) entry.unhidden += 1;
         }
       }
     } catch (error) {

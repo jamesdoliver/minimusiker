@@ -284,7 +284,9 @@ export async function GET(request: NextRequest) {
 
     // Merge counts and derive per-track-type audio stages into bookings
     const bookingsWithRegistrations = bookingsWithAccessCodes.map(booking => {
-      const songCount = booking.eventRecordId ? songCounts.get(booking.eventRecordId) || 0 : 0;
+      const songCountEntry = booking.eventRecordId ? songCounts.get(booking.eventRecordId) : undefined;
+      const songCount = songCountEntry?.total ?? 0;
+      const unhiddenSongCount = songCountEntry?.unhidden ?? 0;
       const summary = booking.eventRecordId ? audioSummary.get(booking.eventRecordId) : undefined;
       const event = booking.eventRecordId ? eventByRecordId.get(booking.eventRecordId) : undefined;
 
@@ -292,10 +294,12 @@ export async function GET(request: NextRequest) {
       // We deliberately ignore the shared `audio_pipeline_stage` field here because it
       // gets flipped to 'finals_submitted' as soon as any final file (including a
       // schulsong) is uploaded, which is the bug this fix addresses.
+      // Compare against unhiddenSongCount so engineer-hidden songs (which never get
+      // a final uploaded) don't permanently block M=green.
       let minimusikertagAudioStage: 'not_started' | 'staff_uploaded' | 'finals_submitted' = 'not_started';
       if (summary) {
         const finalSongs = summary.minimusikertagFinalSongIds.size;
-        if (songCount > 0 && finalSongs >= songCount) {
+        if (unhiddenSongCount > 0 && finalSongs >= unhiddenSongCount) {
           minimusikertagAudioStage = 'finals_submitted';
         } else if (finalSongs > 0 || summary.minimusikertagHasRaw) {
           minimusikertagAudioStage = 'staff_uploaded';
