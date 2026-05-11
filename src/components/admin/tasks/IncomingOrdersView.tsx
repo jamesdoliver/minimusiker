@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { GuesstimateOrderWithEventDetails } from '@/lib/types/tasks';
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
 import IncomingOrderCard from './IncomingOrderCard';
 
 interface IncomingOrdersViewProps {
@@ -44,11 +45,7 @@ export default function IncomingOrdersView({ onStockArrived }: IncomingOrdersVie
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(data.error || `Server error (${response.status})`);
-    }
+    const data = await parseJsonOrThrow<{ success: boolean; error?: string }>(response);
 
     if (!data.success) {
       throw new Error(data.error || 'Failed to mark order as arrived');

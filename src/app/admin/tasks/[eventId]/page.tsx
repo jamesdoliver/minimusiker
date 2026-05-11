@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { cn, formatDate } from '@/lib/utils';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EventDetailTimeline from '@/components/admin/tasks/EventDetailTimeline';
 import EventWelleBreakdown from '@/components/admin/tasks/EventWelleBreakdown';
 import type { TaskWithEventDetails } from '@/lib/types/tasks';
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
 
 // ---------------------------------------------------------------------------
 // Types (match the API response shape from /api/admin/tasks/events/[eventId])
@@ -38,48 +39,45 @@ interface EventDetailData {
 export default function EventDetailPage({
   params,
 }: {
-  params: Promise<{ eventId: string }>;
+  params: { eventId: string };
 }) {
-  const { eventId } = use(params);
+  const { eventId } = params;
 
   const [data, setData] = useState<EventDetailData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchEventData() {
-      try {
-        setIsLoading(true);
-        setError(null);
+  const fetchEventData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
 
-        const res = await fetch(`/api/admin/tasks/events/${eventId}`, {
-          credentials: 'include',
-        });
+      const res = await fetch(`/api/admin/tasks/events/${eventId}`, {
+        credentials: 'include',
+      });
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(
-            errData.error || `Failed to load event (${res.status})`
-          );
-        }
+      const json = await parseJsonOrThrow<{
+        success: boolean;
+        error?: string;
+        data: EventDetailData;
+      }>(res);
 
-        const json = await res.json();
-
-        if (!json.success) {
-          throw new Error(json.error || 'Failed to load event data');
-        }
-
-        setData(json.data);
-      } catch (err) {
-        console.error('Error fetching event detail:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load event');
-      } finally {
-        setIsLoading(false);
+      if (!json.success) {
+        throw new Error(json.error || 'Failed to load event data');
       }
-    }
 
-    fetchEventData();
+      setData(json.data);
+    } catch (err) {
+      console.error('Error fetching event detail:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load event');
+    } finally {
+      setIsLoading(false);
+    }
   }, [eventId]);
+
+  useEffect(() => {
+    fetchEventData();
+  }, [fetchEventData]);
 
   // ---------------------------------------------------------------------------
   // Loading state
@@ -104,7 +102,7 @@ export default function EventDetailPage({
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
           <p className="text-red-600">Error: {error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => fetchEventData()}
             className="mt-2 text-sm text-red-700 underline hover:no-underline"
           >
             Try again
@@ -205,7 +203,11 @@ export default function EventDetailPage({
       {/* ----------------------------------------------------------------- */}
       {/* Section 2 — Timeline                                               */}
       {/* ----------------------------------------------------------------- */}
-      <EventDetailTimeline tasks={tasks} eventDate={event.eventDate} />
+      <EventDetailTimeline
+        tasks={tasks}
+        eventDate={event.eventDate}
+        onTaskRefresh={fetchEventData}
+      />
 
       {/* ----------------------------------------------------------------- */}
       {/* Section 3 — Welle Breakdown                                        */}

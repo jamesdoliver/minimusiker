@@ -18,20 +18,16 @@ import {
   TaskMatrixCell,
   TaskCellStatus,
 } from '@/lib/types/tasks';
-import {
-  PAPER_ORDER_TEMPLATES,
-  CLOTHING_ORDER_TEMPLATES,
-  SHIPPING_TEMPLATE,
-  getTemplateById,
-  calculateUrgencyScore,
-  calculateDeadline,
-} from '@/lib/config/taskTemplates';
+import type { Event } from '@/lib/types/airtable';
 import {
   TASK_TIMELINE,
   calculateDeadline as calculateDeadlineV2,
+  getTimelineEntry,
   type TaskPrefix,
-  type TaskCompletionType as TimelineCompletionType,
+  type TaskCompletionType,
 } from '@/lib/config/taskTimeline';
+import { calculateUrgencyScore } from '@/lib/utils/taskUrgency';
+import { withRetry } from '@/lib/utils/withRetry';
 import {
   TASKS_TABLE_ID,
   TASKS_FIELD_IDS,
@@ -42,7 +38,30 @@ import {
   type ShopifyOrderLineItem,
 } from '@/lib/types/airtable';
 import { getOrdersByEventRecordId } from './ordersHelper';
+import { computeNewDeadline } from './deadlineHelper';
+import { uniqueLinkedRecordIds } from './taskBatchHelpers';
 import { classifyVariant } from '@/lib/config/variantClassification';
+
+// Re-export normalizeCompletionType from its dedicated module so the service
+// stays the single import point for downstream code, while unit tests can
+// pull the helper directly without dragging in the Airtable SDK singletons.
+export { normalizeCompletionType } from './normalizeCompletionType';
+import { normalizeCompletionType } from './normalizeCompletionType';
+
+// Re-export uniqueLinkedRecordIds so existing imports from this module still work.
+export { uniqueLinkedRecordIds };
+
+/**
+ * Type for the prefetched record maps passed to enrichTaskWithEventDetails.
+ *
+ * `gos` is typed as the Airtable SDK record-shape (`{ id; get(field) }`)
+ * because the GO record is read field-by-field (no transformation), to
+ * preserve parity with the per-record fallback path.
+ */
+type EnrichmentMaps = {
+  events: Map<string, Event>;
+  gos: Map<string, { id: string; get: (field: string) => unknown }>;
+};
 
 /**
  * TaskService - Handles task generation, retrieval, and completion
@@ -83,63 +102,6 @@ class TaskService {
   }
 
   /**
-   * Generate all tasks for a new event
-   * Called when a SimplyBook booking is confirmed
-   */
-  async generateTasksForEvent(eventId: string): Promise<Task[]> {
-    // Get event details to calculate deadlines
-    const event = await this.airtable.getEventById(eventId);
-    if (!event) {
-      throw new Error(`Event not found: ${eventId}`);
-    }
-
-    const eventDate = new Date(event.event_date);
-    const createdTasks: Task[] = [];
-
-    // Generate Paper Order tasks from templates
-    for (const template of PAPER_ORDER_TEMPLATES) {
-      const deadline = calculateDeadline(eventDate, template.timeline_offset);
-
-      const taskInput: CreateTaskInput = {
-        event_id: eventId,
-        template_id: template.id,
-        task_type: template.type,
-        task_name: template.name,
-        description: template.description,
-        completion_type: template.completion_type,
-        timeline_offset: template.timeline_offset,
-        deadline: deadline.toISOString(),
-        status: 'pending',
-      };
-
-      const task = await this.createTask(taskInput);
-      createdTasks.push(task);
-    }
-
-    // Generate Clothing Order tasks from templates
-    for (const template of CLOTHING_ORDER_TEMPLATES) {
-      const deadline = calculateDeadline(eventDate, template.timeline_offset);
-
-      const taskInput: CreateTaskInput = {
-        event_id: eventId,
-        template_id: template.id,
-        task_type: template.type,
-        task_name: template.name,
-        description: template.description,
-        completion_type: template.completion_type,
-        timeline_offset: template.timeline_offset,
-        deadline: deadline.toISOString(),
-        status: 'pending',
-      };
-
-      const task = await this.createTask(taskInput);
-      createdTasks.push(task);
-    }
-
-    return createdTasks;
-  }
-
-  /**
    * Create a single task in Airtable
    */
   async createTask(input: CreateTaskInput): Promise<Task> {
@@ -157,9 +119,6 @@ class TaskService {
       [TASKS_FIELD_IDS.deadline]: input.deadline.split('T')[0], // Date only
       [TASKS_FIELD_IDS.status]: input.status,
       [TASKS_FIELD_IDS.created_at]: new Date().toISOString(),
-      ...(input.parent_task_id && {
-        [TASKS_FIELD_IDS.parent_task_id]: [input.parent_task_id],
-      }),
     });
 
     // Re-fetch with returnFieldsByFieldId for consistent field ID mapping
@@ -202,14 +161,16 @@ class TaskService {
     const filterFormula = filters.length > 0 ? `AND(${filters.join(', ')})` : '';
 
     // Fetch all tasks to calculate counts
-    const allRecords = await table
-      .select({
-        returnFieldsByFieldId: true,
-        filterByFormula: options.status
-          ? `{${TASKS_FIELD_IDS.status}} = '${options.status}'`
-          : '',
-      })
-      .all();
+    const allRecords = await withRetry(() =>
+      table
+        .select({
+          returnFieldsByFieldId: true,
+          filterByFormula: options.status
+            ? `{${TASKS_FIELD_IDS.status}} = '${options.status}'`
+            : '',
+        })
+        .all(),
+    );
 
     // Calculate counts per type
     const counts: Record<TaskFilterTab, number> = {
@@ -231,12 +192,29 @@ class TaskService {
 
     // Fetch filtered tasks
     const filteredRecords = filterFormula
-      ? await table.select({ returnFieldsByFieldId: true, filterByFormula: filterFormula }).all()
+      ? await withRetry(() =>
+          table
+            .select({ returnFieldsByFieldId: true, filterByFormula: filterFormula })
+            .all(),
+        )
       : allRecords;
 
-    // Transform to TaskWithEventDetails
+    // Batch-fetch supporting records once instead of per-task. Without this,
+    // each enrichTaskWithEventDetails would fire its own getEventById +
+    // goTable.find round-trips, producing up to ~2N calls for N tasks.
+    const eventIds = uniqueLinkedRecordIds(filteredRecords, TASKS_FIELD_IDS.event_id);
+    const goIds = uniqueLinkedRecordIds(filteredRecords, TASKS_FIELD_IDS.go_id);
+
+    const [events, gos] = await Promise.all([
+      this.batchFetchEvents(eventIds),
+      this.batchFetchGOs(goIds),
+    ]);
+
+    // Transform to TaskWithEventDetails (using prefetched maps)
     const tasks = await Promise.all(
-      filteredRecords.map((record) => this.enrichTaskWithEventDetails(record))
+      filteredRecords.map((record) =>
+        this.enrichTaskWithEventDetails(record, { events, gos }),
+      ),
     );
 
     // Sort by urgency (lower score = more urgent)
@@ -282,7 +260,7 @@ class TaskService {
     completionData: TaskCompletionData,
     adminEmail: string,
     goEnrichment?: { order_ids?: string; contains?: GuesstimateOrderItem[] }
-  ): Promise<{ task: Task; goId?: string; shippingTaskId?: string; fulfillmentSummary?: WelleFulfillmentSummary }> {
+  ): Promise<{ task: Task; goId?: string; fulfillmentSummary?: WelleFulfillmentSummary }> {
     const base = this.airtable.getBase();
     const table = base(TASKS_TABLE_ID);
 
@@ -303,13 +281,12 @@ class TaskService {
       return this.completeWelleTask(task, taskId, adminEmail, completionData);
     }
 
-    const template = getTemplateById(task.template_id);
+    const entry = getTimelineEntry(task.template_id);
 
     let goId: string | undefined;
-    let shippingTaskId: string | undefined;
 
-    // Create go_id if template requires it
-    if (template?.creates_go_id) {
+    // Create go_id if the timeline entry requires it
+    if (entry?.creates_go_id) {
       const goOrder = await this.createGuesstimateOrder({
         event_id: task.event_id,
         event_ids: task.event_ids,
@@ -337,40 +314,15 @@ class TaskService {
       updateFields[TASKS_FIELD_IDS.order_ids] = goEnrichment.order_ids;
     }
 
-    await table.update(taskId, updateFields as Partial<Airtable.FieldSet>);
-
-    // Create shipping task if template requires it
-    if (template?.creates_shipping && goId) {
-      const event = await this.airtable.getEventById(task.event_id);
-      if (event) {
-        const shippingTask = await this.createTask({
-          event_id: task.event_id,
-          event_ids: task.event_ids,
-          template_id: `shipping_${task.template_id}`,
-          task_type: 'shipping',
-          task_name: SHIPPING_TEMPLATE.name,
-          description: `${SHIPPING_TEMPLATE.description} - ${template.name}`,
-          completion_type: SHIPPING_TEMPLATE.completion_type,
-          timeline_offset: 0, // Immediate
-          deadline: new Date().toISOString(),
-          status: 'pending',
-          parent_task_id: taskId,
-        });
-        shippingTaskId = shippingTask.id;
-
-        // Link shipping task to the go_id
-        await table.update(shippingTask.id, {
-          [TASKS_FIELD_IDS.go_id]: [goId],
-        });
-      }
-    }
+    await withRetry(() =>
+      table.update(taskId, updateFields as Partial<Airtable.FieldSet>),
+    );
 
     // Refetch the updated task
     const updatedRecord = await this.findTaskRecord(table, taskId);
     return {
       task: this.transformTaskRecord(updatedRecord),
       goId,
-      shippingTaskId,
     };
   }
 
@@ -551,7 +503,7 @@ class TaskService {
       task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
       task_name: entry.displayName,
       description: entry.description,
-      completion_type: this.mapCompletionType(entry.completion),
+      completion_type: entry.completion,
       timeline_offset: entry.offset,
       deadline: deadline.toISOString(),
       status: 'pending',
@@ -598,7 +550,7 @@ class TaskService {
       task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
       task_name: entry.displayName,
       description: entry.description,
-      completion_type: this.mapCompletionType(entry.completion),
+      completion_type: entry.completion,
       timeline_offset: entry.offset,
       deadline: deadline.toISOString(),
       status: 'pending',
@@ -682,9 +634,19 @@ class TaskService {
 
   /**
    * Get GuesstimateOrders enriched with event details (for incoming orders view)
+   *
+   * Batches the event lookup with `getEventsByIds` instead of fetching one event
+   * per order — same pattern as `getTasks`. For ~N pending orders this collapses
+   * up to N round-trips into a single batched select.
    */
   async getGuesstimateOrdersEnriched(options?: { pendingOnly?: boolean }): Promise<GuesstimateOrderWithEventDetails[]> {
     const orders = await this.getGuesstimateOrders(undefined, options?.pendingOnly);
+
+    // Collect unique event IDs and batch-fetch once
+    const eventIds = Array.from(
+      new Set(orders.map((o) => o.event_id).filter((id): id is string => Boolean(id))),
+    );
+    const events = await this.batchFetchEvents(eventIds);
 
     const enriched: GuesstimateOrderWithEventDetails[] = [];
 
@@ -693,7 +655,7 @@ class TaskService {
       let eventDate = '';
 
       if (order.event_id) {
-        const event = await this.airtable.getEventById(order.event_id);
+        const event = events.get(order.event_id);
         if (event) {
           schoolName = event.school_name;
           eventDate = event.event_date;
@@ -769,24 +731,8 @@ class TaskService {
   }
 
   /**
-   * Map a timeline completion type to the existing TaskCompletionType used in Airtable.
-   */
-  private mapCompletionType(completion: TimelineCompletionType): Task['completion_type'] {
-    switch (completion) {
-      case 'monetary':
-        return 'monetary';
-      case 'orchestrated':
-        return 'checkbox';
-      case 'tracklist':
-        return 'submit_only';
-      case 'quantity_checkbox':
-        return 'checkbox';
-    }
-  }
-
-  /**
-   * Generate all 11 tasks for an event using the new TASK_TIMELINE config.
-   * This is the v2 replacement for generateTasksForEvent().
+   * Generate all 11 tasks for an event using the canonical TASK_TIMELINE config.
+   * Called when a SimplyBook booking is confirmed.
    */
   async generateTasksForEventV2(eventId: string): Promise<Task[]> {
     // Get event details to calculate deadlines
@@ -807,7 +753,7 @@ class TaskService {
         task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
         task_name: entry.displayName,
         description: entry.description,
-        completion_type: this.mapCompletionType(entry.completion),
+        completion_type: entry.completion,
         timeline_offset: entry.offset,
         deadline: deadline.toISOString(),
         status: 'pending',
@@ -829,7 +775,7 @@ class TaskService {
     templateId: string,
     completionData: TaskCompletionData,
     adminEmail: string,
-  ): Promise<{ task: Task; goId?: string; shippingTaskId?: string }> {
+  ): Promise<{ task: Task; goId?: string }> {
     // Find the TASK_TIMELINE entry
     const entry = TASK_TIMELINE.find((e) => e.id === templateId);
     if (!entry) {
@@ -870,7 +816,7 @@ class TaskService {
       task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
       task_name: entry.displayName,
       description: entry.description,
-      completion_type: this.mapCompletionType(entry.completion),
+      completion_type: entry.completion,
       timeline_offset: entry.offset,
       deadline: deadline.toISOString(),
       status: 'pending',
@@ -896,12 +842,14 @@ class TaskService {
     // 1. Parallel fetch: confirmed events + all non-cancelled tasks
     const [confirmedEvents, taskRecords] = await Promise.all([
       this.airtable.getConfirmedEvents(),
-      table
-        .select({
-          returnFieldsByFieldId: true,
-          filterByFormula: `{${TASKS_FIELD_IDS.status}} != 'cancelled'`,
-        })
-        .all(),
+      withRetry(() =>
+        table
+          .select({
+            returnFieldsByFieldId: true,
+            filterByFormula: `{${TASKS_FIELD_IDS.status}} != 'cancelled'`,
+          })
+          .all(),
+      ),
     ]);
 
     // 2. Index tasks by event_id → template_id for O(1) lookup
@@ -1143,7 +1091,7 @@ class TaskService {
             task_type: this.mapPrefixToTaskType(entry.prefix, entry.id),
             task_name: entry.displayName,
             description: entry.description,
-            completion_type: this.mapCompletionType(entry.completion),
+            completion_type: entry.completion,
             timeline_offset: entry.offset,
             deadline: deadlineStr,
             status: 'pending',
@@ -1182,7 +1130,6 @@ class TaskService {
 
     const eventIds = get(TASKS_FIELD_IDS.event_id) as string[] | undefined;
     const goIds = get(TASKS_FIELD_IDS.go_id) as string[] | undefined;
-    const parentTaskIds = get(TASKS_FIELD_IDS.parent_task_id) as string[] | undefined;
 
     return {
       id: record.id,
@@ -1193,7 +1140,10 @@ class TaskService {
       task_type: (get(TASKS_FIELD_IDS.task_type) as TaskType) || 'paper_order',
       task_name: (get(TASKS_FIELD_IDS.task_name) as string) || '',
       description: (get(TASKS_FIELD_IDS.description) as string) || '',
-      completion_type: (get(TASKS_FIELD_IDS.completion_type) as Task['completion_type']) || 'submit_only',
+      completion_type: normalizeCompletionType(
+        get(TASKS_FIELD_IDS.completion_type) as string | undefined,
+        (get(TASKS_FIELD_IDS.template_id) as string) || '',
+      ),
       timeline_offset: (get(TASKS_FIELD_IDS.timeline_offset) as number) || 0,
       deadline: (get(TASKS_FIELD_IDS.deadline) as string) || '',
       status: (get(TASKS_FIELD_IDS.status) as TaskStatus) || 'pending',
@@ -1202,21 +1152,81 @@ class TaskService {
       completion_data: get(TASKS_FIELD_IDS.completion_data) as string | undefined,
       go_id: goIds?.[0],
       order_ids: get(TASKS_FIELD_IDS.order_ids) as string | undefined,
-      parent_task_id: parentTaskIds?.[0],
       created_at: (get(TASKS_FIELD_IDS.created_at) as string) || '',
     };
   }
 
-  private async enrichTaskWithEventDetails(record: { id: string; get: (field: string) => unknown }): Promise<TaskWithEventDetails> {
+  /**
+   * Batch-fetch Events by record ID into a Map keyed by record ID.
+   * Returns an empty Map for empty input (no network call).
+   */
+  private async batchFetchEvents(eventIds: string[]): Promise<Map<string, Event>> {
+    const map = new Map<string, Event>();
+    if (eventIds.length === 0) return map;
+    const events = await this.airtable.getEventsByIds(eventIds);
+    for (const event of events) {
+      map.set(event.id, event);
+    }
+    return map;
+  }
+
+  /**
+   * Batch-fetch GuesstimateOrder records by record ID into a Map keyed by
+   * record ID. Returns the raw Airtable records (not transformed) so the
+   * caller can read fields by ID directly — matching the per-record
+   * fallback path in enrichTaskWithEventDetails.
+   *
+   * Chunks at 50 IDs per request to stay safely under Airtable's URL-based
+   * formula length cap (~16 KB). Returns an empty Map for empty input
+   * (no network call).
+   */
+  private async batchFetchGOs(
+    goIds: string[],
+  ): Promise<Map<string, { id: string; get: (field: string) => unknown }>> {
+    const map = new Map<string, { id: string; get: (field: string) => unknown }>();
+    if (goIds.length === 0) return map;
+
+    // Sanitize IDs: only allow valid Airtable record ID characters
+    const safeIds = goIds.filter((id) => /^rec[a-zA-Z0-9]{14}$/.test(id));
+    if (safeIds.length === 0) return map;
+
+    const base = this.airtable.getBase();
+    const goTable = base(GUESSTIMATE_ORDERS_TABLE_ID);
+    const batchSize = 50;
+    for (let i = 0; i < safeIds.length; i += batchSize) {
+      const batch = safeIds.slice(i, i + batchSize);
+      const formula = `OR(${batch.map((id) => `RECORD_ID() = '${id}'`).join(',')})`;
+      try {
+        const records = await withRetry(() =>
+          goTable
+            .select({ filterByFormula: formula, returnFieldsByFieldId: true })
+            .all(),
+        );
+        for (const record of records) {
+          map.set(record.id, record);
+        }
+      } catch (error) {
+        console.error('Error batch-fetching GuesstimateOrders by IDs:', error);
+      }
+    }
+    return map;
+  }
+
+  private async enrichTaskWithEventDetails(
+    record: { id: string; get: (field: string) => unknown },
+    prefetched?: EnrichmentMaps,
+  ): Promise<TaskWithEventDetails> {
     const task = this.transformTaskRecord(record);
 
-    // Get event details
+    // Get event details (use prefetched map or fetch directly)
     let schoolName = 'Unknown School';
     let eventDate = task.deadline;
     let eventType: string | undefined;
 
     if (task.event_id) {
-      const event = await this.airtable.getEventById(task.event_id);
+      const event =
+        prefetched?.events.get(task.event_id) ??
+        (await this.airtable.getEventById(task.event_id));
       if (event) {
         schoolName = event.school_name;
         eventDate = event.event_date;
@@ -1229,20 +1239,20 @@ class TaskService {
       schoolName = `${task.event_ids.length} schools`;
     }
 
-    // Get go_id display value and stock arrival status
+    // Get go_id display value
     let goDisplayId: string | undefined;
-    let stockArrived: boolean | undefined;
-    if (task.go_id) {
+    const goId = task.go_id;
+    if (goId) {
       try {
-        const base = this.airtable.getBase();
-        const goTable = base(GUESSTIMATE_ORDERS_TABLE_ID);
-        const goRecord = await goTable.find(task.go_id);
-        goDisplayId = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.go_id) as string;
+        let goRecord = prefetched?.gos.get(goId);
+        if (!goRecord) {
+          const base = this.airtable.getBase();
+          const goTable = base(GUESSTIMATE_ORDERS_TABLE_ID);
+          goRecord = await goTable.find(goId);
+        }
 
-        // For shipping tasks, check if linked GO-ID stock has arrived
-        if (task.task_type === 'shipping') {
-          const dateCompleted = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.date_completed) as string | undefined;
-          stockArrived = !!dateCompleted;
+        if (goRecord) {
+          goDisplayId = goRecord.get(GUESSTIMATE_ORDERS_FIELD_IDS.go_id) as string;
         }
       } catch {
         // Ignore if go_id record not found
@@ -1253,9 +1263,9 @@ class TaskService {
     const deadline = new Date(task.deadline);
     const { urgencyScore, daysUntilDue, isOverdue } = calculateUrgencyScore(deadline);
 
-    // Get R2 file path from template
-    const template = getTemplateById(task.template_id);
-    const r2FilePath = template?.r2_file?.(task.event_id);
+    // Get R2 file path from the timeline entry
+    const entry = getTimelineEntry(task.template_id);
+    const r2FilePath = entry?.r2_file?.(task.event_id);
 
     return {
       ...task,
@@ -1267,7 +1277,6 @@ class TaskService {
       days_until_due: daysUntilDue,
       is_overdue: isOverdue,
       r2_file_path: r2FilePath,
-      stock_arrived: stockArrived,
     };
   }
 
@@ -1311,37 +1320,54 @@ class TaskService {
     // Find all pending tasks for this event
     // Use SEARCH() with ARRAYJOIN() because event_id is a linked record field (array)
     const sanitizedEventId = eventRecordId.replace(/'/g, "\\'");
-    const records = await table
-      .select({
-        returnFieldsByFieldId: true,
-        filterByFormula: `AND(
-          SEARCH('${sanitizedEventId}', ARRAYJOIN({${TASKS_FIELD_IDS.event_id}})),
-          {${TASKS_FIELD_IDS.status}} = 'pending'
-        )`,
-      })
-      .all();
+    const records = await withRetry(() =>
+      table
+        .select({
+          returnFieldsByFieldId: true,
+          filterByFormula: `AND(
+            SEARCH('${sanitizedEventId}', ARRAYJOIN({${TASKS_FIELD_IDS.event_id}})),
+            {${TASKS_FIELD_IDS.status}} = 'pending'
+          )`,
+        })
+        .all(),
+    );
 
-    const updatedTasks: string[] = [];
+    // Build the update set first. Prefer the canonical offset from the v2 timeline
+    // (looked up via template_id) so the timeline config is the single source of
+    // truth; fall back to the stored timeline_offset for legacy templates that are
+    // not in the v2 timeline. Uses the UTC-safe v2 calculator to avoid DST/TZ
+    // off-by-one bugs.
+    const updates: Array<{ id: string; fields: Partial<Airtable.FieldSet> }> = [];
 
-    // Update each task's deadline based on its timeline_offset
     for (const record of records) {
-      const timelineOffset = record.get(TASKS_FIELD_IDS.timeline_offset) as number | undefined;
+      const templateId = record.get(TASKS_FIELD_IDS.template_id) as string | undefined;
+      const storedOffset = record.get(TASKS_FIELD_IDS.timeline_offset) as number | undefined;
 
-      // Skip tasks without timeline_offset (e.g., manually created tasks)
-      if (timelineOffset === undefined || timelineOffset === null) {
+      const newDeadline = computeNewDeadline(eventDate, templateId, storedOffset);
+
+      // Skip tasks without an offset (e.g., manually created tasks)
+      if (newDeadline === null) {
         continue;
       }
 
-      // Calculate new deadline using the existing calculateDeadline function
-      const newDeadline = calculateDeadline(eventDate, timelineOffset);
-
-      // Update the task
-      await table.update(record.id, {
-        [TASKS_FIELD_IDS.deadline]: newDeadline.toISOString().split('T')[0], // Date only
+      updates.push({
+        id: record.id,
+        fields: {
+          [TASKS_FIELD_IDS.deadline]: newDeadline, // Date only (YYYY-MM-DD)
+        },
       });
-
-      updatedTasks.push(record.id);
     }
+
+    // Bulk update — Airtable accepts up to 10 records per call. For ~11 tasks
+    // this is 2 round-trips instead of N. Each chunk is wrapped in withRetry
+    // so transient 5xx / rate-limit errors are retried per chunk.
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const chunk = updates.slice(i, i + BATCH_SIZE);
+      await withRetry(() => table.update(chunk));
+    }
+
+    const updatedTasks = updates.map((u) => u.id);
 
     console.log(
       `Recalculated deadlines for ${updatedTasks.length} tasks for event ${eventRecordId} with new date ${newEventDate}`

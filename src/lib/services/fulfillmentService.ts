@@ -205,8 +205,18 @@ class FulfillmentService {
     const eventSummary = await this.orderWaveService.getEventOrders(eventRecordId);
 
     // 2. Get the orders for the requested wave
-    const waveOrders: WaveOrder[] =
+    const allWaveOrders: WaveOrder[] =
       welle === 'Welle 1' ? eventSummary.welle1.orders : eventSummary.welle2.orders;
+
+    // Idempotency: skip orders that are already fully fulfilled. This makes the
+    // method safe to call repeatedly — particularly important because
+    // taskService.completeWelleTask invokes it after the FE already did, and
+    // Shopify rejects fulfillment requests with no remaining line items
+    // (fulfillSingleOrder throws "No eligible line items found..."). Orders
+    // with 'partial' status are NOT filtered — there's still work to do.
+    const waveOrders = allWaveOrders.filter(
+      (o) => o.fulfillmentStatus !== 'fulfilled',
+    );
 
     if (waveOrders.length === 0) {
       return {

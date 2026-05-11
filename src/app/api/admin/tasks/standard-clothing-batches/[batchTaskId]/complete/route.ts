@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getStandardClothingBatchService } from '@/lib/services/standardClothingBatchService';
 import { requireAdmin } from '@/lib/auth/verifyAdminSession';
+import { apiOk, apiError } from '@/lib/api/response';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,20 +20,14 @@ export async function POST(
     const { batchTaskId } = await params;
 
     if (!batchTaskId) {
-      return NextResponse.json(
-        { success: false, error: 'Batch task ID is required' },
-        { status: 400 }
-      );
+      return apiError('Batch task ID is required', 400);
     }
 
     const body = await request.json();
     const { amount, notes } = body;
 
     if (typeof amount !== 'number' || amount < 0) {
-      return NextResponse.json(
-        { success: false, error: 'Valid amount is required' },
-        { status: 400 }
-      );
+      return apiError('Valid amount is required', 400);
     }
 
     // Get the batch data (re-aggregate from task)
@@ -40,10 +35,7 @@ export async function POST(
     const batch = await service.getPendingBatchByTaskId(batchTaskId);
 
     if (!batch) {
-      return NextResponse.json(
-        { success: false, error: 'Pending batch not found' },
-        { status: 404 }
-      );
+      return apiError('Pending batch not found', 404);
     }
 
     const adminEmail = admin.email;
@@ -56,19 +48,12 @@ export async function POST(
       adminEmail
     );
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        task_id: result.taskId,
-        go_id: result.goId,
-        shipping_task_id: result.shippingTaskId,
-      },
+    return apiOk({
+      task_id: result.taskId,
+      go_id: result.goId,
     });
   } catch (error) {
     console.error('Error completing standard batch:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to complete standard batch' },
-      { status: 500 }
-    );
+    return apiError('Failed to complete standard batch', 500);
   }
 }

@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getTaskService } from '@/lib/services/taskService';
 import { TaskCompletionData } from '@/lib/types/tasks';
 import { requireAdmin } from '@/lib/auth/verifyAdminSession';
+import { apiOk, apiError } from '@/lib/api/response';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +24,7 @@ export async function POST(request: NextRequest) {
     const { eventId, templateId, completion_data, status } = body;
 
     if (!eventId || !templateId) {
-      return NextResponse.json(
-        { success: false, error: 'eventId and templateId are required' },
-        { status: 400 },
-      );
+      return apiError('eventId and templateId are required', 400);
     }
 
     const completionData: TaskCompletionData = completion_data || {};
@@ -35,20 +33,13 @@ export async function POST(request: NextRequest) {
     // Handle skip
     if (status === 'skipped') {
       const task = await taskService.createAndSkipTask(eventId, templateId, admin.email);
-      return NextResponse.json({
-        success: true,
-        data: { task },
-        message: 'Task created and skipped.',
-      });
+      return apiOk({ task }, 'Task created and skipped.');
     }
 
     // Handle partial
     if (status === 'partial') {
       if (!completionData.notes) {
-        return NextResponse.json(
-          { success: false, error: 'Notes are required for partial completion' },
-          { status: 400 },
-        );
+        return apiError('Notes are required for partial completion', 400);
       }
       const task = await taskService.createAndPartialTask(
         eventId,
@@ -56,11 +47,7 @@ export async function POST(request: NextRequest) {
         completionData,
         admin.email,
       );
-      return NextResponse.json({
-        success: true,
-        data: { task },
-        message: 'Task created and partially completed.',
-      });
+      return apiOk({ task }, 'Task created and partially completed.');
     }
 
     // Default: complete
@@ -71,24 +58,17 @@ export async function POST(request: NextRequest) {
       admin.email,
     );
 
-    return NextResponse.json({
-      success: true,
-      data: {
+    return apiOk(
+      {
         task: result.task,
         go_id: result.goId,
-        shipping_task_id: result.shippingTaskId,
       },
-      message: result.shippingTaskId
-        ? 'Task created and completed. Shipping task created.'
-        : 'Task created and completed successfully.',
-    });
+      'Task created and completed successfully.',
+    );
   } catch (error) {
     console.error('Error creating and completing task:', error);
     const message = error instanceof Error ? error.message : 'Failed to complete task';
     const status = message === 'Task is already completed' ? 409 : 500;
-    return NextResponse.json(
-      { success: false, error: message },
-      { status },
-    );
+    return apiError(message, status);
   }
 }

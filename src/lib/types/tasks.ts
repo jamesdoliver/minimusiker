@@ -1,5 +1,12 @@
 // Task Types for Admin Portal Task Management
 
+// How a task is completed — canonical definition lives in taskTimeline.
+// Imported and re-exported here so existing `TaskCompletionType` imports
+// from this module keep working, while internal interfaces below can also
+// reference it locally.
+import type { TaskCompletionType } from '@/lib/config/taskTimeline';
+export type { TaskCompletionType };
+
 // Task type categories
 export type TaskType =
   | 'paper_order'
@@ -8,9 +15,6 @@ export type TaskType =
   | 'cd_master'
   | 'cd_production'
   | 'shipping';
-
-// How a task is completed
-export type TaskCompletionType = 'monetary' | 'checkbox' | 'submit_only';
 
 // Task status
 export type TaskStatus = 'pending' | 'completed' | 'cancelled' | 'skipped' | 'partial';
@@ -34,7 +38,6 @@ export interface Task {
   completion_data?: string; // JSON string of TaskCompletionData
   go_id?: string; // Linked GuesstimateOrder record ID
   order_ids?: string; // Comma-separated Shopify order IDs
-  parent_task_id?: string; // For shipping tasks, references parent task
   created_at: string;
 }
 
@@ -49,7 +52,6 @@ export interface TaskWithEventDetails extends Task {
   is_overdue: boolean;
   r2_file_path?: string; // Path to downloadable file
   r2_download_url?: string; // Signed URL for download
-  stock_arrived?: boolean; // For shipping tasks: whether linked GO-ID stock has arrived
 }
 
 // Completion data stored as JSON
@@ -84,19 +86,6 @@ export interface GuesstimateOrderWithEventDetails extends GuesstimateOrder {
   school_name: string;
   event_date: string;
   parsed_contains: GuesstimateOrderItem[];
-}
-
-// Task Template definition (hardcoded in config)
-export interface TaskTemplate {
-  id: string; // Unique template identifier
-  type: TaskType;
-  name: string;
-  description: string;
-  timeline_offset: number; // Days relative to event
-  completion_type: TaskCompletionType;
-  r2_file?: (eventId: string) => string; // Function to generate R2 path
-  creates_go_id: boolean;
-  creates_shipping: boolean;
 }
 
 // Task type configuration for UI
@@ -176,7 +165,6 @@ export interface CreateTaskInput {
   timeline_offset: number;
   deadline: string;
   status: TaskStatus;
-  parent_task_id?: string;
 }
 
 export interface CompleteTaskInput {
@@ -198,13 +186,6 @@ export interface CreateGuesstimateOrderInput {
 
 /** Category prefix for the new task timeline */
 export type NewTaskPrefix = 'Ship' | 'Order' | 'Shipment' | 'Audio';
-
-/** Completion mode for the new task timeline */
-export type NewTaskCompletionType =
-  | 'monetary'
-  | 'orchestrated'
-  | 'tracklist'
-  | 'quantity_checkbox';
 
 /** Visual status of a cell in the task matrix grid */
 export type TaskCellStatus = 'white' | 'yellow' | 'red' | 'green' | 'grey' | 'orange';

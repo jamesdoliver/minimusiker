@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
 
 interface CdProductionCompletionProps {
   taskId: string;
@@ -11,7 +12,7 @@ interface CdProductionCompletionProps {
 
 export default function CdProductionCompletion({
   taskId,
-  eventId,
+  eventId: _eventId,
   onComplete,
 }: CdProductionCompletionProps) {
   const [quantity, setQuantity] = useState<number | null>(null);
@@ -21,13 +22,17 @@ export default function CdProductionCompletion({
 
   // Fetch CD quantity on mount
   useEffect(() => {
+    const controller = new AbortController();
     const fetchQuantity = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/admin/tasks/${taskId}/cd-quantity`);
-        const data = await response.json();
+        const response = await fetch(`/api/admin/tasks/${taskId}/cd-quantity`, {
+          credentials: 'include',
+          signal: controller.signal,
+        });
+        const data = await parseJsonOrThrow<{ success: boolean; data: { quantity: number }; error?: string }>(response);
 
         if (!data.success) {
           throw new Error(data.error || 'Failed to fetch CD quantity');
@@ -35,13 +40,15 @@ export default function CdProductionCompletion({
 
         setQuantity(data.data.quantity);
       } catch (err) {
+        if ((err as { name?: string }).name === 'AbortError') return;
         setError(err instanceof Error ? err.message : 'Failed to load CD quantity');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
     fetchQuantity();
+    return () => controller.abort();
   }, [taskId]);
 
   const handleComplete = async () => {
@@ -51,13 +58,13 @@ export default function CdProductionCompletion({
     try {
       const response = await fetch(`/api/admin/tasks/${taskId}`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           completion_data: { quantity_confirmed: true },
         }),
       });
-
-      const data = await response.json();
+      const data = await parseJsonOrThrow<{ success: boolean; error?: string }>(response);
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to complete task');

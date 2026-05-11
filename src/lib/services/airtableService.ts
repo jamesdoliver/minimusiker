@@ -62,6 +62,7 @@ import { SONGS_TABLE_ID } from '@/lib/types/teacher';
 import { ManualCost } from '@/lib/types/analytics';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { aggregateEventTotals, AggregableClass } from '@/lib/utils/eventAggregation';
+import { withRetry } from '@/lib/utils/withRetry';
 import {
   TeacherResource,
   TEACHER_RESOURCES_TABLE_ID,
@@ -6209,7 +6210,9 @@ class AirtableService {
    */
   async getEventById(recordId: string): Promise<Event | null> {
     try {
-      const record = await this.base(EVENTS_TABLE_ID).find(recordId);
+      const record = await withRetry(() =>
+        this.base(EVENTS_TABLE_ID).find(recordId),
+      );
       return this.transformEventRecord(record);
     } catch (error) {
       console.error('Error fetching Event by record ID:', error);
@@ -6231,6 +6234,47 @@ class AirtableService {
       const event = await this.getEventById(recordId);
       if (event) {
         events.push(event);
+      }
+    }
+    return events;
+  }
+
+  /**
+   * Batch-fetch Events by Airtable record IDs using a single (or chunked)
+   * `OR(RECORD_ID()=...)` filter formula. This avoids the N+1 round-trips
+   * that `getEventsByRecordIds` makes.
+   *
+   * Chunks at 50 IDs per request to stay safely under Airtable's URL-based
+   * formula length cap (~16 KB).
+   */
+  async getEventsByIds(recordIds: string[]): Promise<Event[]> {
+    if (!recordIds || recordIds.length === 0) {
+      return [];
+    }
+
+    // Sanitize IDs: only allow valid Airtable record ID characters
+    const safeIds = recordIds.filter((id) => /^rec[a-zA-Z0-9]{14}$/.test(id));
+    if (safeIds.length === 0) return [];
+
+    const events: Event[] = [];
+    const batchSize = 50;
+    for (let i = 0; i < safeIds.length; i += batchSize) {
+      const batch = safeIds.slice(i, i + batchSize);
+      const formula = `OR(${batch.map((id) => `RECORD_ID() = '${id}'`).join(',')})`;
+      try {
+        const records = await withRetry(() =>
+          this.base(EVENTS_TABLE_ID)
+            .select({
+              filterByFormula: formula,
+              returnFieldsByFieldId: true,
+            })
+            .all(),
+        );
+        for (const record of records) {
+          events.push(this.transformEventRecord(record));
+        }
+      } catch (error) {
+        console.error('Error batch-fetching events by IDs:', error);
       }
     }
     return events;

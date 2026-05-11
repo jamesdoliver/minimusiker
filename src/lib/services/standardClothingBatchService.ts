@@ -671,7 +671,7 @@ class StandardClothingBatchService {
 
   /**
    * Complete a standard clothing batch through the task cascade.
-   * Creates GO-ID (linked to all events) + shipping task.
+   * Creates GO-ID linked to all events.
    */
   async completeStandardBatch(
     taskId: string,
@@ -679,7 +679,7 @@ class StandardClothingBatchService {
     notes: string | undefined,
     batch: StandardClothingBatch,
     adminEmail: string
-  ): Promise<{ taskId: string; goId: string; shippingTaskId?: string }> {
+  ): Promise<{ taskId: string; goId: string }> {
     const taskService = getTaskService();
 
     // Build aggregated items for GO enrichment
@@ -715,7 +715,6 @@ class StandardClothingBatchService {
     return {
       taskId: result.task.id,
       goId: result.goId || '',
-      shippingTaskId: result.shippingTaskId,
     };
   }
 }

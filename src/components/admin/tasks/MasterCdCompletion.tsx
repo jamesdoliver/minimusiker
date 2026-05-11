@@ -3,25 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { useClientZipDownload, ZipDownloadFile } from '@/lib/hooks/useClientZipDownload';
-
-interface TrackInfo {
-  songId: string;
-  title: string;
-  className: string;
-  albumOrder: number;
-  status: 'ready' | 'processing' | 'missing';
-  r2Key: string;
-  durationSeconds: number;
-}
-
-interface MasterCdData {
-  eventId: string;
-  schoolName: string;
-  totalTracks: number;
-  readyTracks: number;
-  allReady: boolean;
-  tracks: TrackInfo[];
-}
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
+import type { MasterCdData } from '@/lib/services/masterCdService';
 
 interface MasterCdCompletionProps {
   taskId: string;
@@ -46,31 +29,31 @@ export default function MasterCdCompletion({
   const [error, setError] = useState<string | null>(null);
   const { state: zipState, startDownload: startZipDownload, cancel: cancelZipDownload } = useClientZipDownload();
 
-  const fetchTracklist = useCallback(async () => {
+  const fetchTracklist = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await fetch(`/api/admin/tasks/${taskId}/tracklist`, {
         credentials: 'include',
+        signal,
       });
-      if (!response.ok) {
-        throw new Error(`Server error (${response.status})`);
-      }
-      const data = await response.json();
-      if (data.success) {
-        setTracklist(data.data);
-      } else {
+      const data = await parseJsonOrThrow<{ success: boolean; data: MasterCdData; error?: string }>(response);
+      if (!data.success) {
         throw new Error(data.error || 'Failed to fetch tracklist');
       }
+      setTracklist(data.data);
     } catch (err) {
+      if ((err as { name?: string }).name === 'AbortError') return;
       setError(err instanceof Error ? err.message : 'Failed to load tracklist');
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) setIsLoading(false);
     }
   }, [taskId]);
 
   useEffect(() => {
-    fetchTracklist();
+    const controller = new AbortController();
+    fetchTracklist(controller.signal);
+    return () => controller.abort();
   }, [fetchTracklist]);
 
   const handleDownloadAll = async () => {
@@ -80,10 +63,7 @@ export default function MasterCdCompletion({
       const response = await fetch(`/api/admin/tasks/${taskId}/download`, {
         credentials: 'include',
       });
-      if (!response.ok) {
-        throw new Error(`Download failed (${response.status})`);
-      }
-      const data = await response.json();
+      const data = await parseJsonOrThrow<{ success: boolean; data: { tracks: Array<{ trackNumber: number; filename: string; url: string }> }; error?: string }>(response);
       if (!data.success) {
         throw new Error(data.error || 'Failed to get download URLs');
       }
@@ -123,12 +103,7 @@ export default function MasterCdCompletion({
           completion_data: { tracklist_verified: true },
         }),
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to complete task (${response.status})`);
-      }
-
-      const data = await response.json();
+      const data = await parseJsonOrThrow<{ success: boolean; error?: string }>(response);
       if (!data.success) {
         throw new Error(data.error || 'Failed to complete task');
       }
@@ -169,7 +144,7 @@ export default function MasterCdCompletion({
             <p className="text-red-700 font-medium">Error loading tracklist</p>
             <p className="text-sm text-red-600 mt-1">{error}</p>
             <button
-              onClick={fetchTracklist}
+              onClick={() => fetchTracklist()}
               className="mt-3 text-sm text-red-700 underline hover:no-underline"
             >
               Try again
@@ -192,7 +167,7 @@ export default function MasterCdCompletion({
               Album Tracklist — {tracklist.schoolName}
             </h3>
             <p className="text-sm text-gray-500 mt-0.5">
-              {tracklist.totalTracks} tracks
+              {tracklist.totalCount} tracks
               {' '}&middot;{' '}
               <span
                 className={cn(
@@ -200,7 +175,7 @@ export default function MasterCdCompletion({
                   tracklist.allReady ? 'text-green-600' : 'text-amber-600'
                 )}
               >
-                {tracklist.readyTracks}/{tracklist.totalTracks} ready
+                {tracklist.readyCount}/{tracklist.totalCount} ready
               </span>
             </p>
           </div>
@@ -275,7 +250,7 @@ export default function MasterCdCompletion({
               >
                 {/* Track Number */}
                 <td className="px-6 py-3 text-sm font-mono text-gray-500">
-                  {track.albumOrder}
+                  {track.trackNumber}
                 </td>
 
                 {/* Song Title */}
@@ -290,7 +265,7 @@ export default function MasterCdCompletion({
 
                 {/* Duration */}
                 <td className="px-6 py-3 text-sm text-gray-500 text-right font-mono">
-                  {track.durationSeconds > 0
+                  {track.durationSeconds && track.durationSeconds > 0
                     ? formatDuration(track.durationSeconds)
                     : '—'}
                 </td>

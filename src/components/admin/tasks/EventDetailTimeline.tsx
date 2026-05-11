@@ -10,6 +10,10 @@ import {
   type TaskTimelineEntry,
 } from '@/lib/config/taskTimeline';
 import type { TaskWithEventDetails, TaskCellStatus } from '@/lib/types/tasks';
+import MonetaryCompletion from './MonetaryCompletion';
+import MasterCdCompletion from './MasterCdCompletion';
+import CdProductionCompletion from './CdProductionCompletion';
+import WelleCompletion from './WelleCompletion';
 
 // ---------------------------------------------------------------------------
 // Status dot colours (reuses the matrix palette)
@@ -58,11 +62,13 @@ function deriveCellStatus(task: TaskWithEventDetails | undefined): TaskCellStatu
 interface EventDetailTimelineProps {
   tasks: TaskWithEventDetails[];
   eventDate: string;
+  onTaskRefresh: () => void;
 }
 
 export default function EventDetailTimeline({
   tasks,
   eventDate,
+  onTaskRefresh,
 }: EventDetailTimelineProps) {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
@@ -159,6 +165,7 @@ export default function EventDetailTimeline({
           task={taskByTemplateId.get(expandedTaskId)}
           eventDate={eventDate}
           onClose={() => setExpandedTaskId(null)}
+          onTaskRefresh={onTaskRefresh}
         />
       )}
     </div>
@@ -260,7 +267,7 @@ function TimelineItem({
 }
 
 // ---------------------------------------------------------------------------
-// ExpandedTaskCard — shows full details + generic "Mark Complete" button
+// ExpandedTaskCard — shows full details + dispatches to completion component
 // ---------------------------------------------------------------------------
 
 interface ExpandedTaskCardProps {
@@ -268,6 +275,7 @@ interface ExpandedTaskCardProps {
   task: TaskWithEventDetails | undefined;
   eventDate: string;
   onClose: () => void;
+  onTaskRefresh: () => void;
 }
 
 function ExpandedTaskCard({
@@ -275,39 +283,13 @@ function ExpandedTaskCard({
   task,
   eventDate,
   onClose,
+  onTaskRefresh,
 }: ExpandedTaskCardProps) {
   const prefixStyle = PREFIX_STYLES[entry.prefix];
   const deadline = calculateDeadline(eventDate, entry.offset);
   const cellStatus = deriveCellStatus(task);
   const isCompleted = cellStatus === 'green';
   const canComplete = cellStatus !== 'green' && cellStatus !== 'grey';
-
-  const [isCompleting, setIsCompleting] = useState(false);
-  const [completeError, setCompleteError] = useState<string | null>(null);
-
-  const handleMarkComplete = async () => {
-    if (!task) return;
-    setIsCompleting(true);
-    setCompleteError(null);
-    try {
-      const res = await fetch(`/api/admin/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ completion_data: { confirmed: true } }),
-      });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Failed to complete task');
-      }
-      // Reload page to refresh data
-      window.location.reload();
-    } catch (err) {
-      setCompleteError(err instanceof Error ? err.message : 'Failed to complete task');
-    } finally {
-      setIsCompleting(false);
-    }
-  };
 
   return (
     <div className="border-t border-gray-200 bg-gray-50 px-6 py-5">
@@ -382,23 +364,87 @@ function ExpandedTaskCard({
           </div>
         )}
 
-        {/* Action */}
+        {/* Completion body (dispatched by completion type) */}
         {canComplete && (
-          <div className="mt-4 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleMarkComplete}
-              disabled={isCompleting}
-              className="px-4 py-2 text-sm font-medium text-white bg-[#94B8B3] rounded-lg hover:bg-[#7da39e] transition-colors disabled:opacity-60"
-            >
-              {isCompleting ? 'Completing...' : 'Mark Complete'}
-            </button>
-            {completeError && (
-              <span className="text-sm text-red-600">{completeError}</span>
-            )}
+          <div className="mt-4">
+            <CompletionBody
+              entry={entry}
+              task={task}
+              onComplete={() => {
+                onTaskRefresh();
+                onClose();
+              }}
+            />
           </div>
         )}
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// CompletionBody — dispatches to the right completion component by type
+// ---------------------------------------------------------------------------
+
+function CompletionBody({
+  entry,
+  task,
+  onComplete,
+}: {
+  entry: TaskTimelineEntry;
+  task: TaskWithEventDetails | undefined;
+  onComplete: () => void;
+}) {
+  if (!task) {
+    return (
+      <p className="mt-4 text-sm text-gray-500">
+        Task record not yet created — completing this from the matrix will
+        create the underlying record automatically.
+      </p>
+    );
+  }
+
+  switch (entry.completion) {
+    case 'monetary':
+      return (
+        <MonetaryCompletion
+          taskId={task.id}
+          taskName={entry.displayName}
+          willCreateGoId={entry.creates_go_id}
+          onComplete={onComplete}
+        />
+      );
+    case 'tracklist':
+      return (
+        <MasterCdCompletion
+          taskId={task.id}
+          eventId={task.event_id}
+          onComplete={onComplete}
+        />
+      );
+    case 'quantity_checkbox':
+      return (
+        <CdProductionCompletion
+          taskId={task.id}
+          eventId={task.event_id}
+          onComplete={onComplete}
+        />
+      );
+    case 'orchestrated': {
+      const welle: 'Welle 1' | 'Welle 2' =
+        entry.id === 'shipment_welle_1' ? 'Welle 1' : 'Welle 2';
+      return (
+        <WelleCompletion
+          taskId={task.id}
+          eventId={task.event_id}
+          welle={welle}
+          onComplete={onComplete}
+        />
+      );
+    }
+    default: {
+      const _exhaustive: never = entry.completion;
+      return <p className="text-red-600">Unknown completion type: {_exhaustive}</p>;
+    }
+  }
 }

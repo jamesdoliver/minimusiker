@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,19 +75,24 @@ export default function WelleCompletion({
   // Fetch orders for the event
   // -------------------------------------------------------------------------
 
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     setError(null);
 
     try {
       const res = await fetch(`/api/admin/orders/events/${eventId}`, {
         credentials: 'include',
+        signal,
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await parseJsonOrThrow<{
+        success: boolean;
+        error?: string;
+        data: { welle1?: { orders?: WaveOrder[] }; welle2?: { orders?: WaveOrder[] } };
+      }>(res);
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Failed to fetch orders (${res.status})`);
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to fetch orders');
       }
 
       // Pick the correct wave's orders
@@ -94,15 +100,18 @@ export default function WelleCompletion({
       const waveData = data.data[waveKey];
       setOrders(waveData?.orders ?? []);
     } catch (err) {
+      if ((err as { name?: string }).name === 'AbortError') return;
       console.error('Error fetching event orders:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch orders');
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) setIsLoading(false);
     }
   }, [eventId, welle]);
 
   useEffect(() => {
-    fetchOrders();
+    const controller = new AbortController();
+    fetchOrders(controller.signal);
+    return () => controller.abort();
   }, [fetchOrders]);
 
   // -------------------------------------------------------------------------
@@ -122,10 +131,14 @@ export default function WelleCompletion({
         body: JSON.stringify({ welle }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await parseJsonOrThrow<{
+        success: boolean;
+        error?: string;
+        data: FulfillmentResult;
+      }>(res);
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Fulfillment failed (${res.status})`);
+      if (!data.success) {
+        throw new Error(data.error || 'Fulfillment failed');
       }
 
       const result: FulfillmentResult = data.data;
@@ -134,7 +147,7 @@ export default function WelleCompletion({
       // If all succeeded, auto-complete the task
       if (result.failed === 0) {
         try {
-          await fetch(`/api/admin/tasks/${taskId}`, {
+          const completeRes = await fetch(`/api/admin/tasks/${taskId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -145,6 +158,7 @@ export default function WelleCompletion({
               },
             }),
           });
+          await parseJsonOrThrow(completeRes);
           onComplete();
         } catch (completeErr) {
           console.error('Error completing task:', completeErr);

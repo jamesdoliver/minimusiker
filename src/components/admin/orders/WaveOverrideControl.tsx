@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { parseJsonOrThrow } from '@/lib/api/parseResponse';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,10 +45,10 @@ export default function WaveOverrideControl({
         body: JSON.stringify({ shipment_wave: newWave }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await parseJsonOrThrow<{ success: boolean; error?: string }>(res);
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Failed to update wave (${res.status})`);
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to update wave');
       }
 
       toast.success(`Wave updated to ${newWave}`);
