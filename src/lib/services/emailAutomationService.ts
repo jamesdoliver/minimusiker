@@ -6,6 +6,7 @@
  */
 
 import { getAirtableService } from './airtableService';
+import { getActivityService } from '@/lib/services/activityService';
 import { sendCampaignEmail, CampaignEmailOptions } from './resendService';
 import { generateUnsubscribeUrl } from '@/lib/utils/unsubscribe';
 import { getTeacherService } from './teacherService';
@@ -293,6 +294,7 @@ export async function getTeacherRecipientsForEvent(
             name: teacher.name,
             type: 'teacher',
             eventId: eventId,
+            eventRecordId,
             templateData: {
               school_name: eventData.schoolName,
               event_date: formatDateGerman(eventData.eventDate),
@@ -318,6 +320,7 @@ export async function getTeacherRecipientsForEvent(
           name: contactName,
           type: 'teacher',
           eventId: eventId,
+          eventRecordId,
           templateData: {
             school_name: eventData.schoolName,
             event_date: formatDateGerman(eventData.eventDate),
@@ -342,6 +345,7 @@ export async function getTeacherRecipientsForEvent(
             name: staff.staff_name,
             type: 'teacher',
             eventId: eventId,
+            eventRecordId,
             templateData: {
               school_name: eventData.schoolName,
               event_date: formatDateGerman(eventData.eventDate),
@@ -407,6 +411,7 @@ export async function getParentRecipientsForEvent(
             name: parent.parent_first_name,
             type: 'parent',
             eventId: eventId,
+            eventRecordId,
             classId: registration.class_id?.[0],
             parentRecordId,
             templateData: {
@@ -609,7 +614,28 @@ export async function sendAutomatedEmail(
     resendMessageId: result.messageId,
   };
 
-  await airtable.createEmailLog(logInput);
+  const emailLogId = await airtable.createEmailLog(logInput);
+
+  // Log to event activity timeline on successful send so admins can see
+  // timeline-cron sends in the per-event view. EMAIL_LOGS still records
+  // failures/skips with the error reason — we only mirror successes here
+  // to keep the activity timeline actionable.
+  if (result.success && recipient.eventRecordId) {
+    getActivityService().logActivity({
+      eventRecordId: recipient.eventRecordId,
+      activityType: 'email_sent',
+      description: `${template.name} sent to ${recipient.email}`,
+      actorEmail: 'system@minimusiker.de',
+      actorType: 'system',
+      metadata: {
+        templateName: template.name,
+        recipientEmail: recipient.email,
+        recipientType: recipient.type,
+        emailLogId: emailLogId ?? undefined,
+        resendMessageId: result.messageId,
+      },
+    });
+  }
 
   return {
     recipientEmail: recipient.email,

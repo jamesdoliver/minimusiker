@@ -231,7 +231,8 @@ export interface EmailRecipient {
   email: string;
   name?: string;
   type: 'teacher' | 'parent' | 'non-buyer';
-  eventId: string;
+  eventId: string;                // the string event_id like 'evt_xxx'
+  eventRecordId?: string;          // the Airtable record ID like 'recXXX', for activity logging
   classId?: string;
   parentRecordId?: string;   // only set for parent recipients
   // Additional data for template substitution

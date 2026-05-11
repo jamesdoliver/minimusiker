@@ -7460,9 +7460,12 @@ class AirtableService {
   }
 
   /**
-   * Create an email log entry
+   * Create an email log entry.
+   * Returns the created record's Airtable id (e.g. 'recXXX') so callers can
+   * cross-reference activity-timeline entries with EMAIL_LOGS rows. Returns
+   * null if the email tables aren't initialized or the create call fails.
    */
-  async createEmailLog(data: CreateEmailLogInput): Promise<EmailLog | null> {
+  async createEmailLog(data: CreateEmailLogInput): Promise<string | null> {
     if (!this.ensureEmailTablesInitialized()) return null;
 
     try {
@@ -7477,7 +7480,7 @@ class AirtableService {
         [EMAIL_LOGS_FIELD_IDS.resend_message_id]: data.resendMessageId || '',
       });
 
-      return this.transformEmailLogRecord(record);
+      return record.id;
     } catch (error) {
       console.error('Error creating email log:', error);
       return null;
