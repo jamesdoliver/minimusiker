@@ -107,6 +107,13 @@ const nextConfig = {
       { source: '/24', destination: '/e/24', permanent: true },
     ];
   },
+  async rewrites() {
+    return [
+      // Serve the static landing page at /abschiedsbox from public/abschiedsbox/index.html.
+      // HTML uses absolute /abschiedsbox/* paths for assets, so no trailing-slash dance.
+      { source: '/abschiedsbox', destination: '/abschiedsbox/index.html' },
+    ];
+  },
 };
 
 module.exports = withNextIntl(nextConfig);
