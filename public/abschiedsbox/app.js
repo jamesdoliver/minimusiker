@@ -2,15 +2,10 @@
 // Grundschul-Abschieds-Box · app.js
 // ============================================================
 
-// ----- Shopify config (placeholder — fill in later) -----
-const SHOPIFY_CONFIG = {
-  domain: 'IHR-SHOP.myshopify.com',            // TODO: deine Shopify-Domain
-  storefrontAccessToken: '',                    // TODO: Storefront API Token
-  variants: {
-    box: 'gid://shopify/ProductVariant/0',           // TODO: Variant-ID der Box
-    upsellLieder: 'gid://shopify/ProductVariant/0',  // TODO: Variant-ID des Upsells
-  },
-};
+// Shopify variant ID for the Grundschul-Abschieds-Box product.
+// Shop domain + Storefront token live server-side in the Next app —
+// this client calls /api/shopify/create-checkout, which does the cartCreate.
+const BOX_VARIANT_ID = 'gid://shopify/ProductVariant/54172638576986';
 
 const PRICES = {
   box: 44.99,
@@ -290,6 +285,23 @@ function clearFieldError(input) {
   if (err) err.remove();
 }
 
+function setCheckoutError(message) {
+  const form = $('#checkout-form');
+  const submit = form.querySelector('.checkout-submit');
+  let banner = form.querySelector('.checkout-error');
+  if (!message) {
+    if (banner) banner.remove();
+    return;
+  }
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.className = 'checkout-error';
+    banner.setAttribute('role', 'alert');
+    submit.parentElement.insertBefore(banner, submit);
+  }
+  banner.textContent = message;
+}
+
 function validateForm(form) {
   let firstInvalid = null;
   const required = form.querySelectorAll('input[required]');
@@ -324,11 +336,12 @@ function initFormValidation() {
 // ----- Checkout submit -----
 function initCheckout() {
   const form = $('#checkout-form');
+  const submitBtn = form.querySelector('.checkout-submit');
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!validateForm(form)) return;
 
-    // Upsell requires a school selection from the combobox
     const schoolInput = $('#upsell-school');
     const schoolIdInput = $('#upsell-school-id');
     if (state.upsellActive && !schoolIdInput.value) {
@@ -337,58 +350,48 @@ function initCheckout() {
       return;
     }
 
-    const orderData = {
-      email: $('#email').value,
-      shipping: {
-        firstName: $('#firstname').value,
-        lastName: $('#lastname').value,
-        address1: $('#street').value,
-        zip: $('#zip').value,
-        city: $('#city').value,
-        country: $('#country').value,
-      },
-      lineItems: [
-        { variantId: SHOPIFY_CONFIG.variants.box, quantity: state.qty },
-      ],
-      paymentMethod: state.paymentMethod,
-    };
+    const schoolLabel = state.upsellActive
+      ? schoolInput.value.trim()
+      : 'Keine eigenen Schullieder';
+    const noteValue = state.upsellActive
+      ? `Eigene Schullieder: ${schoolInput.value.trim()}`
+      : 'Keine eigenen Schullieder';
 
-    if (state.upsellActive) {
-      const [kundenId, eventId] = schoolIdInput.value.split('-');
-      orderData.lineItems.push({
-        variantId: SHOPIFY_CONFIG.variants.upsellLieder,
-        quantity: 1,
-        customAttributes: [
-          { key: 'Schule', value: schoolInput.value.trim() },
-          { key: 'KundenID', value: kundenId },
-          { key: 'EventID', value: eventId },
-        ],
+    setCheckoutError(null);
+    submitBtn.disabled = true;
+
+    try {
+      const response = await fetch('/api/shopify/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lineItems: [{ variantId: BOX_VARIANT_ID, quantity: state.qty }],
+          customAttributes: {
+            parentEmail: $('#email').value.trim(),
+            schoolName: schoolLabel,
+          },
+          note: noteValue,
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server-Fehler (${response.status})`);
+      }
+
+      const data = await response.json();
+      if (!data.checkoutUrl) {
+        throw new Error('Checkout-URL fehlt in der Antwort.');
+      }
+
+      window.location.href = data.checkoutUrl;
+    } catch (err) {
+      console.error('Checkout-Fehler:', err);
+      setCheckoutError(
+        'Bestellung konnte nicht erstellt werden. Bitte später erneut versuchen oder support@minimusiker.de kontaktieren.'
+      );
+      submitBtn.disabled = false;
     }
-
-    console.log('Bereit für Shopify Checkout:', orderData);
-
-    // ============================================================
-    // Shopify integration goes here. Three common patterns:
-    //
-    //  A) Storefront API (cartCreate)
-    //     POST https://${domain}/api/2024-10/graphql.json
-    //     with X-Shopify-Storefront-Access-Token header.
-    //     → Get cart.checkoutUrl → window.location = checkoutUrl
-    //
-    //  B) Buy Button SDK
-    //     <script src="https://sdks.shopifycdn.com/buy-button/latest/buy-button-storefront.min.js"></script>
-    //     ShopifyBuy.UI.onReady(...).then(ui => ui.createComponent(...))
-    //
-    //  C) Permalink redirect (simplest)
-    //     window.location = `https://${domain}/cart/${variantId}:${qty}?attributes...`
-    // ============================================================
-
-    alert(
-      'Checkout vorbereitet!\n\nSobald die Shopify-Anbindung eingerichtet ist, geht es hier direkt zur Zahlung weiter.\n\n' +
-        'Bestellung:\n' +
-        JSON.stringify(orderData, null, 2)
-    );
   });
 }
 

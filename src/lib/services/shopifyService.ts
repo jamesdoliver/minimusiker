@@ -326,7 +326,8 @@ class ShopifyService {
   async createCart(
     lineItems: CartLineInput[],
     attributes?: MiniMusikerCartAttributes,
-    discountCodes?: string[]
+    discountCodes?: string[],
+    note?: string
   ): Promise<CartCreateResult> {
     const mutation = `
       mutation CartCreate($input: CartInput!) {
@@ -385,6 +386,7 @@ class ShopifyService {
       attributes?: Array<{ key: string; value: string }>;
       buyerIdentity?: { email: string };
       discountCodes?: string[];
+      note?: string;
     } = {
       lines: lineItems.map((item) => ({
         merchandiseId: item.merchandiseId,
@@ -396,6 +398,11 @@ class ShopifyService {
     if (discountCodes && discountCodes.length > 0) {
       cartInput.discountCodes = discountCodes;
       console.log('[createCart] Applying discount codes:', discountCodes);
+    }
+
+    // Note becomes the Shopify order note (searchable in admin orders list)
+    if (note) {
+      cartInput.note = note;
     }
 
     // Add custom attributes if provided
@@ -586,7 +593,8 @@ class ShopifyService {
   async createCartFromCheckoutItems(
     lineItems: CheckoutLineItem[],
     customAttributes?: CheckoutCustomAttributes,
-    discountCodes?: string[]
+    discountCodes?: string[],
+    note?: string
   ): Promise<CartCreateResult> {
     // Convert CheckoutLineItem to CartLineInput
     const cartLines: CartLineInput[] = lineItems.map((item) => ({
@@ -605,7 +613,7 @@ class ShopifyService {
         }
       : undefined;
 
-    return this.createCart(cartLines, cartAttributes, discountCodes);
+    return this.createCart(cartLines, cartAttributes, discountCodes, note);
   }
 
   /**

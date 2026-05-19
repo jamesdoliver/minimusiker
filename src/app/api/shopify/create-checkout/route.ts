@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 interface CheckoutRequest {
   lineItems: CheckoutLineItem[];
   customAttributes?: CheckoutCustomAttributes;
+  note?: string;
 }
 
 /**
@@ -39,7 +40,7 @@ interface CheckoutRequest {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { lineItems, customAttributes } = (await request.json()) as CheckoutRequest;
+    const { lineItems, customAttributes, note } = (await request.json()) as CheckoutRequest;
 
     if (!lineItems || lineItems.length === 0) {
       return NextResponse.json(
@@ -139,6 +140,7 @@ export async function POST(request: NextRequest) {
         lineItems,
         customAttributes,
         discountCodes,
+        note,
       });
 
       return NextResponse.json({
@@ -159,7 +161,8 @@ export async function POST(request: NextRequest) {
     const cart = await shopifyService.createCartFromCheckoutItems(
       lineItems,
       customAttributes,
-      discountCodes
+      discountCodes,
+      note
     );
 
     console.log('[create-checkout] Shopify cart created:', {
