@@ -469,6 +469,10 @@ class ShopifyService {
 
     const cart = data.cartCreate.cart;
 
+    // Confirm what Shopify actually persisted (vs. what we sent) — useful
+    // when debugging cart-attribute / note flow from the headless checkout.
+    console.log('[createCart] Shopify echoed attributes back:', cart.attributes);
+
     return {
       cartId: cart.id,
       checkoutUrl: cart.checkoutUrl,
