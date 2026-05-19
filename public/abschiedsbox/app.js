@@ -17,7 +17,6 @@ const VAT_RATE = 0.19;
 const state = {
   qty: 1,
   upsellActive: false,
-  paymentMethod: 'card',
 };
 
 // ----- Helpers -----
@@ -250,19 +249,6 @@ function initUpsell() {
     if (e.target.closest('input, label, select, option, button, .combobox-listbox')) return;
     cb.checked = !cb.checked;
     apply();
-  });
-}
-
-// ----- Payment radios -----
-function initPayment() {
-  $$('.payment-method').forEach((label) => {
-    const input = label.querySelector('input[type="radio"]');
-    label.addEventListener('click', () => {
-      $$('.payment-method').forEach((m) => m.classList.remove('active'));
-      label.classList.add('active');
-      state.paymentMethod = input.value;
-      input.checked = true;
-    });
   });
 }
 
@@ -509,7 +495,6 @@ document.addEventListener('DOMContentLoaded', () => {
   updateTotals();
   initQty();
   initUpsell();
-  initPayment();
   initFormValidation();
   initCheckout();
   initAudioPlayer();
