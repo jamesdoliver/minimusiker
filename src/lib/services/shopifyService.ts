@@ -14,6 +14,7 @@ import {
   MiniMusikerCartAttributes,
   CartCreateResult,
   ShopifyCart,
+  ShippingAddressInput,
 } from '../types/shop';
 
 class ShopifyService {
@@ -327,7 +328,8 @@ class ShopifyService {
     lineItems: CartLineInput[],
     attributes?: MiniMusikerCartAttributes,
     discountCodes?: string[],
-    note?: string
+    note?: string,
+    shippingAddress?: ShippingAddressInput
   ): Promise<CartCreateResult> {
     const mutation = `
       mutation CartCreate($input: CartInput!) {
@@ -384,7 +386,12 @@ class ShopifyService {
     const cartInput: {
       lines: Array<{ merchandiseId: string; quantity: number }>;
       attributes?: Array<{ key: string; value: string }>;
-      buyerIdentity?: { email: string };
+      buyerIdentity?: {
+        email?: string;
+        deliveryAddressPreferences?: Array<{
+          deliveryAddress: ShippingAddressInput;
+        }>;
+      };
       discountCodes?: string[];
       note?: string;
     } = {
@@ -416,13 +423,27 @@ class ShopifyService {
 
       // Log attributes being sent to Shopify
       console.log('[createCart] Sending attributes to Shopify:', cartInput.attributes);
+    }
 
-      // Set buyer identity with email for better order tracking
-      if (attributes.parentEmail) {
-        cartInput.buyerIdentity = {
-          email: attributes.parentEmail,
-        };
+    // Build buyerIdentity from email + optional shipping address (both pre-fill
+    // the Shopify checkout so the customer doesn't have to retype).
+    const buyerIdentity: NonNullable<typeof cartInput.buyerIdentity> = {};
+    if (attributes?.parentEmail) {
+      buyerIdentity.email = attributes.parentEmail;
+    }
+    if (shippingAddress) {
+      const cleaned = Object.fromEntries(
+        Object.entries(shippingAddress).filter(
+          ([_, v]) => v !== undefined && v !== null && v !== ''
+        )
+      ) as ShippingAddressInput;
+      if (Object.keys(cleaned).length > 0) {
+        buyerIdentity.deliveryAddressPreferences = [{ deliveryAddress: cleaned }];
+        console.log('[createCart] Pre-filling shipping address at checkout');
       }
+    }
+    if (Object.keys(buyerIdentity).length > 0) {
+      cartInput.buyerIdentity = buyerIdentity;
     }
 
     const data = await this.query<{
@@ -594,7 +615,8 @@ class ShopifyService {
     lineItems: CheckoutLineItem[],
     customAttributes?: CheckoutCustomAttributes,
     discountCodes?: string[],
-    note?: string
+    note?: string,
+    shippingAddress?: ShippingAddressInput
   ): Promise<CartCreateResult> {
     // Convert CheckoutLineItem to CartLineInput
     const cartLines: CartLineInput[] = lineItems.map((item) => ({
@@ -613,7 +635,7 @@ class ShopifyService {
         }
       : undefined;
 
-    return this.createCart(cartLines, cartAttributes, discountCodes, note);
+    return this.createCart(cartLines, cartAttributes, discountCodes, note, shippingAddress);
   }
 
   /**

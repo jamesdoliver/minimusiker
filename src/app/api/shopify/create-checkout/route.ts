@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import shopifyService from '@/lib/services/shopifyService';
-import { CheckoutLineItem, CheckoutCustomAttributes } from '@/lib/types/shop';
+import { CheckoutLineItem, CheckoutCustomAttributes, ShippingAddressInput } from '@/lib/types/shop';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 
@@ -10,6 +10,7 @@ interface CheckoutRequest {
   lineItems: CheckoutLineItem[];
   customAttributes?: CheckoutCustomAttributes;
   note?: string;
+  shippingAddress?: ShippingAddressInput;
 }
 
 /**
@@ -40,7 +41,7 @@ interface CheckoutRequest {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { lineItems, customAttributes, note } = (await request.json()) as CheckoutRequest;
+    const { lineItems, customAttributes, note, shippingAddress } = (await request.json()) as CheckoutRequest;
 
     if (!lineItems || lineItems.length === 0) {
       return NextResponse.json(
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest) {
         customAttributes,
         discountCodes,
         note,
+        shippingAddress,
       });
 
       return NextResponse.json({
@@ -162,7 +164,8 @@ export async function POST(request: NextRequest) {
       lineItems,
       customAttributes,
       discountCodes,
-      note
+      note,
+      shippingAddress
     );
 
     console.log('[create-checkout] Shopify cart created:', {

@@ -80,6 +80,20 @@ export interface CartBuyerIdentity {
   countryCode?: string;
 }
 
+// Shipping address pre-fill at Shopify checkout (maps to Cart API
+// buyerIdentity.deliveryAddressPreferences[].deliveryAddress).
+// `country` is the ISO 3166-1 alpha-2 code, e.g. 'DE', 'AT', 'CH'.
+export interface ShippingAddressInput {
+  firstName?: string;
+  lastName?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  zip?: string;
+  country?: string;
+  phone?: string;
+}
+
 // Cart creation input
 export interface CartCreateInput {
   lines: CartLineInput[];

@@ -371,6 +371,14 @@ function initCheckout() {
             schoolName: schoolLabel,
           },
           note: noteValue,
+          shippingAddress: {
+            firstName: $('#firstname').value.trim(),
+            lastName: $('#lastname').value.trim(),
+            address1: $('#street').value.trim(),
+            city: $('#city').value.trim(),
+            zip: $('#zip').value.trim(),
+            country: $('#country').value,
+          },
         }),
       });
 
