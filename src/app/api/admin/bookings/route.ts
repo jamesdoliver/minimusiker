@@ -54,6 +54,16 @@ export interface BookingWithDetails {
   eventId?: string;              // Event identifier (e.g., evt_schulname_minimusiker_20260320_a1b2c3)
   // Audio pipeline
   audioPipelineStage?: 'not_started' | 'staff_uploaded' | 'finals_submitted';
+  /**
+   * Minimusikertag-only audio pipeline state, derived from non-schulsong audio files.
+   * Used by the admin UI to render an M-specific indicator that ignores schulsong uploads.
+   */
+  minimusikertagAudioStage?: 'not_started' | 'staff_uploaded' | 'finals_submitted';
+  /**
+   * Schulsong audio pipeline state, derived from the schulsong audio file's approval status
+   * and the event's schulsong_released_at timestamp.
+   */
+  schulsongAudioStage?: 'none' | 'pending' | 'rejected' | 'approved' | 'released';
   // Admin notes
   adminNotes?: string;
   // Discount code (simplybookHash)
@@ -258,20 +268,75 @@ export async function GET(request: NextRequest) {
       .map(b => b.eventRecordId)
       .filter((id): id is string => !!id);
 
-    // Fetch registration, class, and song counts in parallel batch queries
-    const [registrationCounts, classCounts, songCounts] = await Promise.all([
+    // Build a lookup so we can read schulsong_released_at when deriving the S indicator
+    const eventByRecordId = new Map<string, Event>();
+    for (const event of eventsMap.values()) {
+      eventByRecordId.set(event.id, event);
+    }
+
+    // Fetch registration, class, song counts, and per-event audio pipeline summary in parallel
+    const [registrationCounts, classCounts, songCounts, audioSummary] = await Promise.all([
       airtableService.getRegistrationCountsByEventIds(eventRecordIds),
       airtableService.getClassCountsByEventIds(eventRecordIds),
       airtableService.getSongCountsByEventIds(eventRecordIds),
+      airtableService.getAudioPipelineSummaryByEventIds(eventRecordIds),
     ]);
 
-    // Merge counts into bookings
-    const bookingsWithRegistrations = bookingsWithAccessCodes.map(booking => ({
-      ...booking,
-      registrationCount: booking.eventRecordId ? registrationCounts.get(booking.eventRecordId) || 0 : 0,
-      classCount: booking.eventRecordId ? classCounts.get(booking.eventRecordId) || 0 : 0,
-      songCount: booking.eventRecordId ? songCounts.get(booking.eventRecordId) || 0 : 0,
-    }));
+    // Merge counts and derive per-track-type audio stages into bookings
+    const bookingsWithRegistrations = bookingsWithAccessCodes.map(booking => {
+      const songCountEntry = booking.eventRecordId ? songCounts.get(booking.eventRecordId) : undefined;
+      const songCount = songCountEntry?.total ?? 0;
+      const unhiddenSongCount = songCountEntry?.unhidden ?? 0;
+      const summary = booking.eventRecordId ? audioSummary.get(booking.eventRecordId) : undefined;
+      const event = booking.eventRecordId ? eventByRecordId.get(booking.eventRecordId) : undefined;
+
+      // Derive Minimusikertag-specific stage from non-schulsong audio files.
+      // We deliberately ignore the shared `audio_pipeline_stage` field here because it
+      // gets flipped to 'finals_submitted' as soon as any final file (including a
+      // schulsong) is uploaded, which is the bug this fix addresses.
+      // Compare against unhiddenSongCount so engineer-hidden songs (which never get
+      // a final uploaded) don't permanently block M=green.
+      //
+      // Note: this admin dot does NOT match the engineer-page status badge, by design.
+      //   - Engineer page reads `audio_pipeline_stage` directly: "I clicked Submit
+      //     Finals" (workflow state — engineer-facing, set as soon as ≥1 final exists).
+      //   - Admin dot below: "All non-schulsong unhidden songs actually have a final"
+      //     (completeness state — admin-facing).
+      // Both are correct for their audience. If you ever need a single source of
+      // truth, fix at the source: gate submit-for-review on completeness, which
+      // would also close the mixReadyEmailService premature-fire gap.
+      let minimusikertagAudioStage: 'not_started' | 'staff_uploaded' | 'finals_submitted' = 'not_started';
+      if (summary) {
+        const finalSongs = summary.minimusikertagFinalSongIds.size;
+        if (unhiddenSongCount > 0 && finalSongs >= unhiddenSongCount) {
+          minimusikertagAudioStage = 'finals_submitted';
+        } else if (finalSongs > 0 || summary.minimusikertagHasRaw) {
+          minimusikertagAudioStage = 'staff_uploaded';
+        }
+      }
+
+      // Derive Schulsong stage from the active schulsong audio file + event release timestamp
+      let schulsongAudioStage: 'none' | 'pending' | 'rejected' | 'approved' | 'released' = 'none';
+      const schulsongFile = summary?.schulsongFile;
+      if (schulsongFile) {
+        if (schulsongFile.approvalStatus === 'rejected') {
+          schulsongAudioStage = 'rejected';
+        } else if (schulsongFile.approvalStatus === 'approved' || schulsongFile.teacherApprovedAt) {
+          schulsongAudioStage = event?.schulsong_released_at ? 'released' : 'approved';
+        } else {
+          schulsongAudioStage = 'pending';
+        }
+      }
+
+      return {
+        ...booking,
+        registrationCount: booking.eventRecordId ? registrationCounts.get(booking.eventRecordId) || 0 : 0,
+        classCount: booking.eventRecordId ? classCounts.get(booking.eventRecordId) || 0 : 0,
+        songCount,
+        minimusikertagAudioStage,
+        schulsongAudioStage,
+      };
+    });
 
     // Filter out deleted/cancelled bookings and soft-deleted events
     const visibleBookings = bookingsWithRegistrations.filter(

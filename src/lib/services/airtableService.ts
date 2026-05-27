@@ -57,8 +57,14 @@ import {
   SCHULSONG_TABLE_ID,
   SCHULSONG_FIELD_IDS,
   SchulsongProduktionStatus,
+  AUDIO_FILES_LINKED_FIELD_IDS,
 } from '@/lib/types/airtable';
-import { SONGS_TABLE_ID } from '@/lib/types/teacher';
+import {
+  SONGS_TABLE_ID,
+  SONGS_FIELD_IDS,
+  AUDIO_FILES_TABLE_ID,
+  AUDIO_FILES_FIELD_IDS,
+} from '@/lib/types/teacher';
 import { ManualCost } from '@/lib/types/analytics';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
 import { aggregateEventTotals, AggregableClass } from '@/lib/utils/eventAggregation';
@@ -83,6 +89,34 @@ import {
 
 // Single table name in Airtable
 export const TABLE_NAME = 'parent_journey_table';
+
+/**
+ * Per-event song count split into total (for display) and unhidden
+ * (for M-audio completeness). Engineer-hidden songs are excluded from `unhidden`
+ * since the engineer will never upload a final for them, and counting them
+ * would prevent the M indicator from ever turning green.
+ */
+export interface SongCountSummary {
+  total: number;
+  unhidden: number;
+}
+
+/**
+ * Per-event audio pipeline summary used by admin views to render
+ * independent indicators for Minimusikertag audio and Schulsong audio.
+ */
+export interface AudioPipelineSummary {
+  /** Unique song identifiers (song record ID or song_id text) that have at least one final non-schulsong audio file */
+  minimusikertagFinalSongIds: Set<string>;
+  /** True if at least one non-schulsong raw audio file has been uploaded */
+  minimusikertagHasRaw: boolean;
+  /** Most recently uploaded schulsong final file (if any) — drives the S indicator */
+  schulsongFile?: {
+    approvalStatus: 'pending' | 'approved' | 'rejected';
+    teacherApprovedAt?: string;
+    uploadedAt?: string;
+  };
+}
 
 /** Extract message from any thrown value, including Airtable SDK errors which don't extend Error */
 function extractErrorMessage(error: unknown): string {
@@ -6594,32 +6628,37 @@ class AirtableService {
   }
 
   /**
-   * Get song counts for multiple events in a single query
+   * Get song counts for multiple events in a single query.
+   * Returns both total and unhidden counts; the M (Minimusikertag) completeness
+   * indicator uses unhidden so engineer-hidden songs don't block M=green, while
+   * the displayed C/S column keeps showing the total.
+   *
    * @param eventRecordIds Array of Event record IDs
-   * @returns Map of event record ID to song count
+   * @returns Map of event record ID to { total, unhidden }
    */
-  async getSongCountsByEventIds(eventRecordIds: string[]): Promise<Map<string, number>> {
-    const counts = new Map<string, number>();
+  async getSongCountsByEventIds(eventRecordIds: string[]): Promise<Map<string, SongCountSummary>> {
+    const counts = new Map<string, SongCountSummary>();
 
     if (eventRecordIds.length === 0) return counts;
 
-    // Initialize all event IDs with 0
-    eventRecordIds.forEach(id => counts.set(id, 0));
+    eventRecordIds.forEach(id => counts.set(id, { total: 0, unhidden: 0 }));
 
     try {
       const records = await this.base(SONGS_TABLE_ID)
         .select({
-          fields: [SONGS_LINKED_FIELD_IDS.event_link],
+          fields: [SONGS_LINKED_FIELD_IDS.event_link, SONGS_FIELD_IDS.hidden_by_engineer],
           returnFieldsByFieldId: true,
         })
         .all();
 
       for (const record of records) {
         const eventIdArray = record.fields[SONGS_LINKED_FIELD_IDS.event_link] as string[] || [];
+        const isHidden = Boolean(record.fields[SONGS_FIELD_IDS.hidden_by_engineer]);
         for (const eventId of eventIdArray) {
-          if (counts.has(eventId)) {
-            counts.set(eventId, (counts.get(eventId) || 0) + 1);
-          }
+          const entry = counts.get(eventId);
+          if (!entry) continue;
+          entry.total += 1;
+          if (!isHidden) entry.unhidden += 1;
         }
       }
     } catch (error) {
@@ -6627,6 +6666,106 @@ class AirtableService {
     }
 
     return counts;
+  }
+
+  /**
+   * Get per-event audio pipeline summary in a single AudioFiles scan.
+   * Splits Minimusikertag finals (non-schulsong) from Schulsong approval state so
+   * the admin booking row can show separate M and S indicators.
+   *
+   * @param eventRecordIds Array of Event record IDs
+   * @returns Map of event record ID → AudioPipelineSummary
+   */
+  async getAudioPipelineSummaryByEventIds(
+    eventRecordIds: string[]
+  ): Promise<Map<string, AudioPipelineSummary>> {
+    const summary = new Map<string, AudioPipelineSummary>();
+
+    if (eventRecordIds.length === 0) return summary;
+
+    // Initialize empty summary for each event so callers can rely on the map key
+    const eventIdSet = new Set(eventRecordIds);
+    for (const id of eventRecordIds) {
+      summary.set(id, {
+        minimusikertagFinalSongIds: new Set<string>(),
+        minimusikertagHasRaw: false,
+      });
+    }
+
+    try {
+      const records = await this.base(AUDIO_FILES_TABLE_ID)
+        .select({
+          fields: [
+            AUDIO_FILES_LINKED_FIELD_IDS.event_link,
+            AUDIO_FILES_LINKED_FIELD_IDS.song_link,
+            AUDIO_FILES_FIELD_IDS.song_id,
+            AUDIO_FILES_FIELD_IDS.type,
+            AUDIO_FILES_FIELD_IDS.is_schulsong,
+            AUDIO_FILES_FIELD_IDS.approval_status,
+            AUDIO_FILES_FIELD_IDS.teacher_approved_at,
+            AUDIO_FILES_FIELD_IDS.uploaded_at,
+            AUDIO_FILES_FIELD_IDS.status,
+          ],
+          returnFieldsByFieldId: true,
+        })
+        .all();
+
+      for (const record of records) {
+        const eventIds = (record.fields[AUDIO_FILES_LINKED_FIELD_IDS.event_link] as string[]) || [];
+        const type = record.fields[AUDIO_FILES_FIELD_IDS.type] as string | undefined;
+        const isSchulsong = Boolean(record.fields[AUDIO_FILES_FIELD_IDS.is_schulsong]);
+        const status = record.fields[AUDIO_FILES_FIELD_IDS.status] as string | undefined;
+        // Skip records that aren't usable audio (e.g. processing/error or Logic Pro projects with type='logic')
+        if (type !== 'raw' && type !== 'preview' && type !== 'final') continue;
+
+        for (const eventRecordId of eventIds) {
+          if (!eventIdSet.has(eventRecordId)) continue;
+          const entry = summary.get(eventRecordId)!;
+
+          if (isSchulsong) {
+            // For schulsong, only consider final uploads as the canonical "approval target"
+            if (type !== 'final') continue;
+            const approvalStatus = (record.fields[AUDIO_FILES_FIELD_IDS.approval_status] as
+              | 'pending'
+              | 'approved'
+              | 'rejected'
+              | undefined) || 'pending';
+            const teacherApprovedAt = record.fields[AUDIO_FILES_FIELD_IDS.teacher_approved_at] as string | undefined;
+            const uploadedAt = record.fields[AUDIO_FILES_FIELD_IDS.uploaded_at] as string | undefined;
+
+            // Keep the most recently uploaded schulsong as the active one
+            const isMoreRecent =
+              !entry.schulsongFile ||
+              !entry.schulsongFile.uploadedAt ||
+              (uploadedAt && uploadedAt > entry.schulsongFile.uploadedAt);
+            if (isMoreRecent) {
+              entry.schulsongFile = { approvalStatus, teacherApprovedAt, uploadedAt };
+            }
+          } else {
+            // Non-schulsong = Minimusikertag audio.
+            // Treat anything with raw uploads as "staff_uploaded" signal.
+            if (type === 'raw') {
+              entry.minimusikertagHasRaw = true;
+            } else if (type === 'final' && status !== 'error') {
+              // Both fields hold the same Songs record ID string — `song_id` is a
+              // text field that mirrors `song_link[0]` for pre-normalized rows
+              // (see teacherService.createAudioFile). Prefer the linked-record
+              // field; fall back to the text mirror so the Set stays consistent.
+              const songLinkArray = (record.fields[AUDIO_FILES_LINKED_FIELD_IDS.song_link] as string[]) || [];
+              const songIdText = record.fields[AUDIO_FILES_FIELD_IDS.song_id] as string | undefined;
+              const songKey = songLinkArray[0] || songIdText;
+              if (songKey) {
+                entry.minimusikertagFinalSongIds.add(songKey);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching audio pipeline summary:', error);
+    }
+
+    return summary;
   }
 
   /**
