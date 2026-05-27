@@ -209,13 +209,6 @@ export default function EventSelectionStep({
                               >
                                 {classOption.className}
                               </div>
-                              {classOption.teacherName && !classOption.isDefault && (
-                                <div className="text-xs text-gray-500 mt-0.5 truncate">
-                                  {tClass('teacher', {
-                                    teacherName: classOption.teacherName,
-                                  })}
-                                </div>
-                              )}
                               {classOption.isDefault && (
                                 <div className="text-xs text-gray-500 mt-0.5">
                                   (Sammelklasse)
