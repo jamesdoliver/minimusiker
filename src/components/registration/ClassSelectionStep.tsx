@@ -113,11 +113,6 @@ export default function ClassSelectionStep({
                   <div className="font-medium text-gray-900">
                     {classItem.className}
                   </div>
-                  {classItem.teacherName && (
-                    <div className="text-sm text-gray-600 mt-1">
-                      {t('teacher', { teacherName: classItem.teacherName })}
-                    </div>
-                  )}
                   {classItem.registeredCount > 0 && (
                     <div className="text-xs text-gray-500 mt-1">
                       {t('parentsRegistered', { count: classItem.registeredCount })}
