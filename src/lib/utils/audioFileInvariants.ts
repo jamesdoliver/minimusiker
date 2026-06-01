@@ -39,7 +39,8 @@ export function assertReadyEligible(file: AudioFileSnapshot): void {
  * Same final+ready rule as before, PLUS: a Schulsong is only downloadable
  * once the teacher has approved it (teacherApprovedAt set). This keeps the
  * download list/zip in sync with the Schulsong approval card, which already
- * gates on teacherApprovedAt.
+ * gates on teacherApprovedAt. Parent-side has its own gate on
+ * event.schulsong_released_at (see /api/parent/audio-access).
  */
 export function isTeacherDownloadable(file: {
   type: string;
