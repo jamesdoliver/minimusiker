@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { AudioFile } from '@/lib/types/teacher';
+import { isTeacherDownloadable } from '@/lib/utils/audioFileInvariants';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,14 +35,19 @@ export async function GET(
       );
     }
 
-    // 1. Get all final+ready audio files
+    // 1. Get all final+ready audio files (Schulsong gated on teacher approval)
     const allAudioFiles = await teacherService.getAudioFilesByEventId(eventId);
-    const finalReadyFiles = allAudioFiles.filter(
-      (f: AudioFile) => f.type === 'final' && f.status === 'ready'
+    const finalReadyFiles = allAudioFiles.filter(isTeacherDownloadable);
+
+    // True when a final Schulsong exists but the teacher hasn't approved it yet —
+    // drives the dynamic subtitle in AudioDownloadSection.
+    const schulsongPending = allAudioFiles.some(
+      (f: AudioFile) =>
+        f.isSchulsong && f.type === 'final' && f.status === 'ready' && !f.teacherApprovedAt
     );
 
     if (finalReadyFiles.length === 0) {
-      return NextResponse.json({ success: true, tracks: [] });
+      return NextResponse.json({ success: true, tracks: [], schulsongPending });
     }
 
     // 2. Get album tracks — canonical order (schulsong at 1, groups included)
@@ -158,7 +164,7 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ success: true, tracks });
+    return NextResponse.json({ success: true, tracks, schulsongPending });
   } catch (error) {
     console.error('Error fetching teacher audio downloads:', error);
     return NextResponse.json(

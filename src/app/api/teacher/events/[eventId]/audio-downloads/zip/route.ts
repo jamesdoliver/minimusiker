@@ -3,6 +3,7 @@ import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
 import { AudioFile } from '@/lib/types/teacher';
+import { isTeacherDownloadable } from '@/lib/utils/audioFileInvariants';
 import archiver from 'archiver';
 import { PassThrough } from 'stream';
 
@@ -37,11 +38,9 @@ export async function GET(
       );
     }
 
-    // 1. Get all final+ready audio files
+    // 1. Get all final+ready audio files (Schulsong gated on teacher approval)
     const allAudioFiles = await teacherService.getAudioFilesByEventId(eventId);
-    const finalReadyFiles = allAudioFiles.filter(
-      (f: AudioFile) => f.type === 'final' && f.status === 'ready'
-    );
+    const finalReadyFiles = allAudioFiles.filter(isTeacherDownloadable);
 
     if (finalReadyFiles.length === 0) {
       return NextResponse.json(

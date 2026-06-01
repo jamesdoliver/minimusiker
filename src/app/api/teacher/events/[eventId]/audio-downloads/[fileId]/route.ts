@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyTeacherSession } from '@/lib/auth/verifyTeacherSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
+import { isTeacherDownloadable } from '@/lib/utils/audioFileInvariants';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +39,7 @@ export async function GET(
 
     const allAudioFiles = await teacherService.getAudioFilesByEventId(eventId);
     const audioFile = allAudioFiles.find(
-      (f) => f.id === fileId && f.type === 'final' && f.status === 'ready'
+      (f) => f.id === fileId && isTeacherDownloadable(f)
     );
 
     if (!audioFile) {

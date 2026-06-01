@@ -14,6 +14,7 @@ interface Track {
 
 interface AudioDownloadResponse {
   tracks: Track[];
+  schulsongPending?: boolean;
 }
 
 interface AudioDownloadSectionProps {
@@ -39,6 +40,7 @@ function formatTime(seconds: number): string {
 export default function AudioDownloadSection({ eventId }: AudioDownloadSectionProps) {
   const [loading, setLoading] = useState(true);
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [schulsongPending, setSchulsongPending] = useState(false);
   const [fetchError, setFetchError] = useState(false);
   const [zipDownloading, setZipDownloading] = useState(false);
 
@@ -61,6 +63,7 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
         }
         const data: AudioDownloadResponse = await response.json();
         setTracks(data.tracks || []);
+        setSchulsongPending(Boolean(data.schulsongPending));
       } catch (err) {
         console.error('Error fetching audio downloads:', err);
         setFetchError(true);
@@ -216,7 +219,11 @@ export default function AudioDownloadSection({ eventId }: AudioDownloadSectionPr
           </div>
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Aufnahmen</h2>
-            <p className="text-sm text-gray-500">Alle Aufnahmen sind fertig — anhören oder herunterladen.</p>
+            <p className="text-sm text-gray-500">
+              {schulsongPending
+                ? 'Die Klassenaufnahmen sind fertig. Der Schulsong erscheint hier, sobald du ihn freigegeben hast.'
+                : 'Alle Aufnahmen sind fertig — anhören oder herunterladen.'}
+            </p>
           </div>
         </div>
 

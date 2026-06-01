@@ -33,3 +33,21 @@ export function assertReadyEligible(file: AudioFileSnapshot): void {
     );
   }
 }
+
+/**
+ * Whether a teacher may download/stream this file from the portal.
+ * Same final+ready rule as before, PLUS: a Schulsong is only downloadable
+ * once the teacher has approved it (teacherApprovedAt set). This keeps the
+ * download list/zip in sync with the Schulsong approval card, which already
+ * gates on teacherApprovedAt.
+ */
+export function isTeacherDownloadable(file: {
+  type: string;
+  status: string;
+  isSchulsong?: boolean;
+  teacherApprovedAt?: string;
+}): boolean {
+  if (file.type !== 'final' || file.status !== 'ready') return false;
+  if (file.isSchulsong && !file.teacherApprovedAt) return false;
+  return true;
+}
