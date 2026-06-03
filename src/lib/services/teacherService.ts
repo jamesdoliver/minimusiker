@@ -1,6 +1,7 @@
 import Airtable from 'airtable';
 import crypto from 'crypto';
 import { generateClassId } from '@/lib/utils/eventIdentifiers';
+import { dedupeClassViews } from '@/lib/utils/eventAggregation';
 import { assertReadyEligible } from '@/lib/utils/audioFileInvariants';
 import { isSchulsongOnlyEvent } from '@/lib/utils/eventTier';
 import {
@@ -1785,7 +1786,48 @@ class TeacherService {
       // Generate class_id for the catch-all class
       const classId = generateClassId(data.schoolName, data.bookingDate, DEFAULT_CLASS_NAME);
 
-      // Check if default class already exists (idempotency)
+      // Idempotency (primary): does this Event already have ANY default class
+      // linked? Checking via the Event's reverse-link is robust to class_id
+      // drift — generateClassId changes when the booking is rescheduled (the
+      // date is baked in) or when the slug-normalization code changes between
+      // deploys, which the class_id check below silently misses, producing the
+      // duplicate "Alle Kinder" rows teachers were seeing.
+      try {
+        // Read the reverse-link by FIELD ID (returnFieldsByFieldId), matching how
+        // the rest of the codebase reads EVENTS_FIELD_IDS.classes — robust to the
+        // Airtable display name. (.find() can't return fields by id, so select.)
+        const [eventRecord] = await this.base(EVENTS_TABLE_ID)
+          .select({
+            filterByFormula: `RECORD_ID() = '${data.eventRecordId.replace(/'/g, "\\'")}'`,
+            returnFieldsByFieldId: true,
+            maxRecords: 1,
+          })
+          .firstPage();
+        const linkedClassIds =
+          (eventRecord?.fields[EVENTS_FIELD_IDS.classes] as string[] | undefined) || [];
+        if (linkedClassIds.length > 0) {
+          const existingDefaults = await this.base(CLASSES_TABLE_ID)
+            .select({
+              filterByFormula: `AND(OR(${linkedClassIds
+                .map((id) => `RECORD_ID() = '${id}'`)
+                .join(',')}), {${CLASSES_FIELD_IDS.is_default}} = TRUE())`,
+              maxRecords: 1,
+            })
+            .firstPage();
+          if (existingDefaults.length > 0) {
+            console.log(`Default class already linked to event ${data.eventId}, skipping creation`);
+            return null;
+          }
+        }
+      } catch (linkErr) {
+        console.warn(
+          'createDefaultClass: event-link idempotency check failed, relying on class_id check',
+          linkErr
+        );
+      }
+
+      // Idempotency (secondary): exact class_id match (covers events whose
+      // reverse-link is momentarily empty, e.g. first class on a fresh event).
       const existingRecords = await this.base(CLASSES_TABLE_ID)
         .select({
           filterByFormula: `AND({${CLASSES_FIELD_IDS.class_id}} = '${classId.replace(/'/g, "\\'")}', {${CLASSES_FIELD_IDS.is_default}} = TRUE())`,
@@ -2825,7 +2867,7 @@ class TeacherService {
         const audioFiles = await this.getAudioFilesByEventId(eventId);
 
         // Build class views from Classes table
-        const classViews: TeacherClassView[] = [];
+        let classViews: TeacherClassView[] = [];
         for (const classRecord of classRecords) {
           const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
           const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
@@ -2850,6 +2892,9 @@ class TeacherService {
             classType,
           });
         }
+
+        // Collapse duplicate class rows (drifted-class_id duplicates) before counts/display
+        classViews = dedupeClassViews(classViews);
 
         // Determine event status - Use date-only comparison to avoid timezone issues
         const eventDate = new Date(actualEventDate);
@@ -2964,7 +3009,7 @@ class TeacherService {
         const audioFiles = await this.getAudioFilesByEventId(eventId);
 
         // Build class views from Classes table
-        const classViews: TeacherClassView[] = [];
+        let classViews: TeacherClassView[] = [];
         for (const classRecord of classRecords) {
           const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
           const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
@@ -2989,6 +3034,9 @@ class TeacherService {
             classType,
           });
         }
+
+        // Collapse duplicate class rows (drifted-class_id duplicates) before counts/display
+        classViews = dedupeClassViews(classViews);
 
         // Determine event status
         const eventDate = new Date(actualEventDate);
@@ -3086,7 +3134,7 @@ class TeacherService {
         const audioFiles = await this.getAudioFilesByEventId(eventId);
 
         // Build class views from Classes table
-        const classViews: TeacherClassView[] = [];
+        let classViews: TeacherClassView[] = [];
         for (const classRecord of classRecords) {
           const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
           const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
@@ -3111,6 +3159,9 @@ class TeacherService {
             classType,
           });
         }
+
+        // Collapse duplicate class rows (drifted-class_id duplicates) before counts/display
+        classViews = dedupeClassViews(classViews);
 
         // Determine event status
         const eventDateParsed = new Date(actualEventDate);
