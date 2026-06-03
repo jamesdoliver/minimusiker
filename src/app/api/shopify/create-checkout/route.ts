@@ -3,6 +3,7 @@ import shopifyService from '@/lib/services/shopifyService';
 import { CheckoutLineItem, CheckoutCustomAttributes, ShippingAddressInput } from '@/lib/types/shop';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
+import { filterPurchasableLineItems, qualifiesForBundleDiscount } from '@/lib/utils/checkoutDiscounts';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +67,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Drop sold-out items (currently: hoodie variants) before doing anything else.
+    // A sold-out hoodie is dropped by Shopify at checkout anyway; removing it here
+    // means we never send it AND the cart-level bundle discount can never survive
+    // onto a shirt-only order. The portal already hides sold-out products — this
+    // guards stale/tampered clients.
+    const purchasableLineItems = filterPurchasableLineItems(lineItems);
+
+    if (purchasableLineItems.length < lineItems.length) {
+      console.warn('[create-checkout] Dropped sold-out line item(s):', {
+        sent: lineItems.length,
+        purchasable: purchasableLineItems.length,
+      });
+    }
+
+    if (purchasableLineItems.length === 0) {
+      return NextResponse.json(
+        { error: 'Die ausgewählten Artikel sind aktuell ausverkauft.' },
+        { status: 409 }
+      );
+    }
+
     // Determine discount codes to apply
     const discountCodes: string[] = [];
 
@@ -118,10 +140,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Bundle check (T-shirt + Hoodie)
-    const hasTshirt = lineItems.some(item => item.productType === 'tshirt');
-    const hasHoodie = lineItems.some(item => item.productType === 'hoodie');
-    if (hasTshirt && hasHoodie) {
+    // 2. Bundle check (T-shirt + Hoodie) — evaluated on PURCHASABLE items only, so a
+    //    bundle whose hoodie is sold out never earns the 15% on the surviving shirt.
+    if (qualifiesForBundleDiscount(purchasableLineItems)) {
       discountCodes.push('BUNDLE15');
       console.log('[create-checkout] Bundle discount applied: T-shirt + Hoodie combo');
     }
@@ -138,7 +159,7 @@ export async function POST(request: NextRequest) {
       const mockCartId = `mock_cart_${Date.now()}`;
       console.log('[create-checkout] Mock cart created:', {
         cartId: mockCartId,
-        lineItems,
+        lineItems: purchasableLineItems,
         customAttributes,
         discountCodes,
         note,
@@ -148,7 +169,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         cartId: mockCartId,
         checkoutUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/checkout/mock/${mockCartId}`,
-        totalQuantity: lineItems.reduce((sum, item) => sum + item.quantity, 0),
+        totalQuantity: purchasableLineItems.reduce((sum, item) => sum + item.quantity, 0),
         totalAmount: 0,
         currency: 'EUR',
         // Legacy fields for backward compatibility
@@ -161,7 +182,7 @@ export async function POST(request: NextRequest) {
 
     // Create real Shopify cart using modern Cart API
     const cart = await shopifyService.createCartFromCheckoutItems(
-      lineItems,
+      purchasableLineItems,
       customAttributes,
       discountCodes,
       note,
@@ -170,7 +191,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[create-checkout] Shopify cart created:', {
       cartId: cart.cartId,
-      itemCount: lineItems.length,
+      itemCount: purchasableLineItems.length,
       totalQuantity: cart.totalQuantity,
       totalAmount: cart.totalAmount,
       currency: cart.currency,

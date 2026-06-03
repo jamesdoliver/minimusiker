@@ -23,6 +23,7 @@ interface ClothingProductCardProps {
   ) => void;
   onCardClick?: () => void;
   isAdded?: boolean;
+  soldOut?: boolean;
   className?: string;
 }
 
@@ -38,6 +39,7 @@ export default function ClothingProductCard({
   onAdd,
   onCardClick,
   isAdded = false,
+  soldOut = false,
   className = ''
 }: ClothingProductCardProps) {
   const t = useTranslations('parentPortalCard');
@@ -46,6 +48,7 @@ export default function ClothingProductCard({
   const [quantity, setQuantity] = useState(1);
 
   const handleAdd = () => {
+    if (soldOut) return;
     onAdd(
       productId,
       showTshirtSize ? tshirtSize : null,
@@ -59,28 +62,36 @@ export default function ClothingProductCard({
   return (
     <div
       role="button"
-      tabIndex={0}
-      onClick={() => onCardClick?.()}
+      tabIndex={soldOut ? -1 : 0}
+      aria-disabled={soldOut}
+      onClick={() => { if (!soldOut) onCardClick?.(); }}
       onKeyDown={(e) => {
+        if (soldOut) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onCardClick?.();
         }
       }}
       className={cn(
-        'relative flex flex-col p-6 rounded-xl border-2 transition-all duration-200 bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-sage-500',
-        isAdded
-          ? 'border-sage-400 shadow-md'
-          : 'border-gray-200 hover:border-sage-300 hover:shadow-md',
+        'relative flex flex-col p-6 rounded-xl border-2 transition-all duration-200 bg-white focus:outline-none focus:ring-2 focus:ring-sage-500',
+        soldOut
+          ? 'border-gray-200 opacity-60 cursor-not-allowed'
+          : isAdded
+            ? 'border-sage-400 shadow-md cursor-pointer'
+            : 'border-gray-200 hover:border-sage-300 hover:shadow-md cursor-pointer',
         className
       )}
     >
-      {/* Savings Badge */}
-      {savings && savings > 0 && (
+      {/* Sold-out / Savings Badge */}
+      {soldOut ? (
+        <div className="absolute -top-2 -right-2 bg-gray-700 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm z-10">
+          {t('soldOut')}
+        </div>
+      ) : savings && savings > 0 ? (
         <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm z-10">
           {t('savings', { amount: savings.toFixed(0) })}
         </div>
-      )}
+      ) : null}
 
       {/* Product Image or Emoji */}
       <div className="flex justify-center items-center h-32 mb-4">
@@ -113,7 +124,7 @@ export default function ClothingProductCard({
       </p>
 
       {/* Size Selectors */}
-      <div className="mt-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+      <div className={cn('mt-4 space-y-3', soldOut && 'hidden')} onClick={(e) => e.stopPropagation()}>
         {showTshirtSize && (
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-600">
@@ -153,7 +164,21 @@ export default function ClothingProductCard({
         )}
       </div>
 
-      {/* Quantity and Add Button */}
+      {/* Sold-out: disabled button only */}
+      {soldOut ? (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full flex items-center justify-center px-4 py-2 bg-gray-200 text-gray-500 font-medium rounded-lg cursor-not-allowed"
+          >
+            {t('soldOut')}
+          </button>
+        </div>
+      ) : (
+      /* Quantity and Add Button */
       <div className="mt-4 pt-4 border-t border-gray-100">
         <div className="flex items-center justify-between gap-4">
           {/* Quantity Controls */}
@@ -194,6 +219,7 @@ export default function ClothingProductCard({
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }

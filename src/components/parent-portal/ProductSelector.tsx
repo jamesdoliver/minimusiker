@@ -541,6 +541,12 @@ export default function ProductSelector({
     hoodieSize: HoodieSize | null,
     quantity: number
   ) => {
+    // Never add a sold-out product (e.g. hoodie / bundle while hoodies are paused).
+    // Central guard so every add path (card button, detail sheet) is covered.
+    if (getClothingProduct(activeClothingProducts, productId as ClothingProductId)?.soldOut) {
+      return;
+    }
+
     const newItem: ClothingItem = {
       id: generateId(),
       productId: productId as ClothingProductId,
@@ -846,7 +852,8 @@ export default function ProductSelector({
                 showTshirtSize={product.showTshirtSize}
                 showHoodieSize={product.showHoodieSize}
                 onAdd={handleAddClothing}
-                onCardClick={() => setActiveDetailProduct({ type: 'clothing', id: product.id })}
+                soldOut={product.soldOut}
+                onCardClick={() => { if (!product.soldOut) setActiveDetailProduct({ type: 'clothing', id: product.id }); }}
                 className={product.id === 'tshirt-hoodie' ? 'col-span-2 lg:col-span-1' : ''}
               />
               {activeDetailProduct?.type === 'clothing' && activeDetailProduct.id === product.id && (() => {

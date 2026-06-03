@@ -356,6 +356,7 @@
     "schoolSong": "Your School Song",
     "tshirtSize": "T-Shirt Size",
     "hoodieSize": "Hoodie Size",
-    "chooseSize": "Choose Size"
+    "chooseSize": "Choose Size",
+    "soldOut": "Sold out"
   }
 }
