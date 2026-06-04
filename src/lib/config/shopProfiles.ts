@@ -464,8 +464,12 @@ export function resolveShopProfile(
     return isPlus ? SCS_PLUS_PROFILE : SCS_PROFILE;
   }
 
-  // Schulsong-only (schulsong flag set but NOT minimusikertag)
-  if (isSchulsong && !isMinimusikertag) {
+  // Schulsong-only: a schulsong event with NO audio tier (not Minimusikertag and not
+  // Plus; SCS is already handled above). A Plus/Minimusikertag event that *also* has a
+  // schulsong keeps its full audio shopfront — the schulsong is delivered via its own
+  // pipeline, not sold in the shop. Without the !isPlus guard a "Plus + Schulsong" event
+  // wrongly rendered as schulsong-only, removing all audio products (regression: event 1756).
+  if (isSchulsong && !isMinimusikertag && !isPlus) {
     return SCHULSONG_ONLY_PROFILE;
   }
 

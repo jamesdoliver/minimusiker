@@ -301,8 +301,28 @@ describe('resolveShopProfile', () => {
     expect(profile.audioProducts.length).toBeGreaterThan(0);
   });
 
-  it('schulsong-only takes priority over plus', () => {
+  it('returns plus (with audio) for a Plus + Schulsong event — schulsong must NOT hide the audio shopfront', () => {
+    // Regression: TEMPELHOFER STRASSE (event 1756) was a Plus + Schulsong event that
+    // resolved to schulsong-only, removing every audio product from the parent shop with
+    // no way to re-enable it. A schulsong is delivered via its own pipeline, not the shop,
+    // so it must never strip the audio tier.
     const profile = resolveShopProfile({ isPlus: true, isSchulsong: true, isMinimusikertag: false });
-    expect(profile.profileType).toBe('schulsong-only');
+    expect(profile.profileType).toBe('plus');
+    expect(profile.audioProducts.length).toBeGreaterThan(0);
+  });
+
+  it('keeps schulsong-only ONLY when the event has no audio tier (not Plus, not Minimusikertag, not SCS)', () => {
+    expect(resolveShopProfile({ isSchulsong: true }).profileType).toBe('schulsong-only');
+    expect(
+      resolveShopProfile({ isSchulsong: true, isPlus: false, isMinimusikertag: false }).profileType
+    ).toBe('schulsong-only');
+  });
+
+  it('never returns a no-audio profile for any audio-tier + schulsong combination', () => {
+    expect(resolveShopProfile({ isMinimusikertag: true, isSchulsong: true }).audioProducts.length).toBeGreaterThan(0);
+    expect(resolveShopProfile({ isPlus: true, isSchulsong: true }).audioProducts.length).toBeGreaterThan(0);
+    expect(resolveShopProfile({ isMinimusikertag: true, isPlus: true, isSchulsong: true }).audioProducts.length).toBeGreaterThan(0);
+    // SCS profiles sell CD + Kinderliederbox, so SCS + Schulsong still has audio.
+    expect(resolveShopProfile({ isScs: true, isSchulsong: true }).audioProducts.length).toBeGreaterThan(0);
   });
 });

@@ -4,6 +4,7 @@ import { CheckoutLineItem, CheckoutCustomAttributes, ShippingAddressInput } from
 import { getAirtableService } from '@/lib/services/airtableService';
 import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
 import { filterPurchasableLineItems, qualifiesForBundleDiscount } from '@/lib/utils/checkoutDiscounts';
+import { resolveShopProfile } from '@/lib/config/shopProfiles';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,8 +98,17 @@ export async function POST(request: NextRequest) {
         const airtable = getAirtableService();
         const event = await airtable.getEventByEventId(customAttributes.eventId);
 
-        // Detect schulsong-only events (no audio products → no early-bird discount)
-        const isSchulsongOnly = event?.is_schulsong === true && event?.is_minimusikertag !== true;
+        // Detect schulsong-only events (no audio products → no early-bird discount).
+        // Derive from the SAME profile the shop renders so this never drifts: a
+        // Plus/Minimusikertag/SCS event that also has a schulsong still sells audio and
+        // must remain early-bird eligible (regression: "Plus + Schulsong" event 1756).
+        const earlyBirdProfile = resolveShopProfile({
+          isMinimusikertag: event?.is_minimusikertag === true,
+          isPlus: event?.is_plus === true,
+          isSchulsong: event?.is_schulsong === true,
+          isScs: event?.scs_shirts_included === true,
+        });
+        const isSchulsongOnly = earlyBirdProfile.audioProducts.length === 0;
 
         // Early-bird discount: must be within deadline window AND not schulsong-only
         if (event?.event_date && !isSchulsongOnly) {
