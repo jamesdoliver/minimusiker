@@ -33,6 +33,13 @@ export interface ClothingProduct {
   showHoodieSize: boolean;
   savings?: number;
   isPersonalized?: boolean;
+  /**
+   * When true the product is shown as "Ausverkauft" and cannot be added to the
+   * cart. Set on the Hoodie + T-Shirt&Hoodie bundle while WirMachenDruck cannot
+   * deliver hoodies. Also drives SOLD_OUT_HOODIE_VARIANT_IDS so the checkout
+   * route refuses the bundle discount on an order that won't contain a hoodie.
+   */
+  soldOut?: boolean;
 }
 
 export type ShopProfileType = 'minimusikertag' | 'plus' | 'schulsong-only' | 'scs' | 'scs-plus';
@@ -70,6 +77,7 @@ const STANDARD_CLOTHING: ClothingProduct[] = [
     showTshirtSize: false,
     showHoodieSize: true,
     isPersonalized: false,
+    soldOut: true, // WirMachenDruck hoodie delivery paused
   },
   {
     id: 'tshirt-hoodie',
@@ -81,6 +89,7 @@ const STANDARD_CLOTHING: ClothingProduct[] = [
     showHoodieSize: true,
     savings: 15,
     isPersonalized: false,
+    soldOut: true, // bundle includes the hoodie -> sold out with it
   },
 ];
 
@@ -104,6 +113,7 @@ const PERSONALIZED_CLOTHING: ClothingProduct[] = [
     showTshirtSize: false,
     showHoodieSize: true,
     isPersonalized: true,
+    soldOut: true, // WirMachenDruck hoodie delivery paused
   },
   {
     id: 'tshirt-hoodie',
@@ -115,6 +125,7 @@ const PERSONALIZED_CLOTHING: ClothingProduct[] = [
     showHoodieSize: true,
     savings: 15,
     isPersonalized: true,
+    soldOut: true, // bundle includes the hoodie -> sold out with it
   },
 ];
 
@@ -320,6 +331,7 @@ const SCS_HOODIE_ONLY: ClothingProduct[] = [
     showTshirtSize: false,
     showHoodieSize: true,
     isPersonalized: true,
+    soldOut: true, // WirMachenDruck hoodie delivery paused
   },
 ];
 
@@ -383,6 +395,48 @@ export const AUDIO_PRODUCT_VARIANT_IDS = new Set([
   '53525549089114',   // Minicard+CD bundle PLUS
   '53836123472218',   // Kinderliederbox PLUS
 ]);
+
+// ============================================================================
+// SOLD-OUT HOODIE VARIANTS (server-side discount/availability guard)
+// ============================================================================
+
+/**
+ * Numeric Shopify variant IDs for every hoodie variant that belongs to a clothing
+ * product currently flagged `soldOut`. Derived from the config so it stays in sync:
+ * clearing the `soldOut` flags (hoodies back in stock) automatically empties this set.
+ *
+ * Used by the checkout route to (a) drop a sold-out hoodie line before it reaches
+ * Shopify and (b) refuse the BUNDLE15 discount on any order that would not actually
+ * contain a purchasable hoodie — closing the shirt-only-with-bundle-discount leak.
+ *
+ * Variant IDs are the numeric portion after "gid://shopify/ProductVariant/".
+ */
+export const SOLD_OUT_HOODIE_VARIANT_IDS: Set<string> = (() => {
+  const ids = new Set<string>();
+  const profiles: ShopProfile[] = [
+    MINIMUSIKERTAG_PROFILE,
+    PLUS_PROFILE,
+    SCHULSONG_ONLY_PROFILE,
+    SCS_PROFILE,
+    SCS_PLUS_PROFILE,
+  ];
+  for (const profile of profiles) {
+    const clothing = [
+      ...profile.personalizedClothingProducts,
+      ...profile.standardClothingProducts,
+    ];
+    const hoodieSoldOut = clothing.some(
+      (p) => (p.id === 'hoodie' || p.id === 'tshirt-hoodie') && p.soldOut === true
+    );
+    if (!hoodieSoldOut) continue;
+    for (const [key, gid] of Object.entries(profile.shopifyVariantMap)) {
+      if (key.startsWith('hoodie-')) {
+        ids.add(gid.split('/').pop() as string);
+      }
+    }
+  }
+  return ids;
+})();
 
 // ============================================================================
 // PROFILE RESOLUTION
