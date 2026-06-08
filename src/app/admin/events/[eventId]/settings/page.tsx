@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -103,7 +103,6 @@ function storageValue(displayVal: number, negateForDisplay: boolean): number {
 
 export default function EventSettingsPage() {
   const params = useParams();
-  const router = useRouter();
   const eventId = params.eventId as string;
 
   const [isLoading, setIsLoading] = useState(true);
@@ -739,7 +738,7 @@ function ThresholdField({
             min={0}
             max={365}
             value={hasOverride && !disabled ? value : ''}
-            placeholder={`${field.suffix.includes('vor') ? '-' : '+'}${defaultValue}`}
+            placeholder={`${defaultValue}`}
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             className="w-20 px-3 py-1.5 text-sm border rounded-lg text-right focus:ring-2 focus:ring-[#5a8a82] focus:border-[#5a8a82] outline-none placeholder:text-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
