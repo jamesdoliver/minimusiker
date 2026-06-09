@@ -2285,9 +2285,9 @@ class TeacherService {
           hasFinal: audioFiles.some((a) => a.type === 'final' && a.status !== 'error'),
         };
 
-        // Populate member classes details
+        // Populate member classes details (always an array, even for empty groups)
+        const memberClasses: TeacherClassView[] = [];
         if (group.memberClassIds.length > 0) {
-          const memberClasses: TeacherClassView[] = [];
           for (const classRecordId of group.memberClassIds) {
             try {
               // Use .select() instead of .find() to support returnFieldsByFieldId
@@ -2314,8 +2314,8 @@ class TeacherService {
               console.warn(`Could not fetch class record ${classRecordId}:`, err);
             }
           }
-          group.memberClasses = memberClasses;
         }
+        group.memberClasses = memberClasses;
 
         groups.push(group);
       }

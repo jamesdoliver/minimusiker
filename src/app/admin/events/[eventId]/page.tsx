@@ -1842,7 +1842,7 @@ export default function EventDetailPage() {
                           </span>
                         </div>
                         <div className="text-sm text-gray-500">
-                          {group.memberClasses.map((c) => c.className).join(', ')} • {songs.length}{' '}
+                          {(group.memberClasses || []).map((c) => c.className).join(', ')} • {songs.length}{' '}
                           {songs.length === 1 ? 'Lied' : 'Lieder'}
                         </div>
                       </div>
