@@ -28,6 +28,23 @@ import { isSchulsongOnlyEvent } from '@/lib/utils/eventTier';
 // Constants
 const RATE_LIMIT_DELAY_MS = 500; // 500ms delay between emails to respect Resend rate limits
 
+// Catch-up window for the timeline cron: a missed or truncated run self-heals
+// within this many days because the existing per-template/event/recipient dedup
+// makes re-scanning an already-sent cohort a no-op. Mirrors the look-back the
+// schulsong/mix-ready crons already use ("covers cron drift; dedup makes
+// multiple runs safe"). Applied to pre-event steps only — see catchUpWindowDays.
+const CATCH_UP_DAYS = 7;
+
+/**
+ * How many days of look-back the timeline cron should use for a template,
+ * given its triggerDays. Pre-event steps (negative triggerDays) get a catch-up
+ * window so a missed run self-heals. Day-0 and post-event steps get none — a
+ * late "your event is today!" mail would be worse than a missed one.
+ */
+export function catchUpWindowDays(triggerDays: number): number {
+  return triggerDays < 0 ? CATCH_UP_DAYS : 0;
+}
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -185,11 +202,18 @@ export function substituteTemplateVariables(
 /**
  * Get all events that match a specific trigger threshold
  * @param triggerDays - Number of days before (negative) or after (positive) the event
- * @returns Events where (event_date - today) equals triggerDays
+ * @param prefetchedEvents - Optional pre-fetched events to avoid a repeated Airtable call
+ * @param lookBackDays - Catch-up window. With 0 (default) only events whose
+ *   threshold day is exactly today match (strict equality — used by the admin
+ *   dry-run preview). With N>0 events whose threshold day fell in the last N
+ *   days also match, so a missed/truncated cron run self-heals on a later run;
+ *   the existing dedup prevents re-sends.
+ * @returns Events where (event_date - today) equals triggerDays (within the look-back window)
  */
 export async function getEventsHittingThreshold(
   triggerDays: number,
-  prefetchedEvents?: Event[]
+  prefetchedEvents?: Event[],
+  lookBackDays: number = 0
 ): Promise<EventThresholdMatch[]> {
   const airtable = getAirtableService();
 
@@ -211,6 +235,12 @@ export async function getEventsHittingThreshold(
 
   const targetDateStr = targetDate.toISOString().split('T')[0];
 
+  // Start of the catch-up window: targetDate - lookBackDays. With lookBackDays=0
+  // this equals targetDate, collapsing the window check back to strict equality.
+  const windowStart = new Date(targetDate);
+  windowStart.setUTCDate(windowStart.getUTCDate() - lookBackDays);
+  const windowStartStr = windowStart.toISOString().split('T')[0];
+
   try {
     const events = prefetchedEvents ?? await airtable.getAllEvents();
 
@@ -224,10 +254,12 @@ export async function getEventsHittingThreshold(
       const overrides = parseOverrides(event.timeline_overrides);
       if (overrides?.communications_paused) continue;
 
-      // Compare dates (normalize to YYYY-MM-DD)
+      // Compare dates (normalize to YYYY-MM-DD). Match any threshold day that
+      // fell within the catch-up window [windowStart, target] — string compare
+      // is chronological for zero-padded ISO dates.
       const eventDateStr = event.event_date.split('T')[0];
 
-      if (eventDateStr === targetDateStr) {
+      if (eventDateStr >= windowStartStr && eventDateStr <= targetDateStr) {
         const eventDate = new Date(event.event_date);
         const daysUntil = daysBetween(todayUtcMidnight, eventDate);
 
@@ -718,8 +750,15 @@ export async function processEmailAutomation(
           `[Email Automation] Template: ${template.name} (trigger: ${template.triggerDays} days, audience: ${template.audience.join(', ')})`
         );
 
-        // Get events matching this template's trigger threshold
-        const events = await getEventsHittingThreshold(template.triggerDays, allEvents);
+        // Get events matching this template's trigger threshold. Pre-event
+        // steps use a catch-up window so a missed/truncated run self-heals on a
+        // later run (dedup keeps re-sends from happening); day-0/post-event
+        // steps stay same-day-only.
+        const events = await getEventsHittingThreshold(
+          template.triggerDays,
+          allEvents,
+          catchUpWindowDays(template.triggerDays)
+        );
 
         // Filter events by template's event type filters
         const filteredEvents = events.filter(event => eventMatchesTemplate(event, template));
@@ -777,8 +816,14 @@ export async function processEmailAutomation(
                 result.emailsFailed++;
               }
 
-              // Rate limiting delay
-              await sleep(RATE_LIMIT_DELAY_MS);
+              // Rate-limit only after an actual Resend call. A dedup skip makes
+              // no Resend request, so the 500ms delay would be pure waste — and
+              // with the catch-up window re-scanning already-sent cohorts each
+              // run, sleeping on every skip would inflate run time toward the
+              // 300s cap (the very timeout that dropped cohorts in the first place).
+              if (sendResult.error !== 'Already sent') {
+                await sleep(RATE_LIMIT_DELAY_MS);
+              }
             }
           }
         }
