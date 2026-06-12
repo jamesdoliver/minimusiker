@@ -720,6 +720,26 @@ class R2Service {
   }
 
   /**
+   * Like fileExists, but retries a few times with a short backoff. R2 is
+   * usually read-after-write consistent, but a HEAD immediately after a direct
+   * browser PUT can occasionally 404 — which surfaced to engineers as a false
+   * "File not found in storage. Upload may have failed." on the upload confirm.
+   * Kept separate from fileExists so the many fast-path callers (logo/printable
+   * existence probes) don't inherit the retries.
+   */
+  async fileExistsWithRetry(
+    key: string,
+    attempts: number = 3,
+    delayMs: number = 300
+  ): Promise<boolean> {
+    for (let i = 0; i < attempts; i++) {
+      if (await this.fileExists(key)) return true;
+      if (i < attempts - 1) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return false;
+  }
+
+  /**
    * Upload raw audio file for a class
    * Raw audio files are stored in recordings/{eventId}/{classId}/raw/
    * Each raw file gets a unique timestamp-based name
@@ -1080,23 +1100,22 @@ class R2Service {
    */
   async moveFile(fromKey: string, toKey: string): Promise<boolean> {
     try {
-      // Get the file from temp location
-      const buffer = await this.getFileBuffer(fromKey);
-      if (!buffer) {
-        console.error('Could not retrieve file from temp location:', fromKey);
-        return false;
-      }
+      // Server-side copy within the bucket. Pulling the object through the
+      // function's memory (getFileBuffer + PutObjectCommand) OOM'd / timed out
+      // the batch-confirm step on large WAV mixes — CopyObject keeps the bytes
+      // inside R2. CopySource must be URL-encoded per path segment (keys contain
+      // spaces, e.g. "Title - Klasse 1a.wav") or R2 can't resolve it.
+      const encodedSource = fromKey.split('/').map(encodeURIComponent).join('/');
+      await this.client.send(
+        new CopyObjectCommand({
+          Bucket: this.bucketName,
+          CopySource: `${this.bucketName}/${encodedSource}`,
+          Key: toKey,
+        })
+      );
 
-      // Upload to final location
-      const command = new PutObjectCommand({
-        Bucket: this.bucketName,
-        Key: toKey,
-        Body: buffer,
-      });
-
-      await this.client.send(command);
-
-      // Delete from temp location
+      // Delete the temp original only after a successful copy (copy throws on
+      // failure → caught below → temp preserved for retry).
       await this.deleteFile(fromKey);
 
       return true;

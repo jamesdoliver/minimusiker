@@ -166,9 +166,11 @@ export async function PUT(
       );
     }
 
-    // Verify the file was uploaded to R2
+    // Verify the file was uploaded to R2. Retry briefly: a HEAD right after the
+    // browser's direct PUT can momentarily 404 on read-after-write lag, which
+    // otherwise surfaces as a false "Upload may have failed." to the engineer.
     const r2Service = getR2Service();
-    const fileExists = await r2Service.fileExists(r2Key);
+    const fileExists = await r2Service.fileExistsWithRetry(r2Key);
     if (!fileExists) {
       return NextResponse.json(
         { error: 'File not found in storage. Upload may have failed.' },
