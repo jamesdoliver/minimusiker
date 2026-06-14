@@ -57,6 +57,19 @@ const TEST_BLOCKLIST = new Set([
   'unknown school', 'sabine bleck', 'larseland grundschule',
 ]);
 
+// Abandoned manual-draft bookings (M-*) for real schools whose event never
+// took place: pending months past the draft date with zero recordings,
+// registrations, orders, or audio-pipeline activity, and no confirmed booking.
+// Keyed by simplybook_id (stable). If a school is genuinely rebooked it will get
+// a numeric, dated booking that this generator picks up automatically.
+// Verified 2026-06-14 (see scripts/tmp-verify-pending-drafts diagnostics).
+const STALE_DRAFT_IDS = new Set([
+  'M-23a8b4', // Schule am Halmerweg, Bremen — draft date 2026-02-17, no activity
+  'M-9fdc47', // Paul-Sillus-Schule, Jever — draft date 2026-03-10, no activity
+  'M-f65466', // Paul-Sillus-Schule, Jever — duplicate draft, no linked event
+  'M-08ed7e', // Lembergschule Poppenweiler, Ludwigsburg — draft date 2026-03-23, no activity
+]);
+
 // Display-name fixes for typos / misnamed bookings (web-verified).
 const NAME_FIXES = {
   'Erich Kästner Grundschule Veitrsbronn': 'Erich Kästner Grundschule Veitsbronn', // Airtable typo
@@ -169,11 +182,16 @@ async function fetchAll(table, fields) {
     }
   }
 
-  // Apply k fixes to preserved entries (labels stay untouched).
-  const preserved = existing.map((s) => {
-    const fix = K_FIXES[`${s.n}|${s.c}`];
-    return fix ? { ...s, k: fix } : { ...s };
-  });
+  // Apply k fixes to preserved entries (labels stay untouched), and drop any
+  // entry keyed to a stale abandoned draft (verified never to have happened).
+  const droppedStale = existing.filter((s) => STALE_DRAFT_IDS.has(String(s.e)));
+  const preserved = existing
+    .filter((s) => !STALE_DRAFT_IDS.has(String(s.e)))
+    .map((s) => {
+      const fix = K_FIXES[`${s.n}|${s.c}`];
+      return fix ? { ...s, k: fix } : { ...s };
+    });
+  if (droppedStale.length) console.log(`Dropped ${droppedStale.length} stale draft entries: ${droppedStale.map((s) => `${s.n} (e=${s.e})`).join(', ')}`);
   const existingEs = new Set(preserved.map((s) => String(s.e)));
   const existingKs = new Map(); // alte_id -> entry (for same-school-different-spelling)
   for (const s of preserved) if (s.k) existingKs.set(s.k, s);
@@ -229,6 +247,7 @@ async function fetchAll(table, fields) {
   // 2. SchoolBookings (SimplyBook + manual drafts)
   for (const b of bookings) {
     if (b.simplybook_status && DEAD_STATUS_RE.test(b.simplybook_status)) continue;
+    if (STALE_DRAFT_IDS.has(b.simplybook_id)) { review.push({ name: (b.school_name || '').trim(), city: b.city, src: `SchoolBookings sb=${b.simplybook_id}`, why: 'EXCLUDED — abandoned draft, event verified as never having taken place' }); continue; }
     const effDate = b.start_date || eventDateByBooking.get(b.recId) || null;
     if (!effDate || effDate < WINDOW_START) continue;
     const ein = (b.einrichtung || []).map((id) => einById.get(id)).filter(Boolean)[0];
@@ -236,7 +255,7 @@ async function fetchAll(table, fields) {
     if (!name.trim()) continue;
     if (b.is_kita || (ein && ein.type === 'KiTa') || isKitaName(name)) continue;
     if (isTest(name)) { review.push({ name: name.trim(), city: b.city, src: `SchoolBookings sb=${b.simplybook_id}`, why: 'test blocklist' }); continue; }
-    if (!b.start_date) review.push({ name: cleanName(name), city: b.city, src: `SchoolBookings sb=${b.simplybook_id}`, why: `INCLUDED, but manual draft without start_date (status=${b.simplybook_status}, event date ${effDate}) — verify the event really took place` });
+    if (!b.start_date) review.push({ name: cleanName(name), city: b.city, src: `SchoolBookings sb=${b.simplybook_id}`, why: `INCLUDED, manual draft without start_date (status=${b.simplybook_status}, event date ${effDate}) — backed by a confirmed sibling booking` });
     addCandidate({ name, city: b.city || (ein && ein.ort), e: b.simplybook_id || `sb-${b.recId.slice(-6)}`, k: (ein && ein.alte_id) || 0, src: 'SchoolBookings', date: effDate });
   }
 
