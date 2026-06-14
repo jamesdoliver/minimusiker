@@ -56,6 +56,8 @@ import {
   getTriggerTemplate,
   getTriggerTemplateBySlug,
   seedMissingTriggerTemplates,
+  renderTriggerTemplate,
+  getSampleVariables,
 } from './triggerTemplateService';
 
 describe('defaultActive plumbing', () => {
@@ -111,5 +113,63 @@ describe('getTriggerTemplateBySlug honors defaultActive', () => {
   it('returns active=false when defaultActive=false and no Airtable record', async () => {
     const t = await getTriggerTemplateBySlug('test_default_inactive');
     expect(t?.active).toBe(false);
+  });
+});
+
+describe('renderTriggerTemplate variable resolution', () => {
+  // The trigger send-path injects camelCase keys (childName, parentFirstName)
+  // while the timeline/preview editor documents snake_case ({{child_name}}).
+  // A template override authored in snake_case must still render.
+  it('resolves snake_case body tokens from a camelCase variables map', () => {
+    const out = renderTriggerTemplate(
+      'Hallo {{parent_first_name}}, hier singt {{child_name}} an der {{school_name}}.',
+      { parentFirstName: 'Anna', childName: 'Max', schoolName: 'GS Sonnenschein' }
+    );
+    expect(out).toBe('Hallo Anna, hier singt Max an der GS Sonnenschein.');
+  });
+
+  it('still resolves camelCase tokens (no regression)', () => {
+    const out = renderTriggerTemplate(
+      'Hallo {{parentFirstName}}, hier singt {{childName}}.',
+      { parentFirstName: 'Anna', childName: 'Max' }
+    );
+    expect(out).toBe('Hallo Anna, hier singt Max.');
+  });
+
+  it('resolves triple-brace (unescaped) tokens under both conventions', () => {
+    const out = renderTriggerTemplate('{{{child_name}}} / {{{childName}}}', {
+      childName: 'Max & Co',
+    });
+    expect(out).toBe('Max & Co / Max & Co');
+  });
+
+  it('strips genuinely unknown placeholders', () => {
+    const out = renderTriggerTemplate('Hallo {{unknown_token}}!', { childName: 'Max' });
+    expect(out).toBe('Hallo !');
+  });
+
+  it('inserts $ sequences in values literally (no replacement-string interpolation)', () => {
+    // URL-bearing variables (signed tokens) can contain $&, $1, $$ — these must
+    // not be interpreted as String.replace replacement patterns.
+    const out = renderTriggerTemplate('Link: {{parentPortalLink}}', {
+      parentPortalLink: 'https://x.test/p?t=a$1b$&c$$d',
+    });
+    expect(out).toBe('Link: https://x.test/p?t=a$1b$&c$$d');
+  });
+});
+
+describe('getSampleVariables for mix-ready trigger templates', () => {
+  it.each([
+    'parent_mix_ready_audio_buyer',
+    'parent_mix_ready_non_audio_buyer',
+    'teacher_mix_ready',
+  ])('returns non-empty preview sample data for %s', (slug) => {
+    const vars = getSampleVariables(slug);
+    expect(Object.keys(vars).length).toBeGreaterThan(0);
+    // childName/parentFirstName drive the personalization that broke in prod.
+    if (slug.startsWith('parent_')) {
+      expect(vars.childName).toBeTruthy();
+      expect(vars.parentFirstName).toBeTruthy();
+    }
   });
 });

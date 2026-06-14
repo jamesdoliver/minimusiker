@@ -151,22 +151,55 @@ export async function getTriggerTemplate(slug: string): Promise<TriggerTemplateR
 
 /**
  * Substitute {{variable}} placeholders in a template string.
+ *
+ * Resolves each variable under BOTH its given key and a derived snake_case
+ * alias. The trigger send-path injects camelCase keys (e.g. `childName`,
+ * `parentFirstName`), but the timeline/preview editor documents the same
+ * variables in snake_case (`{{child_name}}`, `{{parent_first_name}}` — see
+ * `getPreviewTemplateData` in emailAutomationService). An override authored in
+ * either convention must render; previously a snake_case token in the body was
+ * never matched and got silently stripped to an empty string (parents received
+ * "Hallo ," with no name). Accepting both conventions is purely additive —
+ * camelCase tokens resolve exactly as before.
  */
 export function renderTriggerTemplate(
   template: string,
   variables: Record<string, string>
 ): string {
-  let result = template;
+  // Expand the map so every value is reachable via its original key and its
+  // snake_case alias (camelToSnake). Explicit keys win over derived aliases.
+  const resolved: Record<string, string> = {};
   for (const [key, value] of Object.entries(variables)) {
-    if (value !== undefined && value !== null) {
-      // Handle triple braces first ({{{key}}} — Mustache-style unescaped HTML), then double braces
-      const triplePattern = new RegExp(`\\{\\{\\{${key}\\}\\}\\}`, 'g');
-      result = result.replace(triplePattern, value);
-      const doublePattern = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-      result = result.replace(doublePattern, value);
+    if (value === undefined || value === null) continue;
+    resolved[key] = value;
+    const snakeAlias = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+    if (snakeAlias !== key && resolved[snakeAlias] === undefined) {
+      resolved[snakeAlias] = value;
     }
   }
-  // Remove any remaining unsubstituted placeholders (both {{x}} and {{{x}}})
+
+  let result = template;
+  for (const [key, value] of Object.entries(resolved)) {
+    // Handle triple braces first ({{{key}}} — Mustache-style unescaped HTML), then
+    // double braces. Use the function replacer so `$` sequences in the value (e.g.
+    // signed tokens in a URL) are inserted literally, not interpreted as `$&`/`$1`.
+    const triplePattern = new RegExp(`\\{\\{\\{${key}\\}\\}\\}`, 'g');
+    result = result.replace(triplePattern, () => value);
+    const doublePattern = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+    result = result.replace(doublePattern, () => value);
+  }
+
+  // Surface (don't silently swallow) any placeholder we couldn't resolve — a
+  // mistyped or genuinely-missing variable is a content bug worth logging —
+  // then strip it so raw {{tokens}} never reach a recipient.
+  const unresolved = result.match(/\{\{\{?[^}]+\}\}\}?/g);
+  if (unresolved && unresolved.length > 0) {
+    console.warn(
+      `[TriggerTemplate] Stripped ${unresolved.length} unresolved placeholder(s): ${[
+        ...new Set(unresolved),
+      ].join(', ')}`
+    );
+  }
   result = result.replace(/\{\{\{?[^}]+\}\}\}?/g, '');
   return result;
 }
@@ -500,6 +533,28 @@ export function getSampleVariables(slug: string): Record<string, string> {
       parentPortalLink: 'https://minimusiker.app/familie',
       parentName: 'Anna',
       merchandiseDeadline: '15.03.2025',
+    },
+    parent_mix_ready_audio_buyer: {
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      parentName: 'Anna Becker',
+      parentFirstName: 'Anna',
+      childName: 'Max',
+      className: 'Klasse 3a',
+      parentPortalLink: 'https://minimusiker.app/familie',
+    },
+    parent_mix_ready_non_audio_buyer: {
+      schoolName: 'Grundschule Sonnenschein',
+      eventDate: 'Montag, 15. März 2025',
+      parentName: 'Anna Becker',
+      parentFirstName: 'Anna',
+      childName: 'Max',
+      className: 'Klasse 3a',
+      parentPortalLink: 'https://minimusiker.app/familie',
+    },
+    teacher_mix_ready: {
+      schoolName: 'Grundschule Sonnenschein',
+      parentPortalLink: 'https://minimusiker.app/familie',
     },
     engineer_schulsong_uploaded: {
       engineerName: 'Max',
