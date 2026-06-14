@@ -19,6 +19,7 @@ import {
   getEventTier,
   getEventsHittingThreshold,
   catchUpWindowDays,
+  substituteTemplateVariables,
 } from './emailAutomationService';
 import { EventThresholdMatch, EmailTemplate } from '@/lib/types/email-automation';
 import { Event } from '@/lib/types/airtable';
@@ -238,5 +239,23 @@ describe('getEventTier — invalid-flag-combo guard', () => {
     // priority chain pick a tier so downstream code keeps working.
     const tier = getEventTier({ isPlus: true, isMinimusikertag: true });
     expect(tier).toBe('plus');
+  });
+});
+
+describe('substituteTemplateVariables $-sequence safety', () => {
+  it('inserts $ sequences in values literally (no replacement-string interpolation)', () => {
+    // URL-bearing variables (signed tokens, query params) can contain $&, $1, $$ —
+    // these must not be interpreted as String.replace replacement patterns.
+    const out = substituteTemplateVariables('Link: {{parent_portal_link}}', {
+      parent_portal_link: 'https://x.test/p?t=a$1b$&c$$d',
+    });
+    expect(out).toBe('Link: https://x.test/p?t=a$1b$&c$$d');
+  });
+
+  it('still substitutes ordinary values and strips unknown placeholders', () => {
+    const out = substituteTemplateVariables('Hallo {{parent_first_name}}{{missing}}!', {
+      parent_first_name: 'Anna',
+    });
+    expect(out).toBe('Hallo Anna!');
   });
 });

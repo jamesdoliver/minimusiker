@@ -179,11 +179,13 @@ export function substituteTemplateVariables(
     });
   }
 
-  // Replace all {{variable}} patterns, skipping _-prefixed internal keys
+  // Replace all {{variable}} patterns, skipping _-prefixed internal keys.
+  // Use the function replacer so `$` sequences in the value (e.g. signed tokens
+  // in a URL) are inserted literally, not interpreted as `$&`/`$1`.
   for (const [key, value] of Object.entries(data)) {
     if (value !== undefined && !key.startsWith('_')) {
       const pattern = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-      result = result.replace(pattern, value);
+      result = result.replace(pattern, () => value);
     }
   }
 
