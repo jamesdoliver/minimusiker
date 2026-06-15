@@ -144,3 +144,21 @@ export function aggregateEventTotals(classes: AggregableClass[]): EventTotals {
 
   return { totalChildren, totalParents, overallRegistrationRate };
 }
+
+/**
+ * Null-safe ascending comparator for sorting class views by display name.
+ *
+ * `className` is `undefined` whenever a Class row's `class_name` field is unset
+ * in Airtable — e.g. leftover empty classes from a class merge (regression:
+ * event 1776 Pleisterschule had 3 such rows). Calling `.localeCompare` directly
+ * on `undefined` throws "Cannot read properties of undefined (reading
+ * 'localeCompare')", which 500s every endpoint that sorts classes by name and
+ * makes the admin event-detail page unreachable. Coerce a missing name to ''
+ * (blanks sort first) — mirrors the already-guarded journey sorts.
+ */
+export function compareClassName(
+  a: { className?: string },
+  b: { className?: string },
+): number {
+  return (a.className || '').localeCompare(b.className || '');
+}

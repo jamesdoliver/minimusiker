@@ -1,4 +1,4 @@
-import { dedupeClassViews, DedupableClass } from './eventAggregation';
+import { dedupeClassViews, DedupableClass, compareClassName } from './eventAggregation';
 
 function cls(overrides: Partial<DedupableClass> = {}): DedupableClass {
   return {
@@ -137,5 +137,34 @@ describe('dedupeClassViews', () => {
     const out = dedupeClassViews(input);
     expect(out).toHaveLength(1);
     expect(out[0].numChildren).toBe(22);
+  });
+});
+
+describe('compareClassName', () => {
+  // Regression: event 1776 (Pleisterschule) had 3 classes with an unset
+  // class_name (reads back as undefined). The old `a.className.localeCompare(...)`
+  // sorts threw "Cannot read properties of undefined (reading 'localeCompare')",
+  // 500ing getSchoolEventDetail and making the admin event page unreachable.
+  it('does not throw when a className is undefined', () => {
+    expect(() => compareClassName({ className: undefined }, { className: 'Klasse 1a' })).not.toThrow();
+    expect(() => compareClassName({ className: 'Klasse 1a' }, { className: undefined })).not.toThrow();
+    expect(() => compareClassName({ className: undefined }, { className: undefined })).not.toThrow();
+  });
+
+  it('sorts a mixed list (incl. undefined names) without throwing; blanks sort first', () => {
+    const input = [
+      { className: 'Klasse 2a' },
+      { className: undefined },
+      { className: 'Klasse 1a' },
+      { className: undefined },
+    ];
+    const sorted = [...input].sort(compareClassName);
+    expect(sorted.map((c) => c.className)).toEqual([undefined, undefined, 'Klasse 1a', 'Klasse 2a']);
+  });
+
+  it('orders normal names alphabetically', () => {
+    expect(compareClassName({ className: 'Klasse 1a' }, { className: 'Klasse 2a' })).toBeLessThan(0);
+    expect(compareClassName({ className: 'Klasse 2a' }, { className: 'Klasse 1a' })).toBeGreaterThan(0);
+    expect(compareClassName({ className: 'Klasse 1a' }, { className: 'Klasse 1a' })).toBe(0);
   });
 });
