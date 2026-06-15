@@ -579,10 +579,10 @@ export const EVENTS_FIELD_IDS = {
   scs_shirts_included: 'fldcriEUgu7ymH2l7',            // Checkbox - enables SchulClothingOrder
   minicard_order_enabled: 'fldWGtJ7WXCK28wSt',          // Checkbox - enables bulk minicard order tracking
   minicard_order_quantity: 'fldYkBvcTuI7i6t2m',         // Number - quantity of minicards ordered
-  // PLACEHOLDER until scripts/create-audio-free-without-purchase-field.ts is run against the base.
-  // Parent gate reads this BY NAME (getEventByEventId is name-keyed), so a placeholder ID is safe for
-  // reads; the real fld... ID is required only for the admin WRITE toggle (Airtable write keys by ID).
-  audio_free_without_purchase: 'fldAUDIOFREEWITHOUT0', // Checkbox - when CHECKED, parents download audio after release WITHOUT a Minicard purchase
+  // Parent gate reads this BY NAME (getEventByEventId is name-keyed); the real fld... ID below is
+  // required for the admin WRITE toggle (Airtable write keys by field ID). Created via
+  // scripts/create-audio-free-without-purchase-field.ts.
+  audio_free_without_purchase: 'fldo5lWzPCEI7az74', // Checkbox - when CHECKED, parents download audio after release WITHOUT a Minicard purchase
   // Tracklist finalization
   tracklist_finalized_at: 'fldAAcT2sIrFJ2Jq2',    // DateTime - when teacher finalized album order
   schulsong_tracklist_title: 'fld1A7YBxEuvp7tGZ',  // Text - custom schulsong title for CD booklet
