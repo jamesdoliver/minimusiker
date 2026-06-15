@@ -67,7 +67,7 @@ import {
 } from '@/lib/types/teacher';
 import { ManualCost } from '@/lib/types/analytics';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
-import { aggregateEventTotals, AggregableClass } from '@/lib/utils/eventAggregation';
+import { aggregateEventTotals, AggregableClass, compareClassName } from '@/lib/utils/eventAggregation';
 import { withRetry } from '@/lib/utils/withRetry';
 import {
   TeacherResource,
@@ -2510,7 +2510,10 @@ class AirtableService {
 
         for (const classRecord of classRecords) {
           const classId = classRecord.fields[CLASSES_FIELD_IDS.class_id] as string;
-          const className = classRecord.fields[CLASSES_FIELD_IDS.class_name] as string;
+          // Default to '' — an unset class_name reads back as undefined, and the type
+          // (EventClassDetail.className: string) and every downstream consumer assume a
+          // string. See compareClassName for the crash this prevents (event 1776).
+          const className = (classRecord.fields[CLASSES_FIELD_IDS.class_name] as string) || '';
           const classMainTeacher = classRecord.fields[CLASSES_FIELD_IDS.main_teacher] as string;
           const totalChildren = (classRecord.fields[CLASSES_FIELD_IDS.total_children] as number) || 0;
 
@@ -2542,7 +2545,7 @@ class AirtableService {
         }
 
         // Sort classes by name
-        classes.sort((a, b) => a.className.localeCompare(b.className));
+        classes.sort(compareClassName);
 
         // Compute totals (excludes is_default catch-all when real classes exist)
         const { totalChildren, totalParents, overallRegistrationRate } = aggregateEventTotals(classes);
@@ -2641,7 +2644,7 @@ class AirtableService {
           registrationRate: cls.totalChildren > 0
             ? Math.round((cls.registeredParents / cls.totalChildren) * 100)
             : 0,
-        })).sort((a, b) => a.className.localeCompare(b.className));
+        })).sort(compareClassName);
 
         const totalChildren = classes.reduce((sum, c) => sum + c.totalChildren, 0);
         const totalParents = classes.reduce((sum, c) => sum + c.registeredParents, 0);
@@ -3087,7 +3090,7 @@ class AirtableService {
             const sortedClasses = classesWithCounts.sort((a, b) => {
               if (a.isDefault && !b.isDefault) return 1;
               if (!a.isDefault && b.isDefault) return -1;
-              return a.className.localeCompare(b.className);
+              return compareClassName(a, b);
             });
 
             return {
@@ -3177,7 +3180,7 @@ class AirtableService {
               .sort((a, b) => {
                 if (a.isDefault && !b.isDefault) return 1;
                 if (!a.isDefault && b.isDefault) return -1;
-                return a.className.localeCompare(b.className);
+                return compareClassName(a, b);
               });
 
             return {
@@ -3326,7 +3329,7 @@ class AirtableService {
         );
 
         // Sort by class name
-        return classesWithCounts.sort((a, b) => a.className.localeCompare(b.className));
+        return classesWithCounts.sort(compareClassName);
       } catch (error) {
         console.error('Error getting event classes:', error);
         return [];
@@ -3377,7 +3380,7 @@ class AirtableService {
             registeredCount: data.registeredCount,
             isDefault: data.isDefault,
           }))
-          .sort((a, b) => a.className.localeCompare(b.className));
+          .sort(compareClassName);
       } catch (error) {
         console.error('Error getting event classes:', error);
         return [];
@@ -4568,7 +4571,7 @@ class AirtableService {
           classType: (cr.fields[CLASSES_FIELD_IDS.class_type] as string) || 'regular',
         }));
 
-        classes.sort((a, b) => a.className.localeCompare(b.className));
+        classes.sort(compareClassName);
       }
 
       return {
