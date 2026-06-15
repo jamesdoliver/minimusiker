@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyParentSession } from '@/lib/auth/verifyParentSession';
 import { hasMinicardForEvent } from '@/lib/utils/minicardAccess';
+import { resolveAudioFreeForAll, shouldEmitDownloads } from '@/lib/utils/audioAccessGate';
 import { getAirtableService } from '@/lib/services/airtableService';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { getR2Service } from '@/lib/services/r2Service';
@@ -110,11 +111,13 @@ export async function GET(request: NextRequest) {
     const hasPreviewsAvailable = previewDate ? now >= previewDate && !audioHidden : false;
     const isReleased = releaseDate ? now >= releaseDate && !audioHidden && schulsongGatePassed : false;
 
-    // 2. Check minicard purchase status
-    // If minicard ordering is disabled for this event, all parents get audio access
-    // after the release period — no purchase required
-    const minicardDisabled = !event?.minicard_order_enabled;
-    const hasMinicard = minicardDisabled || await hasMinicardForEvent(session.parentId, eventId);
+    // 2. Check audio access.
+    // Downloads require a Minicard purchase UNLESS this event is explicitly marked
+    // free via the audio_free_without_purchase flag. Default (flag unset) = purchase
+    // required — an unconfigured event must NOT give audio away. This is decoupled from
+    // minicard_order_enabled (which only drives admin bulk-order tracking). See audioAccessGate.ts.
+    const audioFreeForAll = resolveAudioFreeForAll(event);
+    const hasMinicard = audioFreeForAll || await hasMinicardForEvent(session.parentId, eventId);
 
     // 3. Build class preview info (always included when audio exists)
     const classPreview = await buildClassPreview(r2, teacherService, eventId, classId);
@@ -129,8 +132,8 @@ export async function GET(request: NextRequest) {
       releaseDate: previewDate ? previewDate.toISOString() : undefined,
     };
 
-    // Only include full content when minicard buyer AND released
-    if (hasMinicard && isReleased) {
+    // Only include full content when the parent has access (purchase or free-for-all) AND released
+    if (shouldEmitDownloads(audioFreeForAll, hasMinicard, isReleased)) {
       // All audio tracklist (new unified approach)
       const allAudio = await buildAllAudio(r2, teacherService, airtableService, eventId, classId, { showAllGroups: true });
       if (allAudio) {

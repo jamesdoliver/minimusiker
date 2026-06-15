@@ -575,26 +575,6 @@ class R2Service {
   }
 
   /**
-   * Get a signed URL for full recording (24-hour expiry)
-   */
-  async getFullRecordingUrl(eventId: string, className?: string): Promise<string> {
-    let key: string;
-    if (className) {
-      const classSlug = className
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .substring(0, 30);
-      key = `events/${eventId}/${classSlug}/full.mp3`;
-    } else {
-      key = `events/${eventId}/full.mp3`;
-    }
-    // 24 hours in seconds
-    return this.generateSignedUrl(key, 86400);
-  }
-
-  /**
    * Get a signed URL for preview audio using class_id (30-minute expiry)
    * Recommended for new implementations
    */
@@ -602,16 +582,6 @@ class R2Service {
     const key = `events/${eventId}/${classId}/preview.mp3`;
     // 30 minutes in seconds
     return this.generateSignedUrl(key, 1800);
-  }
-
-  /**
-   * Get a signed URL for full recording using class_id (24-hour expiry)
-   * Recommended for new implementations
-   */
-  async getFullRecordingUrlByClassId(eventId: string, classId: string): Promise<string> {
-    const key = `events/${eventId}/${classId}/full.mp3`;
-    // 24 hours in seconds
-    return this.generateSignedUrl(key, 86400);
   }
 
   /**

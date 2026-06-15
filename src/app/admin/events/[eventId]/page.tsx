@@ -200,6 +200,7 @@ export default function EventDetailPage() {
   const [scsShirtsIncluded, setScsShirtsIncluded] = useState(false);
   const [minicardOrderEnabled, setMinicardOrderEnabled] = useState(false);
   const [minicardOrderQuantity, setMinicardOrderQuantity] = useState<number>(0);
+  const [audioFreeWithoutPurchase, setAudioFreeWithoutPurchase] = useState(false);
 
   // Refresh teacher state
   const [isRefreshingTeacher, setIsRefreshingTeacher] = useState(false);
@@ -256,6 +257,7 @@ export default function EventDetailPage() {
       setScsShirtsIncluded(data.data?.scsShirtsIncluded || false);
       setMinicardOrderEnabled(data.data?.minicardOrderEnabled || false);
       setMinicardOrderQuantity(data.data?.minicardOrderQuantity || 0);
+      setAudioFreeWithoutPurchase(data.data?.audioFreeWithoutPurchase || false);
       // Admin notes
       setAdminNotes(data.data?.adminNotes || '');
       setSavedNotes(data.data?.adminNotes || '');
@@ -533,11 +535,13 @@ export default function EventDetailPage() {
     const prevScs = scsShirtsIncluded;
     const prevMinicard = minicardOrderEnabled;
     const prevMinicardQty = minicardOrderQuantity;
+    const prevAudioFree = audioFreeWithoutPurchase;
 
     // Optimistic update
     if (field === 'scs_shirts_included') setScsShirtsIncluded(value as boolean);
     if (field === 'minicard_order_enabled') setMinicardOrderEnabled(value as boolean);
     if (field === 'minicard_order_quantity') setMinicardOrderQuantity(value as number);
+    if (field === 'audio_free_without_purchase') setAudioFreeWithoutPurchase(value as boolean);
 
     try {
       const response = await fetch(`/api/admin/events/${encodeURIComponent(eventId)}`, {
@@ -552,6 +556,7 @@ export default function EventDetailPage() {
       setScsShirtsIncluded(prevScs);
       setMinicardOrderEnabled(prevMinicard);
       setMinicardOrderQuantity(prevMinicardQty);
+      setAudioFreeWithoutPurchase(prevAudioFree);
       toast.error('Failed to update bulk order setting');
     }
   };
@@ -1447,6 +1452,26 @@ export default function EventDetailPage() {
                   <span className="text-xs text-gray-500">Minicards</span>
                 </div>
               )}
+            </div>
+
+            {/* Free Audio Without Purchase Toggle — gates parent downloads, NOT bulk-order tracking */}
+            <div className="space-y-1">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={audioFreeWithoutPurchase}
+                    onChange={(e) => handleBulkOrderUpdate('audio_free_without_purchase', e.target.checked)}
+                  />
+                  <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-500 transition-colors" />
+                  <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4" />
+                </div>
+                <span className="text-sm text-gray-700">Free audio without purchase</span>
+              </label>
+              <p className="ml-12 text-xs text-gray-500">
+                When on, parents can download audio after release without buying a Minicard. Default off = purchase required.
+              </p>
             </div>
           </div>
 

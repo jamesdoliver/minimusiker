@@ -6032,6 +6032,7 @@ class AirtableService {
       scs_shirts_included?: boolean;
       minicard_order_enabled?: boolean;
       minicard_order_quantity?: number;
+      audio_free_without_purchase?: boolean;
       event_date?: string;
       tracklist_finalized_at?: string | null;
       schulsong_tracklist_title?: string | null;
@@ -6082,6 +6083,9 @@ class AirtableService {
       }
       if (updates.minicard_order_quantity !== undefined) {
         updateFields[EVENTS_FIELD_IDS.minicard_order_quantity] = updates.minicard_order_quantity;
+      }
+      if (updates.audio_free_without_purchase !== undefined) {
+        updateFields[EVENTS_FIELD_IDS.audio_free_without_purchase] = updates.audio_free_without_purchase;
       }
       if (updates.event_date !== undefined) {
         updateFields[EVENTS_FIELD_IDS.event_date] = updates.event_date;
@@ -6828,6 +6832,7 @@ class AirtableService {
       scs_shirts_included: val(EVENTS_FIELD_IDS.scs_shirts_included, 'scs_shirts_included') as boolean | undefined,
       minicard_order_enabled: val(EVENTS_FIELD_IDS.minicard_order_enabled, 'minicard_order_enabled') as boolean | undefined,
       minicard_order_quantity: val(EVENTS_FIELD_IDS.minicard_order_quantity, 'minicard_order_quantity') as number | undefined,
+      audio_free_without_purchase: val(EVENTS_FIELD_IDS.audio_free_without_purchase, 'audio_free_without_purchase') as boolean | undefined,
       // Linked classes (Airtable field name is "Classes" with capital C)
       classes: val(EVENTS_FIELD_IDS.classes, 'Classes') as string[] | undefined,
       // Tracklist finalization
