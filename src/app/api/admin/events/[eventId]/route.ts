@@ -8,7 +8,7 @@ import { verifyAdminSession } from '@/lib/auth/verifyAdminSession';
 import { getTeacherService } from '@/lib/services/teacherService';
 import { simplybookService } from '@/lib/services/simplybookService';
 import { generateEventId } from '@/lib/utils/eventIdentifiers';
-import { parseOverrides } from '@/lib/utils/eventThresholds';
+import { parseOverrides, validateTimelineOverrideValues } from '@/lib/utils/eventThresholds';
 import {
   triggerDateChangeNotification,
   triggerCancellationNotification,
@@ -326,33 +326,14 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        // Validate all values are numbers within reasonable bounds (except known boolean/object keys)
-        for (const [key, value] of Object.entries(parsed)) {
-          if (key === 'milestones' || key === 'task_offsets') continue; // Phase 2 nested objects
-          if (key === 'audio_hidden') {
-            if (typeof value !== 'boolean') {
-              return NextResponse.json(
-                { success: false, error: `Invalid value for ${key}: must be a boolean` },
-                { status: 400 }
-              );
-            }
-            continue;
-          }
-          if (key === 'hidden_products') {
-            if (!Array.isArray(value) || !value.every((v: unknown) => typeof v === 'string')) {
-              return NextResponse.json(
-                { success: false, error: `Invalid value for ${key}: must be an array of strings` },
-                { status: 400 }
-              );
-            }
-            continue;
-          }
-          if (typeof value !== 'number' || !isFinite(value as number) || Math.abs(value as number) > 365) {
-            return NextResponse.json(
-              { success: false, error: `Invalid value for ${key}: must be a finite number between -365 and 365` },
-              { status: 400 }
-            );
-          }
+        // Validate per-key values (numbers within bounds, plus known boolean/array keys).
+        // Validator lives beside EventTimelineOverrides so new keys can't fall through.
+        const overridesError = validateTimelineOverrideValues(parsed as Record<string, unknown>);
+        if (overridesError) {
+          return NextResponse.json(
+            { success: false, error: overridesError },
+            { status: 400 }
+          );
         }
       } catch {
         return NextResponse.json(

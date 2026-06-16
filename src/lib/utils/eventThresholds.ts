@@ -61,6 +61,41 @@ export function parseOverrides(json: string | undefined | null): EventTimelineOv
 }
 
 /**
+ * Validate the per-key values of a parsed timeline_overrides object.
+ *
+ * Returns an error message for the first invalid key, or null if every value is valid.
+ * Kept beside EventTimelineOverrides so a new key is validated the moment it is added —
+ * the omission that let a boolean key fall through to the numeric guard.
+ *
+ * Rules (mirror EventTimelineOverrides):
+ *  - milestones / task_offsets: nested Phase 2 objects, not validated here
+ *  - audio_hidden / communications_paused: boolean kill-switches
+ *  - hidden_products: array of product-id strings
+ *  - everything else: a finite numeric day threshold/offset in [-365, 365]
+ */
+export function validateTimelineOverrideValues(parsed: Record<string, unknown>): string | null {
+  for (const [key, value] of Object.entries(parsed)) {
+    if (key === 'milestones' || key === 'task_offsets') continue;
+    if (key === 'audio_hidden' || key === 'communications_paused') {
+      if (typeof value !== 'boolean') {
+        return `Invalid value for ${key}: must be a boolean`;
+      }
+      continue;
+    }
+    if (key === 'hidden_products') {
+      if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+        return `Invalid value for ${key}: must be an array of strings`;
+      }
+      continue;
+    }
+    if (typeof value !== 'number' || !isFinite(value) || Math.abs(value) > 365) {
+      return `Invalid value for ${key}: must be a finite number between -365 and 365`;
+    }
+  }
+  return null;
+}
+
+/**
  * Get a threshold value, preferring the per-event override, falling back to global default.
  */
 export function getThreshold(key: ThresholdKey, overrides?: EventTimelineOverrides | null): number {
