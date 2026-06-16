@@ -130,6 +130,7 @@ export async function GET(
       scsShirtsIncluded?: boolean;
       minicardOrderEnabled?: boolean;
       minicardOrderQuantity?: number;
+      audioFreeWithoutPurchase?: boolean;
       tracklistFinalizedAt?: string;
       adminNotes?: string;
     } = {};
@@ -173,6 +174,7 @@ export async function GET(
             scsShirtsIncluded: resolvedEventRecord.scs_shirts_included,
             minicardOrderEnabled: resolvedEventRecord.minicard_order_enabled,
             minicardOrderQuantity: resolvedEventRecord.minicard_order_quantity,
+            audioFreeWithoutPurchase: resolvedEventRecord.audio_free_without_purchase,
             tracklistFinalizedAt: resolvedEventRecord.tracklist_finalized_at,
             adminNotes: resolvedEventRecord.admin_notes,
           };
@@ -273,11 +275,12 @@ export async function PATCH(
     const hasBulkOrderUpdate =
       body.scs_shirts_included !== undefined ||
       body.minicard_order_enabled !== undefined ||
-      body.minicard_order_quantity !== undefined;
+      body.minicard_order_quantity !== undefined ||
+      body.audio_free_without_purchase !== undefined;
 
     if (!hasDateUpdate && !hasStatusUpdate && !hasStaffUpdate && !hasEventTypeUpdates && !hasNotesUpdate && !hasOverridesUpdate && !hasChildrenUpdate && !hasDealUpdate && !hasStandardMerchOverride && !hasMerchCutoffUpdate && !hasBulkOrderUpdate) {
       return NextResponse.json(
-        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children, deal_builder_enabled, deal_type, deal_config, standard_merch_override, schulsong_merch_cutoff, scs_shirts_included, minicard_order_enabled, minicard_order_quantity' },
+        { success: false, error: 'No valid fields to update. Supported: event_date, status, assigned_staff, is_plus, is_kita, is_schulsong, is_minimusikertag, admin_notes, timeline_overrides, estimated_children, deal_builder_enabled, deal_type, deal_config, standard_merch_override, schulsong_merch_cutoff, scs_shirts_included, minicard_order_enabled, minicard_order_quantity, audio_free_without_purchase' },
         { status: 400 }
       );
     }
@@ -997,19 +1000,23 @@ export async function PATCH(
       if (body.minicard_order_quantity !== undefined) {
         bulkOrderFields.minicard_order_quantity = body.minicard_order_quantity;
       }
+      if (body.audio_free_without_purchase !== undefined) {
+        bulkOrderFields.audio_free_without_purchase = body.audio_free_without_purchase;
+      }
       updatedEvent = await airtableService.updateEventFields(eventRecordId, bulkOrderFields);
 
       const changes: string[] = [];
       if (body.scs_shirts_included !== undefined) changes.push(`SCS shirts: ${body.scs_shirts_included ? 'enabled' : 'disabled'}`);
       if (body.minicard_order_enabled !== undefined) changes.push(`Minicard order: ${body.minicard_order_enabled ? 'enabled' : 'disabled'}`);
       if (body.minicard_order_quantity !== undefined) changes.push(`Minicard qty: ${body.minicard_order_quantity}`);
+      if (body.audio_free_without_purchase !== undefined) changes.push(`Free audio w/o purchase: ${body.audio_free_without_purchase ? 'enabled' : 'disabled'}`);
       getActivityService().logActivity({
         eventRecordId,
         activityType: 'bulk_order_updated',
         description: `Bulk order updated: ${changes.join(', ')}`,
         actorEmail: admin.email,
         actorType: 'admin',
-        metadata: { scsShirtsIncluded: body.scs_shirts_included, minicardOrderEnabled: body.minicard_order_enabled, minicardOrderQuantity: body.minicard_order_quantity },
+        metadata: { scsShirtsIncluded: body.scs_shirts_included, minicardOrderEnabled: body.minicard_order_enabled, minicardOrderQuantity: body.minicard_order_quantity, audioFreeWithoutPurchase: body.audio_free_without_purchase },
       });
     }
 
