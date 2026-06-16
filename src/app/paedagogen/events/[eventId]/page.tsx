@@ -320,7 +320,11 @@ function SongCard({ song, onDelete }: { song: Song; onDelete: (songId: string) =
         </div>
         <div>
           <p className="font-medium text-gray-900">
-            {song.title}
+            {song.title?.trim() ? (
+              song.title
+            ) : (
+              <span className="italic text-red-600">⚠️ Ohne Titel</span>
+            )}
             {song.hiddenByEngineer && (
               <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
                 Vom Ingenieur ausgeblendet
