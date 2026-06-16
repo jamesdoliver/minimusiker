@@ -1733,7 +1733,11 @@ export default function EventDetailPage() {
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-gray-900 truncate">
-                                  {song.title}
+                                  {song.title?.trim() ? (
+                                    song.title
+                                  ) : (
+                                    <span className="italic text-red-600">⚠️ Ohne Titel</span>
+                                  )}
                                   {song.hiddenByEngineer && (
                                     <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
                                       Hidden by engineer
@@ -1962,7 +1966,11 @@ export default function EventDetailPage() {
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-gray-900 truncate">
-                                  {song.title}
+                                  {song.title?.trim() ? (
+                                    song.title
+                                  ) : (
+                                    <span className="italic text-red-600">⚠️ Ohne Titel</span>
+                                  )}
                                   {song.hiddenByEngineer && (
                                     <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
                                       Hidden by engineer
@@ -2207,7 +2215,11 @@ export default function EventDetailPage() {
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-gray-900 truncate">
-                                  {song.title}
+                                  {song.title?.trim() ? (
+                                    song.title
+                                  ) : (
+                                    <span className="italic text-red-600">⚠️ Ohne Titel</span>
+                                  )}
                                   {song.hiddenByEngineer && (
                                     <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
                                       Hidden by engineer
@@ -2456,7 +2468,11 @@ export default function EventDetailPage() {
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-gray-900 truncate">
-                                  {song.title}
+                                  {song.title?.trim() ? (
+                                    song.title
+                                  ) : (
+                                    <span className="italic text-red-600">⚠️ Ohne Titel</span>
+                                  )}
                                   {song.hiddenByEngineer && (
                                     <span className="ml-2 px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
                                       Hidden by engineer

@@ -32,9 +32,12 @@ export default function EditSongModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const trimmedTitle = title.trim();
+  const canSubmit = trimmedTitle.length > 0 && !isSubmitting;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
+    if (!trimmedTitle) {
       setError('Please enter a song title');
       return;
     }
@@ -97,6 +100,7 @@ export default function EditSongModal({
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
               placeholder="e.g., Twinkle Twinkle Little Star"
+              required
             />
           </div>
 
@@ -150,8 +154,8 @@ export default function EditSongModal({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              disabled={!canSubmit}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </button>

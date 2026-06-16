@@ -2,6 +2,7 @@
 
 export interface HinweiseSectionProps {
   classesWithoutSongs: string[];
+  totalClasses: number;
   tracklistFinalized: boolean;
   isSchulsong: boolean;
   schulsongApproved: boolean;
@@ -18,6 +19,7 @@ interface HinweisRow {
 
 export function HinweiseSection({
   classesWithoutSongs,
+  totalClasses,
   tracklistFinalized,
   isSchulsong,
   schulsongApproved,
@@ -26,10 +28,13 @@ export function HinweiseSection({
   const rows: HinweisRow[] = [];
 
   if (!isSchulsongOnly) {
+    const hasClasses = totalClasses > 0;
     rows.push({
       key: 'classes',
-      complete: classesWithoutSongs.length === 0,
-      pendingText: (
+      complete: hasClasses && classesWithoutSongs.length === 0,
+      pendingText: !hasClasses ? (
+        'Es wurden noch keine Klassen erstellt'
+      ) : (
         <>
           Folgende Klassen haben noch keine Lieder:{' '}
           <span className="font-medium">{classesWithoutSongs.join(', ')}</span>
