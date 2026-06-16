@@ -1,5 +1,6 @@
 import Airtable, { FieldSet, Table } from 'airtable';
 import { ENGINEER_IDS, getEngineerIdForTrack } from '@/lib/config/engineers';
+import { localeCompareSafe } from '@/lib/utils/localeCompareSafe';
 import {
   ParentJourney,
   AirtableRecord,
@@ -1361,7 +1362,7 @@ class AirtableService {
 
         // Sort by registered_child name
         return journeys.sort((a, b) =>
-          a.registered_child.localeCompare(b.registered_child)
+          localeCompareSafe(a.registered_child, b.registered_child)
         );
       } catch (error) {
         console.error('Error fetching records by class ID:', error);
@@ -2542,7 +2543,7 @@ class AirtableService {
         }
 
         // Sort classes by name
-        classes.sort((a, b) => a.className.localeCompare(b.className));
+        classes.sort((a, b) => localeCompareSafe(a.className, b.className));
 
         // Compute totals (excludes is_default catch-all when real classes exist)
         const { totalChildren, totalParents, overallRegistrationRate } = aggregateEventTotals(classes);
@@ -2641,7 +2642,7 @@ class AirtableService {
           registrationRate: cls.totalChildren > 0
             ? Math.round((cls.registeredParents / cls.totalChildren) * 100)
             : 0,
-        })).sort((a, b) => a.className.localeCompare(b.className));
+        })).sort((a, b) => localeCompareSafe(a.className, b.className));
 
         const totalChildren = classes.reduce((sum, c) => sum + c.totalChildren, 0);
         const totalParents = classes.reduce((sum, c) => sum + c.registeredParents, 0);
@@ -3087,7 +3088,7 @@ class AirtableService {
             const sortedClasses = classesWithCounts.sort((a, b) => {
               if (a.isDefault && !b.isDefault) return 1;
               if (!a.isDefault && b.isDefault) return -1;
-              return a.className.localeCompare(b.className);
+              return localeCompareSafe(a.className, b.className);
             });
 
             return {
@@ -3177,7 +3178,7 @@ class AirtableService {
               .sort((a, b) => {
                 if (a.isDefault && !b.isDefault) return 1;
                 if (!a.isDefault && b.isDefault) return -1;
-                return a.className.localeCompare(b.className);
+                return localeCompareSafe(a.className, b.className);
               });
 
             return {
@@ -3326,7 +3327,7 @@ class AirtableService {
         );
 
         // Sort by class name
-        return classesWithCounts.sort((a, b) => a.className.localeCompare(b.className));
+        return classesWithCounts.sort((a, b) => localeCompareSafe(a.className, b.className));
       } catch (error) {
         console.error('Error getting event classes:', error);
         return [];
@@ -3377,7 +3378,7 @@ class AirtableService {
             registeredCount: data.registeredCount,
             isDefault: data.isDefault,
           }))
-          .sort((a, b) => a.className.localeCompare(b.className));
+          .sort((a, b) => localeCompareSafe(a.className, b.className));
       } catch (error) {
         console.error('Error getting event classes:', error);
         return [];
@@ -3667,7 +3668,7 @@ class AirtableService {
         id: record.id,
         name: record.fields['staff_name'] as string || '',
         email: record.fields['E-Mail'] as string || '',
-      })).sort((a, b) => a.name.localeCompare(b.name));
+      })).sort((a, b) => localeCompareSafe(a.name, b.name));
     } catch (error) {
       console.error('Error fetching team staff:', error);
       throw new Error(`Failed to fetch team staff: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -3949,7 +3950,7 @@ class AirtableService {
         name: record.fields['staff_name'] as string || '',
         email: record.fields['E-Mail'] as string || '',
         numericId: record.fields['ID'] as number | undefined,
-      })).sort((a, b) => a.name.localeCompare(b.name));
+      })).sort((a, b) => localeCompareSafe(a.name, b.name));
     } catch (error) {
       console.error('Error fetching engineer staff:', error);
       throw new Error(`Failed to fetch engineers: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -4568,7 +4569,7 @@ class AirtableService {
           classType: (cr.fields[CLASSES_FIELD_IDS.class_type] as string) || 'regular',
         }));
 
-        classes.sort((a, b) => a.className.localeCompare(b.className));
+        classes.sort((a, b) => localeCompareSafe(a.className, b.className));
       }
 
       return {
@@ -7366,7 +7367,7 @@ class AirtableService {
           name: (record.fields[PERSONEN_FIELD_IDS.staff_name] as string) || '',
         }))
         .filter(staff => staff.name) // Filter out records without names
-        .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
+        .sort((a, b) => localeCompareSafe(a.name, b.name)); // Sort alphabetically
     } catch (error) {
       console.error('Error fetching all staff members:', error);
       return [];
@@ -7392,7 +7393,7 @@ class AirtableService {
           name: (record.fields[TEAMS_REGIONEN_FIELD_IDS.name] as string) || '',
         }))
         .filter(region => region.name) // Filter out records without names
-        .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
+        .sort((a, b) => localeCompareSafe(a.name, b.name)); // Sort alphabetically
     } catch (error) {
       console.error('Error fetching all regions:', error);
       return [];
