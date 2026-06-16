@@ -14,6 +14,7 @@
  */
 
 import { SOLD_OUT_HOODIE_VARIANT_IDS } from '@/lib/config/shopProfiles';
+import { isClothingVariant } from '@/lib/config/clothingVariants';
 
 export type CheckoutProductType = 'tshirt' | 'hoodie' | 'audio';
 
@@ -57,4 +58,29 @@ export function qualifiesForBundleDiscount(items: CheckoutLineItemLike[]): boole
   const hasTshirt = items.some((item) => item.productType === 'tshirt');
   const hasHoodie = items.some((item) => item.productType === 'hoodie');
   return hasTshirt && hasHoodie;
+}
+
+/**
+ * True when the line item is PERSONALIZED ("Schul") clothing (the batch-produced,
+ * school-branded variants). Standard clothing and audio return false — `isClothingVariant`
+ * matches only the personalized variant map (CLOTHING_VARIANTS), not STANDARD_CLOTHING_VARIANTS.
+ */
+export function isPersonalizedClothingLineItem(
+  item: CheckoutLineItemLike,
+  isPersonalized: (variantId: string) => boolean = isClothingVariant
+): boolean {
+  return isPersonalized(item.variantId);
+}
+
+/**
+ * Removes PERSONALIZED clothing line items — used by the checkout route once the
+ * personalized order cutoff has passed (the school-branded items are batch-produced and
+ * can't be added to a print run that has shipped). Standard clothing (rolling stock) and
+ * audio are never personalized, so they always survive.
+ */
+export function stripPersonalizedClothingLineItems<T extends CheckoutLineItemLike>(
+  items: T[],
+  isPersonalized: (variantId: string) => boolean = isClothingVariant
+): T[] {
+  return items.filter((item) => !isPersonalizedClothingLineItem(item, isPersonalized));
 }

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import shopifyService from '@/lib/services/shopifyService';
 import { CheckoutLineItem, CheckoutCustomAttributes, ShippingAddressInput } from '@/lib/types/shop';
 import { getAirtableService } from '@/lib/services/airtableService';
-import { parseOverrides, getThreshold } from '@/lib/utils/eventThresholds';
-import { filterPurchasableLineItems, qualifiesForBundleDiscount } from '@/lib/utils/checkoutDiscounts';
+import { parseOverrides, getThreshold, canOrderPersonalizedClothingForEvent } from '@/lib/utils/eventThresholds';
+import { filterPurchasableLineItems, qualifiesForBundleDiscount, stripPersonalizedClothingLineItems } from '@/lib/utils/checkoutDiscounts';
 import { resolveShopProfile } from '@/lib/config/shopProfiles';
+import { computeStandardMerchOnly } from '@/lib/utils/eventTimeline';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
     // means we never send it AND the cart-level bundle discount can never survive
     // onto a shirt-only order. The portal already hides sold-out products — this
     // guards stale/tampered clients.
-    const purchasableLineItems = filterPurchasableLineItems(lineItems);
+    let purchasableLineItems = filterPurchasableLineItems(lineItems);
 
     if (purchasableLineItems.length < lineItems.length) {
       console.warn('[create-checkout] Dropped sold-out line item(s):', {
@@ -92,11 +93,18 @@ export async function POST(request: NextRequest) {
     // Determine discount codes to apply
     const discountCodes: string[] = [];
 
-    // 1. Early-bird check + schoolName backfill (requires event lookup)
+    // Whether PERSONALIZED ("Schul") clothing may still be ordered. Personalized items
+    // are batch-produced per school and close at their cutoff; standard clothing + audio
+    // are always allowed. Fail CLOSED for personalized when the event can't be verified
+    // (missing eventId or lookup failure) — an unattributable school shirt can't be produced.
+    let personalizedAllowed = false;
+
+    // 1. Early-bird + schoolName backfill + personalized-cutoff resolution (event lookup)
     if (customAttributes?.eventId) {
       try {
         const airtable = getAirtableService();
         const event = await airtable.getEventByEventId(customAttributes.eventId);
+        const overrides = parseOverrides(event?.timeline_overrides);
 
         // Detect schulsong-only events (no audio products → no early-bird discount).
         // Derive from the SAME profile the shop renders so this never drifts: a
@@ -110,10 +118,22 @@ export async function POST(request: NextRequest) {
         });
         const isSchulsongOnly = earlyBirdProfile.audioProducts.length === 0;
 
+        // Personalized clothing window — mirrors the shop's personalized→standard switch
+        // so the server enforcement and the UI never disagree. Standard clothing is NOT
+        // governed by this (it stays orderable indefinitely).
+        if (event) {
+          personalizedAllowed = canOrderPersonalizedClothingForEvent({
+            eventDate: event.event_date,
+            overrides,
+            isSchulsongOnly,
+            isStandardMerchOnly: computeStandardMerchOnly(event.standard_merch_override, event.is_under_100),
+            schulsongMerchCutoff: event.schulsong_merch_cutoff ?? null,
+          });
+        }
+
         // Early-bird discount: must be within deadline window AND not schulsong-only
         if (event?.event_date && !isSchulsongOnly) {
           const eventDate = new Date(event.event_date);
-          const overrides = parseOverrides(event.timeline_overrides);
           const earlyBirdDays = getThreshold('early_bird_deadline_days', overrides);
           const deadline = new Date(eventDate);
           deadline.setDate(deadline.getDate() - earlyBirdDays);
@@ -146,7 +166,29 @@ export async function POST(request: NextRequest) {
         }
       } catch (error) {
         console.error('[create-checkout] Error checking early-bird/schoolName:', error);
-        // Continue without early-bird discount if lookup fails
+        // personalizedAllowed stays false → personalized stripped below (fail-closed).
+        // Standard clothing + audio are unaffected; early-bird discount is simply skipped.
+      }
+    }
+
+    // Enforce the personalized ("Schul") clothing cutoff server-side. Standard clothing
+    // (rolling stock) and audio always pass; only personalized variants are stripped —
+    // this closes the stale/tampered-client gap for the batch-produced school items.
+    if (!personalizedAllowed) {
+      const beforeStrip = purchasableLineItems.length;
+      purchasableLineItems = stripPersonalizedClothingLineItems(purchasableLineItems);
+      if (purchasableLineItems.length < beforeStrip) {
+        console.warn('[create-checkout] Stripped personalized clothing past its order cutoff:', {
+          eventId: customAttributes?.eventId,
+          before: beforeStrip,
+          after: purchasableLineItems.length,
+        });
+      }
+      if (purchasableLineItems.length === 0) {
+        return NextResponse.json(
+          { error: 'Die Bestellfrist für personalisierte Schulkleidung ist abgelaufen. Standard-Artikel und Audio sind weiterhin bestellbar.' },
+          { status: 409 }
+        );
       }
     }
 

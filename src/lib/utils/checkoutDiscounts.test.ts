@@ -18,6 +18,8 @@ import {
   filterPurchasableLineItems,
   qualifiesForBundleDiscount,
   isSoldOutHoodieLine,
+  isPersonalizedClothingLineItem,
+  stripPersonalizedClothingLineItems,
   type CheckoutLineItemLike,
 } from './checkoutDiscounts';
 import {
@@ -101,6 +103,48 @@ describe('checkout sold-out hoodie guard', () => {
       // Simulate hoodies back in stock via an empty sold-out set.
       const purchasable = filterPurchasableLineItems([tshirtLine(), hoodieLine()], new Set<string>());
       expect(qualifiesForBundleDiscount(purchasable)).toBe(true);
+    });
+  });
+});
+
+/**
+ * Personalized ("Schul") clothing strip — server enforcement of the batch-production
+ * cutoff. Personalized clothing closes at its cutoff; STANDARD clothing is rolling
+ * stock and must ALWAYS survive, as must audio.
+ */
+describe('personalized clothing strip', () => {
+  const VMAP = MINIMUSIKERTAG_PROFILE.shopifyVariantMap;
+  const personalizedTshirt = (): CheckoutLineItemLike => ({ variantId: VMAP['tshirt-personalized-98/104 (3-4J)'], quantity: 1, productType: 'tshirt' });
+  const personalizedHoodie = (): CheckoutLineItemLike => ({ variantId: VMAP['hoodie-personalized-116 (5-6 J)'], quantity: 1, productType: 'hoodie' });
+  const standardTshirt = (): CheckoutLineItemLike => ({ variantId: VMAP['tshirt-standard-152/164 (12-14J)'], quantity: 1, productType: 'tshirt' });
+  const audioLine = (): CheckoutLineItemLike => ({ variantId: VMAP['minicard'], quantity: 1, productType: 'audio' });
+
+  describe('isPersonalizedClothingLineItem', () => {
+    it('is true for personalized clothing only — NOT standard, NOT audio', () => {
+      expect(isPersonalizedClothingLineItem(personalizedTshirt())).toBe(true);
+      expect(isPersonalizedClothingLineItem(personalizedHoodie())).toBe(true);
+      expect(isPersonalizedClothingLineItem(standardTshirt())).toBe(false);
+      expect(isPersonalizedClothingLineItem(audioLine())).toBe(false);
+    });
+  });
+
+  describe('stripPersonalizedClothingLineItems', () => {
+    it('removes personalized clothing but KEEPS standard clothing and audio', () => {
+      const kept = stripPersonalizedClothingLineItems([
+        personalizedTshirt(), personalizedHoodie(), standardTshirt(), audioLine(),
+      ]);
+      expect(kept).toHaveLength(2);
+      expect(kept.some((i) => i.variantId === VMAP['tshirt-standard-152/164 (12-14J)'])).toBe(true);
+      expect(kept.some((i) => i.productType === 'audio')).toBe(true);
+      expect(kept.some((i) => i.variantId === VMAP['tshirt-personalized-98/104 (3-4J)'])).toBe(false);
+    });
+
+    it('leaves a standard+audio cart fully intact', () => {
+      expect(stripPersonalizedClothingLineItems([standardTshirt(), audioLine()])).toHaveLength(2);
+    });
+
+    it('can empty a personalized-only cart', () => {
+      expect(stripPersonalizedClothingLineItems([personalizedTshirt(), personalizedHoodie()])).toHaveLength(0);
     });
   });
 });
