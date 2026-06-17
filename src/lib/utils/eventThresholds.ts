@@ -9,7 +9,7 @@
  *   const earlyBirdDays = getThreshold('early_bird_deadline_days', overrides);
  */
 
-import { EVENT_MILESTONES, Milestone } from './eventTimeline';
+import { EVENT_MILESTONES, Milestone, canOrderPersonalizedClothing } from './eventTimeline';
 
 // Phase 1 thresholds (editable in settings)
 export interface EventTimelineOverrides {
@@ -144,4 +144,57 @@ export function getTaskOffset(taskId: string, overrides?: EventTimelineOverrides
   const value = overrides?.task_offsets?.[taskId];
   if (typeof value === 'number' && isFinite(value)) return value;
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Personalized ("Schul") clothing order window
+// ---------------------------------------------------------------------------
+
+/**
+ * Inputs for the personalized-clothing window. Available identically on the client
+ * (from /api/parent/schulsong-status) and the server (from the Event record).
+ */
+export interface PersonalizedClothingWindowArgs {
+  eventDate?: string | null;
+  overrides?: EventTimelineOverrides | null;
+  /** Schulsong-only event (no audio tier) — uses the extended clothing window. */
+  isSchulsongOnly?: boolean;
+  /** Under-100 / force-standard event — personalized is never offered. */
+  isStandardMerchOnly?: boolean;
+  /** Absolute schulsong merch cutoff (DateTime), when set. */
+  schulsongMerchCutoff?: string | null;
+}
+
+/**
+ * Whether PERSONALIZED ("Schul") clothing may still be ordered for an event.
+ *
+ * Personalized clothing is batch-produced per school, so it closes at a cutoff;
+ * STANDARD clothing is rolling stock and is NOT governed by this (stays orderable).
+ *
+ * This mirrors the shop's existing `showPersonalized` computation
+ * (src/app/familie/shop/page.tsx) exactly, so the server checkout enforcement and the
+ * shop UI's personalized→standard switch never drift:
+ *   1. standard-merch-only (under-100 / force-standard) → never personalized
+ *   2. absolute schulsong_merch_cutoff → open while now < cutoff
+ *   3. relative cutoff: schulsong_clothing_cutoff_days (schulsong-only) else
+ *      personalized_clothing_cutoff_days, via canOrderPersonalizedClothing
+ */
+export function canOrderPersonalizedClothingForEvent(
+  args: PersonalizedClothingWindowArgs,
+  now: Date = new Date(),
+): boolean {
+  const { eventDate, overrides, isSchulsongOnly, isStandardMerchOnly, schulsongMerchCutoff } = args;
+
+  if (isStandardMerchOnly) return false;
+
+  if (schulsongMerchCutoff) {
+    const cutoff = new Date(schulsongMerchCutoff);
+    if (isFinite(cutoff.getTime())) return now.getTime() < cutoff.getTime();
+  }
+
+  const cutoffDays = isSchulsongOnly
+    ? getThreshold('schulsong_clothing_cutoff_days', overrides)
+    : getThreshold('personalized_clothing_cutoff_days', overrides);
+
+  return canOrderPersonalizedClothing(eventDate ?? undefined, cutoffDays);
 }
