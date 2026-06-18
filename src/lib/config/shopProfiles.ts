@@ -6,6 +6,8 @@
  * determine which profile the parent portal shop displays.
  */
 
+import { isSchulsongOnlyEvent } from '@/lib/utils/eventTier';
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -469,7 +471,16 @@ export function resolveShopProfile(
   // schulsong keeps its full audio shopfront — the schulsong is delivered via its own
   // pipeline, not sold in the shop. Without the !isPlus guard a "Plus + Schulsong" event
   // wrongly rendered as schulsong-only, removing all audio products (regression: event 1756).
-  if (isSchulsong && !isMinimusikertag && !isPlus) {
+  //
+  // Derive this from the canonical isSchulsongOnlyEvent() predicate (eventTier.ts) — which
+  // the teacher portal and email audience filters also use — so the shop's notion of
+  // "schulsong-only" can never drift away from theirs again. (isScs is already handled
+  // above, so it is intentionally not part of the predicate here.)
+  if (isSchulsongOnlyEvent({
+    is_schulsong: isSchulsong,
+    is_minimusikertag: isMinimusikertag,
+    is_plus: isPlus,
+  })) {
     return SCHULSONG_ONLY_PROFILE;
   }
 
