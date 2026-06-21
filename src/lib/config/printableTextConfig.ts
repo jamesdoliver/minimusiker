@@ -206,15 +206,6 @@ export const TEXT_ELEMENT_STYLES: Record<PrintableItemType, Record<TextElementTy
 };
 
 /**
- * Get the default font family for a template type
- * All types now default to Springwood Display
- */
-export function getFontFamilyForType(type: PrintableItemType): string {
-  // All types now default to Springwood Display
-  return 'Springwood Display, cursive';
-}
-
-/**
  * Convert a FontFamily value to its CSS font-family string
  */
 export function fontFamilyToCss(fontFamily?: FontFamily): string {

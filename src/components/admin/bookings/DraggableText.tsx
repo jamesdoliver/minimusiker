@@ -1,7 +1,7 @@
 'use client';
 
 import { Rnd } from 'react-rnd';
-import { useCallback } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { TextElementType } from '@/lib/config/printableTextConfig';
 
 interface DraggableTextProps {
@@ -59,6 +59,26 @@ export default function DraggableText({
   onSelect,
   disabled = false,
 }: DraggableTextProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const onSizeChangeRef = useRef(onSizeChange);
+  onSizeChangeRef.current = onSizeChange;
+
+  // Auto-grow: when text content overflows the box, expand height.
+  // Uses useLayoutEffect to resize before paint (prevents flicker).
+  // Uses ref for onSizeChange to avoid re-firing on every parent render
+  // (onSizeChange is an inline arrow function that changes identity each render).
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el || disabled) return;
+    const overflow = el.scrollHeight - el.clientHeight;
+    if (overflow > 1) {
+      onSizeChangeRef.current({
+        width: size.width,
+        height: size.height + overflow,
+      });
+    }
+  }, [text, fontSize, size.width, size.height, disabled]);
+
   const handleDragStop = useCallback(
     (_e: unknown, d: { x: number; y: number }) => {
       // Store CSS values directly - no conversion
@@ -148,6 +168,7 @@ export default function DraggableText({
       }}
     >
       <div
+        ref={contentRef}
         onClick={handleClick}
         className={`w-full h-full flex flex-col items-center justify-center text-center overflow-hidden rounded ${
           disabled
